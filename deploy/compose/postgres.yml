@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-latest}
+    container_name: ${EMPIRE_POSTGRES_CONTAINER:-empire-postgres}
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+
+    volumes:
+      - ${EMPIRE_POSTGRES_DATA_DIR}:/var/lib/postgresql
+      - ../../db/seed:/seed:ro
+
+    networks:
+      - empire-net
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

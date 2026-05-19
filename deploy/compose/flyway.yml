@@ -1,0 +1,28 @@
+services:
+  flyway:
+    image: flyway/flyway:${FLYWAY_VERSION:-latest}
+    container_name: ${EMPIRE_FLYWAY_CONTAINER:-empire-flyway}
+
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      FLYWAY_USER: ${POSTGRES_USER}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
+
+      FLYWAY_DEFAULT_SCHEMA: ${FLYWAY_DEFAULT_SCHEMA}
+      FLYWAY_SCHEMAS: ${FLYWAY_SCHEMAS}
+      FLYWAY_LOCATIONS: ${FLYWAY_LOCATIONS}
+
+      FLYWAY_CONNECT_RETRIES: ${FLYWAY_CONNECT_RETRIES:-20}
+      FLYWAY_BASELINE_ON_MIGRATE: ${FLYWAY_BASELINE_ON_MIGRATE:-true}
+      FLYWAY_VALIDATE_MIGRATION_NAMING: ${FLYWAY_VALIDATE_MIGRATION_NAMING:-true}
+
+    volumes:
+      - ../../db/flyway/sql:/flyway/sql:ro
+      - ../../db/seed:/seed:ro
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - empire-net

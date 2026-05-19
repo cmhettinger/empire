@@ -1,0 +1,28 @@
+# OS / editor
+.DS_Store
+.vscode/
+
+# Python (future)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.poetry/
+.venv/
+
+# real env files
+deploy/env/*.env
+!deploy/env/*.example.env
+
+# Log files
+*.log
+
+# support files
+/tools/db/postgresql-jdbc.jar
+/tools/db/.cache/
+
+# ------------------------------------------------------------------
+# Build / generated artifacts (all apps)
+# ------------------------------------------------------------------
+build/
+tmp/

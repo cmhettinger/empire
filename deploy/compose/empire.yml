@@ -1,0 +1,10 @@
+name: empire
+
+networks:
+  empire-net:
+    name: ${EMPIRE_DOCKER_NETWORK:-empire-net}
+
+include:
+  - postgres.yml
+  - pgbouncer.yml
+  - flyway.yml
