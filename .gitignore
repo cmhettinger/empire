@@ -1,5 +1,6 @@
 # OS / editor
 .DS_Store
+.idea/
 .vscode/
 
 # Python (future)
@@ -20,6 +21,7 @@ deploy/env/*.env
 # support files
 /tools/db/postgresql-jdbc.jar
 /tools/db/.cache/
+.airflowignore
 
 # ------------------------------------------------------------------
 # Build / generated artifacts (all apps)

@@ -1,0 +1,128 @@
+x-airflow-common: &airflow-common
+  build:
+    context: ../docker/airflow
+    dockerfile: Dockerfile
+
+  image: ${EMPIRE_AIRFLOW_IMAGE}
+
+  user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
+
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?options=-csearch_path%3Dairflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?options=-csearch_path%3Dairflow
+
+    AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+    AIRFLOW__CELERY__WORKER_CONCURRENCY: ${AIRFLOW_WORKER_CONCURRENCY:-2}
+
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_API_AUTH_JWT_SECRET}
+    AIRFLOW__API__SECRET_KEY: ${AIRFLOW_API_SECRET_KEY}
+
+    AIRFLOW__API__BASE_URL: http://airflow-api:8080
+    AIRFLOW__WEBSERVER__BASE_URL: http://localhost:${AIRFLOW_HOST_PORT:-8080}
+
+    AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: ${AIRFLOW_DAG_REFRESH_INTERVAL:-5}
+    AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL: ${AIRFLOW_DAG_MIN_FILE_PROCESS_INTERVAL:-5}
+
+  volumes:
+    - ../../dags:/opt/airflow/dags
+    - ${EMPIRE_AIRFLOW_LOGS_DIR}:/opt/airflow/logs
+    - ${EMPIRE_AIRFLOW_PLUGINS_DIR}:/opt/airflow/plugins
+    - ${EMPIRE_OUTPUT_DIR}:/opt/empire/output
+
+  depends_on:
+    postgres:
+      condition: service_healthy
+    pgbouncer:
+      condition: service_started
+    redis:
+      condition: service_healthy
+
+  networks:
+    - empire-net
+
+services:
+  redis:
+    image: redis:${REDIS_VERSION}
+    container_name: ${EMPIRE_REDIS_CONTAINER}
+    restart: unless-stopped
+    command: redis-server --appendonly no
+
+    networks:
+      - empire-net
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: ${EMPIRE_AIRFLOW_INIT_CONTAINER:-empire-airflow-init}
+    restart: "no"
+
+    environment:
+      <<: *airflow-common-env
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?options=-csearch_path%3Dairflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?options=-csearch_path%3Dairflow
+
+    command:
+      - bash
+      - -lc
+      - >
+          set -euo pipefail;
+          echo "==> Airflow DB migrate";
+          airflow db migrate;
+          echo "==> Airflow connection: empiredb";
+          airflow connections delete empiredb || true;
+          airflow connections add empiredb
+          --conn-type postgres
+          --conn-host pgbouncer
+          --conn-port 5432
+          --conn-schema "$$POSTGRES_DB"
+          --conn-login "$$POSTGRES_USER"
+          --conn-password "$$POSTGRES_PASSWORD";
+          airflow connections get empiredb;
+          echo "==> Airflow init complete";
+
+  airflow-api:
+    <<: *airflow-common
+    container_name: ${EMPIRE_AIRFLOW_API_CONTAINER:-empire-airflow-api}
+    restart: unless-stopped
+    ports:
+      - "${AIRFLOW_HOST_PORT:-8080}:8080"
+    command: api-server
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: ${EMPIRE_AIRFLOW_SCHEDULER_CONTAINER:-empire-airflow-scheduler}
+    restart: unless-stopped
+    command: scheduler
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: ${EMPIRE_AIRFLOW_DAG_PROCESSOR_CONTAINER:-empire-airflow-dag-processor}
+    restart: unless-stopped
+    command: dag-processor
+
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: ${EMPIRE_AIRFLOW_TRIGGERER_CONTAINER:-empire-airflow-triggerer}
+    restart: unless-stopped
+    command: triggerer
+
+  airflow-worker:
+    <<: *airflow-common
+    container_name: ${EMPIRE_AIRFLOW_WORKER_CONTAINER:-empire-airflow-worker}
+    restart: unless-stopped
+    command: celery worker

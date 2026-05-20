@@ -8,3 +8,4 @@ include:
   - postgres.yml
   - pgbouncer.yml
   - flyway.yml
+  - airflow.yml
