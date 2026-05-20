@@ -24,5 +24,8 @@ db-validate: ## Validate Flyway migrations
 db-clean: ## Drop all objects in Flyway schemas
 	$(COMPOSE) run --rm flyway clean
 
+db-repair: ## Repair Flyway
+	$(COMPOSE) run --rm flyway repair
+
 db-psql: ## Open psql against Postgres
 	$(COMPOSE) exec postgres sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
