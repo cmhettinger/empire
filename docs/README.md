@@ -1,9 +1,10 @@
 # Overview and Getting Started
 
-This document serves as the **entry point** for navigating all documentation in the
+This document serves as the **entry point** for navigating documentation in the
 `empire` repository.
 
-It takes you from a fresh clone of the repository to a working local database and your first successful migrations.
+It takes you from a fresh clone of the repository to a working local environment,
+including PostgreSQL, Flyway, and Airflow.
 
 No prior context is assumed.
 
@@ -13,7 +14,7 @@ No prior context is assumed.
 
 - The `docs/` tree is canonical.
 - Every directory contains a `README.md`.
-- If a directory has one document, it **is** `README.md`.
+- If a directory contains a single document, it **is** `README.md`.
 
 ---
 
@@ -28,7 +29,7 @@ You will need:
 - Poetry
 - rsync
 
-Install rsync:
+Install `rsync`:
 
 ```bash
 brew install rsync
@@ -64,19 +65,19 @@ Create:
 deploy/env/local.env
 ```
 
-by starting from the example:
+from the example:
 
 ```bash
 cp deploy/env/local.example.env deploy/env/local.env
 ```
 
-Review and update any values as needed.
+Review and update values as needed.
 
 ### Important Variables
 
 #### PostgreSQL / Docker
 
-These are consumed by Docker Compose and Flyway:
+Consumed by Docker Compose, Flyway, and Airflow:
 
 ```text
 POSTGRES_DB
@@ -90,7 +91,7 @@ EMPIRE_POSTGRES_DATA_DIR
 
 #### PgBouncer
 
-These are consumed by PgBouncer:
+Consumed by PgBouncer:
 
 ```text
 PGBOUNCER_VERSION
@@ -102,7 +103,7 @@ PGBOUNCER_DEFAULT_POOL_SIZE
 
 #### Flyway
 
-These are consumed by Flyway:
+Consumed by Flyway:
 
 ```text
 FLYWAY_VERSION
@@ -111,11 +112,71 @@ FLYWAY_SCHEMAS
 FLYWAY_LOCATIONS
 ```
 
+#### Airflow
+
+Consumed by Airflow:
+
+```text
+AIRFLOW_FERNET_KEY
+AIRFLOW_API_AUTH_JWT_SECRET
+AIRFLOW_API_SECRET_KEY
+
+AIRFLOW_UID
+AIRFLOW_GID
+
+AIRFLOW_DAG_REFRESH_INTERVAL
+AIRFLOW_DAG_MIN_FILE_PROCESS_INTERVAL
+```
+
+> Secrets **must not** be committed to git.
+
 ---
 
-## Start the Local Database
+## Generate Required Secrets
 
-From the repository root:
+Before starting Airflow, generate required secrets.
+
+### Generate Fernet Key
+
+Used for Airflow credential encryption.
+
+```bash
+docker run --rm apache/airflow:3.2.1 \
+  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+### Generate JWT/API Secrets
+
+Generate two separate secrets:
+
+```bash
+openssl rand -hex 32
+openssl rand -hex 32
+```
+
+Update:
+
+```text
+deploy/env/local.env
+```
+
+with:
+
+```env
+AIRFLOW_FERNET_KEY=<generated_fernet_key>
+AIRFLOW_API_AUTH_JWT_SECRET=<openssl_output>
+AIRFLOW_API_SECRET_KEY=<openssl_output>
+```
+
+---
+
+## First-Time Local Setup
+
+For a fresh clone, initialize the environment in this order.
+
+### 1. Start Database Services
+
+Start PostgreSQL and PgBouncer:
 
 ```bash
 make db-up
@@ -127,27 +188,21 @@ Verify:
 make db-ps
 ```
 
-View logs:
+Optional logs:
 
 ```bash
 make db-logs
 ```
 
-Connect with `psql`:
+Optional `psql` connection:
 
 ```bash
 make db-psql
 ```
 
-Stop the database:
-
-```bash
-make db-down
-```
-
 ---
 
-## Apply Database Migrations
+### 2. Apply Database Migrations
 
 Flyway migrations create:
 
@@ -189,6 +244,163 @@ make db-migrate
 
 ---
 
+### 3. Build the Airflow Image
+
+This installs Python dependencies from:
+
+```text
+deploy/docker/airflow/airflow-requirements.txt
+```
+
+Build:
+
+```bash
+make airflow-build
+```
+
+---
+
+### 4. Initialize Airflow Metadata
+
+Initialize or upgrade Airflow metadata and create required connections:
+
+```bash
+make airflow-init
+```
+
+---
+
+### 5. Start the Airflow Stack
+
+Start Redis + Airflow services:
+
+```bash
+make airflow-up
+```
+
+Verify:
+
+```bash
+make airflow-ps
+```
+
+Access the UI:
+
+```text
+http://localhost:8080
+```
+
+Verify DAG visibility:
+
+```bash
+make airflow-dags
+```
+
+If successful, you now have:
+
+- PostgreSQL running
+- PgBouncer running
+- Flyway initialized
+- Airflow initialized
+- Celery executor working
+- Redis running
+- DAG processing enabled
+
+You are ready to begin development.
+
+---
+
+## Daily Development Workflow
+
+After the initial setup succeeds, you normally do **not** need to repeat the initialization sequence.
+
+Start the full environment:
+
+```bash
+make empire-up
+```
+
+Check status:
+
+```bash
+make empire-ps
+```
+
+Tail logs:
+
+```bash
+make empire-logs
+```
+
+Stop everything:
+
+```bash
+make empire-down
+```
+
+---
+
+## Airflow Development Notes
+
+### DAG Updates
+
+Changes under:
+
+```text
+dags/
+```
+
+are automatically detected by Airflow.
+
+No rebuild is required.
+
+---
+
+### Adding Python Libraries
+
+If you add dependencies to:
+
+```text
+deploy/docker/airflow/airflow-requirements.txt
+```
+
+Rebuild and recreate Airflow:
+
+```bash
+make airflow-build
+make airflow-recreate
+```
+
+---
+
+### Inspect Installed Packages
+
+List installed Python packages:
+
+```bash
+make airflow-pip-list
+```
+
+Freeze exact versions:
+
+```bash
+make airflow-pip-freeze
+```
+
+Show details for a package:
+
+```bash
+make airflow-pip-show PKG=<package>
+```
+
+Example:
+
+```bash
+make airflow-pip-show PKG=yfinance
+```
+
+---
+
 ## Flyway Migration Conventions
 
 Empire uses **versioned migrations only**.
@@ -223,38 +435,4 @@ Example:
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS core;
-
-CREATE TABLE core.example (
-    example_id BIGSERIAL PRIMARY KEY,
-    created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 ```
-
----
-
-## First-Time Local Setup
-
-For a fresh clone:
-
-```bash
-cp deploy/env/local.example.env deploy/env/local.env
-```
-
-Edit configuration as needed.
-
-Then:
-
-```bash
-make db-up
-make db-migrate
-make db-info
-```
-
-If successful, you now have:
-
-- PostgreSQL running
-- PgBouncer running
-- Empire schemas created
-- Flyway initialized
-
-You are ready to begin development.
