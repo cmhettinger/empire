@@ -1,7 +1,7 @@
 x-airflow-common: &airflow-common
   build:
-    context: ../docker/airflow
-    dockerfile: Dockerfile
+    context: ../..
+    dockerfile: deploy/docker/airflow/Dockerfile
 
   image: ${EMPIRE_AIRFLOW_IMAGE}
 
@@ -29,6 +29,15 @@ x-airflow-common: &airflow-common
 
     AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: ${AIRFLOW_DAG_REFRESH_INTERVAL:-5}
     AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL: ${AIRFLOW_DAG_MIN_FILE_PROCESS_INTERVAL:-5}
+
+    EMPIRE_MAIL_SMTP_HOST: ${EMPIRE_MAIL_SMTP_HOST}
+    EMPIRE_MAIL_SMTP_PORT: ${EMPIRE_MAIL_SMTP_PORT:-587}
+    EMPIRE_MAIL_SMTP_STARTTLS: ${EMPIRE_MAIL_SMTP_STARTTLS:-true}
+    EMPIRE_MAIL_SMTP_SSL: ${EMPIRE_MAIL_SMTP_SSL:-false}
+    EMPIRE_MAIL_USERNAME: ${EMPIRE_MAIL_USERNAME}
+    EMPIRE_MAIL_PASSWORD: ${EMPIRE_MAIL_PASSWORD}
+    EMPIRE_MAIL_FROM: ${EMPIRE_MAIL_FROM}
+    EMPIRE_MAIL_TO_DEFAULT: ${EMPIRE_MAIL_TO_DEFAULT}
 
   volumes:
     - ../../dags:/opt/airflow/dags
