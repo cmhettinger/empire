@@ -9,7 +9,8 @@ delivery, or Airflow-specific code.
 
 ## Configuration
 
-Empire uses one shared environment file at the repository root: `local.env`.
+Empire uses shared environment files under `deploy/env/`. For local Mac
+development, the active file is `deploy/env/local.env`.
 Reusable packages do not load that file themselves, and `empire-mail` does not
 look for package-local `.env` files. The runtime layer that starts the process,
 such as Docker Compose, shell scripts, Airflow, or a CLI, is responsible for
@@ -32,7 +33,8 @@ If `to` is omitted when sending, `EMPIRE_MAIL_TO_DEFAULT` is used.
 
 Gmail SMTP works with an app password on accounts where app passwords are
 enabled. In Empire local development, place these values in the shared
-repo-root `local.env` or export them in your shell before running the process.
+`deploy/env/local.env` file or export them in your shell before running the
+process.
 
 ```dotenv
 EMPIRE_MAIL_SMTP_HOST=smtp.gmail.com
@@ -82,7 +84,7 @@ send_report_email(
 ## Manual smoke tests
 
 These commands send real email. Run them from the repository root after
-populating the shared `local.env` file.
+populating `deploy/env/local.env`.
 
 Load the shared Empire environment into the current shell:
 

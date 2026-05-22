@@ -10,7 +10,7 @@ Description:
   Loads an Empire environment file into the current shell.
 
 Environment file:
-  ./local.env by default
+  ./deploy/env/local.env by default
 
 Examples:
   source bin/env-load
@@ -38,7 +38,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   exit 1
 fi
 
-ENV_FILE="${1:-local.env}"
+ENV_FILE="${1:-deploy/env/local.env}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "ERROR: env file not found: ${ENV_FILE}" >&2

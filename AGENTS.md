@@ -99,10 +99,11 @@ If code may be reused, it belongs in `packages/`.
 
 ## Environment Configuration
 
-Empire uses ONE shared environment file at repository root:
+Empire uses shared environment files under `deploy/env/`. For local development,
+the active file is:
 
 ```text
-local.env
+deploy/env/local.env
 ```
 
 ### Rules
@@ -117,7 +118,7 @@ Reusable packages MUST NOT:
 
 - Load `.env` files internally
 - Use `python-dotenv`
-- Assume paths to `local.env`
+- Assume paths to files under `deploy/env/`
 - Depend on repo filesystem structure
 - Own environment loading
 
@@ -143,7 +144,7 @@ db_host = os.environ["EMPIRE_DB_HOST"]
 from dotenv import load_dotenv
 
 load_dotenv()
-load_dotenv("local.env")
+load_dotenv("deploy/env/local.env")
 ```
 
 ---
