@@ -115,6 +115,14 @@ echo "hello,report" > /tmp/empire-mail-report.csv
 poetry run python -c 'from empire_mail import send_report_email; send_report_email(subject="Empire report email test", text="Attached is a test report.", report_path="/tmp/empire-mail-report.csv")'
 ```
 
+Test an email to two recipients with two attachments:
+
+```bash
+echo "first,report" > /tmp/empire-mail-report-1.csv
+echo "second,report" > /tmp/empire-mail-report-2.csv
+poetry run python -c 'from empire_mail import send_email; send_email(to=["person-one@example.com", "person-two@example.com"], subject="Empire multi-recipient attachment test", text="Attached are two test reports.", attachments=["/tmp/empire-mail-report-1.csv", "/tmp/empire-mail-report-2.csv"])'
+```
+
 Pass `to="recipient@example.com"` to any helper to override
 `EMPIRE_MAIL_TO_DEFAULT`.
 
