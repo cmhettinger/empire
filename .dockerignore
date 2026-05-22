@@ -1,0 +1,16 @@
+.git
+.DS_Store
+
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+build/
+tmp/
+data/
+
+deploy/env/*.env
+!deploy/env/*.example.env
