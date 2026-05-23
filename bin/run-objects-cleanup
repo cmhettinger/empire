@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/run-objects-cleanup RUN_ID [--env-file PATH] [--dry-run]
+
+Description:
+  Deletes active stored objects associated with one run_id.
+
+  Physical files are deleted and core.stored_object rows are marked deleted.
+  The core.core_run row is left in place as lineage/history.
+
+Examples:
+  bin/run-objects-cleanup 79f89602-0e85-4765-84b7-82c6284b4fb6 --dry-run
+  bin/run-objects-cleanup 79f89602-0e85-4765-84b7-82c6284b4fb6
+
+Options:
+  --env-file PATH  Load an environment file before running.
+                   Defaults to deploy/env/local.env.
+  --dry-run        Print what would be cleaned without deleting files or
+                   updating database rows.
+  -h, --help       Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+DRY_RUN="false"
+RUN_ID=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -*)
+      echo "ERROR: unknown argument: $1" >&2
+      echo >&2
+      usage >&2
+      exit 1
+      ;;
+    *)
+      if [[ -n "${RUN_ID}" ]]; then
+        echo "ERROR: only one RUN_ID may be provided." >&2
+        exit 1
+      fi
+      RUN_ID="$1"
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "${RUN_ID}" ]]; then
+  echo "ERROR: RUN_ID is required." >&2
+  echo >&2
+  usage >&2
+  exit 1
+fi
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "ERROR: env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${REPO_ROOT}/packages/empire-core/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-core/src${PYTHONPATH:+:${PYTHONPATH}}"
+export EMPIRE_CLEANUP_RUN_OBJECTS_RUN_ID="${RUN_ID}"
+export EMPIRE_CLEANUP_RUN_OBJECTS_DRY_RUN="${DRY_RUN}"
+
+"${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-core/src/empire_core/scripts/cleanup_run_objects.py"

@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/init-storage-roots [--env-file PATH] [--create-dirs] [--dry-run]
+
+Description:
+  Initializes core.storage_root rows from EMPIRE_STORAGE_ROOT_* environment
+  variables. Root names are derived from the suffix:
+
+    EMPIRE_STORAGE_ROOT_GLOBAL=/path/to/global  -> root_name = global
+    EMPIRE_STORAGE_ROOT_JELLYFIN=/path/to/video -> root_name = jellyfin
+
+Options:
+  --env-file PATH  Load an environment file before running.
+                   Defaults to deploy/env/local.env.
+  --create-dirs    Create root directories if they do not exist.
+                   Useful for local dev. Use carefully on servers with mounts.
+  --dry-run        Print planned changes without touching the filesystem or DB.
+  -h, --help       Show this help message.
+
+Prerequisites:
+  - Database services are running.
+  - Flyway migrations have created core.storage_root.
+  - packages/empire-core dependencies are installed.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+CREATE_DIRS="false"
+DRY_RUN="false"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    --create-dirs)
+      CREATE_DIRS="true"
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown argument: $1" >&2
+      echo >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "ERROR: env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${REPO_ROOT}/packages/empire-core/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-core/src${PYTHONPATH:+:${PYTHONPATH}}"
+export EMPIRE_INIT_STORAGE_ROOTS_CREATE_DIRS="${CREATE_DIRS}"
+export EMPIRE_INIT_STORAGE_ROOTS_DRY_RUN="${DRY_RUN}"
+
+"${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-core/src/empire_core/scripts/init_storage_roots.py"

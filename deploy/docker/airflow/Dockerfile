@@ -9,3 +9,7 @@ RUN pip install --no-cache-dir -r /requirements.txt
 COPY packages/empire-mail /opt/empire/packages/empire-mail
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-mail
+
+COPY packages/empire-core /opt/empire/packages/empire-core
+
+RUN pip install --no-cache-dir /opt/empire/packages/empire-core

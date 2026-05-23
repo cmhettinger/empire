@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/run-objects-purge RUN_ID [--env-file PATH] [--ignore-purge-after] [--dry-run]
+
+Description:
+  Purges deleted stored-object metadata associated with one run_id.
+
+  Only objects already marked deleted are eligible. Active objects are not
+  deleted or purged by this script.
+
+Examples:
+  bin/run-objects-purge 79f89602-0e85-4765-84b7-82c6284b4fb6 --dry-run
+  bin/run-objects-purge 79f89602-0e85-4765-84b7-82c6284b4fb6
+  bin/run-objects-purge 79f89602-0e85-4765-84b7-82c6284b4fb6 --ignore-purge-after
+
+Options:
+  --env-file PATH        Load an environment file before running.
+                         Defaults to deploy/env/local.env.
+  --ignore-purge-after   Purge deleted rows for the run immediately, even when
+                         purge_after is in the future.
+  --dry-run              Print what would be purged without changing metadata.
+  -h, --help             Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+DRY_RUN="false"
+IGNORE_PURGE_AFTER="false"
+RUN_ID=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    --ignore-purge-after)
+      IGNORE_PURGE_AFTER="true"
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -*)
+      echo "ERROR: unknown argument: $1" >&2
+      echo >&2
+      usage >&2
+      exit 1
+      ;;
+    *)
+      if [[ -n "${RUN_ID}" ]]; then
+        echo "ERROR: only one RUN_ID may be provided." >&2
+        exit 1
+      fi
+      RUN_ID="$1"
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "${RUN_ID}" ]]; then
+  echo "ERROR: RUN_ID is required." >&2
+  echo >&2
+  usage >&2
+  exit 1
+fi
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "ERROR: env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${REPO_ROOT}/packages/empire-core/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-core/src${PYTHONPATH:+:${PYTHONPATH}}"
+export EMPIRE_PURGE_RUN_OBJECTS_RUN_ID="${RUN_ID}"
+export EMPIRE_PURGE_RUN_OBJECTS_DRY_RUN="${DRY_RUN}"
+export EMPIRE_PURGE_RUN_OBJECTS_IGNORE_PURGE_AFTER="${IGNORE_PURGE_AFTER}"
+
+"${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-core/src/empire_core/scripts/purge_run_objects.py"

@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "empire-core"
+version = "0.1.0"
+description = "Lightweight Empire platform services for run context and object storage."
+authors = ["Empire"]
+readme = "README.md"
+packages = [{ include = "empire_core", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+psycopg = { version = "^3.2.0", extras = ["binary"] }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

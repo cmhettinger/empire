@@ -128,6 +128,25 @@ AIRFLOW_DAG_REFRESH_INTERVAL
 AIRFLOW_DAG_MIN_FILE_PROCESS_INTERVAL
 ```
 
+#### Empire Core
+
+Consumed by `packages/empire-core` and operational scripts:
+
+```text
+EMPIRE_DB_HOST
+EMPIRE_DB_PORT
+EMPIRE_DB_NAME
+EMPIRE_DB_USER
+EMPIRE_DB_PASSWORD
+
+EMPIRE_OBJECT_STORE_TOMBSTONE_DAYS
+EMPIRE_STORAGE_ROOT_GLOBAL
+EMPIRE_STORAGE_ROOT_JELLYFIN
+```
+
+Storage root variables are environment-specific filesystem paths. They are
+upserted into `core.storage_root` after Flyway migrations run.
+
 > Secrets **must not** be committed to git.
 
 ---
@@ -244,7 +263,104 @@ make db-migrate
 
 ---
 
-### 3. Build the Airflow Image
+### 3. Initialize Empire Core Storage Roots
+
+Empire object storage roots are environment-specific and are not hardcoded in
+Flyway migrations. Configure them in:
+
+```text
+deploy/env/local.env
+```
+
+For local development, the initial roots are:
+
+```env
+EMPIRE_STORAGE_ROOT_GLOBAL=/Users/chris/Documents/project/empire/empire-object-store/global
+EMPIRE_STORAGE_ROOT_JELLYFIN=/Users/chris/Documents/project/empire/empire-object-store/jellyfin
+```
+
+Initialize or update `core.storage_root` from the environment:
+
+```bash
+bin/init-storage-roots
+```
+
+For a first local setup, create the directories too:
+
+```bash
+bin/init-storage-roots --create-dirs
+```
+
+On a server with mounted storage, make sure mounts exist first and run without
+`--create-dirs` to avoid accidentally creating plain local directories where a
+mount was expected.
+
+Preview without touching the filesystem or database:
+
+```bash
+bin/init-storage-roots --dry-run
+```
+
+The script maps variable suffixes to stable root names:
+
+```text
+EMPIRE_STORAGE_ROOT_GLOBAL   -> global
+EMPIRE_STORAGE_ROOT_JELLYFIN -> jellyfin
+```
+
+Use `global` for general shared objects such as weather data and `jellyfin` for
+larger media/video objects.
+
+---
+
+### Run Object Cleanup
+
+Clean active stored objects for a specific run with:
+
+```bash
+bin/run-objects-cleanup <run_id> --dry-run
+bin/run-objects-cleanup <run_id>
+```
+
+For example:
+
+```bash
+bin/run-objects-cleanup 79f89602-0e85-4765-84b7-82c6284b4fb6 --dry-run
+bin/run-objects-cleanup 79f89602-0e85-4765-84b7-82c6284b4fb6
+```
+
+The cleanup script deletes physical files and marks matching
+`core.stored_object` rows deleted. It leaves the `core.core_run` row in place as
+lineage/history.
+
+After cleanup, purge deleted object metadata for a run with:
+
+```bash
+bin/run-objects-purge <run_id> --dry-run
+bin/run-objects-purge <run_id>
+```
+
+By default, purge respects `purge_after`. To purge deleted rows immediately for
+that run:
+
+```bash
+bin/run-objects-purge <run_id> --ignore-purge-after
+```
+
+For local/dev cleanup where the run should be completely removed, use:
+
+```bash
+bin/run-nuke <run_id> --dry-run
+bin/run-nuke <run_id> --yes
+```
+
+`run-nuke` deletes active physical files, purges all deleted object metadata for
+the run immediately, and then deletes the `core.core_run` row. Use it only when
+you intentionally want the run gone from lineage/history.
+
+---
+
+### 4. Build the Airflow Image
 
 This installs Python dependencies from:
 
@@ -260,7 +376,7 @@ make airflow-build
 
 ---
 
-### 4. Initialize Airflow Metadata
+### 5. Initialize Airflow Metadata
 
 Initialize or upgrade Airflow metadata and create required connections:
 
@@ -270,7 +386,7 @@ make airflow-init
 
 ---
 
-### 5. Start the Airflow Stack
+### 6. Start the Airflow Stack
 
 Start Redis + Airflow services:
 
