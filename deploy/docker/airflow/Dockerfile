@@ -13,3 +13,7 @@ RUN pip install --no-cache-dir /opt/empire/packages/empire-mail
 COPY packages/empire-core /opt/empire/packages/empire-core
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-core
+
+COPY packages/empire-youtube /opt/empire/packages/empire-youtube
+
+RUN pip install --no-cache-dir /opt/empire/packages/empire-youtube

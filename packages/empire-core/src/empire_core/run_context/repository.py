@@ -86,8 +86,8 @@ class PostgresRunRepository:
             VALUES (
                 %s, %s, %s, %s,
                 %s, 'started', %s,
-                CASE WHEN %s IS NULL THEN NULL ELSE now() END,
-                CASE WHEN %s IS NULL THEN NULL ELSE now() + (%s * interval '1 second') END,
+                CASE WHEN %s::integer IS NULL THEN NULL ELSE now() END,
+                CASE WHEN %s::integer IS NULL THEN NULL ELSE now() + (%s::integer * interval '1 second') END,
                 %s, %s::jsonb, %s::jsonb
             )
             RETURNING *

@@ -1,0 +1,136 @@
+# empire-youtube
+
+`empire-youtube` provides reusable YouTube metadata scraping utilities for
+Empire.
+
+The package is metadata-only:
+
+- API key authentication through `EMPIRE_YOUTUBE_API_KEY`
+- no OAuth
+- no browser automation
+- no video downloads
+- no thumbnail downloads
+
+Runtime callers provide scraper configuration from a file path, YAML string,
+mapping, or future object-store backed loader. The package does not load `.env`
+files and does not assume where operational config lives in the monorepo.
+
+## Language Filtering
+
+`youtube.filters.language` is sent to YouTube search as `relevanceLanguage`.
+After video hydration, videos that declare a different default language or
+default audio language are excluded. Videos with no declared language are kept,
+because many valid English videos do not populate those metadata fields.
+
+## API Usage
+
+Topic discovery uses `search.list` and is throttled by default to one search
+request every seven seconds. Followed channels use each channel's public uploads
+playlist instead of `search.list`, then apply the configured lookback window
+after video hydration.
+
+## Channel Resolver
+
+Use the repo-level helper to resolve a YouTube handle, channel id, or search
+query into a config-ready channel block:
+
+```bash
+bin/youtube-resolve-channel @grahamhancock
+bin/youtube-resolve-channel @allin
+bin/youtube-resolve-channel @TheRandallCarlson
+```
+
+Example output:
+
+```yaml
+channel_name: Graham Hancock Official Channel
+channel_id: UCk_foUwmaHeFhmAZMnEHQsw
+handle: '@grahamhancock'
+enabled: true
+```
+
+Paste the output under `youtube.followed_channels` in:
+
+```text
+deploy/config/youtube/daily.yml
+```
+
+## Output Contract
+
+The scraper returns one consolidated JSON payload for downstream reports and
+storage:
+
+```json
+{
+  "source": "youtube",
+  "schema_version": 1,
+  "generated_at": "2026-05-23T22:00:00Z",
+  "window_hours": 26,
+  "run_id": "d7e5c5f9-6a5c-4f18-9b1d-8fd1c0d2f92f",
+  "config": {
+    "name": "daily_youtube_scraper",
+    "version": 1
+  },
+  "videos": []
+}
+```
+
+Each video includes normalized metadata, thumbnails, statistics, YouTube-specific
+fields, and discovery provenance such as matched sections, topics, queries,
+channels, and discovery sources.
+
+## Object Store Output
+
+Empire-backed runs write normalized JSON to the object store by default:
+
+```text
+youtube/daily/YYYY/MM/DD/{run_id}/youtube-scraper.json
+```
+
+The object metadata uses:
+
+```text
+domain = youtube
+object_kind = normalized_payload
+content_type = application/json
+```
+
+For local debugging, callers can also write a result to an explicit filesystem
+path:
+
+```python
+from empire_youtube import write_result_to_file
+
+write_result_to_file(result, "build/youtube/youtube-scraper.json")
+```
+
+## Scraper Runner
+
+Run the daily scraper from the repo-level helper:
+
+```bash
+bin/youtube-scrape
+```
+
+By default, config is loaded from the Empire object store using logical name
+`youtube-daily-config`, and output is written back to the object store.
+
+Publish the local config into object store with:
+
+```bash
+bin/youtube-put-config deploy/config/youtube/daily.yml
+```
+
+For local bootstrap or development, pass a config file explicitly:
+
+```bash
+bin/youtube-scrape --config-file deploy/config/youtube/daily.yml
+```
+
+To bypass object-store output for local debugging, provide an output file:
+
+```bash
+bin/youtube-scrape \
+  --config-file deploy/config/youtube/daily.yml \
+  --output-file /tmp/youtube-scraper.json
+```

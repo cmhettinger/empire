@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/youtube-resolve-channel CHANNEL [--env-file PATH]
+
+Description:
+  Resolves a YouTube channel id, handle, or search query into channel metadata.
+
+Examples:
+  bin/youtube-resolve-channel @grahamhancock
+  bin/youtube-resolve-channel UCESLZhusAkFfsNsApnjF_Cg
+  bin/youtube-resolve-channel "All-In Podcast"
+
+Options:
+  --env-file PATH  Load an environment file before running.
+                   Defaults to deploy/env/local.env.
+  -h, --help       Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+CHANNEL=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -*)
+      if [[ -z "${CHANNEL}" ]]; then
+        CHANNEL="$1"
+        shift
+      else
+        echo "ERROR: unknown argument: $1" >&2
+        echo >&2
+        usage >&2
+        exit 1
+      fi
+      ;;
+    *)
+      if [[ -n "${CHANNEL}" ]]; then
+        echo "ERROR: only one CHANNEL may be provided." >&2
+        exit 1
+      fi
+      CHANNEL="$1"
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "${CHANNEL}" ]]; then
+  echo "ERROR: CHANNEL is required." >&2
+  echo >&2
+  usage >&2
+  exit 1
+fi
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "ERROR: env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${REPO_ROOT}/packages/empire-youtube/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-youtube/src${PYTHONPATH:+:${PYTHONPATH}}"
+
+if ! "${PYTHON_BIN}" -c 'import requests, yaml' >/dev/null 2>&1; then
+  echo "ERROR: empire-youtube dependencies are not installed for ${PYTHON_BIN}." >&2
+  echo "       Run: cd packages/empire-youtube && poetry install" >&2
+  exit 1
+fi
+
+"${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-youtube/src/empire_youtube/scripts/resolve_channel.py" "${CHANNEL}"

@@ -201,7 +201,7 @@ class PostgresObjectRepository:
             WHERE o.domain = %s
               AND o.logical_name = %s
               AND o.deleted_at IS NULL
-              AND (%s IS NULL OR o.object_scope = %s)
+              AND (%s::text IS NULL OR o.object_scope = %s)
             ORDER BY o.created_at DESC
             """,
             (domain, logical_name, object_scope, object_scope),

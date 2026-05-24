@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/youtube-scrape [--config-file PATH] [--config-object-id OBJECT_ID]
+                     [--config-logical-name NAME] [--output-file PATH]
+                     [--env-file PATH]
+
+Description:
+  Runs the YouTube scraper and writes normalized JSON to the Empire object store.
+
+  By default, scraper config is loaded from the object store using logical name:
+    youtube-daily-config
+
+Examples:
+  bin/youtube-scrape
+  bin/youtube-scrape --config-file deploy/config/youtube/daily.yml
+  bin/youtube-scrape --config-file deploy/config/youtube/daily.yml --output-file /tmp/youtube-scraper.json
+  bin/youtube-scrape --config-logical-name youtube-daily-config
+
+Options:
+  --config-file PATH          Load scraper config from a local YAML file.
+  --config-object-id ID       Load scraper config from a specific stored object id.
+  --config-logical-name NAME  Load scraper config from an object-store logical name.
+                              Defaults to youtube-daily-config.
+  --output-file PATH          Write normalized JSON to this filesystem path instead
+                              of the Empire object store.
+  --env-file PATH             Load an environment file before running.
+                              Defaults to deploy/env/local.env.
+  --run-type TYPE             Empire run type. Defaults to cli.
+  --runner NAME               Runner name recorded in run context.
+  -h, --help                  Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "ERROR: env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${REPO_ROOT}/packages/empire-youtube/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-youtube/src${PYTHONPATH:+:${PYTHONPATH}}"
+
+if ! "${PYTHON_BIN}" -c 'import empire_core, requests, yaml' >/dev/null 2>&1; then
+  echo "ERROR: empire-youtube dependencies are not installed for ${PYTHON_BIN}." >&2
+  echo "       Run: cd packages/empire-youtube && poetry install" >&2
+  exit 1
+fi
+
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+  "${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-youtube/src/empire_youtube/scripts/scrape.py"
+else
+  "${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-youtube/src/empire_youtube/scripts/scrape.py" "${ARGS[@]}"
+fi
