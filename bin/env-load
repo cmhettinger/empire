@@ -7,7 +7,7 @@ Usage:
   . bin/env-load [ENV_FILE]
 
 Description:
-  Loads an Empire environment file into the current shell.
+  Loads an Empire environment file into the CURRENT shell (mac/local dev).
 
 Environment file:
   ./deploy/env/local.env by default
@@ -26,12 +26,26 @@ IMPORTANT:
 EOF
 }
 
+is_sourced() {
+  if [[ -n "${ZSH_VERSION:-}" ]]; then
+    [[ "${ZSH_EVAL_CONTEXT:-}" == *:file* ]]
+    return
+  fi
+
+  if [[ -n "${BASH_VERSION:-}" ]]; then
+    [[ "${BASH_SOURCE[0]}" != "$0" ]]
+    return
+  fi
+
+  return 1
+}
+
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   usage
   return 0 2>/dev/null || exit 0
 fi
 
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+if ! is_sourced; then
   echo "ERROR: env-load must be sourced, not executed." >&2
   echo >&2
   usage >&2
