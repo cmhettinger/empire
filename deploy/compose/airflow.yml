@@ -39,6 +39,7 @@ x-airflow-common: &airflow-common
     EMPIRE_STORAGE_ROOT_GLOBAL: ${EMPIRE_STORAGE_ROOT_GLOBAL}
     EMPIRE_STORAGE_ROOT_JELLYFIN: ${EMPIRE_STORAGE_ROOT_JELLYFIN}
     EMPIRE_STORAGE_KEY_YOUTUBE: ${EMPIRE_STORAGE_KEY_YOUTUBE}
+    EMPIRE_TEMP_DIR: ${EMPIRE_TEMP_DIR}
 
     EMPIRE_YOUTUBE_API_KEY: ${EMPIRE_YOUTUBE_API_KEY}
 
@@ -58,6 +59,7 @@ x-airflow-common: &airflow-common
     - ${EMPIRE_OUTPUT_DIR}:/opt/empire/output
     - ${EMPIRE_STORAGE_ROOT_GLOBAL}:${EMPIRE_STORAGE_ROOT_GLOBAL}
     - ${EMPIRE_STORAGE_ROOT_JELLYFIN}:${EMPIRE_STORAGE_ROOT_JELLYFIN}
+    - ${EMPIRE_TEMP_DIR}:${EMPIRE_TEMP_DIR}
 
   depends_on:
     postgres:
@@ -116,6 +118,9 @@ services:
           --conn-login "$$POSTGRES_USER"
           --conn-password "$$POSTGRES_PASSWORD";
           airflow connections get empiredb;
+          echo "==> Airflow pool: youtube_download";
+          airflow pools set youtube_download "$${EMPIRE_AIRFLOW_POOL_YOUTUBE_DOWNLOAD_SLOTS:-1}" "Serialize YouTube downloads";
+          airflow pools get youtube_download;
           echo "==> Airflow init complete";
 
   airflow-api:

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import tempfile
 from pathlib import Path
 
 from empire_core.exceptions import ValidationError
+from empire_core.object_store.storage.base import FileWriteResult
 
 
 class FilesystemStorageBackend:
@@ -37,6 +39,60 @@ class FilesystemStorageBackend:
                 pass
             raise
         return path
+
+    def write_file(
+        self,
+        object_key: str,
+        filename: str,
+        source_path: str | Path,
+        *,
+        move: bool = True,
+    ) -> FileWriteResult:
+        source = Path(source_path).expanduser().resolve()
+        if not source.is_file():
+            raise ValidationError(f"source_path must be an existing file: {source_path}")
+
+        path = self.resolve_path(object_key, filename)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        checksum = hashlib.sha256()
+        size_bytes = 0
+
+        fd, temp_name = tempfile.mkstemp(
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+        )
+        try:
+            with source.open("rb") as source_file:
+                with os.fdopen(fd, "wb") as temp_file:
+                    while True:
+                        chunk = source_file.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        checksum.update(chunk)
+                        size_bytes += len(chunk)
+                        temp_file.write(chunk)
+                    temp_file.flush()
+                    os.fsync(temp_file.fileno())
+            os.replace(temp_name, path)
+        except Exception:
+            try:
+                os.unlink(temp_name)
+            except FileNotFoundError:
+                pass
+            raise
+
+        if move:
+            try:
+                source.unlink()
+            except FileNotFoundError:
+                pass
+
+        return FileWriteResult(
+            path=path,
+            size_bytes=size_bytes,
+            checksum_sha256=checksum.hexdigest(),
+        )
 
     def read_bytes(self, object_key: str, filename: str) -> bytes:
         return self.resolve_path(object_key, filename).read_bytes()

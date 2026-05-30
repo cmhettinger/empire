@@ -13,6 +13,7 @@ It is intentionally split into:
 | :--- | :--- |
 | High | complete todo list |
 | High | make empire alias in bash |
+| Medium | generate layout and nfo from json |
 | Medium | pull videos from json |
 
 ## Long-Term Domain Tasks

@@ -80,7 +80,7 @@ set -a
 source "${ENV_FILE}"
 set +a
 
-export PYTHONPATH="${REPO_ROOT}/packages/empire-youtube/src${PYTHONPATH:+:${PYTHONPATH}}"
+export PYTHONPATH="${REPO_ROOT}/packages/empire-youtube/src:${REPO_ROOT}/packages/empire-core/src${PYTHONPATH:+:${PYTHONPATH}}"
 
 if ! "${PYTHON_BIN}" -c 'import empire_core, requests, yaml' >/dev/null 2>&1; then
   echo "ERROR: empire-youtube dependencies are not installed for ${PYTHON_BIN}." >&2

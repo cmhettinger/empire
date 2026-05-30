@@ -17,10 +17,10 @@ log = logging.getLogger(__name__)
 @dag(
     dag_id="youtube_daily_scrape",
     start_date=datetime(2026, 5, 24),
-    schedule="@daily",
+    schedule=None,
     catchup=False,
     max_active_runs=1,
-    tags=["youtube", "scraper", "daily"],
+    tags=["youtube", "scraper", "manual"],
 )
 def youtube_daily_scrape():
     @task(task_id="scrape_youtube_metadata")

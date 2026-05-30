@@ -4,23 +4,27 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  bin/youtube-put-config CONFIG_FILE [--logical-name NAME] [--env-file PATH]
+  bin/youtube-process (--input-file PATH | --input-object-id OBJECT_ID | --input-run-id RUN_ID)
+                      [--env-file PATH]
 
 Description:
-  Publishes a local YouTube scraper YAML config file to the Empire object store.
+  Processes YouTube scraper JSON and writes a Jellyfin library plan to the
+  Empire object store.
 
 Examples:
-  bin/youtube-put-config deploy/config/youtube/daily.yml
-  bin/youtube-put-config deploy/config/youtube/daily.yml --logical-name youtube-daily-config
+  bin/youtube-process --input-file /tmp/youtube-scraper.json
+  bin/youtube-process --input-object-id 00000000-0000-0000-0000-000000000000
+  bin/youtube-process --input-run-id 00000000-0000-0000-0000-000000000000
 
 Options:
-  --logical-name NAME  Object-store logical name. Defaults to youtube-daily-config.
-  --filename NAME      Stored filename. Defaults to daily.yml.
-  --storage-root NAME  Object-store root name. Defaults to global.
-  --storage-key KEY    Object key prefix. Defaults to EMPIRE_STORAGE_KEY_YOUTUBE or youtube.
-  --env-file PATH      Load an environment file before running.
-                       Defaults to deploy/env/local.env.
-  -h, --help           Show this help message.
+  --input-file PATH       Read scraper JSON from a local file.
+  --input-object-id ID    Read scraper JSON from a specific stored object id.
+  --input-run-id ID       Read youtube-scraper.json from a prior run.
+  --env-file PATH         Load an environment file before running.
+                          Defaults to deploy/env/local.env.
+  --run-type TYPE         Empire run type. Defaults to cli.
+  --runner NAME           Runner name recorded in run context.
+  -h, --help              Show this help message.
 EOF
 }
 
@@ -71,14 +75,10 @@ set +a
 
 export PYTHONPATH="${REPO_ROOT}/packages/empire-youtube/src:${REPO_ROOT}/packages/empire-core/src${PYTHONPATH:+:${PYTHONPATH}}"
 
-if ! "${PYTHON_BIN}" -c 'import empire_core, requests, yaml' >/dev/null 2>&1; then
+if ! "${PYTHON_BIN}" -c 'import empire_core' >/dev/null 2>&1; then
   echo "ERROR: empire-youtube dependencies are not installed for ${PYTHON_BIN}." >&2
   echo "       Run: cd packages/empire-youtube && poetry install" >&2
   exit 1
 fi
 
-if [[ ${#ARGS[@]} -eq 0 ]]; then
-  "${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-youtube/src/empire_youtube/scripts/put_config.py"
-else
-  "${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-youtube/src/empire_youtube/scripts/put_config.py" "${ARGS[@]}"
-fi
+"${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-youtube/src/empire_youtube/scripts/process.py" "${ARGS[@]}"

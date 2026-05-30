@@ -219,6 +219,25 @@ with EmpireDatabase.connect_from_env() as conn:
     )
 ```
 
+### Storing local files
+
+For larger files, use `put_file()` so the object store streams from an existing
+local file instead of loading all bytes into memory. By default, the source file
+is removed after it is safely written into the storage root. Pass `move=False`
+to copy instead.
+
+```python
+stored = object_store.put_file(
+    run_context=ctx,
+    storage_root="jellyfin",
+    object_key="media/youtube/channel/video-id",
+    filename="movie.mp4",
+    source_path="/tmp/empire-download/movie.mp4",
+    content_type="video/mp4",
+    object_kind="media_asset",
+)
+```
+
 ### Reading bytes
 
 ```python

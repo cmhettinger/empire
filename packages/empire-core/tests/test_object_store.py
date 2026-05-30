@@ -45,6 +45,62 @@ def test_put_and_get_bytes(tmp_path):
     assert store.get_bytes(stored.object_id) == data
 
 
+def test_put_file_moves_source_by_default(tmp_path):
+    store = ObjectStore(InMemoryObjectRepository(str(tmp_path / "store")))
+    ctx = _run_context()
+    source = tmp_path / "download" / "movie.mp4"
+    source.parent.mkdir()
+    source.write_bytes(b"video bytes")
+
+    stored = store.put_file(
+        run_context=ctx,
+        storage_root="test_root",
+        object_key="media/youtube/example",
+        filename="movie.mp4",
+        source_path=source,
+        content_type="video/mp4",
+        object_kind="media_asset",
+    )
+
+    assert not source.exists()
+    assert stored.size_bytes == len(b"video bytes")
+    assert stored.checksum_sha256 == hashlib.sha256(b"video bytes").hexdigest()
+    assert store.get_bytes(stored.object_id) == b"video bytes"
+
+
+def test_put_file_can_copy_source(tmp_path):
+    store = ObjectStore(InMemoryObjectRepository(str(tmp_path / "store")))
+    source = tmp_path / "download" / "movie.mp4"
+    source.parent.mkdir()
+    source.write_bytes(b"video bytes")
+
+    stored = store.put_file(
+        run_context=None,
+        storage_root="test_root",
+        object_key="manual/media",
+        filename="movie.mp4",
+        source_path=source,
+        move=False,
+    )
+
+    assert source.exists()
+    assert stored.object_scope == "manual"
+    assert store.get_bytes(stored.object_id) == b"video bytes"
+
+
+def test_put_file_requires_existing_file(tmp_path):
+    store = ObjectStore(InMemoryObjectRepository(str(tmp_path)))
+
+    with pytest.raises(ValidationError):
+        store.put_file(
+            run_context=None,
+            storage_root="test_root",
+            object_key="manual/media",
+            filename="movie.mp4",
+            source_path=tmp_path / "missing.mp4",
+        )
+
+
 def test_multiple_objects_per_run(tmp_path):
     store = ObjectStore(InMemoryObjectRepository(str(tmp_path)))
     ctx = _run_context()

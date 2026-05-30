@@ -4,3 +4,4 @@ redis
 psycopg2-binary
 requests
 pandas
+yt-dlp[default]

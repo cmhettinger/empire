@@ -134,3 +134,162 @@ bin/youtube-scrape \
   --config-file deploy/config/youtube/daily.yml \
   --output-file /tmp/youtube-scraper.json
 ```
+
+## Processor Runner
+
+Stage 2 reads scraper JSON from a local file, a stored object id, or a prior run
+id. Processor output is always written to the Empire object store using the
+`jellyfin` storage root by default.
+
+```bash
+bin/youtube-process --input-file /tmp/youtube-scraper.json
+bin/youtube-process --input-object-id 00000000-0000-0000-0000-000000000000
+bin/youtube-process --input-run-id 00000000-0000-0000-0000-000000000000
+```
+
+For each scraped video, stage 2 writes Jellyfin movie sidecars under:
+
+```text
+media/youtube/{channel}/{published-date} - {title} [{video_id}]/
+```
+
+Each video folder contains:
+
+```text
+empire.json
+movie.nfo
+fanart.jpg   # when a thumbnail URL is available
+```
+
+The future downloader stage should write the video itself as:
+
+```text
+movie.mp4
+```
+
+Stage 2 also writes a v1 run-level library plan to the `global` storage root:
+
+```text
+scraper/youtube/daily/YYYY/MM/DD/{run_id}/youtube-library-plan.json
+```
+
+The object metadata uses:
+
+```text
+domain = youtube
+object_kind = jellyfin_library_plan
+content_type = application/json
+```
+
+Detailed Jellyfin layout rules will live in the processor package, while
+`ObjectStore` remains the generic read/write and metadata tool.
+
+Processor sidecars are idempotent by path. If `empire.json`, `movie.nfo`, or
+`fanart.jpg` already exists for a video, the processor skips that sidecar and
+records the skip count in the run summary.
+
+## Downloader Runner
+
+Stage 3 downloads one planned video at a time. It reads a processor plan from
+either a stored object id or a processor run id, then selects one entry by
+YouTube video id.
+
+List available videos in a plan:
+
+```bash
+bin/youtube-download \
+  --plan-object-id 00000000-0000-0000-0000-000000000000 \
+  --list
+```
+
+Download one video:
+
+```bash
+bin/youtube-download \
+  --plan-run-id 00000000-0000-0000-0000-000000000000 \
+  --video-id 4oq91rzQcO8
+```
+
+The downloader shells out to `yt-dlp`, stages the file under:
+
+```text
+${EMPIRE_TEMP_DIR}/youtube/downloads/{run_id}/{video_id}/
+```
+
+and stores the final media asset through `ObjectStore.put_file()`:
+
+```text
+media/youtube/{channel}/{published-date} - {title} [{video_id}]/movie.mp4
+```
+
+Existing `movie.mp4` objects are skipped by path. Download reports are written
+to the `global` storage root:
+
+```text
+scraper/youtube/download/{run_id}/youtube-download-report.json
+```
+
+Per-video failures are recorded in the run summary and report object. Airflow
+tasks should map over video ids so each video can retry independently.
+
+Cleanup is explicit. To remove the planned video folder sidecars when a
+download fails, pass:
+
+```bash
+bin/youtube-download \
+  --plan-object-id 00000000-0000-0000-0000-000000000000 \
+  --video-id 4oq91rzQcO8 \
+  --cleanup-on-failure
+```
+
+During early testing, omit `--cleanup-on-failure` so failed downloads leave
+their `empire.json`, `movie.nfo`, and `fanart.jpg` files available for
+inspection and retry.
+
+## Airflow DAGs
+
+The YouTube Airflow DAGs are manual-only while the pipeline is being hardened:
+
+```text
+dags/youtube/youtube_daily_scrape.py
+dags/youtube/youtube_process_plan.py
+dags/youtube/youtube_download_plan.py
+```
+
+Trigger the processor DAG with one scraper input:
+
+```json
+{
+  "scraper_object_id": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+or:
+
+```json
+{
+  "scraper_run_id": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+Trigger the downloader DAG with one plan input:
+
+```json
+{
+  "plan_object_id": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+To download only selected videos:
+
+```json
+{
+  "plan_object_id": "00000000-0000-0000-0000-000000000000",
+  "video_ids": ["4oq91rzQcO8", "3aA4NBWiNrA"]
+}
+```
+
+The downloader DAG dynamically maps one Airflow task per video id. Each mapped
+task uses the `youtube_download` pool so downloads can be serialized by setting
+that pool to one slot. Set `EMPIRE_YOUTUBE_DOWNLOAD_TASK_DELAY_SECONDS` to add
+an extra delay before each task invokes `yt-dlp`.

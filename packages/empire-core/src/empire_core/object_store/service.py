@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import UUID
 
 from empire_core.config import ObjectStoreConfig
@@ -81,6 +82,62 @@ class ObjectStore:
             object_kind=object_kind,
             size_bytes=len(data),
             checksum_sha256=checksum,
+            expires_at=expires_at,
+            metadata=metadata or {},
+        )
+
+    def put_file(
+        self,
+        *,
+        run_context: RunContext | None,
+        storage_root: str,
+        object_key: str,
+        filename: str,
+        source_path: str | Path,
+        move: bool = True,
+        object_scope: str | None = None,
+        domain: str | None = None,
+        logical_name: str | None = None,
+        content_type: str | None = None,
+        object_kind: str | None = None,
+        expires_at: datetime | None = None,
+        metadata: JsonDict | None = None,
+    ) -> StoredObject:
+        """Store an existing local file without loading it into memory."""
+
+        scope = object_scope or ("run" if run_context else "manual")
+        _validate_scope(scope)
+        if scope == "run" and run_context is None:
+            raise ValidationError("object_scope='run' requires run_context")
+
+        root = self.repository.get_storage_root(storage_root)
+        if root is None:
+            raise StorageRootNotFoundError(f"Storage root not found or inactive: {storage_root}")
+        if root.backend_type != "filesystem":
+            raise ValidationError(f"Unsupported storage backend: {root.backend_type}")
+
+        resolved_domain = domain if domain is not None else run_context.domain if run_context else None
+        backend = self._backend(root.base_uri)
+        result = backend.write_file(
+            object_key,
+            filename,
+            source_path,
+            move=move,
+        )
+
+        logger.info("Stored file object %s/%s in root %s", object_key, filename, storage_root)
+        return self.repository.insert_object(
+            run_id=run_context.run_id if run_context else None,
+            storage_root_id=root.storage_root_id,
+            object_key=object_key,
+            filename=filename,
+            object_scope=scope,
+            domain=resolved_domain,
+            logical_name=logical_name,
+            content_type=content_type,
+            object_kind=object_kind,
+            size_bytes=result.size_bytes,
+            checksum_sha256=result.checksum_sha256,
             expires_at=expires_at,
             metadata=metadata or {},
         )
