@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/run-objects-nuke [--env-file PATH] [--target TARGET] [--yes] [--dry-run]
+
+Description:
+  Immediately removes local object-store files and stored-object metadata for
+  one or more development storage roots.
+
+  This is a local/dev nuke tool. Normal object lifecycle cleanup should prefer:
+    bin/run-objects-cleanup RUN_ID
+    bin/run-objects-purge RUN_ID
+
+Targets:
+  global    EMPIRE_STORAGE_ROOT_GLOBAL
+  jellyfin  EMPIRE_STORAGE_ROOT_JELLYFIN
+  both      Both roots
+
+Examples:
+  bin/run-objects-nuke
+  bin/run-objects-nuke --target global --dry-run
+  bin/run-objects-nuke --target both --yes
+
+Options:
+  --env-file PATH  Load an environment file before running.
+                   Defaults to deploy/env/local.env.
+  --target TARGET  Select global, jellyfin, or both without the menu.
+  --dry-run        Print what would be removed without changing files or DB.
+  --yes            Skip the interactive confirmation prompt.
+  -h, --help       Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+TARGET=""
+DRY_RUN="false"
+YES="false"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    --target)
+      TARGET="${2:-}"
+      if [[ -z "${TARGET}" ]]; then
+        echo "ERROR: --target requires one of: global, jellyfin, both." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN="true"
+      shift
+      ;;
+    --yes)
+      YES="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -*)
+      echo "ERROR: unknown argument: $1" >&2
+      echo >&2
+      usage >&2
+      exit 1
+      ;;
+    *)
+      echo "ERROR: unexpected argument: $1" >&2
+      echo >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "ERROR: env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${REPO_ROOT}/packages/empire-core/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-core/src${PYTHONPATH:+:${PYTHONPATH}}"
+export EMPIRE_NUKE_OBJECTS_TARGET="${TARGET}"
+export EMPIRE_NUKE_OBJECTS_DRY_RUN="${DRY_RUN}"
+export EMPIRE_NUKE_OBJECTS_YES="${YES}"
+
+"${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-core/src/empire_core/scripts/nuke_objects.py"
