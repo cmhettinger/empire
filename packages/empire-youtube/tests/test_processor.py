@@ -111,6 +111,47 @@ def test_movie_nfo_escapes_and_removes_unsafe_xml_text():
     assert parsed.findtext("studio") == "Channel & Co"
 
 
+def test_processor_skips_live_and_upcoming_videos():
+    payload = {
+        "source": "youtube",
+        "schema_version": 1,
+        "videos": [
+            {
+                "video_id": "live123",
+                "title": "Live Now",
+                "channel": {"channel_name": "Channel"},
+                "published_at": "2026-05-31T12:00:00Z",
+                "live_stream": {
+                    "live_broadcast_content": "live",
+                    "actual_start_time": "2026-05-31T12:00:00Z",
+                    "actual_end_time": None,
+                },
+            },
+            {
+                "video_id": "soon123",
+                "title": "Coming Soon",
+                "channel": {"channel_name": "Channel"},
+                "published_at": "2026-05-31T13:00:00Z",
+                "live_stream": {"live_broadcast_content": "upcoming"},
+            },
+            {
+                "video_id": "done123",
+                "title": "Ready",
+                "channel": {"channel_name": "Channel"},
+                "published_at": "2026-05-31T14:00:00Z",
+                "live_stream": {"live_broadcast_content": "none"},
+            },
+        ],
+    }
+
+    plan = YouTubeScrapeProcessor(
+        thumbnail_fetcher=FakeThumbnailFetcher(),
+    ).process(payload)
+
+    assert [entry.video_id for entry in plan.entries] == ["done123"]
+    assert plan.source_video_count == 3
+
+
 def test_jellyfin_friendly_name_cleans_and_truncates_titles():
     assert (
         jellyfin_friendly_name(

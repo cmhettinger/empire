@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import logging
 
+from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.sdk import dag, task
 from empire_core import EmpireDatabase, ObjectStore, RunService
 from empire_youtube import (
@@ -54,7 +55,16 @@ def youtube_daily_scrape():
             "filename": result.stored_object.filename,
         }
 
-    scrape_youtube_metadata()
+    scrape_result = scrape_youtube_metadata()
+    trigger_process_plan = TriggerDagRunOperator(
+        task_id="trigger_youtube_process_plan",
+        trigger_dag_id="youtube_process_plan",
+        conf={
+            "input_run_id": "{{ ti.xcom_pull(task_ids='scrape_youtube_metadata')['run_id'] }}"
+        },
+    )
+
+    scrape_result >> trigger_process_plan
 
 
 youtube_daily_scrape_dag = youtube_daily_scrape()

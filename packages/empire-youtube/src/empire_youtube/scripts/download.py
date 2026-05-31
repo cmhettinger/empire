@@ -17,6 +17,7 @@ from empire_youtube.downloader import (
     load_library_plan_from_object_id,
     load_library_plan_from_run_id,
 )
+from empire_youtube.retention import youtube_expires_at
 from empire_youtube.runner import DEFAULT_DOMAIN, DEFAULT_SUBJECT_KEY
 
 
@@ -152,6 +153,7 @@ def _write_report(object_store: ObjectStore, ctx, result: dict):
         data=data,
         content_type="application/json",
         object_kind=DOWNLOAD_REPORT_OBJECT_KIND,
+        expires_at=youtube_expires_at(),
         metadata={
             "video_id": result["video_id"],
             "status": result["status"],

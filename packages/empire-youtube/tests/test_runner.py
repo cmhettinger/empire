@@ -20,6 +20,7 @@ from empire_youtube.runner import (
 
 def test_run_youtube_scraper_to_object_store(tmp_path, monkeypatch):
     monkeypatch.setenv("EMPIRE_STORAGE_KEY_YOUTUBE", "youtube")
+    monkeypatch.delenv("EMPIRE_YOUTUBE_DAYS_TO_KEEP", raising=False)
     run_repo = InMemoryRunRepository()
     object_repo = InMemoryObjectRepository(str(tmp_path))
     run_service = RunService(run_repo)
@@ -44,6 +45,9 @@ def test_run_youtube_scraper_to_object_store(tmp_path, monkeypatch):
     assert stored.filename == DEFAULT_OUTPUT_FILENAME
     assert stored.object_kind == "normalized_payload"
     assert stored.content_type == "application/json"
+    assert stored.expires_at is not None
+    assert stored.expires_at - datetime.now(UTC) <= timedelta(days=10, seconds=1)
+    assert stored.expires_at - datetime.now(UTC) > timedelta(days=9, hours=23)
     assert stored.metadata == {
         "config_name": "daily_youtube_scraper",
         "config_version": 1,

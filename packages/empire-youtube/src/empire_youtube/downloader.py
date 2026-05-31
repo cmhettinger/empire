@@ -16,6 +16,7 @@ from empire_core.exceptions import ValidationError
 from empire_core.object_store.storage import FilesystemStorageBackend
 
 from empire_youtube.processor import MOVIE_FILENAME
+from empire_youtube.retention import youtube_expires_at
 from empire_youtube.runner import DEFAULT_LIBRARY_PLAN_FILENAME
 
 
@@ -192,6 +193,7 @@ def download_entry_to_object_store(
     output_template = work_dir / "movie.%(ext)s"
     movie_path = work_dir / MOVIE_FILENAME
     downloader = downloader or YtDlpCommand()
+    expires_at = youtube_expires_at()
 
     try:
         downloader.download(url=entry.source_url, output_template=output_template)
@@ -205,6 +207,7 @@ def download_entry_to_object_store(
             source_path=movie_path,
             content_type="video/mp4",
             object_kind=MEDIA_ASSET_OBJECT_KIND,
+            expires_at=expires_at,
             metadata={
                 "source": "youtube",
                 "youtube_video_id": entry.video_id,

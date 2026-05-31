@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from empire_core import ObjectStore, RunService
 
@@ -16,6 +16,7 @@ from test_runner import InMemoryObjectRepository, InMemoryRunRepository
 
 def test_run_youtube_processor_to_object_store(tmp_path, monkeypatch):
     monkeypatch.delenv("EMPIRE_STORAGE_KEY_YOUTUBE_LIBRARY", raising=False)
+    monkeypatch.setenv("EMPIRE_YOUTUBE_DAYS_TO_KEEP", "7")
     run_repo = InMemoryRunRepository()
     object_repo = InMemoryObjectRepository(str(tmp_path))
     object_repo.roots["jellyfin"] = object_repo.roots["global"]
@@ -56,6 +57,9 @@ def test_run_youtube_processor_to_object_store(tmp_path, monkeypatch):
     assert stored.filename == DEFAULT_LIBRARY_PLAN_FILENAME
     assert stored.object_kind == "jellyfin_library_plan"
     assert stored.content_type == "application/json"
+    assert stored.expires_at is not None
+    assert stored.expires_at - datetime.now(UTC) <= timedelta(days=7, seconds=1)
+    assert stored.expires_at - datetime.now(UTC) > timedelta(days=6, hours=23)
     assert result.sidecar_object_count == 3
     assert result.skipped_sidecar_count == 0
     assert stored.metadata == {
@@ -85,6 +89,7 @@ def test_run_youtube_processor_to_object_store(tmp_path, monkeypatch):
         "fanart.jpg",
         DEFAULT_LIBRARY_PLAN_FILENAME,
     }
+    assert all(item.expires_at == stored.expires_at for item in stored_objects)
     assert run_repo.runs[run_id].summary == {
         "stored_object_id": str(stored.object_id),
         "source_video_count": 1,

@@ -12,6 +12,7 @@ from empire_core.object_store.storage import FilesystemStorageBackend
 from empire_youtube.config import YouTubeScraperConfig
 from empire_youtube.models import YouTubeScrapeResult
 from empire_youtube.processor import YouTubeLibraryPlan, YouTubeScrapeProcessor
+from empire_youtube.retention import youtube_expires_at
 from empire_youtube.scraper import YouTubeScraper
 
 
@@ -95,6 +96,7 @@ def run_youtube_scraper_to_object_store(
     )
 
     try:
+        expires_at = youtube_expires_at()
         scrape_result = scraper.scrape(
             generated_at=generated_at,
             run_id=str(ctx.run_id),
@@ -113,6 +115,7 @@ def run_youtube_scraper_to_object_store(
             data=data,
             content_type=DEFAULT_OUTPUT_CONTENT_TYPE,
             object_kind=DEFAULT_OUTPUT_OBJECT_KIND,
+            expires_at=expires_at,
             metadata={
                 "config_name": config.name,
                 "config_version": config.version,
@@ -219,6 +222,7 @@ def run_youtube_processor_to_object_store(
         library_plan = processor.process(scrape_payload)
         stored_sidecars: list[StoredObject] = []
         skipped_sidecar_count = 0
+        expires_at = youtube_expires_at()
         for entry in library_plan.entries:
             for planned_file in entry.files:
                 if _object_file_exists(
@@ -238,6 +242,7 @@ def run_youtube_processor_to_object_store(
                         data=planned_file.data,
                         content_type=planned_file.content_type,
                         object_kind=planned_file.object_kind,
+                        expires_at=expires_at,
                         metadata=planned_file.metadata,
                     )
                 )
@@ -255,6 +260,7 @@ def run_youtube_processor_to_object_store(
             data=data,
             content_type=DEFAULT_OUTPUT_CONTENT_TYPE,
             object_kind=DEFAULT_LIBRARY_PLAN_OBJECT_KIND,
+            expires_at=expires_at,
             metadata={
                 "schema_version": library_plan.schema_version,
                 "source_schema_version": library_plan.source_schema_version,

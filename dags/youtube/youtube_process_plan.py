@@ -4,6 +4,7 @@ from datetime import datetime
 import logging
 from uuid import UUID
 
+from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.sdk import dag, get_current_context, task
 from empire_core import EmpireDatabase, ObjectStore, RunService
 from empire_youtube import YouTubeScrapeProcessor, run_youtube_processor_to_object_store
@@ -64,7 +65,16 @@ def youtube_process_plan():
             "video_ids": video_ids,
         }
 
-    process_youtube_library_plan()
+    process_result = process_youtube_library_plan()
+    trigger_download_plan = TriggerDagRunOperator(
+        task_id="trigger_youtube_download_plan",
+        trigger_dag_id="youtube_download_plan",
+        conf={
+            "plan_run_id": "{{ ti.xcom_pull(task_ids='process_youtube_library_plan')['run_id'] }}"
+        },
+    )
+
+    process_result >> trigger_download_plan
 
 
 def _processor_args_from_conf(conf: dict):

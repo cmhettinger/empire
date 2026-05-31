@@ -32,6 +32,11 @@ from empire_youtube.object_store import (
 )
 from empire_youtube.output import write_result_to_file
 from empire_youtube.processor import YouTubeLibraryPlan, YouTubeScrapeProcessor
+from empire_youtube.retention import (
+    DEFAULT_YOUTUBE_DAYS_TO_KEEP,
+    YOUTUBE_DAYS_TO_KEEP_ENV,
+    youtube_expires_at,
+)
 from empire_youtube.resolver import YouTubeChannelResolver, resolve_channel
 from empire_youtube.runner import (
     DEFAULT_LIBRARY_PLAN_FILENAME,
@@ -67,6 +72,8 @@ __all__ = [
     "YouTubeScraper",
     "YouTubeScraperConfig",
     "YouTubeChannelResolver",
+    "DEFAULT_YOUTUBE_DAYS_TO_KEEP",
+    "YOUTUBE_DAYS_TO_KEEP_ENV",
     "DEFAULT_LIBRARY_PLAN_FILENAME",
     "download_entry_to_object_store",
     "find_download_entry",
@@ -79,4 +86,5 @@ __all__ = [
     "run_youtube_processor_to_object_store",
     "run_youtube_scraper_to_object_store",
     "write_result_to_file",
+    "youtube_expires_at",
 ]

@@ -233,10 +233,10 @@ class PostgresObjectRepository:
             FROM core.stored_object o
             JOIN core.storage_root r ON r.storage_root_id = o.storage_root_id
             WHERE o.deleted_at IS NULL
-              AND (%s IS NULL OR o.run_id = %s)
-              AND (%s IS NULL OR o.object_kind = %s)
-              AND (%s IS NULL OR o.filename = %s)
-              AND (%s IS NULL OR o.logical_name = %s)
+              AND (%s::uuid IS NULL OR o.run_id = %s)
+              AND (%s::text IS NULL OR o.object_kind = %s)
+              AND (%s::text IS NULL OR o.filename = %s)
+              AND (%s::text IS NULL OR o.logical_name = %s)
             ORDER BY o.created_at DESC
             LIMIT 1
             """,

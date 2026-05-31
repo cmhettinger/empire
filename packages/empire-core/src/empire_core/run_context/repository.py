@@ -186,9 +186,9 @@ class PostgresRunRepository:
             WHERE domain = %s
               AND job_name = %s
               AND status = 'succeeded'
-              AND (%s IS NULL OR subject_key = %s)
-              AND (%s IS NULL OR effective_date = %s)
-              AND (%s IS NULL OR completed_at <= %s)
+              AND (%s::text IS NULL OR subject_key = %s)
+              AND (%s::date IS NULL OR effective_date = %s)
+              AND (%s::timestamptz IS NULL OR completed_at <= %s)
             ORDER BY completed_at DESC NULLS LAST, started_at DESC
             LIMIT 1
             """,
@@ -222,9 +222,9 @@ class PostgresRunRepository:
             WHERE domain = %s
               AND job_name = %s
               AND status = 'succeeded'
-              AND (%s IS NULL OR subject_key = %s)
-              AND (%s IS NULL OR completed_at >= %s)
-              AND (%s IS NULL OR completed_at <= %s)
+              AND (%s::text IS NULL OR subject_key = %s)
+              AND (%s::timestamptz IS NULL OR completed_at >= %s)
+              AND (%s::timestamptz IS NULL OR completed_at <= %s)
             ORDER BY completed_at DESC NULLS LAST, started_at DESC
             LIMIT %s
             """,

@@ -162,7 +162,11 @@ class YouTubeScrapeProcessor:
         entries = [
             self._build_entry(video)
             for video in source_videos
-            if isinstance(video, dict) and video.get("video_id")
+            if (
+                isinstance(video, dict)
+                and video.get("video_id")
+                and _is_download_ready(video)
+            )
         ]
 
         return YouTubeLibraryPlan(
@@ -392,6 +396,16 @@ def _runtime_minutes(video: dict[str, Any]) -> int | None:
     if not isinstance(seconds, int) or seconds <= 0:
         return None
     return max(1, round(seconds / 60))
+
+
+def _is_download_ready(video: dict[str, Any]) -> bool:
+    live_stream = video.get("live_stream")
+    if not isinstance(live_stream, dict):
+        return True
+    live_content = str(live_stream.get("live_broadcast_content") or "none").lower()
+    if live_content in {"live", "upcoming"}:
+        return False
+    return True
 
 
 def _channel_name(video: dict[str, Any]) -> str:

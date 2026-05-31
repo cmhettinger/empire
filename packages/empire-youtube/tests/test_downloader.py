@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -42,7 +42,8 @@ def test_iter_and_find_download_entries():
         find_download_entry(plan, video_id="missing")
 
 
-def test_download_entry_to_object_store(tmp_path):
+def test_download_entry_to_object_store(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMPIRE_YOUTUBE_DAYS_TO_KEEP", "14")
     run_repo = InMemoryRunRepository()
     object_repo = MultiRootObjectRepository(str(tmp_path))
     run_service = RunService(run_repo)
@@ -66,6 +67,10 @@ def test_download_entry_to_object_store(tmp_path):
 
     assert result.status == "downloaded"
     assert result.filename == MOVIE_FILENAME
+    stored = object_repo.objects[UUID(result.object_id)]
+    assert stored.expires_at is not None
+    assert stored.expires_at - datetime.now(UTC) <= timedelta(days=14, seconds=1)
+    assert stored.expires_at - datetime.now(UTC) > timedelta(days=13, hours=23)
     assert not (
         tmp_path / "tmp" / "youtube" / "downloads" / str(ctx.run_id) / "abc123"
     ).exists()

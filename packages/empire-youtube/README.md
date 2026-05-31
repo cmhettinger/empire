@@ -229,6 +229,12 @@ to the `global` storage root:
 scraper/youtube/download/{run_id}/youtube-download-report.json
 ```
 
+`EMPIRE_YOUTUBE_DAYS_TO_KEEP` controls retention for short-lived YouTube
+artifacts and defaults to `10` days when unset. `youtube-scraper.json`,
+`movie.mp4`, `empire.json`, `movie.nfo`, `fanart.jpg`, library plans, and
+download reports are stored with `expires_at` set that many days after creation
+so Empire object-store cleanup can delete them later.
+
 Per-video failures are recorded in the run summary and report object. Airflow
 tasks should map over video ids so each video can retry independently.
 
@@ -255,6 +261,11 @@ dags/youtube/youtube_daily_scrape.py
 dags/youtube/youtube_process_plan.py
 dags/youtube/youtube_download_plan.py
 ```
+
+`youtube_daily_scrape` is the manual entry point for the full pipeline. When it
+completes, it triggers `youtube_process_plan` with the scraper run id. When the
+processor completes, it triggers `youtube_download_plan` with the library plan
+run id.
 
 Trigger the processor DAG with one scraper input:
 
