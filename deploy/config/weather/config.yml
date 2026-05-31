@@ -1,0 +1,38 @@
+weather:
+  name: daily_weather_collection
+  version: 1
+  units: imperial
+  store_raw_responses: true
+  retention_days: 7
+
+  locations:
+    - key: ashburn_va
+      name: Ashburn
+      county: Loudoun
+      state: Virginia
+      lat: 39.0277
+      lon: -77.4714
+      nws:
+        gridId: LWX
+        gridX: 80
+        gridY: 76
+
+    - key: savannah_ga
+      name: Savannah
+      county: Chatham
+      state: Georgia
+      lat: 32.0286
+      lon: -81.1821
+      nws:
+        gridId: CHS
+        gridX: 47
+        gridY: 41
+
+  providers:
+    openweather:
+      collect_air_quality: true
+      collect_minutely: true
+      collect_quarter_hourly: true
+      collect_alert_details: true
+    nws:
+      user_agent: empire-weather/0.1

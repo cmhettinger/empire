@@ -198,6 +198,35 @@ class InMemoryObjectRepository:
         self.objects[stored.object_id] = stored
         return stored
 
+    def insert_or_replace_object(self, **kwargs) -> StoredObject:
+        for object_id, existing in list(self.objects.items()):
+            if (
+                existing.storage_root_id == kwargs["storage_root_id"]
+                and existing.object_key == kwargs["object_key"]
+                and existing.filename == kwargs["filename"]
+            ):
+                stored = replace(
+                    existing,
+                    run_id=kwargs["run_id"],
+                    object_scope=kwargs["object_scope"],
+                    domain=kwargs["domain"],
+                    logical_name=kwargs["logical_name"],
+                    content_type=kwargs["content_type"],
+                    object_kind=kwargs["object_kind"],
+                    size_bytes=kwargs["size_bytes"],
+                    checksum_sha256=kwargs["checksum_sha256"],
+                    expires_at=kwargs["expires_at"],
+                    deleted_at=None,
+                    purge_after=None,
+                    delete_attempts=0,
+                    last_delete_error=None,
+                    metadata=kwargs["metadata"],
+                    updated_at=datetime.now(UTC),
+                )
+                self.objects[object_id] = stored
+                return stored
+        return self.insert_object(**kwargs)
+
     def get_object(self, object_id: UUID) -> StoredObject | None:
         return self.objects.get(object_id)
 

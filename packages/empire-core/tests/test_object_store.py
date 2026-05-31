@@ -151,6 +151,45 @@ def test_reference_object_without_run(tmp_path):
     ) == [stored]
 
 
+def test_put_bytes_can_overwrite_reference_object_path(tmp_path):
+    store = ObjectStore(InMemoryObjectRepository(str(tmp_path)))
+
+    first = store.put_bytes(
+        run_context=None,
+        object_scope="reference",
+        domain="weather",
+        logical_name="weather-config",
+        storage_root="test_root",
+        object_key="scraper/weather/config",
+        filename="config.yml",
+        data=b"version: 1",
+        content_type="text/yaml",
+        object_kind="weather_config",
+    )
+    second = store.put_bytes(
+        run_context=None,
+        object_scope="reference",
+        domain="weather",
+        logical_name="weather-config",
+        storage_root="test_root",
+        object_key="scraper/weather/config",
+        filename="config.yml",
+        data=b"version: 2",
+        content_type="text/yaml",
+        object_kind="weather_config",
+        overwrite=True,
+    )
+
+    assert second.object_id == first.object_id
+    assert second.size_bytes == len(b"version: 2")
+    assert store.get_bytes(second.object_id) == b"version: 2"
+    assert store.find_by_logical_name(
+        domain="weather",
+        logical_name="weather-config",
+        object_scope="reference",
+    ) == [second]
+
+
 def test_run_object_requires_run_context(tmp_path):
     store = ObjectStore(InMemoryObjectRepository(str(tmp_path)))
 

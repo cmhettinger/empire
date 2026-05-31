@@ -135,6 +135,73 @@ class PostgresObjectRepository:
         self.connection.commit()
         return self._with_root(row)
 
+    def insert_or_replace_object(
+        self,
+        *,
+        run_id: UUID | None,
+        storage_root_id: int,
+        object_key: str,
+        filename: str,
+        object_scope: str,
+        domain: str | None,
+        logical_name: str | None,
+        content_type: str | None,
+        object_kind: str | None,
+        size_bytes: int,
+        checksum_sha256: str,
+        expires_at: datetime | None,
+        metadata: JsonDict,
+    ) -> StoredObject:
+        row = self._fetchone(
+            """
+            INSERT INTO core.stored_object (
+                run_id, storage_root_id, object_key, filename,
+                object_scope, domain, logical_name, content_type, object_kind,
+                size_bytes, checksum_sha256, expires_at, metadata
+            )
+            VALUES (
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s::jsonb
+            )
+            ON CONFLICT (storage_root_id, object_key, filename)
+            DO UPDATE SET
+                run_id = EXCLUDED.run_id,
+                object_scope = EXCLUDED.object_scope,
+                domain = EXCLUDED.domain,
+                logical_name = EXCLUDED.logical_name,
+                content_type = EXCLUDED.content_type,
+                object_kind = EXCLUDED.object_kind,
+                size_bytes = EXCLUDED.size_bytes,
+                checksum_sha256 = EXCLUDED.checksum_sha256,
+                expires_at = EXCLUDED.expires_at,
+                deleted_at = NULL,
+                purge_after = NULL,
+                delete_attempts = 0,
+                last_delete_error = NULL,
+                metadata = EXCLUDED.metadata,
+                updated_at = now()
+            RETURNING *
+            """,
+            (
+                run_id,
+                storage_root_id,
+                object_key,
+                filename,
+                object_scope,
+                domain,
+                logical_name,
+                content_type,
+                object_kind,
+                size_bytes,
+                checksum_sha256,
+                expires_at,
+                json_dumps(metadata),
+            ),
+        )
+        self.connection.commit()
+        return self._with_root(row)
+
     def get_object(self, object_id: UUID) -> StoredObject | None:
         row = self._fetchone_or_none(
             _stored_object_select("o.object_id = %s"),

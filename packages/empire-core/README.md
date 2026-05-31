@@ -271,6 +271,35 @@ stored = object_store.put_bytes(
 )
 ```
 
+### Well-known object updates
+
+Stored object paths are unique by `(storage_root, object_key, filename)`.
+Normal writes should leave `overwrite` unset so accidental path reuse fails
+fast.
+
+For well-known reference objects such as package configuration, pass
+`overwrite=True` to replace the bytes and metadata at the same object path.
+This keeps the path stable while preserving the same metadata row/object ID.
+
+```python
+stored = object_store.put_bytes(
+    run_context=None,
+    object_scope="reference",
+    domain="weather",
+    logical_name="weather-config",
+    storage_root="global",
+    object_key="scraper/weather/config",
+    filename="config.yml",
+    data=config_bytes,
+    content_type="text/yaml",
+    object_kind="weather_config",
+    overwrite=True,
+)
+```
+
+Use this only for intentional well-known objects. Run-scoped artifacts should
+normally use run-specific object keys instead of overwriting.
+
 ### Logical-name lookup
 
 ```python

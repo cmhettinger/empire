@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/weather-put-config [CONFIG_FILE] [--logical-name NAME] [--env-file PATH]
+
+Description:
+  Publishes a local weather YAML config file to the Empire object store.
+  Defaults to deploy/config/weather/config.yml when CONFIG_FILE is omitted.
+
+Options:
+  --logical-name NAME  Object-store logical name. Defaults to weather-config.
+  --filename NAME      Stored filename. Defaults to config.yml.
+  --storage-root NAME  Object-store root name. Defaults to global.
+  --storage-key KEY    Object key prefix. Defaults to EMPIRE_STORAGE_KEY_WEATHER or scraper/weather.
+  --env-file PATH      Load an environment file before running.
+                       Defaults to deploy/env/local.env.
+  -h, --help           Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "ERROR: env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${REPO_ROOT}/packages/empire-weather/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-weather/src:${REPO_ROOT}/packages/empire-core/src${PYTHONPATH:+:${PYTHONPATH}}"
+
+if ! "${PYTHON_BIN}" -c 'import empire_core, requests' >/dev/null 2>&1; then
+  echo "ERROR: empire-weather dependencies are not installed for ${PYTHON_BIN}." >&2
+  echo "       Run: cd packages/empire-weather && poetry install" >&2
+  exit 1
+fi
+
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+  "${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-weather/src/empire_weather/scripts/put_config.py"
+else
+  "${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-weather/src/empire_weather/scripts/put_config.py" "${ARGS[@]}"
+fi

@@ -52,6 +52,7 @@ class ObjectStore:
         object_kind: str | None = None,
         expires_at: datetime | None = None,
         metadata: JsonDict | None = None,
+        overwrite: bool = False,
     ) -> StoredObject:
         scope = object_scope or ("run" if run_context else "manual")
         _validate_scope(scope)
@@ -70,21 +71,27 @@ class ObjectStore:
         checksum = hashlib.sha256(data).hexdigest()
 
         logger.info("Stored object %s/%s in root %s", object_key, filename, storage_root)
-        return self.repository.insert_object(
-            run_id=run_context.run_id if run_context else None,
-            storage_root_id=root.storage_root_id,
-            object_key=object_key,
-            filename=filename,
-            object_scope=scope,
-            domain=resolved_domain,
-            logical_name=logical_name,
-            content_type=content_type,
-            object_kind=object_kind,
-            size_bytes=len(data),
-            checksum_sha256=checksum,
-            expires_at=expires_at,
-            metadata=metadata or {},
-        )
+        object_args = {
+            "run_id": run_context.run_id if run_context else None,
+            "storage_root_id": root.storage_root_id,
+            "object_key": object_key,
+            "filename": filename,
+            "object_scope": scope,
+            "domain": resolved_domain,
+            "logical_name": logical_name,
+            "content_type": content_type,
+            "object_kind": object_kind,
+            "size_bytes": len(data),
+            "checksum_sha256": checksum,
+            "expires_at": expires_at,
+            "metadata": metadata or {},
+        }
+        if overwrite:
+            insert_or_replace = getattr(self.repository, "insert_or_replace_object", None)
+            if not callable(insert_or_replace):
+                raise ValidationError("Object repository does not support overwrite")
+            return insert_or_replace(**object_args)
+        return self.repository.insert_object(**object_args)
 
     def put_file(
         self,
