@@ -4,20 +4,21 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  bin/youtube-put-config CONFIG_FILE [--logical-name NAME] [--env-file PATH]
+  bin/youtube-put-config [CONFIG_FILE] [--logical-name NAME] [--env-file PATH]
 
 Description:
   Publishes a local YouTube scraper YAML config file to the Empire object store.
+  Defaults to object-store/config/youtube/config.yml when CONFIG_FILE is omitted.
 
 Examples:
-  bin/youtube-put-config deploy/config/youtube/daily.yml
-  bin/youtube-put-config deploy/config/youtube/daily.yml --logical-name youtube-daily-config
+  bin/youtube-put-config
+  bin/youtube-put-config object-store/config/youtube/config.yml --logical-name youtube-daily-config
 
 Options:
   --logical-name NAME  Object-store logical name. Defaults to youtube-daily-config.
-  --filename NAME      Stored filename. Defaults to daily.yml.
-  --storage-root NAME  Object-store root name. Defaults to global.
-  --storage-key KEY    Object key prefix. Defaults to EMPIRE_STORAGE_KEY_YOUTUBE or youtube.
+  --filename NAME      Stored filename. Defaults to config.yml.
+  --storage-root NAME  Object-store root name. Defaults to config.
+  --storage-key KEY    Object key prefix. Defaults to youtube.
   --env-file PATH      Load an environment file before running.
                        Defaults to deploy/env/local.env.
   -h, --help           Show this help message.

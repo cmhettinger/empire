@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
 import logging
 import os
 import time
+from datetime import UTC, datetime
 from uuid import UUID
 
 from airflow.sdk import dag, get_current_context, task
@@ -19,6 +19,7 @@ from empire_youtube.downloader import (
     load_library_plan_from_run_id,
 )
 from empire_youtube.retention import youtube_expires_at
+from empire_youtube.runner import DEFAULT_STORAGE_KEY, youtube_run_object_key
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +63,11 @@ def youtube_daily_download():
         )
         cleanup_on_failure = bool(conf.get("cleanup_on_failure", False))
         if delay_seconds > 0:
-            log.info("Sleeping %s seconds before downloading %s", delay_seconds, video_id)
+            log.info(
+                "Sleeping %s seconds before downloading %s",
+                delay_seconds,
+                video_id,
+            )
             time.sleep(delay_seconds)
 
         with EmpireDatabase.connect_from_env() as conn:
@@ -74,7 +79,7 @@ def youtube_daily_download():
                 domain="youtube",
                 job_name="youtube_download",
                 subject_key=entry.video_id,
-                effective_date=None,
+                effective_date=datetime.now(UTC).date(),
                 run_type="airflow",
                 runner="airflow",
                 runner_ref={
@@ -99,9 +104,16 @@ def youtube_daily_download():
                 report = _write_report(object_store, ctx, result.to_dict())
                 run_service.complete_run(
                     ctx.run_id,
-                    summary={**result.to_dict(), "report_object_id": str(report.object_id)},
+                    summary={
+                        **result.to_dict(),
+                        "report_object_id": str(report.object_id),
+                    },
                 )
-                log.info("Completed YouTube download for %s: %s", video_id, result.status)
+                log.info(
+                    "Completed YouTube download for %s: %s",
+                    video_id,
+                    result.status,
+                )
                 return {
                     **result.to_dict(),
                     "run_id": str(ctx.run_id),
@@ -113,7 +125,10 @@ def youtube_daily_download():
                 run_service.fail_run(
                     ctx.run_id,
                     error_message=result.error_message or str(exc),
-                    summary={**result.to_dict(), "report_object_id": str(report.object_id)},
+                    summary={
+                        **result.to_dict(),
+                        "report_object_id": str(report.object_id),
+                    },
                 )
                 log.exception("Failed YouTube download for %s", video_id)
                 raise
@@ -145,7 +160,14 @@ def _write_report(object_store: ObjectStore, ctx, result: dict):
     return object_store.put_bytes(
         run_context=ctx,
         storage_root="global",
-        object_key=f"scraper/youtube/download/{ctx.run_id}",
+        object_key=youtube_run_object_key(
+            storage_key_prefix=os.environ.get(
+                "EMPIRE_STORAGE_KEY_YOUTUBE",
+                DEFAULT_STORAGE_KEY,
+            ),
+            effective_date=ctx.effective_date,
+            run_id=str(ctx.run_id),
+        ),
         filename=DOWNLOAD_REPORT_FILENAME,
         data=data,
         content_type="application/json",

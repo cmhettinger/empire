@@ -16,7 +16,7 @@ from test_config import CONFIG
 
 
 def test_run_weather_collection_to_object_store(tmp_path, monkeypatch):
-    monkeypatch.setenv("EMPIRE_STORAGE_KEY_WEATHER", "/scraper/weather/")
+    monkeypatch.setenv("EMPIRE_STORAGE_KEY_WEATHER", "/weather/")
     run_repo = InMemoryRunRepository()
     object_repo = InMemoryObjectRepository(str(tmp_path))
     run_service = RunService(run_repo)
@@ -37,7 +37,7 @@ def test_run_weather_collection_to_object_store(tmp_path, monkeypatch):
     run_id = result.run_context.run_id
     stored = result.stored_object
     assert run_repo.runs[run_id].status == "succeeded"
-    assert stored.object_key == f"scraper/weather/runs/2026/05/30/{run_id}"
+    assert stored.object_key == f"weather/runs/2026/05/30/{run_id}"
     assert stored.filename == DEFAULT_OUTPUT_FILENAME
     assert stored.expires_at == generated_at + timedelta(days=7)
     assert stored.metadata["location_count"] == 1

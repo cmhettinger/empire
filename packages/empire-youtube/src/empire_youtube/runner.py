@@ -27,7 +27,7 @@ DEFAULT_PROCESSOR_JOB_NAME = "youtube_process"
 DEFAULT_LIBRARY_STORAGE_ROOT = "jellyfin"
 DEFAULT_LIBRARY_STORAGE_KEY = "media/youtube"
 DEFAULT_LIBRARY_PLAN_STORAGE_ROOT = "global"
-DEFAULT_LIBRARY_PLAN_STORAGE_KEY = "scraper/youtube"
+DEFAULT_LIBRARY_PLAN_STORAGE_KEY = DEFAULT_STORAGE_KEY
 DEFAULT_LIBRARY_PLAN_FILENAME = "youtube-library-plan.json"
 DEFAULT_LIBRARY_PLAN_OBJECT_KIND = "jellyfin_library_plan"
 
@@ -155,11 +155,29 @@ def _daily_output_key(
     run_id: str,
 ) -> str:
     prefix = storage_key_prefix.strip("/")
-    return (
-        f"{prefix}/daily/"
+    return youtube_run_object_key(
+        storage_key_prefix=prefix,
+        effective_date=effective_date,
+        run_id=run_id,
+    )
+
+
+def youtube_run_object_key(
+    *,
+    storage_key_prefix: str,
+    effective_date: date,
+    run_id: str,
+    suffix: str | None = None,
+) -> str:
+    prefix = storage_key_prefix.strip("/")
+    object_key = (
+        f"{prefix}/"
         f"{effective_date:%Y}/{effective_date:%m}/{effective_date:%d}/"
         f"{run_id}"
     )
+    if suffix:
+        object_key = f"{object_key}/{suffix.strip('/')}"
+    return object_key
 
 
 def run_youtube_processor_to_object_store(
@@ -191,12 +209,9 @@ def run_youtube_processor_to_object_store(
         "EMPIRE_STORAGE_KEY_YOUTUBE_LIBRARY",
         DEFAULT_LIBRARY_STORAGE_KEY,
     )
-    resolved_plan_storage_root = plan_storage_root or os.environ.get(
-        "EMPIRE_STORAGE_ROOT_NAME_YOUTUBE_LIBRARY_PLAN",
-        DEFAULT_LIBRARY_PLAN_STORAGE_ROOT,
-    )
+    resolved_plan_storage_root = plan_storage_root or DEFAULT_LIBRARY_PLAN_STORAGE_ROOT
     resolved_plan_storage_key = plan_storage_key_prefix or os.environ.get(
-        "EMPIRE_STORAGE_KEY_YOUTUBE_LIBRARY_PLAN",
+        "EMPIRE_STORAGE_KEY_YOUTUBE",
         DEFAULT_LIBRARY_PLAN_STORAGE_KEY,
     )
 

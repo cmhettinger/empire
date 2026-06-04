@@ -25,8 +25,8 @@ def test_load_config_by_logical_name_from_fixed_weather_path(tmp_path):
         object_scope=DEFAULT_CONFIG_OBJECT_SCOPE,
         domain=DEFAULT_CONFIG_DOMAIN,
         logical_name=DEFAULT_CONFIG_LOGICAL_NAME,
-        storage_root="global",
-        object_key="scraper/weather/config",
+        storage_root="config",
+        object_key="weather",
         filename=DEFAULT_CONFIG_FILENAME,
         data=yaml.safe_dump(CONFIG).encode("utf-8"),
         content_type=DEFAULT_CONFIG_CONTENT_TYPE,
@@ -35,6 +35,6 @@ def test_load_config_by_logical_name_from_fixed_weather_path(tmp_path):
 
     config = load_config_by_logical_name(store)
 
-    assert stored.object_key == "scraper/weather/config"
+    assert stored.object_key == "weather"
     assert stored.filename == "config.yml"
     assert config.name == "daily_weather"

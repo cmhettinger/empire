@@ -5,7 +5,7 @@ Empire.
 
 The package is metadata-only:
 
-- API key authentication through `EMPIRE_YOUTUBE_API_KEY`
+- API key authentication through `EMPIRE_YOUTUBE_GOOGLE_API_KEY`
 - no OAuth
 - no browser automation
 - no video downloads
@@ -52,7 +52,7 @@ enabled: true
 Paste the output under `youtube.followed_channels` in:
 
 ```text
-deploy/config/youtube/daily.yml
+object-store/config/youtube/config.yml
 ```
 
 ## Output Contract
@@ -84,7 +84,7 @@ channels, and discovery sources.
 Empire-backed runs write normalized JSON to the object store by default:
 
 ```text
-youtube/daily/YYYY/MM/DD/{run_id}/youtube-scraper.json
+youtube/YYYY/MM/DD/{run_id}/youtube-scraper.json
 ```
 
 The object metadata uses:
@@ -118,28 +118,29 @@ By default, config is loaded from the Empire object store using logical name
 Publish the local config into object store with:
 
 ```bash
-bin/youtube-put-config deploy/config/youtube/daily.yml
+bin/youtube-put-config
 ```
 
 For local bootstrap or development, pass a config file explicitly:
 
 ```bash
-bin/youtube-scrape --config-file deploy/config/youtube/daily.yml
+bin/youtube-scrape --config-file object-store/config/youtube/config.yml
 ```
 
 To bypass object-store output for local debugging, provide an output file:
 
 ```bash
 bin/youtube-scrape \
-  --config-file deploy/config/youtube/daily.yml \
+  --config-file object-store/config/youtube/config.yml \
   --output-file /tmp/youtube-scraper.json
 ```
 
 ## Processor Runner
 
 Stage 2 reads scraper JSON from a local file, a stored object id, or a prior run
-id. Processor output is always written to the Empire object store using the
-`jellyfin` storage root by default.
+id. The run-level library plan is written to the `global` storage root under
+`EMPIRE_STORAGE_KEY_YOUTUBE`; media sidecars are written to the `jellyfin`
+storage root so the Jellyfin container can consume them.
 
 ```bash
 bin/youtube-process --input-file /tmp/youtube-scraper.json
@@ -167,10 +168,10 @@ The future downloader stage should write the video itself as:
 movie.mp4
 ```
 
-Stage 2 also writes a v1 run-level library plan to the `global` storage root:
+Stage 2 also writes a v1 run-level library plan to the `global` run folder:
 
 ```text
-scraper/youtube/daily/YYYY/MM/DD/{run_id}/youtube-library-plan.json
+youtube/YYYY/MM/DD/{run_id}/youtube-library-plan.json
 ```
 
 The object metadata uses:
@@ -181,12 +182,12 @@ object_kind = jellyfin_library_plan
 content_type = application/json
 ```
 
-Detailed Jellyfin layout rules will live in the processor package, while
-`ObjectStore` remains the generic read/write and metadata tool.
+The processor produces Jellyfin-compatible sidecar content, while `ObjectStore`
+remains the generic read/write and metadata tool.
 
-Processor sidecars are idempotent by path. If `empire.json`, `movie.nfo`, or
-`fanart.jpg` already exists for a video, the processor skips that sidecar and
-records the skip count in the run summary.
+Processor sidecars are idempotent by Jellyfin media path. If `empire.json`,
+`movie.nfo`, or `fanart.jpg` already exists for a video, the processor skips
+that sidecar and records the skip count in the run summary.
 
 ## Downloader Runner
 
@@ -223,10 +224,10 @@ media/youtube/{channel}/{published-date} - {title} [{video_id}]/movie.mp4
 ```
 
 Existing `movie.mp4` objects are skipped by path. Download reports are written
-to the `global` storage root:
+under the download run folder:
 
 ```text
-scraper/youtube/download/{run_id}/youtube-download-report.json
+youtube/YYYY/MM/DD/{download_run_id}/youtube-download-report.json
 ```
 
 `EMPIRE_YOUTUBE_DAYS_TO_KEEP` controls retention for short-lived YouTube

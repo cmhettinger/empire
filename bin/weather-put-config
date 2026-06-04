@@ -8,13 +8,13 @@ Usage:
 
 Description:
   Publishes a local weather YAML config file to the Empire object store.
-  Defaults to deploy/config/weather/config.yml when CONFIG_FILE is omitted.
+  Defaults to object-store/config/weather/config.yml when CONFIG_FILE is omitted.
 
 Options:
   --logical-name NAME  Object-store logical name. Defaults to weather-config.
   --filename NAME      Stored filename. Defaults to config.yml.
-  --storage-root NAME  Object-store root name. Defaults to global.
-  --storage-key KEY    Object key prefix. Defaults to EMPIRE_STORAGE_KEY_WEATHER or scraper/weather.
+  --storage-root NAME  Object-store root name. Defaults to config.
+  --storage-key KEY    Object key prefix. Defaults to weather.
   --env-file PATH      Load an environment file before running.
                        Defaults to deploy/env/local.env.
   -h, --help           Show this help message.

@@ -74,6 +74,9 @@ def test_download_entry_to_object_store(tmp_path, monkeypatch):
     assert not (
         tmp_path / "tmp" / "youtube" / "downloads" / str(ctx.run_id) / "abc123"
     ).exists()
+    assert not (
+        tmp_path / "tmp" / "youtube" / "downloads" / str(ctx.run_id)
+    ).exists()
     assert object_store.get_bytes(UUID(result.object_id)) == b"video"
 
 

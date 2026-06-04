@@ -214,7 +214,6 @@ def download_entry_to_object_store(
                 "source_url": entry.source_url,
             },
         )
-        _remove_dir_if_empty(work_dir)
         return YouTubeDownloadResult(
             video_id=entry.video_id,
             status="downloaded",
@@ -242,6 +241,7 @@ def download_entry_to_object_store(
         ) from exc
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
+        _remove_empty_temp_parents(work_dir)
 
 
 class YouTubeDownloadError(RuntimeError):
@@ -353,11 +353,13 @@ def _work_dir(temp_dir: str | Path | None, run_id: str, video_id: str) -> Path:
     return root / DEFAULT_TEMP_SUBDIR / run_id / video_id
 
 
-def _remove_dir_if_empty(path: Path) -> None:
-    try:
-        path.rmdir()
-    except OSError:
-        return
+def _remove_empty_temp_parents(work_dir: Path) -> None:
+    downloads_dir = work_dir.parents[1]
+    for path in (work_dir.parent, downloads_dir):
+        try:
+            path.rmdir()
+        except OSError:
+            break
 
 
 def _required_text(data: dict[str, Any], key: str) -> str:

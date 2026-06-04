@@ -7,14 +7,14 @@ from empire_youtube.exceptions import YouTubeConfigError
 
 
 def test_missing_api_key(monkeypatch):
-    monkeypatch.delenv("EMPIRE_YOUTUBE_API_KEY", raising=False)
+    monkeypatch.delenv("EMPIRE_YOUTUBE_GOOGLE_API_KEY", raising=False)
 
-    with pytest.raises(YouTubeConfigError, match="EMPIRE_YOUTUBE_API_KEY"):
+    with pytest.raises(YouTubeConfigError, match="EMPIRE_YOUTUBE_GOOGLE_API_KEY"):
         YouTubeAPIConfig.from_env()
 
 
 def test_api_key_from_env(monkeypatch):
-    monkeypatch.setenv("EMPIRE_YOUTUBE_API_KEY", "test-key")
+    monkeypatch.setenv("EMPIRE_YOUTUBE_GOOGLE_API_KEY", "test-key")
 
     config = YouTubeAPIConfig.from_env()
 

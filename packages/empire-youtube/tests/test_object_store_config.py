@@ -85,7 +85,7 @@ def _put_config(store: ObjectStore, data: bytes):
         logical_name=DEFAULT_CONFIG_LOGICAL_NAME,
         storage_root="test_root",
         object_key="youtube/config",
-        filename="daily.yml",
+        filename="config.yml",
         data=data,
         content_type="text/yaml",
         object_kind="scraper_config",

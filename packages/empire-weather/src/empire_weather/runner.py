@@ -17,7 +17,7 @@ from empire_weather.models import WeatherCollectionResult
 DEFAULT_DOMAIN = "weather"
 DEFAULT_SUBJECT_KEY = "all_locations"
 DEFAULT_STORAGE_ROOT = "global"
-DEFAULT_STORAGE_KEY = "scraper/weather"
+DEFAULT_STORAGE_KEY = "weather"
 DEFAULT_OUTPUT_FILENAME = "weather.json"
 DEFAULT_OUTPUT_CONTENT_TYPE = "application/json"
 DEFAULT_OUTPUT_OBJECT_KIND = "normalized_payload"

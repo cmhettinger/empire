@@ -41,7 +41,7 @@ def test_run_youtube_scraper_to_object_store(tmp_path, monkeypatch):
     run_id = result.run_context.run_id
     stored = result.stored_object
     assert run_repo.runs[run_id].status == "succeeded"
-    assert stored.object_key == f"youtube/daily/2026/05/23/{run_id}"
+    assert stored.object_key == f"youtube/2026/05/23/{run_id}"
     assert stored.filename == DEFAULT_OUTPUT_FILENAME
     assert stored.object_kind == "normalized_payload"
     assert stored.content_type == "application/json"
@@ -62,7 +62,7 @@ def test_run_youtube_scraper_to_object_store(tmp_path, monkeypatch):
     assert run_repo.runs[run_id].summary == {
         "stored_object_id": str(stored.object_id),
         "video_count": 1,
-        "object_key": f"youtube/daily/2026/05/23/{run_id}",
+        "object_key": f"youtube/2026/05/23/{run_id}",
         "filename": DEFAULT_OUTPUT_FILENAME,
     }
 

@@ -70,6 +70,12 @@ class InMemoryObjectRepository:
                 root_name="global",
                 backend_type="filesystem",
                 base_uri=base_uri,
+            ),
+            "config": StorageRoot(
+                storage_root_id=2,
+                root_name="config",
+                backend_type="filesystem",
+                base_uri=base_uri,
             )
         }
         self.objects: dict[UUID, StoredObject] = {}

@@ -1,9 +1,11 @@
-"""Download one planned YouTube video into the Jellyfin object store."""
+"""Download one planned YouTube video into the Empire object store."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+from datetime import UTC, datetime
 
 from empire_core import EmpireDatabase, ObjectStore, RunService
 
@@ -18,7 +20,11 @@ from empire_youtube.downloader import (
     load_library_plan_from_run_id,
 )
 from empire_youtube.retention import youtube_expires_at
-from empire_youtube.runner import DEFAULT_DOMAIN, DEFAULT_SUBJECT_KEY
+from empire_youtube.runner import (
+    DEFAULT_DOMAIN,
+    DEFAULT_STORAGE_KEY,
+    youtube_run_object_key,
+)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -42,7 +48,7 @@ def main(argv: list[str] | None = None) -> None:
             domain=DEFAULT_DOMAIN,
             job_name="youtube_download",
             subject_key=entry.video_id,
-            effective_date=None,
+            effective_date=datetime.now(UTC).date(),
             run_type=args.run_type,
             runner=args.runner,
             runner_ref={"command": "bin/youtube-download"},
@@ -97,7 +103,7 @@ def main(argv: list[str] | None = None) -> None:
 
 def parse_args(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(
-        description="Download one planned YouTube video into Jellyfin storage."
+        description="Download one planned YouTube video into Empire object storage."
     )
     plan_group = parser.add_mutually_exclusive_group(required=True)
     plan_group.add_argument(
@@ -148,7 +154,14 @@ def _write_report(object_store: ObjectStore, ctx, result: dict):
     return object_store.put_bytes(
         run_context=ctx,
         storage_root="global",
-        object_key=f"scraper/youtube/download/{ctx.run_id}",
+        object_key=youtube_run_object_key(
+            storage_key_prefix=os.environ.get(
+                "EMPIRE_STORAGE_KEY_YOUTUBE",
+                DEFAULT_STORAGE_KEY,
+            ),
+            effective_date=ctx.effective_date,
+            run_id=str(ctx.run_id),
+        ),
         filename=DOWNLOAD_REPORT_FILENAME,
         data=data,
         content_type="application/json",

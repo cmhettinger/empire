@@ -16,8 +16,8 @@ Description:
 
 Examples:
   bin/youtube-scrape
-  bin/youtube-scrape --config-file deploy/config/youtube/daily.yml
-  bin/youtube-scrape --config-file deploy/config/youtube/daily.yml --output-file /tmp/youtube-scraper.json
+  bin/youtube-scrape --config-file object-store/config/youtube/config.yml
+  bin/youtube-scrape --config-file object-store/config/youtube/config.yml --output-file /tmp/youtube-scraper.json
   bin/youtube-scrape --config-logical-name youtube-daily-config
 
 Options:

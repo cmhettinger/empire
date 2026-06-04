@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 
 from empire_core import EmpireDatabase, ObjectStore
@@ -19,9 +18,9 @@ from empire_weather.object_store import (
 )
 
 
-DEFAULT_STORAGE_ROOT = "global"
-DEFAULT_STORAGE_KEY = "scraper/weather"
-DEFAULT_LOCAL_CONFIG_FILE = "deploy/config/weather/config.yml"
+DEFAULT_STORAGE_ROOT = "config"
+DEFAULT_STORAGE_KEY = "weather"
+DEFAULT_LOCAL_CONFIG_FILE = "object-store/config/weather/config.yml"
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -31,11 +30,7 @@ def main(argv: list[str] | None = None) -> None:
     WeatherCollectionConfig.from_yaml(data.decode("utf-8"))
 
     storage_root = args.storage_root or DEFAULT_STORAGE_ROOT
-    storage_key = (
-        args.storage_key
-        or os.environ.get("EMPIRE_STORAGE_KEY_WEATHER")
-        or DEFAULT_STORAGE_KEY
-    ).strip("/")
+    storage_key = (args.storage_key or DEFAULT_STORAGE_KEY).strip("/")
 
     with EmpireDatabase.connect_from_env() as connection:
         object_store = ObjectStore.from_connection(connection)
@@ -45,7 +40,7 @@ def main(argv: list[str] | None = None) -> None:
             domain=DEFAULT_CONFIG_DOMAIN,
             logical_name=args.logical_name,
             storage_root=storage_root,
-            object_key=f"{storage_key}/config",
+            object_key=storage_key,
             filename=args.filename,
             data=data,
             content_type=DEFAULT_CONFIG_CONTENT_TYPE,
@@ -87,11 +82,11 @@ def parse_args(argv: list[str] | None = None):
     )
     parser.add_argument(
         "--storage-root",
-        help="Object-store root name. Defaults to global.",
+        help="Object-store root name. Defaults to config.",
     )
     parser.add_argument(
         "--storage-key",
-        help="Object key prefix. Defaults to EMPIRE_STORAGE_KEY_WEATHER or scraper/weather.",
+        help="Object key prefix. Defaults to weather.",
     )
     return parser.parse_args(argv)
 

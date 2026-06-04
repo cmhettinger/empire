@@ -29,3 +29,8 @@ deploy/env/*.env
 # ------------------------------------------------------------------
 build/
 tmp/
+
+# Objectstore runtime data
+object-store/*
+!object-store/config/
+!object-store/config/**

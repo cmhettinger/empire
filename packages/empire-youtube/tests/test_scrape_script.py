@@ -19,9 +19,9 @@ def test_parse_args_defaults_to_object_store_logical_name():
 
 
 def test_parse_args_accepts_config_file_override():
-    args = script.parse_args(["--config-file", "deploy/config/youtube/daily.yml"])
+    args = script.parse_args(["--config-file", "object-store/config/youtube/config.yml"])
 
-    assert args.config_file == "deploy/config/youtube/daily.yml"
+    assert args.config_file == "object-store/config/youtube/config.yml"
 
 
 def test_parse_args_accepts_output_file():

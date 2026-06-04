@@ -13,10 +13,10 @@ stable Empire weather payload. Air quality still comes from the OpenWeather 2.5
 air pollution endpoint when that endpoint is enabled for the configured API key.
 
 Configuration is environment-driven and package configuration is stored as a
-well-known object under:
+well-known object in the `config` storage root under:
 
 ```text
-${EMPIRE_STORAGE_KEY_WEATHER}/config/config.yml
+weather/config.yml
 ```
 
 Run artifacts are stored under:
@@ -91,19 +91,19 @@ Publish the default weather config to the Empire object store:
 bin/weather-put-config
 ```
 
-Run this again after changing `deploy/config/weather/config.yml`; the collector
+Run this again after changing `object-store/config/weather/config.yml`; the collector
 loads weather config from the object store by default.
 
 That command reads:
 
 ```text
-deploy/config/weather/config.yml
+object-store/config/weather/config.yml
 ```
 
 and stores it as:
 
 ```text
-${EMPIRE_STORAGE_KEY_WEATHER}/config/config.yml
+config:weather/config.yml
 ```
 
 Run collection from the stored config:
@@ -115,5 +115,5 @@ bin/weather-collect
 For a local debug payload without writing a run to the object store:
 
 ```bash
-bin/weather-collect --config-file deploy/config/weather/config.yml --output-file /tmp/weather.json
+bin/weather-collect --config-file object-store/config/weather/config.yml --output-file /tmp/weather.json
 ```

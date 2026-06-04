@@ -15,6 +15,7 @@ from test_runner import InMemoryObjectRepository, InMemoryRunRepository
 
 
 def test_run_youtube_processor_to_object_store(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMPIRE_STORAGE_KEY_YOUTUBE", "/youtube/")
     monkeypatch.delenv("EMPIRE_STORAGE_KEY_YOUTUBE_LIBRARY", raising=False)
     monkeypatch.setenv("EMPIRE_YOUTUBE_DAYS_TO_KEEP", "7")
     run_repo = InMemoryRunRepository()
@@ -52,7 +53,7 @@ def test_run_youtube_processor_to_object_store(tmp_path, monkeypatch):
     run_id = result.run_context.run_id
     stored = result.stored_object
     assert run_repo.runs[run_id].status == "succeeded"
-    assert stored.object_key == f"scraper/youtube/daily/2026/05/23/{run_id}"
+    assert stored.object_key == f"youtube/2026/05/23/{run_id}"
     assert stored.storage_root_name == "global"
     assert stored.filename == DEFAULT_LIBRARY_PLAN_FILENAME
     assert stored.object_kind == "jellyfin_library_plan"
@@ -96,12 +97,13 @@ def test_run_youtube_processor_to_object_store(tmp_path, monkeypatch):
         "plan_entry_count": 1,
         "sidecar_object_count": 3,
         "skipped_sidecar_count": 0,
-        "object_key": f"scraper/youtube/daily/2026/05/23/{run_id}",
+        "object_key": f"youtube/2026/05/23/{run_id}",
         "filename": DEFAULT_LIBRARY_PLAN_FILENAME,
     }
 
 
 def test_run_youtube_processor_skips_existing_sidecars(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMPIRE_STORAGE_KEY_YOUTUBE", "/youtube/")
     monkeypatch.delenv("EMPIRE_STORAGE_KEY_YOUTUBE_LIBRARY", raising=False)
     run_repo = InMemoryRunRepository()
     object_repo = InMemoryObjectRepository(str(tmp_path))
@@ -156,6 +158,7 @@ def test_run_youtube_processor_skips_existing_sidecar_metadata_without_file(
     tmp_path,
     monkeypatch,
 ):
+    monkeypatch.setenv("EMPIRE_STORAGE_KEY_YOUTUBE", "/youtube/")
     monkeypatch.delenv("EMPIRE_STORAGE_KEY_YOUTUBE_LIBRARY", raising=False)
     run_repo = InMemoryRunRepository()
     object_repo = InMemoryObjectRepository(str(tmp_path))

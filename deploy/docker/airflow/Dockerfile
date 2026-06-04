@@ -36,3 +36,7 @@ RUN pip install --no-cache-dir /opt/empire/packages/empire-core
 COPY packages/empire-youtube /opt/empire/packages/empire-youtube
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-youtube
+
+COPY packages/empire-weather /opt/empire/packages/empire-weather
+
+RUN pip install --no-cache-dir /opt/empire/packages/empire-weather

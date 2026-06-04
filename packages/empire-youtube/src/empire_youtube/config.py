@@ -95,7 +95,7 @@ class YouTubeAPIConfig:
 
     @classmethod
     def from_env(cls) -> "YouTubeAPIConfig":
-        return cls(api_key=_required_env("EMPIRE_YOUTUBE_API_KEY"))
+        return cls(api_key=_required_env("EMPIRE_YOUTUBE_GOOGLE_API_KEY"))
 
 
 @dataclass(frozen=True)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 
 from empire_core import EmpireDatabase, ObjectStore
@@ -17,26 +16,21 @@ from empire_youtube.object_store import (
 )
 
 
-DEFAULT_CONFIG_FILENAME = "daily.yml"
+DEFAULT_CONFIG_FILENAME = "config.yml"
 DEFAULT_CONFIG_CONTENT_TYPE = "text/yaml"
-DEFAULT_STORAGE_ROOT = "global"
+DEFAULT_STORAGE_ROOT = "config"
 DEFAULT_STORAGE_KEY = "youtube"
+DEFAULT_LOCAL_CONFIG_FILE = "object-store/config/youtube/config.yml"
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
-    path = Path(args.config_file)
+    path = Path(args.config_file or DEFAULT_LOCAL_CONFIG_FILE)
     data = path.read_bytes()
     YouTubeScraperConfig.from_yaml(data.decode("utf-8"))
 
-    storage_root = args.storage_root or os.environ.get(
-        "EMPIRE_STORAGE_ROOT_NAME_YOUTUBE",
-        DEFAULT_STORAGE_ROOT,
-    )
-    storage_key = (args.storage_key or os.environ.get(
-        "EMPIRE_STORAGE_KEY_YOUTUBE",
-        DEFAULT_STORAGE_KEY,
-    )).strip("/")
+    storage_root = args.storage_root or DEFAULT_STORAGE_ROOT
+    storage_key = (args.storage_key or DEFAULT_STORAGE_KEY).strip("/")
 
     with EmpireDatabase.connect_from_env() as connection:
         object_store = ObjectStore.from_connection(connection)
@@ -46,11 +40,12 @@ def main(argv: list[str] | None = None) -> None:
             domain=DEFAULT_CONFIG_DOMAIN,
             logical_name=args.logical_name,
             storage_root=storage_root,
-            object_key=f"{storage_key}/config",
+            object_key=storage_key,
             filename=args.filename,
             data=data,
             content_type=DEFAULT_CONFIG_CONTENT_TYPE,
             object_kind=DEFAULT_CONFIG_OBJECT_KIND,
+            overwrite=True,
             metadata={
                 "source_path": str(path),
                 "config_logical_name": args.logical_name,
@@ -69,6 +64,7 @@ def parse_args(argv: list[str] | None = None):
     )
     parser.add_argument(
         "config_file",
+        nargs="?",
         help="Local YouTube scraper YAML config file.",
     )
     parser.add_argument(
@@ -86,11 +82,11 @@ def parse_args(argv: list[str] | None = None):
     )
     parser.add_argument(
         "--storage-root",
-        help="Object-store root name. Defaults to global.",
+        help="Object-store root name. Defaults to config.",
     )
     parser.add_argument(
         "--storage-key",
-        help="Object key prefix. Defaults to EMPIRE_STORAGE_KEY_YOUTUBE or youtube.",
+        help="Object key prefix. Defaults to youtube.",
     )
     return parser.parse_args(argv)
 

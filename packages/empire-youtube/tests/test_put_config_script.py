@@ -6,11 +6,11 @@ from empire_youtube.scripts import put_config as script
 
 
 def test_parse_args_defaults():
-    args = script.parse_args(["deploy/config/youtube/daily.yml"])
+    args = script.parse_args([])
 
-    assert args.config_file == "deploy/config/youtube/daily.yml"
+    assert args.config_file is None
     assert args.logical_name == "youtube-daily-config"
-    assert args.filename == "daily.yml"
+    assert args.filename == "config.yml"
     assert args.storage_root is None
     assert args.storage_key is None
 
@@ -31,7 +31,7 @@ youtube:
         encoding="utf-8",
     )
     fake_store = FakeObjectStore()
-    monkeypatch.setenv("EMPIRE_STORAGE_KEY_YOUTUBE", "youtube")
+    monkeypatch.setenv("EMPIRE_STORAGE_KEY_YOUTUBE", "/youtube/")
     monkeypatch.setattr(
         script.EmpireDatabase,
         "connect_from_env",
@@ -48,11 +48,12 @@ youtube:
     assert fake_store.calls[0]["object_scope"] == "reference"
     assert fake_store.calls[0]["domain"] == "youtube"
     assert fake_store.calls[0]["logical_name"] == "youtube-daily-config"
-    assert fake_store.calls[0]["storage_root"] == "global"
-    assert fake_store.calls[0]["object_key"] == "youtube/config"
-    assert fake_store.calls[0]["filename"] == "daily.yml"
+    assert fake_store.calls[0]["storage_root"] == "config"
+    assert fake_store.calls[0]["object_key"] == "youtube"
+    assert fake_store.calls[0]["filename"] == "config.yml"
     assert fake_store.calls[0]["content_type"] == "text/yaml"
     assert fake_store.calls[0]["object_kind"] == "scraper_config"
+    assert fake_store.calls[0]["overwrite"] is True
     assert "stored_object_id:" in capsys.readouterr().out
 
 
@@ -67,8 +68,8 @@ class FakeConnection:
 class FakeObject:
     object_id = uuid4()
     logical_name = "youtube-daily-config"
-    object_key = "youtube/config"
-    filename = "daily.yml"
+    object_key = "youtube"
+    filename = "config.yml"
 
 
 class FakeObjectStore:
