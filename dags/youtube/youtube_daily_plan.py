@@ -14,14 +14,14 @@ log = logging.getLogger(__name__)
 
 
 @dag(
-    dag_id="youtube_process_plan",
+    dag_id="youtube_daily_plan",
     start_date=datetime(2026, 5, 24),
     schedule=None,
     catchup=False,
     max_active_runs=1,
     tags=["youtube", "processor", "manual"],
 )
-def youtube_process_plan():
+def youtube_daily_plan():
     @task(task_id="process_youtube_library_plan")
     def process_youtube_library_plan() -> dict[str, str | int | list[str]]:
         context = get_current_context()
@@ -41,7 +41,7 @@ def youtube_process_plan():
                 object_store=object_store,
                 run_type="airflow",
                 runner="airflow",
-                runner_ref={"dag_id": "youtube_process_plan"},
+                runner_ref={"dag_id": "youtube_daily_plan"},
                 source=args.input_source,
             )
 
@@ -67,8 +67,8 @@ def youtube_process_plan():
 
     process_result = process_youtube_library_plan()
     trigger_download_plan = TriggerDagRunOperator(
-        task_id="trigger_youtube_download_plan",
-        trigger_dag_id="youtube_download_plan",
+        task_id="trigger_youtube_daily_download",
+        trigger_dag_id="youtube_daily_download",
         conf={
             "plan_run_id": "{{ ti.xcom_pull(task_ids='process_youtube_library_plan')['run_id'] }}"
         },
@@ -104,4 +104,4 @@ def _processor_args_from_conf(conf: dict):
     return parse_args(argv)
 
 
-youtube_process_plan_dag = youtube_process_plan()
+youtube_daily_plan_dag = youtube_daily_plan()

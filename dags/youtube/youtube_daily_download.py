@@ -24,14 +24,14 @@ log = logging.getLogger(__name__)
 
 
 @dag(
-    dag_id="youtube_download_plan",
+    dag_id="youtube_daily_download",
     start_date=datetime(2026, 5, 24),
     schedule=None,
     catchup=False,
     max_active_runs=1,
     tags=["youtube", "downloader", "manual"],
 )
-def youtube_download_plan():
+def youtube_daily_download():
     @task(task_id="list_download_video_ids")
     def list_download_video_ids() -> list[str]:
         context = get_current_context()
@@ -78,7 +78,7 @@ def youtube_download_plan():
                 run_type="airflow",
                 runner="airflow",
                 runner_ref={
-                    "dag_id": "youtube_download_plan",
+                    "dag_id": "youtube_daily_download",
                     "task_id": "download_one_video",
                 },
                 params={
@@ -159,4 +159,4 @@ def _write_report(object_store: ObjectStore, ctx, result: dict):
     )
 
 
-youtube_download_plan_dag = youtube_download_plan()
+youtube_daily_download_dag = youtube_daily_download()

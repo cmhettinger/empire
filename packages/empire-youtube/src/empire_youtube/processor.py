@@ -158,9 +158,15 @@ class YouTubeScrapeProcessor:
         source_run_id = scrape_payload.get("run_id")
         if source_run_id is not None:
             source_run_id = str(source_run_id)
+        section_names = _topic_section_names(scrape_payload)
+        run_date_folder = _run_date_folder(scrape_payload.get("generated_at"))
 
         entries = [
-            self._build_entry(video)
+            self._build_entry(
+                video,
+                section_names=section_names,
+                run_date_folder=run_date_folder,
+            )
             for video in source_videos
             if (
                 isinstance(video, dict)
@@ -178,7 +184,13 @@ class YouTubeScrapeProcessor:
             entries=entries,
         )
 
-    def _build_entry(self, video: dict[str, Any]) -> YouTubeLibraryEntry:
+    def _build_entry(
+        self,
+        video: dict[str, Any],
+        *,
+        section_names: dict[str, str],
+        run_date_folder: str,
+    ) -> YouTubeLibraryEntry:
         video_id = str(video["video_id"])
         title = _text_or_default(video.get("title"), "Untitled")
         channel_name = _channel_name(video)
@@ -195,6 +207,11 @@ class YouTubeScrapeProcessor:
             published_date=published_date,
             title=title,
             video_id=video_id,
+            matched_sections=_string_list(video.get("matched_sections")),
+            matched_channels=video.get("matched_channels"),
+            discovery_sources=_string_list(video.get("discovery_sources")),
+            topic_section_names=section_names,
+            run_date_folder=run_date_folder,
         )
         thumbnail_url = select_thumbnail_url(video)
         files = [
@@ -245,15 +262,41 @@ def build_jellyfin_object_key(
     published_date: str,
     title: str,
     video_id: str,
+    matched_sections: list[str] | None = None,
+    matched_channels: Any = None,
+    discovery_sources: list[str] | None = None,
+    topic_section_names: dict[str, str] | None = None,
+    run_date_folder: str | None = None,
 ) -> str:
     """Build the relative object key for one Jellyfin movie folder."""
 
     prefix = storage_key_prefix.strip("/")
+    clean_title = jellyfin_friendly_name(title, max_length=DEFAULT_TITLE_MAX_LENGTH)
+    if _use_topic_section_layout(
+        matched_sections=matched_sections or [],
+        matched_channels=matched_channels,
+        discovery_sources=discovery_sources or [],
+    ):
+        section_key = (matched_sections or [])[0]
+        section_name = (topic_section_names or {}).get(
+            section_key,
+            _section_name_from_key(section_key),
+        )
+        section = jellyfin_friendly_name(
+            section_name,
+            max_length=DEFAULT_CHANNEL_MAX_LENGTH,
+        )
+        folder = f"{clean_title} [{video_id}]"
+        return "/".join(
+            part
+            for part in [prefix, section, run_date_folder or published_date, folder]
+            if part
+        )
+
     channel = jellyfin_friendly_name(
         channel_name,
         max_length=DEFAULT_CHANNEL_MAX_LENGTH,
     )
-    clean_title = jellyfin_friendly_name(title, max_length=DEFAULT_TITLE_MAX_LENGTH)
     folder = f"{published_date} - {clean_title} [{video_id}]"
     return "/".join(part for part in [prefix, channel, folder] if part)
 
@@ -285,6 +328,56 @@ def jellyfin_friendly_name(title: str, max_length: int = 70) -> str:
         value = f"{value}_video"
 
     return value or "untitled"
+
+
+def _use_topic_section_layout(
+    *,
+    matched_sections: list[str],
+    matched_channels: Any,
+    discovery_sources: list[str],
+) -> bool:
+    if not matched_sections:
+        return False
+    if "channel_watch" in discovery_sources:
+        return False
+    if isinstance(matched_channels, list) and matched_channels:
+        return False
+    return True
+
+
+def _topic_section_names(scrape_payload: dict[str, Any]) -> dict[str, str]:
+    config = scrape_payload.get("config")
+    if not isinstance(config, dict):
+        return {}
+    names = config.get("topic_section_names")
+    if not isinstance(names, dict):
+        return {}
+    return {
+        str(key): str(value)
+        for key, value in names.items()
+        if key is not None and value is not None and str(value).strip()
+    }
+
+
+def _section_name_from_key(value: str) -> str:
+    return " ".join(part.capitalize() for part in value.replace("-", "_").split("_") if part)
+
+
+def _run_date_folder(value: Any) -> str:
+    if isinstance(value, str) and value:
+        try:
+            generated_at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            generated_at = None
+        if generated_at is not None:
+            return generated_at.date().strftime("%Y-%m-%d %A")
+    return datetime.now(UTC).date().strftime("%Y-%m-%d %A")
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item is not None and str(item).strip()]
 
 
 def select_thumbnail_url(video: dict[str, Any]) -> str | None:

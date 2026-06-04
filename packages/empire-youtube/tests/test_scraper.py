@@ -126,7 +126,11 @@ def test_scraper_dedupes_and_merges_discovery_sources():
     assert result["schema_version"] == 1
     assert result["generated_at"] == "2026-05-23T22:00:00Z"
     assert result["window_hours"] == 26
-    assert result["config"] == {"name": "daily_youtube_scraper", "version": 1}
+    assert result["config"] == {
+        "name": "daily_youtube_scraper",
+        "version": 1,
+        "topic_section_names": {"ancient_history": "Ancient History"},
+    }
     assert len(result["videos"]) == 1
     video = result["videos"][0]
     assert video["matched_sections"] == ["ancient_history"]

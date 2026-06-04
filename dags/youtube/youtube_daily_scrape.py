@@ -57,8 +57,8 @@ def youtube_daily_scrape():
 
     scrape_result = scrape_youtube_metadata()
     trigger_process_plan = TriggerDagRunOperator(
-        task_id="trigger_youtube_process_plan",
-        trigger_dag_id="youtube_process_plan",
+        task_id="trigger_youtube_daily_plan",
+        trigger_dag_id="youtube_daily_plan",
         conf={
             "input_run_id": "{{ ti.xcom_pull(task_ids='scrape_youtube_metadata')['run_id'] }}"
         },

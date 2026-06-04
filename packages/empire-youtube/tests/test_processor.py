@@ -83,6 +83,106 @@ def test_processor_builds_jellyfin_library_plan():
     ElementTree.fromstring(entry.files[1].data)
 
 
+def test_processor_uses_topic_section_layout_for_topic_only_videos():
+    payload = {
+        "source": "youtube",
+        "schema_version": 1,
+        "generated_at": "2026-06-02T12:00:00Z",
+        "config": {
+            "topic_section_names": {
+                "home_automation": "Home Automation",
+            },
+        },
+        "videos": [
+            {
+                "video_id": "abc123",
+                "url": "https://www.youtube.com/watch?v=abc123",
+                "title": "SONOFF NSPanel Pro Gen 2 Review",
+                "channel": {"channel_name": "Tinkr Reviews Guides"},
+                "published_at": "2026-06-02T10:00:00Z",
+                "matched_sections": ["home_automation"],
+                "matched_topics": ["home_assistant"],
+                "discovery_sources": ["topic_search"],
+            }
+        ],
+    }
+
+    plan = YouTubeScrapeProcessor(
+        thumbnail_fetcher=FakeThumbnailFetcher(),
+    ).process(payload)
+
+    assert plan.entries[0].object_key == (
+        "media/youtube/Home Automation/"
+        "2026-06-02 Tuesday/"
+        "SONOFF NSPanel Pro Gen 2 Review [abc123]"
+    )
+
+
+def test_processor_topic_section_layout_falls_back_to_readable_section_key():
+    payload = {
+        "source": "youtube",
+        "schema_version": 1,
+        "generated_at": "2026-06-02T12:00:00Z",
+        "videos": [
+            {
+                "video_id": "abc123",
+                "title": "SONOFF NSPanel Pro Gen 2 Review",
+                "channel": {"channel_name": "Tinkr Reviews Guides"},
+                "published_at": "2026-06-02T10:00:00Z",
+                "matched_sections": ["home_automation"],
+                "discovery_sources": ["topic_search"],
+            }
+        ],
+    }
+
+    plan = YouTubeScrapeProcessor(
+        thumbnail_fetcher=FakeThumbnailFetcher(),
+    ).process(payload)
+
+    assert plan.entries[0].object_key.startswith(
+        "media/youtube/Home Automation/2026-06-02 Tuesday/"
+    )
+
+
+def test_processor_keeps_channel_layout_for_followed_channel_matches():
+    payload = {
+        "source": "youtube",
+        "schema_version": 1,
+        "generated_at": "2026-06-02T12:00:00Z",
+        "config": {
+            "topic_section_names": {
+                "home_automation": "Home Automation",
+            },
+        },
+        "videos": [
+            {
+                "video_id": "abc123",
+                "url": "https://www.youtube.com/watch?v=abc123",
+                "title": "SONOFF NSPanel Pro Gen 2 Review",
+                "channel": {"channel_name": "Tinkr Reviews Guides"},
+                "published_at": "2026-06-02T10:00:00Z",
+                "matched_sections": ["home_automation"],
+                "matched_channels": [
+                    {
+                        "channel_name": "Tinkr Reviews Guides",
+                        "channel_id": "UC123",
+                    },
+                ],
+                "discovery_sources": ["topic_search", "channel_watch"],
+            }
+        ],
+    }
+
+    plan = YouTubeScrapeProcessor(
+        thumbnail_fetcher=FakeThumbnailFetcher(),
+    ).process(payload)
+
+    assert plan.entries[0].object_key == (
+        "media/youtube/Tinkr Reviews Guides/"
+        "2026-06-02 - SONOFF NSPanel Pro Gen 2 Review [abc123]"
+    )
+
+
 def test_movie_nfo_escapes_and_removes_unsafe_xml_text():
     payload = {
         "source": "youtube",

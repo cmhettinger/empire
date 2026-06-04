@@ -147,6 +147,7 @@ class YouTubeScrapeResult:
     config_name: str
     config_version: int
     videos: list[NormalizedVideo]
+    topic_section_names: dict[str, str] = field(default_factory=dict)
     schema_version: int = OUTPUT_SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -160,6 +161,7 @@ class YouTubeScrapeResult:
             "config": {
                 "name": self.config_name,
                 "version": self.config_version,
+                "topic_section_names": self.topic_section_names,
             },
             "videos": [video.to_dict() for video in self.videos],
         }

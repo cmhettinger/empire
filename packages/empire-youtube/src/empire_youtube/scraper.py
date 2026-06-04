@@ -101,6 +101,9 @@ class YouTubeScraper:
             run_id=run_id,
             config_name=self.config.name,
             config_version=self.config.version,
+            topic_section_names={
+                section.key: section.name for section in self.config.topic_sections
+            },
             videos=videos,
         )
 

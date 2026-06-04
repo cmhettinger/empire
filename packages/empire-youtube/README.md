@@ -258,13 +258,13 @@ The YouTube Airflow DAGs are manual-only while the pipeline is being hardened:
 
 ```text
 dags/youtube/youtube_daily_scrape.py
-dags/youtube/youtube_process_plan.py
-dags/youtube/youtube_download_plan.py
+dags/youtube/youtube_daily_plan.py
+dags/youtube/youtube_daily_download.py
 ```
 
 `youtube_daily_scrape` is the manual entry point for the full pipeline. When it
-completes, it triggers `youtube_process_plan` with the scraper run id. When the
-processor completes, it triggers `youtube_download_plan` with the library plan
+completes, it triggers `youtube_daily_plan` with the scraper run id. When the
+processor completes, it triggers `youtube_daily_download` with the library plan
 run id.
 
 Trigger the processor DAG with one scraper input:

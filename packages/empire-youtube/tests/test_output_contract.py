@@ -34,7 +34,11 @@ def test_scrape_result_output_contract():
     assert data["generated_at"] == "2026-05-23T22:00:00Z"
     assert data["window_hours"] == 26
     assert data["run_id"] == "d7e5c5f9-6a5c-4f18-9b1d-8fd1c0d2f92f"
-    assert data["config"] == {"name": "daily_youtube_scraper", "version": 1}
+    assert data["config"] == {
+        "name": "daily_youtube_scraper",
+        "version": 1,
+        "topic_section_names": {},
+    }
     assert data["videos"][0]["video_id"] == "abc123xyz"
 
     serialized = result.to_json()
