@@ -12,6 +12,7 @@ weather:
       state: Virginia
       lat: 39.0277
       lon: -77.4714
+      accuweather_health_activities_url: /en/us/ashburn/20147/health-activities/2160760
       nws:
         gridId: LWX
         gridX: 80
@@ -23,6 +24,7 @@ weather:
       state: Georgia
       lat: 32.0286
       lon: -81.1821
+      accuweather_health_activities_url: /en/us/savannah/31401/health-activities/446
       nws:
         gridId: CHS
         gridX: 47
@@ -36,3 +38,6 @@ weather:
       collect_alert_details: true
     nws:
       user_agent: empire-weather/0.1
+    accuweather:
+      enabled: true
+      user_agent: empire-weather/0.1 personal daily weather digest

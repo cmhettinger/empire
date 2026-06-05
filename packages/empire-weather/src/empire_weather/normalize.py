@@ -30,11 +30,13 @@ def normalize_weather_payload(
         location_data = by_location.get(location.key, {})
         openweather = location_data.get("openweather")
         nws = location_data.get("nws")
+        accuweather = location_data.get("accuweather")
         locations[location.key] = _normalize_location(
             location=location,
             units=config.units,
             openweather=openweather.data if openweather else {},
             nws=nws.data if nws else {},
+            accuweather=accuweather.data if accuweather else {},
         )
 
     return {
@@ -51,6 +53,7 @@ def normalize_weather_payload(
         "providers": {
             "openweather": {"role": "structured_weather"},
             "nws": {"role": "authoritative_us_alerts_and_forecasts"},
+            "accuweather": {"role": "personal_use_health_activity_page_indexes"},
         },
         "locations": locations,
         "assets": [],
@@ -63,10 +66,12 @@ def _normalize_location(
     units: str,
     openweather: dict[str, Any],
     nws: dict[str, Any],
+    accuweather: dict[str, Any],
 ) -> dict[str, Any]:
     onecall = _as_dict(openweather.get("onecall"))
     current = _as_dict(onecall.get("current"))
     air_quality = _as_dict(openweather.get("air_quality"))
+    health_activities = _as_dict(accuweather.get("health_activities"))
     timezone = onecall.get("timezone")
     dates: dict[str, Any] = {}
 
@@ -191,6 +196,12 @@ def _normalize_location(
         date_key = (item.get("observed_at") or "")[:10] or "undated"
         dates.setdefault(date_key, _empty_date())["air_quality"].append(item)
 
+    if health_activities:
+        fetched_date = (health_activities.get("fetched_at") or "")[:10] or "undated"
+        dates.setdefault(fetched_date, _empty_date())["health_activities"] = _normalize_health_activities(
+            health_activities
+        )
+
     return {
         "key": location.key,
         "name": location.name,
@@ -214,6 +225,7 @@ def _normalize_location(
             "alerts": ["nws", "openweather"],
             "forecast_discussions": "nws",
             "air_quality": "openweather",
+            "health_activities": "accuweather",
         },
         "dates": dict(sorted(dates.items())),
     }
@@ -363,6 +375,27 @@ def _normalize_air_quality(payload: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return items
+
+
+def _normalize_health_activities(payload: dict[str, Any]) -> dict[str, Any]:
+    groups: dict[str, Any] = {}
+    for group_name, items in _as_dict(payload.get("groups")).items():
+        groups[group_name] = [
+            {
+                "name": _as_dict(item).get("name"),
+                "key": _as_dict(item).get("key"),
+                "level": _as_dict(item).get("level"),
+            }
+            for item in _as_list(items)
+            if isinstance(item, dict)
+        ]
+    return {
+        "source": "accuweather",
+        "source_url": payload.get("source_url"),
+        "fetched_at": payload.get("fetched_at"),
+        "personal_use_note": payload.get("personal_use_note"),
+        "groups": groups,
+    }
 
 
 def _short_interval_forecast(

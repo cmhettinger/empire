@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from empire_weather.config import WeatherCollectionConfig
 from empire_weather.models import ProviderLocationData, WeatherCollectionResult
 from empire_weather.normalize import normalize_weather_payload
-from empire_weather.providers import NWSProvider, OpenWeatherProvider
+from empire_weather.providers import AccuWeatherHealthActivitiesProvider, NWSProvider, OpenWeatherProvider
 
 
 class WeatherCollector:
@@ -19,10 +19,12 @@ class WeatherCollector:
         config: WeatherCollectionConfig,
         openweather: OpenWeatherProvider | None = None,
         nws: NWSProvider | None = None,
+        accuweather: AccuWeatherHealthActivitiesProvider | None = None,
     ):
         self.config = config
         self.openweather = openweather or OpenWeatherProvider(config.providers.openweather)
         self.nws = nws or NWSProvider(config.providers.nws)
+        self.accuweather = accuweather or AccuWeatherHealthActivitiesProvider(config.providers.accuweather)
 
     def collect(
         self,
@@ -47,6 +49,14 @@ class WeatherCollector:
             provider_data.extend([openweather_data, nws_data])
             raw_responses.extend(openweather_data.raw_responses)
             raw_responses.extend(nws_data.raw_responses)
+            if self.config.providers.accuweather.enabled:
+                accuweather_data = self.accuweather.collect_location(
+                    location,
+                    collected_at=generated_at,
+                    store_raw=self.config.store_raw_responses,
+                )
+                provider_data.append(accuweather_data)
+                raw_responses.extend(accuweather_data.raw_responses)
 
         payload = normalize_weather_payload(
             config=self.config,

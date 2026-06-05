@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from empire_weather.config import NWSConfig, OpenWeatherConfig, WeatherCollectionConfig
-from empire_weather.providers import NWSProvider, OpenWeatherProvider
+from empire_weather.config import AccuWeatherConfig, NWSConfig, OpenWeatherConfig, WeatherCollectionConfig
+from empire_weather.providers import AccuWeatherHealthActivitiesProvider, NWSProvider, OpenWeatherProvider
+from empire_weather.providers.accuweather import parse_health_activity_indexes
 
 from test_config import CONFIG
 
@@ -104,6 +105,69 @@ def test_nws_provider_fetches_latest_forecast_discussion():
     assert session.requests[-1]["headers"]["User-Agent"] == "test-agent"
 
 
+def test_accuweather_provider_collects_health_activity_html():
+    config = WeatherCollectionConfig.from_mapping(CONFIG)
+    session = FakeSession(
+        {
+            "/en/us/ashburn/20147/health-activities/2160760": """
+                <html><body>
+                  <section>Allergies Tree Pollen High Ragweed Pollen Low Mold Moderate Grass Pollen Low Dust & Dander Very High</section>
+                  <section>Health Arthritis Moderate Sinus Pressure Low Common Cold Low Flu Low Migraine Fair Asthma High</section>
+                  <section>Outdoor Activities Fishing Poor Running Good Golf Fair Biking & Cycling Good Beach & Pool Fair Stargazing Great Hiking Ideal</section>
+                </body></html>
+            """,
+        }
+    )
+    provider = AccuWeatherHealthActivitiesProvider(
+        AccuWeatherConfig(base_url="https://accuweather.test", user_agent="test-agent"),
+        session=session,
+    )
+
+    result = provider.collect_location(
+        config.locations[0],
+        collected_at=datetime(2026, 5, 30, tzinfo=UTC),
+        store_raw=True,
+    )
+
+    activities = result.data["health_activities"]
+    assert activities["source"] == "accuweather"
+    assert activities["source_url"] == (
+        "https://accuweather.test/en/us/ashburn/20147/health-activities/2160760"
+    )
+    assert activities["groups"]["allergies"][0] == {
+        "name": "Tree Pollen",
+        "key": "tree_pollen",
+        "level": "High",
+    }
+    assert activities["groups"]["outdoor_activities"][-1]["level"] == "Ideal"
+    assert result.raw_responses[0].filename == "health_activities.html"
+    assert result.raw_responses[0].content_type == "text/html"
+    assert "Tree Pollen High" in result.raw_responses[0].payload
+    assert session.requests[0]["headers"]["User-Agent"] == "test-agent"
+
+
+def test_parse_health_activity_indexes_groups_known_categories():
+    groups = parse_health_activity_indexes(
+        """
+        Allergies Tree Pollen Low Ragweed Pollen Low Mold Low Grass Pollen Low Dust & Dander Very High
+        Health Arthritis Moderate Sinus Pressure Low Common Cold Moderate Flu Low Migraine Low Asthma High
+        Travel & Commute Air Travel Fair Driving Fair
+        Pests Mosquitos Extreme Indoor Pests Extreme Outdoor Pests Extreme
+        """
+    )
+
+    assert groups["allergies"][-1] == {
+        "name": "Dust & Dander",
+        "key": "dust_dander",
+        "level": "Very High",
+    }
+    assert groups["travel_and_commute"] == [
+        {"name": "Air Travel", "key": "air_travel", "level": "Fair"},
+        {"name": "Driving", "key": "driving", "level": "Fair"},
+    ]
+    assert groups["pests"][0]["level"] == "Extreme"
+
+
 class FakeSession:
     def __init__(self, responses):
         self.responses = responses
@@ -117,10 +181,12 @@ class FakeSession:
 
 class FakeResponse:
     status_code = 200
-    text = ""
 
     def __init__(self, payload):
         self.payload = payload
+        self.text = payload if isinstance(payload, str) else ""
 
     def json(self):
+        if isinstance(self.payload, str):
+            raise ValueError("Response body is not JSON.")
         return self.payload

@@ -18,6 +18,8 @@ DEFAULT_RETENTION_DAYS = 7
 DEFAULT_OPENWEATHER_BASE_URL = "https://api.openweathermap.org"
 DEFAULT_NWS_BASE_URL = "https://api.weather.gov"
 DEFAULT_NWS_USER_AGENT = "empire-weather/0.1"
+DEFAULT_ACCUWEATHER_BASE_URL = "https://www.accuweather.com"
+DEFAULT_ACCUWEATHER_USER_AGENT = "empire-weather/0.1 personal daily weather digest"
 
 
 def required_env(name: str) -> str:
@@ -57,6 +59,7 @@ class WeatherLocationConfig:
     lat: float
     lon: float
     nws: NWSGridConfig
+    accuweather_health_activities_url: str | None = None
     enabled: bool = True
 
     @classmethod
@@ -73,6 +76,10 @@ class WeatherLocationConfig:
             nws=NWSGridConfig.from_mapping(
                 data.get("nws"),
                 field_name="weather.locations[].nws",
+            ),
+            accuweather_health_activities_url=_optional_str(
+                data.get("accuweather_health_activities_url"),
+                "weather.locations[].accuweather_health_activities_url",
             ),
             enabled=_as_bool(data.get("enabled", True), "weather.locations[].enabled"),
         )
@@ -158,11 +165,46 @@ class NWSConfig:
 
 
 @dataclass(frozen=True)
+class AccuWeatherConfig:
+    """Personal-use AccuWeather health/activity page collection settings."""
+
+    enabled: bool = False
+    base_url: str = DEFAULT_ACCUWEATHER_BASE_URL
+    user_agent: str = DEFAULT_ACCUWEATHER_USER_AGENT
+    timeout_seconds: float = 30.0
+
+    @classmethod
+    def from_mapping(cls, data: dict[str, Any] | None) -> "AccuWeatherConfig":
+        if data is not None and not isinstance(data, dict):
+            raise WeatherConfigError("weather.providers.accuweather must be a mapping.")
+        data = data or {}
+        return cls(
+            enabled=_as_bool(data.get("enabled", False), "weather.providers.accuweather.enabled"),
+            base_url=_as_str(
+                data.get("base_url", DEFAULT_ACCUWEATHER_BASE_URL),
+                "weather.providers.accuweather.base_url",
+            ),
+            user_agent=_as_str(
+                data.get(
+                    "user_agent",
+                    os.environ.get("EMPIRE_WEATHER_ACCUWEATHER_USER_AGENT", DEFAULT_ACCUWEATHER_USER_AGENT),
+                ),
+                "weather.providers.accuweather.user_agent",
+            ),
+            timeout_seconds=_as_float(
+                data.get("timeout_seconds", 30.0),
+                "weather.providers.accuweather.timeout_seconds",
+            ),
+        )
+
+
+@dataclass(frozen=True)
 class WeatherProviderConfig:
     """Provider configuration for one weather collection job."""
 
     openweather: OpenWeatherConfig
     nws: NWSConfig = field(default_factory=NWSConfig)
+    accuweather: AccuWeatherConfig = field(default_factory=AccuWeatherConfig)
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any] | None, *, units: str) -> "WeatherProviderConfig":
@@ -172,6 +214,7 @@ class WeatherProviderConfig:
         return cls(
             openweather=OpenWeatherConfig.from_mapping(data.get("openweather"), units=units),
             nws=NWSConfig.from_mapping(data.get("nws")),
+            accuweather=AccuWeatherConfig.from_mapping(data.get("accuweather")),
         )
 
 
@@ -240,6 +283,12 @@ def _as_str(value: Any, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise WeatherConfigError(f"{field_name} must be a non-empty string.")
     return value.strip()
+
+
+def _optional_str(value: Any, field_name: str) -> str | None:
+    if value is None:
+        return None
+    return _as_str(value, field_name)
 
 
 def _as_key(value: Any, field_name: str) -> str:

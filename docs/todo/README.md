@@ -23,10 +23,6 @@ coverage expansion.
 | Medium | Collect NOAA/nowCOAST temperature or weather-analysis maps | NOAA nowCOAST, NWS/NOAA map services | Determine whether NOAA sources provide useful finished local/regional map products. |
 | Medium | Add OpenWeather Maps 1.0 tile collector | OpenWeather Weather Maps 1.0 | Key access is confirmed. Raw tiles are weather overlays only, so this needs base-map composition before it is report-friendly. |
 | Medium | Composite OpenWeather maps over a base map | OpenWeather Maps 1.0, OpenStreetMap, Census TIGER/Line | Fetch matching weather and base-map tiles, stitch them, add labels/markers, and store finished PNGs. |
-| Medium | Expand air quality collection | OpenWeather Air Pollution API | Current AQ snapshot works. Add forecast/history if available and normalize by date. |
-| Medium | Add pollen/allergy provider | Ambee, Tomorrow.io, Open-Meteo if useful for U.S. locations | Not available from current NWS/OpenWeather coverage in a useful way. Needs provider decision. |
-| Low | Add historical weather backfill mode | OpenWeather One Call API 4.0 timelines/history | Separate from daily collection; should write date-oriented payloads using explicit backfill parameters. |
-| Low | Add provider capability probes | OpenWeather, NOAA/NWS/nowCOAST | Small CLI/debug probes for map, air quality, radar, and satellite access before enabling permanent collection. |
 | Low | Generate report-ready weather graphics | Future reporting package | Keep `empire-weather` as acquisition layer; reporting package can render charts, briefings, PDFs, and dashboards later. |
 
 ## Short-Term Tactical Tasks

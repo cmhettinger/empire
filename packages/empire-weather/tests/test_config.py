@@ -19,12 +19,14 @@ CONFIG = {
                 "state": "Virginia",
                 "lat": 39.0277,
                 "lon": -77.4714,
+                "accuweather_health_activities_url": "/en/us/ashburn/20147/health-activities/2160760",
                 "nws": {"gridId": "LWX", "gridX": 80, "gridY": 76},
             }
         ],
         "providers": {
             "openweather": {"api_key": "test-key"},
             "nws": {"user_agent": "empire-weather-test"},
+            "accuweather": {"enabled": True, "user_agent": "empire-weather-test"},
         },
     }
 }
@@ -39,11 +41,17 @@ def test_config_from_mapping():
     assert config.store_raw_responses is True
     assert config.retention_days == 7
     assert config.locations[0].key == "ashburn_va"
+    assert (
+        config.locations[0].accuweather_health_activities_url
+        == "/en/us/ashburn/20147/health-activities/2160760"
+    )
     assert config.locations[0].nws.grid_id == "LWX"
     assert config.providers.openweather.api_key == "test-key"
     assert config.providers.openweather.collect_minutely is True
     assert config.providers.openweather.collect_quarter_hourly is True
     assert config.providers.openweather.collect_alert_details is True
+    assert config.providers.accuweather.enabled is True
+    assert config.providers.accuweather.user_agent == "empire-weather-test"
 
 
 def test_openweather_key_can_come_from_env(monkeypatch):

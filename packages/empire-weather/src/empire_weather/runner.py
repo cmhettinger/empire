@@ -107,13 +107,18 @@ def run_weather_collection_to_object_store(
         raw_count = 0
         for raw in collection_result.raw_responses:
             raw_key = f"{object_key}/raw/{raw.location_key}/{raw.provider}/{raw.endpoint}"
+            raw_data = (
+                raw.payload.encode("utf-8")
+                if isinstance(raw.payload, str)
+                else json.dumps(raw.payload, indent=2, sort_keys=True).encode("utf-8")
+            )
             object_store.put_bytes(
                 run_context=ctx,
                 storage_root=resolved_storage_root,
                 object_key=raw_key,
                 filename=raw.filename,
-                data=json.dumps(raw.payload, indent=2, sort_keys=True).encode("utf-8"),
-                content_type=DEFAULT_RAW_CONTENT_TYPE,
+                data=raw_data,
+                content_type=raw.content_type,
                 object_kind=DEFAULT_RAW_OBJECT_KIND,
                 expires_at=expires_at,
                 metadata={

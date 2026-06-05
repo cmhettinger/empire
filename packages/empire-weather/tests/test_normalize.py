@@ -50,6 +50,13 @@ def test_normalized_payload_is_date_oriented():
                             "sunrise": 1780120800,
                             "sunset": 1780173600,
                             "moon_phase": 0.5,
+                        },
+                        {
+                            "dt": 1780228800,
+                            "summary": "Warm again",
+                            "temp": {"day": 76, "min": 62, "max": 81, "night": 67},
+                            "feels_like": {"day": 77, "night": 67},
+                            "humidity": 56,
                         }
                     ],
                     "alert_details": [
@@ -111,6 +118,29 @@ def test_normalized_payload_is_date_oriented():
                 },
             },
         ),
+        ProviderLocationData(
+            provider="accuweather",
+            location_key="ashburn_va",
+            collected_at=generated_at,
+            data={
+                "health_activities": {
+                    "source": "accuweather",
+                    "source_url": "https://www.accuweather.com/en/us/ashburn/20147/health-activities/2160760",
+                    "fetched_at": generated_at.isoformat(),
+                    "personal_use_note": (
+                        "Collected from the public AccuWeather Health & Activities page for a personal "
+                        "Empire daily weather digest."
+                    ),
+                    "groups": {
+                        "allergies": [
+                            {"name": "Tree Pollen", "key": "tree_pollen", "level": "High"},
+                            {"name": "Dust & Dander", "key": "dust_dander", "level": "Very High"},
+                        ],
+                        "pests": [{"name": "Mosquitos", "key": "mosquitos", "level": "Extreme"}],
+                    },
+                }
+            },
+        ),
     ]
 
     payload = normalize_weather_payload(
@@ -123,6 +153,7 @@ def test_normalized_payload_is_date_oriented():
     location = payload["locations"]["ashburn_va"]
     assert "2026-05-30" in location["dates"]
     day = location["dates"]["2026-05-30"]
+    next_day = location["dates"]["2026-05-31"]
     assert day["current_conditions"]["source"] == "openweather"
     assert day["minutely_forecasts"][0]["precipitation"] == {
         "value": 0.1,
@@ -140,4 +171,12 @@ def test_normalized_payload_is_date_oriented():
     assert day["alerts"][1]["source"] == "openweather"
     assert day["forecast_discussions"][0]["text"] == "Forecast discussion text."
     assert day["air_quality"][0]["aqi"] == {"value": 2, "unit": "index"}
+    assert day["health_activities"]["source"] == "accuweather"
+    assert day["health_activities"]["groups"]["allergies"][1] == {
+        "name": "Dust & Dander",
+        "key": "dust_dander",
+        "level": "Very High",
+    }
+    assert "health_activities" not in next_day
     assert location["provenance"]["alerts"] == ["nws", "openweather"]
+    assert location["provenance"]["health_activities"] == "accuweather"

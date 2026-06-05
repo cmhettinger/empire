@@ -9,6 +9,7 @@ from typing import Any
 
 
 JsonDict = dict[str, Any]
+RawPayload = JsonDict | str
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,8 @@ class RawProviderResponse:
     location_key: str
     endpoint: str
     filename: str
-    payload: JsonDict
+    payload: RawPayload
+    content_type: str = "application/json"
 
 
 @dataclass(frozen=True)

@@ -41,7 +41,7 @@ def test_run_weather_collection_to_object_store(tmp_path, monkeypatch):
     assert stored.filename == DEFAULT_OUTPUT_FILENAME
     assert stored.expires_at == generated_at + timedelta(days=7)
     assert stored.metadata["location_count"] == 1
-    assert result.raw_object_count == 1
+    assert result.raw_object_count == 2
 
     payload = json.loads(object_store.get_bytes(stored.object_id))
     assert payload["run_id"] == str(run_id)
@@ -52,9 +52,14 @@ def test_run_weather_collection_to_object_store(tmp_path, monkeypatch):
         for obj in object_repo.objects.values()
         if obj.object_kind == "raw_provider_response"
     ]
-    assert len(raw_objects) == 1
-    assert raw_objects[0].object_key.endswith("/raw/ashburn_va/openweather/onecall")
-    assert raw_objects[0].expires_at == generated_at + timedelta(days=7)
+    assert len(raw_objects) == 2
+    raw_by_provider = {obj.metadata["provider"]: obj for obj in raw_objects}
+    assert raw_by_provider["openweather"].object_key.endswith("/raw/ashburn_va/openweather/onecall")
+    assert raw_by_provider["openweather"].expires_at == generated_at + timedelta(days=7)
+    assert raw_by_provider["accuweather"].object_key.endswith(
+        "/raw/ashburn_va/accuweather/health_activities"
+    )
+    assert raw_by_provider["accuweather"].content_type == "text/html"
 
 
 def test_run_failure_marks_run_failed(tmp_path):
@@ -99,7 +104,15 @@ class FakeCollector(WeatherCollector):
                     endpoint="onecall",
                     filename="onecall.json",
                     payload={"ok": True},
-                )
+                ),
+                RawProviderResponse(
+                    provider="accuweather",
+                    location_key="ashburn_va",
+                    endpoint="health_activities",
+                    filename="health_activities.html",
+                    payload="<html>Tree Pollen High</html>",
+                    content_type="text/html",
+                ),
             ],
         )
 
