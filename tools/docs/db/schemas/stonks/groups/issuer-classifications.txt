@@ -1,5 +1,7 @@
 # Issuer classification support.
 
+classification_system
 classification_code
+provider
 issuer_classification
 issuer

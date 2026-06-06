@@ -1,4 +1,6 @@
 # Security identity.
 
+identifier_type
+provider
 security
 security_identifier

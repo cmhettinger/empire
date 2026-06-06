@@ -2,9 +2,17 @@
 erDiagram
   classification_code {
     UUID class_code_id PK
-    VARCHAR class_system
+    VARCHAR class_system FK
     VARCHAR code
     TEXT label
+    TEXT description
+    BOOL is_active
+  }
+
+  classification_system {
+    VARCHAR class_system PK
+    TEXT system_name
+    VARCHAR provider_code FK
     TEXT description
     BOOL is_active
   }
@@ -31,9 +39,17 @@ erDiagram
   exchange_alias {
     UUID exchange_alias_id PK
     UUID exchange_id FK
-    VARCHAR source_code
+    VARCHAR provider_code FK
     TEXT raw_name
     TEXT normalized_name
+    BOOL is_active
+  }
+
+  identifier_type {
+    VARCHAR id_type PK
+    TEXT id_name
+    VARCHAR applies_to
+    TEXT description
     BOOL is_active
   }
 
@@ -108,7 +124,7 @@ erDiagram
     UUID class_code_id FK
     DATE valid_from
     DATE valid_to
-    VARCHAR source_code
+    VARCHAR provider_code FK
     VARCHAR confidence_code FK
     TIMESTAMPTZ created_at
   }
@@ -116,11 +132,11 @@ erDiagram
   issuer_identifier {
     UUID issuer_identifier_id PK
     UUID issuer_id FK
-    VARCHAR id_type
+    VARCHAR id_type FK
     TEXT id_value
     DATE valid_from
     DATE valid_to
-    VARCHAR source_code
+    VARCHAR provider_code FK
     VARCHAR confidence_code FK
     TIMESTAMPTZ created_at
   }
@@ -131,7 +147,7 @@ erDiagram
     TEXT name
     DATE valid_from
     DATE valid_to
-    VARCHAR source_code
+    VARCHAR provider_code FK
     VARCHAR confidence_code FK
     TIMESTAMPTZ created_at
   }
@@ -161,8 +177,45 @@ erDiagram
     TEXT ticker_display
     DATE valid_from
     DATE valid_to
-    VARCHAR source_code
+    VARCHAR provider_code FK
     VARCHAR confidence_code FK
+    TIMESTAMPTZ created_at
+  }
+
+  provider {
+    VARCHAR provider_code PK
+    TEXT provider_name
+    VARCHAR provider_type
+    TEXT website
+    TEXT description
+    BOOL is_active
+  }
+
+  provider_evidence {
+    UUID provider_evidence_id PK
+    UUID provider_observation_id FK
+    UUID issuer_id FK
+    UUID security_id FK
+    UUID listing_id FK
+    UUID event_id FK
+    VARCHAR evidence_role
+    TEXT notes
+    TIMESTAMPTZ created_at
+  }
+
+  provider_observation {
+    UUID provider_observation_id PK
+    VARCHAR provider_code FK
+    DATE provider_date
+    TIMESTAMPTZ observed_at
+    TEXT accession_no
+    VARCHAR form_type
+    DATE filing_date
+    UUID object_id
+    TEXT object_key
+    TEXT source_url
+    TEXT raw_key
+    JSONB summary_json
     TIMESTAMPTZ created_at
   }
 
@@ -187,7 +240,7 @@ erDiagram
     UUID listing_id FK
     VARCHAR event_type
     DATE event_date
-    VARCHAR source_code
+    VARCHAR provider_code FK
     VARCHAR confidence_code FK
     TEXT description
     JSONB details_json
@@ -197,46 +250,21 @@ erDiagram
   security_identifier {
     UUID security_identifier_id PK
     UUID security_id FK
-    VARCHAR id_type
+    VARCHAR id_type FK
     TEXT id_value
     DATE valid_from
     DATE valid_to
-    VARCHAR source_code
+    VARCHAR provider_code FK
     VARCHAR confidence_code FK
     TIMESTAMPTZ created_at
   }
 
-  source_evidence {
-    UUID source_evidence_id PK
-    UUID source_obs_id FK
-    UUID issuer_id FK
-    UUID security_id FK
-    UUID listing_id FK
-    UUID event_id FK
-    VARCHAR evidence_role
-    TEXT notes
-    TIMESTAMPTZ created_at
-  }
-
-  source_observation {
-    UUID source_obs_id PK
-    VARCHAR source_code
-    DATE source_date
-    TIMESTAMPTZ observed_at
-    TEXT accession_no
-    VARCHAR form_type
-    DATE filing_date
-    UUID object_id
-    TEXT object_key
-    TEXT source_url
-    TEXT raw_key
-    JSONB summary_json
-    TIMESTAMPTZ created_at
-  }
-
+  classification_system ||--o{ classification_code : "fk_classification_code_system"
+  provider ||--o{ classification_system : "fk_classification_system_provider"
   iso3166_country ||--o{ exchange : "fk_exchange_country"
   iso10383_mic ||--o{ exchange : "fk_exchange_mic"
   exchange ||--o{ exchange_alias : "fk_exchange_alias_exchange"
+  provider ||--o{ exchange_alias : "fk_exchange_alias_provider"
   instrument_class ||--o{ instrument_type : "fk_instrument_type_class"
   iso10383_mic_cat ||--o{ iso10383_mic : "fk_iso10383_mic_category"
   iso3166_country ||--o{ iso10383_mic : "fk_iso10383_mic_country"
@@ -245,27 +273,36 @@ erDiagram
   classification_code ||--o{ issuer_classification : "fk_issuer_class_code"
   confidence_level ||--o{ issuer_classification : "fk_issuer_class_confidence"
   issuer ||--o{ issuer_classification : "fk_issuer_class_issuer"
+  provider ||--o{ issuer_classification : "fk_issuer_class_provider"
   confidence_level ||--o{ issuer_identifier : "fk_issuer_identifier_confidence"
   issuer ||--o{ issuer_identifier : "fk_issuer_identifier_issuer"
+  provider ||--o{ issuer_identifier : "fk_issuer_identifier_provider"
+  identifier_type ||--o{ issuer_identifier : "fk_issuer_identifier_type"
   confidence_level ||--o{ issuer_name_history : "fk_issuer_name_confidence"
   issuer ||--o{ issuer_name_history : "fk_issuer_name_issuer"
+  provider ||--o{ issuer_name_history : "fk_issuer_name_provider"
   iso4217_currency ||--o{ listing : "fk_listing_currency"
   exchange ||--o{ listing : "fk_listing_exchange"
   security ||--o{ listing : "fk_listing_security"
   confidence_level ||--o{ listing_symbol_history : "fk_listing_symbol_confidence"
   listing ||--o{ listing_symbol_history : "fk_listing_symbol_listing"
+  provider ||--o{ listing_symbol_history : "fk_listing_symbol_provider"
+  security_event ||--o{ provider_evidence : "fk_provider_evidence_event"
+  issuer ||--o{ provider_evidence : "fk_provider_evidence_issuer"
+  listing ||--o{ provider_evidence : "fk_provider_evidence_listing"
+  provider_observation ||--o{ provider_evidence : "fk_provider_evidence_observation"
+  security ||--o{ provider_evidence : "fk_provider_evidence_security"
+  provider ||--o{ provider_observation : "fk_provider_observation_provider"
   iso4217_currency ||--o{ security : "fk_security_currency"
   issuer ||--o{ security : "fk_security_issuer"
   instrument_type ||--o{ security : "fk_security_type"
   confidence_level ||--o{ security_event : "fk_security_event_confidence"
   issuer ||--o{ security_event : "fk_security_event_issuer"
   listing ||--o{ security_event : "fk_security_event_listing"
+  provider ||--o{ security_event : "fk_security_event_provider"
   security ||--o{ security_event : "fk_security_event_security"
   confidence_level ||--o{ security_identifier : "fk_security_identifier_confidence"
+  provider ||--o{ security_identifier : "fk_security_identifier_provider"
   security ||--o{ security_identifier : "fk_security_identifier_security"
-  security_event ||--o{ source_evidence : "fk_source_evidence_event"
-  issuer ||--o{ source_evidence : "fk_source_evidence_issuer"
-  listing ||--o{ source_evidence : "fk_source_evidence_listing"
-  source_observation ||--o{ source_evidence : "fk_source_evidence_obs"
-  security ||--o{ source_evidence : "fk_source_evidence_security"
+  identifier_type ||--o{ security_identifier : "fk_security_identifier_type"
 ```

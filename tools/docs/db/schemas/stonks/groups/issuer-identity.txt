@@ -1,5 +1,7 @@
 # Issuer identity and name history.
 
+identifier_type
+provider
 issuer
 issuer_identifier
 issuer_name_history

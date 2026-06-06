@@ -15,7 +15,7 @@ erDiagram
   exchange_alias {
     UUID exchange_alias_id PK
     UUID exchange_id FK
-    VARCHAR source_code
+    VARCHAR provider_code FK
     TEXT raw_name
     TEXT normalized_name
     BOOL is_active
@@ -56,9 +56,19 @@ erDiagram
     SMALLINT minor_unit
   }
 
+  provider {
+    VARCHAR provider_code PK
+    TEXT provider_name
+    VARCHAR provider_type
+    TEXT website
+    TEXT description
+    BOOL is_active
+  }
+
   iso3166_country ||--o{ exchange : "fk_exchange_country"
   iso10383_mic ||--o{ exchange : "fk_exchange_mic"
   exchange ||--o{ exchange_alias : "fk_exchange_alias_exchange"
+  provider ||--o{ exchange_alias : "fk_exchange_alias_provider"
   iso10383_mic_cat ||--o{ iso10383_mic : "fk_iso10383_mic_category"
   iso3166_country ||--o{ iso10383_mic : "fk_iso10383_mic_country"
   iso10383_mic ||--o{ iso10383_mic : "fk_iso10383_mic_operating"

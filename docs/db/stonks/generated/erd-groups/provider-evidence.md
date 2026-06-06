@@ -31,6 +31,43 @@ erDiagram
     TIMESTAMPTZ updated_at
   }
 
+  provider {
+    VARCHAR provider_code PK
+    TEXT provider_name
+    VARCHAR provider_type
+    TEXT website
+    TEXT description
+    BOOL is_active
+  }
+
+  provider_evidence {
+    UUID provider_evidence_id PK
+    UUID provider_observation_id FK
+    UUID issuer_id FK
+    UUID security_id FK
+    UUID listing_id FK
+    UUID event_id FK
+    VARCHAR evidence_role
+    TEXT notes
+    TIMESTAMPTZ created_at
+  }
+
+  provider_observation {
+    UUID provider_observation_id PK
+    VARCHAR provider_code FK
+    DATE provider_date
+    TIMESTAMPTZ observed_at
+    TEXT accession_no
+    VARCHAR form_type
+    DATE filing_date
+    UUID object_id
+    TEXT object_key
+    TEXT source_url
+    TEXT raw_key
+    JSONB summary_json
+    TIMESTAMPTZ created_at
+  }
+
   security {
     UUID security_id PK
     UUID issuer_id FK
@@ -52,49 +89,23 @@ erDiagram
     UUID listing_id FK
     VARCHAR event_type
     DATE event_date
-    VARCHAR source_code
+    VARCHAR provider_code FK
     VARCHAR confidence_code
     TEXT description
     JSONB details_json
     TIMESTAMPTZ created_at
   }
 
-  source_evidence {
-    UUID source_evidence_id PK
-    UUID source_obs_id FK
-    UUID issuer_id FK
-    UUID security_id FK
-    UUID listing_id FK
-    UUID event_id FK
-    VARCHAR evidence_role
-    TEXT notes
-    TIMESTAMPTZ created_at
-  }
-
-  source_observation {
-    UUID source_obs_id PK
-    VARCHAR source_code
-    DATE source_date
-    TIMESTAMPTZ observed_at
-    TEXT accession_no
-    VARCHAR form_type
-    DATE filing_date
-    UUID object_id
-    TEXT object_key
-    TEXT source_url
-    TEXT raw_key
-    JSONB summary_json
-    TIMESTAMPTZ created_at
-  }
-
   security ||--o{ listing : "fk_listing_security"
+  security_event ||--o{ provider_evidence : "fk_provider_evidence_event"
+  issuer ||--o{ provider_evidence : "fk_provider_evidence_issuer"
+  listing ||--o{ provider_evidence : "fk_provider_evidence_listing"
+  provider_observation ||--o{ provider_evidence : "fk_provider_evidence_observation"
+  security ||--o{ provider_evidence : "fk_provider_evidence_security"
+  provider ||--o{ provider_observation : "fk_provider_observation_provider"
   issuer ||--o{ security : "fk_security_issuer"
   issuer ||--o{ security_event : "fk_security_event_issuer"
   listing ||--o{ security_event : "fk_security_event_listing"
+  provider ||--o{ security_event : "fk_security_event_provider"
   security ||--o{ security_event : "fk_security_event_security"
-  security_event ||--o{ source_evidence : "fk_source_evidence_event"
-  issuer ||--o{ source_evidence : "fk_source_evidence_issuer"
-  listing ||--o{ source_evidence : "fk_source_evidence_listing"
-  source_observation ||--o{ source_evidence : "fk_source_evidence_obs"
-  security ||--o{ source_evidence : "fk_source_evidence_security"
 ```

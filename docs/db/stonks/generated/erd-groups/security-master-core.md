@@ -51,9 +51,18 @@ erDiagram
     TEXT ticker_display
     DATE valid_from
     DATE valid_to
-    VARCHAR source_code
+    VARCHAR provider_code FK
     VARCHAR confidence_code
     TIMESTAMPTZ created_at
+  }
+
+  provider {
+    VARCHAR provider_code PK
+    TEXT provider_name
+    VARCHAR provider_type
+    TEXT website
+    TEXT description
+    BOOL is_active
   }
 
   security {
@@ -73,5 +82,6 @@ erDiagram
   exchange ||--o{ listing : "fk_listing_exchange"
   security ||--o{ listing : "fk_listing_security"
   listing ||--o{ listing_symbol_history : "fk_listing_symbol_listing"
+  provider ||--o{ listing_symbol_history : "fk_listing_symbol_provider"
   issuer ||--o{ security : "fk_security_issuer"
 ```

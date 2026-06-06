@@ -4,15 +4,18 @@
 # generation targets.
 
 classification_code
+classification_system
 confidence_level
 exchange
 exchange_alias
+identifier_type
 instrument_class
 instrument_type
 iso10383_mic
 iso10383_mic_cat
 iso3166_country
 iso4217_currency
+provider
 issuer
 issuer_classification
 issuer_identifier
@@ -22,5 +25,5 @@ listing_symbol_history
 security
 security_event
 security_identifier
-source_evidence
-source_observation
+provider_evidence
+provider_observation

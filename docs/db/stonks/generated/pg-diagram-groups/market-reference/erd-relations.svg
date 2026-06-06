@@ -17,15 +17,15 @@
 <!-- exchange_alias -->
 <g id="node2" class="node">
 <title>exchange_alias</title>
-<path fill="#f8fafc" stroke="#334155" d="M847,-47C847,-47 773,-47 773,-47 767,-47 761,-41 761,-35 761,-35 761,-23 761,-23 761,-17 767,-11 773,-11 773,-11 847,-11 847,-11 853,-11 859,-17 859,-23 859,-23 859,-35 859,-35 859,-41 853,-47 847,-47"/>
-<text text-anchor="middle" x="810" y="-26.2" font-family="Helvetica,sans-Serif" font-size="11.00">exchange_alias</text>
+<path fill="#f8fafc" stroke="#334155" d="M847,-86C847,-86 773,-86 773,-86 767,-86 761,-80 761,-74 761,-74 761,-62 761,-62 761,-56 767,-50 773,-50 773,-50 847,-50 847,-50 853,-50 859,-56 859,-62 859,-62 859,-74 859,-74 859,-80 853,-86 847,-86"/>
+<text text-anchor="middle" x="810" y="-65.2" font-family="Helvetica,sans-Serif" font-size="11.00">exchange_alias</text>
 </g>
 <!-- exchange&#45;&gt;exchange_alias -->
 <g id="edge1" class="edge">
 <title>exchange&#45;&gt;exchange_alias</title>
-<path fill="none" stroke="#64748b" d="M577.2,-29C621.25,-29 700.27,-29 753.66,-29"/>
-<polygon fill="#64748b" stroke="#64748b" points="753.69,-31.45 760.69,-29 753.69,-26.55 753.69,-31.45"/>
-<text text-anchor="middle" x="669" y="-31.6" font-family="Helvetica,sans-Serif" font-size="8.00">fk_exchange_alias_exchange</text>
+<path fill="none" stroke="#64748b" d="M577.21,-30.32C614.1,-32.21 675.74,-36.55 728,-46 736.49,-47.53 745.38,-49.53 754.03,-51.7"/>
+<polygon fill="#64748b" stroke="#64748b" points="753.52,-54.1 760.91,-53.47 754.74,-49.36 753.52,-54.1"/>
+<text text-anchor="middle" x="669" y="-48.6" font-family="Helvetica,sans-Serif" font-size="8.00">fk_exchange_alias_exchange</text>
 </g>
 <!-- iso10383_mic -->
 <g id="node3" class="node">
@@ -85,6 +85,19 @@
 <title>iso4217_currency</title>
 <path fill="#f8fafc" stroke="#334155" d="M99,-218C99,-218 12,-218 12,-218 6,-218 0,-212 0,-206 0,-206 0,-194 0,-194 0,-188 6,-182 12,-182 12,-182 99,-182 99,-182 105,-182 111,-188 111,-194 111,-194 111,-206 111,-206 111,-212 105,-218 99,-218"/>
 <text text-anchor="middle" x="55.5" y="-197.2" font-family="Helvetica,sans-Serif" font-size="11.00">iso4217_currency</text>
+</g>
+<!-- provider -->
+<g id="node7" class="node">
+<title>provider</title>
+<path fill="#f8fafc" stroke="#334155" d="M561.5,-126C561.5,-126 525.5,-126 525.5,-126 519.5,-126 513.5,-120 513.5,-114 513.5,-114 513.5,-102 513.5,-102 513.5,-96 519.5,-90 525.5,-90 525.5,-90 561.5,-90 561.5,-90 567.5,-90 573.5,-96 573.5,-102 573.5,-102 573.5,-114 573.5,-114 573.5,-120 567.5,-126 561.5,-126"/>
+<text text-anchor="middle" x="543.5" y="-105.2" font-family="Helvetica,sans-Serif" font-size="11.00">provider</text>
+</g>
+<!-- provider&#45;&gt;exchange_alias -->
+<g id="edge7" class="edge">
+<title>provider&#45;&gt;exchange_alias</title>
+<path fill="none" stroke="#64748b" d="M573.56,-103.6C616.72,-97.08 698.53,-84.71 753.43,-76.4"/>
+<polygon fill="#64748b" stroke="#64748b" points="754.1,-78.78 760.65,-75.31 753.36,-73.94 754.1,-78.78"/>
+<text text-anchor="middle" x="669" y="-99.6" font-family="Helvetica,sans-Serif" font-size="8.00">fk_exchange_alias_provider</text>
 </g>
 </g>
 </svg>

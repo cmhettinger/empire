@@ -401,19 +401,19 @@ Events may reference an issuer, security, listing, or a combination.
 
 ---
 
-# Evidence and Lineage
+# Provider Evidence and Lineage
 
-Every important fact should be traceable back to a source.
+Every important fact should be traceable back to a provider observation.
 
 ```text
 ┌──────────────────────┐
-│ source_observation   │
+│ provider_observation │
 └──────────┬───────────┘
            │
            │ one observation can support many things
            v
 ┌──────────────────────┐
-│ source_evidence      │
+│ provider_evidence    │
 └──────┬──────┬──────┬──┘
        │      │      │
        v      v      v
@@ -422,9 +422,9 @@ Every important fact should be traceable back to a source.
 └────────┘ └──────────┘ └─────────┘
 ```
 
-## source_observation
+## provider_observation
 
-Represents a raw observation from a source system.
+Represents a raw observation from a provider.
 
 Examples:
 
@@ -435,7 +435,7 @@ Examples:
 
 ---
 
-## source_evidence
+## provider_evidence
 
 Associates observations with records in the security master.
 
@@ -444,7 +444,7 @@ This provides:
 - Auditability
 - Traceability
 - Historical lineage
-- Source verification
+- Provider verification
 
 ---
 
@@ -476,6 +476,6 @@ Everything else exists to support that structure while preserving:
 - Multiple classification systems
 - Exchange history
 - Corporate action history
-- Full source lineage
+- Full provider lineage
 
 This design is intended to support a complete historical security master dating back to 1995 and sourced primarily from SEC EDGAR, exchange directories, and related reference datasets.

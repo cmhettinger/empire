@@ -4,5 +4,6 @@ iso3166_country
 iso4217_currency
 iso10383_mic_cat
 iso10383_mic
+provider
 exchange
 exchange_alias

@@ -1,8 +1,0 @@
-# Source observations and evidence links.
-
-source_observation
-source_evidence
-issuer
-security
-listing
-security_event

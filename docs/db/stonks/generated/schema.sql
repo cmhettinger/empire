@@ -27,6 +27,15 @@ CREATE TABLE stonks.classification_code (
     CONSTRAINT ck_classification_system_upper CHECK (((class_system)::text = upper((class_system)::text)))
 );
 
+CREATE TABLE stonks.classification_system (
+    class_system character varying(32) NOT NULL,
+    system_name text NOT NULL,
+    provider_code character varying(32),
+    description text,
+    is_active boolean DEFAULT true NOT NULL,
+    CONSTRAINT ck_classification_system_code_upper CHECK (((class_system)::text = upper((class_system)::text)))
+);
+
 CREATE TABLE stonks.confidence_level (
     confidence_code character varying(16) NOT NULL,
     rank smallint NOT NULL,
@@ -52,11 +61,21 @@ CREATE TABLE stonks.exchange (
 CREATE TABLE stonks.exchange_alias (
     exchange_alias_id uuid DEFAULT gen_random_uuid() NOT NULL,
     exchange_id uuid NOT NULL,
-    source_code character varying(32) NOT NULL,
+    provider_code character varying(32) NOT NULL,
     raw_name text NOT NULL,
     normalized_name text,
     is_active boolean DEFAULT true NOT NULL,
-    CONSTRAINT ck_exchange_alias_source_upper CHECK (((source_code)::text = upper((source_code)::text)))
+    CONSTRAINT ck_exchange_alias_provider_upper CHECK (((provider_code)::text = upper((provider_code)::text)))
+);
+
+CREATE TABLE stonks.identifier_type (
+    id_type character varying(32) NOT NULL,
+    id_name text NOT NULL,
+    applies_to character varying(32) NOT NULL,
+    description text,
+    is_active boolean DEFAULT true NOT NULL,
+    CONSTRAINT ck_identifier_type_applies_to CHECK (((applies_to)::text = ANY ((ARRAY['ISSUER'::character varying, 'SECURITY'::character varying, 'LISTING'::character varying, 'FILING'::character varying, 'INTERNAL'::character varying])::text[]))),
+    CONSTRAINT ck_identifier_type_code_upper CHECK (((id_type)::text = upper((id_type)::text)))
 );
 
 CREATE TABLE stonks.instrument_class (
@@ -144,11 +163,11 @@ CREATE TABLE stonks.issuer_classification (
     class_code_id uuid NOT NULL,
     valid_from date,
     valid_to date,
-    source_code character varying(32),
+    provider_code character varying(32),
     confidence_code character varying(16) DEFAULT 'HIGH'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ck_issuer_class_dates CHECK (((valid_to IS NULL) OR (valid_from IS NULL) OR (valid_to >= valid_from))),
-    CONSTRAINT ck_issuer_class_source_upper CHECK (((source_code IS NULL) OR ((source_code)::text = upper((source_code)::text))))
+    CONSTRAINT ck_issuer_class_provider_upper CHECK (((provider_code IS NULL) OR ((provider_code)::text = upper((provider_code)::text))))
 );
 
 CREATE TABLE stonks.issuer_identifier (
@@ -158,11 +177,11 @@ CREATE TABLE stonks.issuer_identifier (
     id_value text NOT NULL,
     valid_from date,
     valid_to date,
-    source_code character varying(32),
+    provider_code character varying(32),
     confidence_code character varying(16) DEFAULT 'HIGH'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ck_issuer_identifier_dates CHECK (((valid_to IS NULL) OR (valid_from IS NULL) OR (valid_to >= valid_from))),
-    CONSTRAINT ck_issuer_identifier_source_upper CHECK (((source_code IS NULL) OR ((source_code)::text = upper((source_code)::text)))),
+    CONSTRAINT ck_issuer_identifier_provider_upper CHECK (((provider_code IS NULL) OR ((provider_code)::text = upper((provider_code)::text)))),
     CONSTRAINT ck_issuer_identifier_type_upper CHECK (((id_type)::text = upper((id_type)::text)))
 );
 
@@ -172,11 +191,11 @@ CREATE TABLE stonks.issuer_name_history (
     name text NOT NULL,
     valid_from date,
     valid_to date,
-    source_code character varying(32),
+    provider_code character varying(32),
     confidence_code character varying(16) DEFAULT 'HIGH'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ck_issuer_name_dates CHECK (((valid_to IS NULL) OR (valid_from IS NULL) OR (valid_to >= valid_from))),
-    CONSTRAINT ck_issuer_name_source_upper CHECK (((source_code IS NULL) OR ((source_code)::text = upper((source_code)::text))))
+    CONSTRAINT ck_issuer_name_provider_upper CHECK (((provider_code IS NULL) OR ((provider_code)::text = upper((provider_code)::text))))
 );
 
 CREATE TABLE stonks.listing (
@@ -206,11 +225,53 @@ CREATE TABLE stonks.listing_symbol_history (
     ticker_display text,
     valid_from date,
     valid_to date,
-    source_code character varying(32),
+    provider_code character varying(32),
     confidence_code character varying(16) DEFAULT 'HIGH'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ck_listing_symbol_dates CHECK (((valid_to IS NULL) OR (valid_from IS NULL) OR (valid_to >= valid_from))),
-    CONSTRAINT ck_listing_symbol_source_upper CHECK (((source_code IS NULL) OR ((source_code)::text = upper((source_code)::text))))
+    CONSTRAINT ck_listing_symbol_provider_upper CHECK (((provider_code IS NULL) OR ((provider_code)::text = upper((provider_code)::text))))
+);
+
+CREATE TABLE stonks.provider (
+    provider_code character varying(32) NOT NULL,
+    provider_name text NOT NULL,
+    provider_type character varying(32) NOT NULL,
+    website text,
+    description text,
+    is_active boolean DEFAULT true NOT NULL,
+    CONSTRAINT ck_provider_code_upper CHECK (((provider_code)::text = upper((provider_code)::text))),
+    CONSTRAINT ck_provider_type_upper CHECK (((provider_type)::text = upper((provider_type)::text)))
+);
+
+CREATE TABLE stonks.provider_evidence (
+    provider_evidence_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    provider_observation_id uuid NOT NULL,
+    issuer_id uuid,
+    security_id uuid,
+    listing_id uuid,
+    event_id uuid,
+    evidence_role character varying(24) DEFAULT 'SUPPORTS'::character varying NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_provider_evidence_role CHECK (((evidence_role)::text = ANY ((ARRAY['SUPPORTS'::character varying, 'CONFLICTS'::character varying, 'CREATED_FROM'::character varying, 'UPDATED_FROM'::character varying, 'MANUAL_REVIEW'::character varying])::text[]))),
+    CONSTRAINT ck_provider_evidence_target CHECK (((issuer_id IS NOT NULL) OR (security_id IS NOT NULL) OR (listing_id IS NOT NULL) OR (event_id IS NOT NULL)))
+);
+
+CREATE TABLE stonks.provider_observation (
+    provider_observation_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    provider_code character varying(32) NOT NULL,
+    provider_date date,
+    observed_at timestamp with time zone DEFAULT now() NOT NULL,
+    accession_no text,
+    form_type character varying(16),
+    filing_date date,
+    object_id uuid,
+    object_key text,
+    source_url text,
+    raw_key text,
+    summary_json jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_provider_observation_provider_upper CHECK (((provider_code)::text = upper((provider_code)::text)))
 );
 
 CREATE TABLE stonks.security (
@@ -235,12 +296,12 @@ CREATE TABLE stonks.security_event (
     listing_id uuid,
     event_type character varying(32) NOT NULL,
     event_date date,
-    source_code character varying(32),
+    provider_code character varying(32),
     confidence_code character varying(16) DEFAULT 'HIGH'::character varying NOT NULL,
     description text,
     details_json jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT ck_security_event_source_upper CHECK (((source_code IS NULL) OR ((source_code)::text = upper((source_code)::text)))),
+    CONSTRAINT ck_security_event_provider_upper CHECK (((provider_code IS NULL) OR ((provider_code)::text = upper((provider_code)::text)))),
     CONSTRAINT ck_security_event_target CHECK (((issuer_id IS NOT NULL) OR (security_id IS NOT NULL) OR (listing_id IS NOT NULL))),
     CONSTRAINT ck_security_event_type CHECK (((event_type)::text = ANY ((ARRAY['ISSUER_NAME_CHANGE'::character varying, 'SECURITY_TITLE_CHANGE'::character varying, 'TICKER_CHANGE'::character varying, 'EXCHANGE_CHANGE'::character varying, 'LISTING_STARTED'::character varying, 'LISTING_ENDED'::character varying, 'DELISTING_NOTICE'::character varying, 'DELISTED'::character varying, 'MERGER'::character varying, 'ACQUISITION'::character varying, 'SPINOFF'::character varying, 'BANKRUPTCY'::character varying, 'MANUAL_CORRECTION'::character varying, 'OTHER'::character varying])::text[])))
 );
@@ -252,43 +313,12 @@ CREATE TABLE stonks.security_identifier (
     id_value text NOT NULL,
     valid_from date,
     valid_to date,
-    source_code character varying(32),
+    provider_code character varying(32),
     confidence_code character varying(16) DEFAULT 'HIGH'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ck_security_identifier_dates CHECK (((valid_to IS NULL) OR (valid_from IS NULL) OR (valid_to >= valid_from))),
-    CONSTRAINT ck_security_identifier_source_upper CHECK (((source_code IS NULL) OR ((source_code)::text = upper((source_code)::text)))),
+    CONSTRAINT ck_security_identifier_provider_upper CHECK (((provider_code IS NULL) OR ((provider_code)::text = upper((provider_code)::text)))),
     CONSTRAINT ck_security_identifier_type_upper CHECK (((id_type)::text = upper((id_type)::text)))
-);
-
-CREATE TABLE stonks.source_evidence (
-    source_evidence_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    source_obs_id uuid NOT NULL,
-    issuer_id uuid,
-    security_id uuid,
-    listing_id uuid,
-    event_id uuid,
-    evidence_role character varying(24) DEFAULT 'SUPPORTS'::character varying NOT NULL,
-    notes text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT ck_source_evidence_role CHECK (((evidence_role)::text = ANY ((ARRAY['SUPPORTS'::character varying, 'CONFLICTS'::character varying, 'CREATED_FROM'::character varying, 'UPDATED_FROM'::character varying, 'MANUAL_REVIEW'::character varying])::text[]))),
-    CONSTRAINT ck_source_evidence_target CHECK (((issuer_id IS NOT NULL) OR (security_id IS NOT NULL) OR (listing_id IS NOT NULL) OR (event_id IS NOT NULL)))
-);
-
-CREATE TABLE stonks.source_observation (
-    source_obs_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    source_code character varying(32) NOT NULL,
-    source_date date,
-    observed_at timestamp with time zone DEFAULT now() NOT NULL,
-    accession_no text,
-    form_type character varying(16),
-    filing_date date,
-    object_id uuid,
-    object_key text,
-    source_url text,
-    raw_key text,
-    summary_json jsonb,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT ck_source_obs_source_upper CHECK (((source_code)::text = upper((source_code)::text)))
 );
 
 CREATE UNLOGGED TABLE stonks.stg_iso10383_mic (
@@ -334,8 +364,17 @@ CREATE UNLOGGED TABLE stonks.stg_iso4217_currency (
     withdrawal_date text
 );
 
+CREATE UNLOGGED TABLE stonks.stg_sec_sic_classification_code (
+    sic_code text,
+    office text,
+    industry_title text
+);
+
 ALTER TABLE ONLY stonks.classification_code
     ADD CONSTRAINT classification_code_pkey PRIMARY KEY (class_code_id);
+
+ALTER TABLE ONLY stonks.classification_system
+    ADD CONSTRAINT classification_system_pkey PRIMARY KEY (class_system);
 
 ALTER TABLE ONLY stonks.confidence_level
     ADD CONSTRAINT confidence_level_pkey PRIMARY KEY (confidence_code);
@@ -348,6 +387,9 @@ ALTER TABLE ONLY stonks.exchange
 
 ALTER TABLE ONLY stonks.exchange
     ADD CONSTRAINT exchange_pkey PRIMARY KEY (exchange_id);
+
+ALTER TABLE ONLY stonks.identifier_type
+    ADD CONSTRAINT identifier_type_pkey PRIMARY KEY (id_type);
 
 ALTER TABLE ONLY stonks.instrument_class
     ADD CONSTRAINT instrument_class_pkey PRIMARY KEY (class_code);
@@ -391,6 +433,15 @@ ALTER TABLE ONLY stonks.listing
 ALTER TABLE ONLY stonks.listing_symbol_history
     ADD CONSTRAINT listing_symbol_history_pkey PRIMARY KEY (listing_symbol_id);
 
+ALTER TABLE ONLY stonks.provider_evidence
+    ADD CONSTRAINT provider_evidence_pkey PRIMARY KEY (provider_evidence_id);
+
+ALTER TABLE ONLY stonks.provider_observation
+    ADD CONSTRAINT provider_observation_pkey PRIMARY KEY (provider_observation_id);
+
+ALTER TABLE ONLY stonks.provider
+    ADD CONSTRAINT provider_pkey PRIMARY KEY (provider_code);
+
 ALTER TABLE ONLY stonks.security_event
     ADD CONSTRAINT security_event_pkey PRIMARY KEY (event_id);
 
@@ -400,12 +451,6 @@ ALTER TABLE ONLY stonks.security_identifier
 ALTER TABLE ONLY stonks.security
     ADD CONSTRAINT security_pkey PRIMARY KEY (security_id);
 
-ALTER TABLE ONLY stonks.source_evidence
-    ADD CONSTRAINT source_evidence_pkey PRIMARY KEY (source_evidence_id);
-
-ALTER TABLE ONLY stonks.source_observation
-    ADD CONSTRAINT source_observation_pkey PRIMARY KEY (source_obs_id);
-
 ALTER TABLE ONLY stonks.classification_code
     ADD CONSTRAINT uq_classification_code UNIQUE (class_system, code);
 
@@ -413,7 +458,7 @@ ALTER TABLE ONLY stonks.confidence_level
     ADD CONSTRAINT uq_confidence_level_rank UNIQUE (rank);
 
 ALTER TABLE ONLY stonks.exchange_alias
-    ADD CONSTRAINT uq_exchange_alias_source_raw UNIQUE (source_code, raw_name);
+    ADD CONSTRAINT uq_exchange_alias_provider_raw UNIQUE (provider_code, raw_name);
 
 ALTER TABLE ONLY stonks.issuer_classification
     ADD CONSTRAINT uq_issuer_class UNIQUE (issuer_id, class_code_id, valid_from);
@@ -434,9 +479,11 @@ CREATE INDEX ix_classification_code ON stonks.classification_code USING btree (c
 
 CREATE INDEX ix_classification_system ON stonks.classification_code USING btree (class_system);
 
+CREATE INDEX ix_classification_system_provider ON stonks.classification_system USING btree (provider_code);
+
 CREATE INDEX ix_exchange_alias_exchange ON stonks.exchange_alias USING btree (exchange_id);
 
-CREATE INDEX ix_exchange_alias_source ON stonks.exchange_alias USING btree (source_code);
+CREATE INDEX ix_exchange_alias_provider ON stonks.exchange_alias USING btree (provider_code);
 
 CREATE INDEX ix_exchange_country ON stonks.exchange USING btree (country_alpha2);
 
@@ -462,17 +509,23 @@ CREATE INDEX ix_issuer_class_code ON stonks.issuer_classification USING btree (c
 
 CREATE INDEX ix_issuer_class_issuer ON stonks.issuer_classification USING btree (issuer_id);
 
+CREATE INDEX ix_issuer_class_provider ON stonks.issuer_classification USING btree (provider_code);
+
 CREATE INDEX ix_issuer_country ON stonks.issuer USING btree (country_alpha2);
 
 CREATE INDEX ix_issuer_identifier_issuer ON stonks.issuer_identifier USING btree (issuer_id);
 
 CREATE INDEX ix_issuer_identifier_lookup ON stonks.issuer_identifier USING btree (id_type, id_value);
 
+CREATE INDEX ix_issuer_identifier_provider ON stonks.issuer_identifier USING btree (provider_code);
+
 CREATE INDEX ix_issuer_name ON stonks.issuer USING btree (current_name);
 
 CREATE INDEX ix_issuer_name_history_issuer ON stonks.issuer_name_history USING btree (issuer_id);
 
 CREATE INDEX ix_issuer_name_history_name ON stonks.issuer_name_history USING btree (name);
+
+CREATE INDEX ix_issuer_name_history_provider ON stonks.issuer_name_history USING btree (provider_code);
 
 CREATE INDEX ix_issuer_status ON stonks.issuer USING btree (status);
 
@@ -490,9 +543,27 @@ CREATE INDEX ix_listing_symbol_active ON stonks.listing_symbol_history USING btr
 
 CREATE INDEX ix_listing_symbol_listing ON stonks.listing_symbol_history USING btree (listing_id);
 
+CREATE INDEX ix_listing_symbol_provider ON stonks.listing_symbol_history USING btree (provider_code);
+
 CREATE INDEX ix_listing_symbol_ticker ON stonks.listing_symbol_history USING btree (ticker_norm);
 
 CREATE INDEX ix_listing_ticker_norm ON stonks.listing USING btree (ticker_norm);
+
+CREATE INDEX ix_provider_evidence_event ON stonks.provider_evidence USING btree (event_id);
+
+CREATE INDEX ix_provider_evidence_issuer ON stonks.provider_evidence USING btree (issuer_id);
+
+CREATE INDEX ix_provider_evidence_listing ON stonks.provider_evidence USING btree (listing_id);
+
+CREATE INDEX ix_provider_evidence_observation ON stonks.provider_evidence USING btree (provider_observation_id);
+
+CREATE INDEX ix_provider_evidence_security ON stonks.provider_evidence USING btree (security_id);
+
+CREATE INDEX ix_provider_observation_accession ON stonks.provider_observation USING btree (accession_no);
+
+CREATE INDEX ix_provider_observation_object ON stonks.provider_observation USING btree (object_id);
+
+CREATE INDEX ix_provider_observation_provider_date ON stonks.provider_observation USING btree (provider_code, provider_date);
 
 CREATE INDEX ix_security_currency ON stonks.security USING btree (currency_code);
 
@@ -500,11 +571,15 @@ CREATE INDEX ix_security_event_issuer ON stonks.security_event USING btree (issu
 
 CREATE INDEX ix_security_event_listing ON stonks.security_event USING btree (listing_id);
 
+CREATE INDEX ix_security_event_provider ON stonks.security_event USING btree (provider_code);
+
 CREATE INDEX ix_security_event_security ON stonks.security_event USING btree (security_id);
 
 CREATE INDEX ix_security_event_type_date ON stonks.security_event USING btree (event_type, event_date);
 
 CREATE INDEX ix_security_identifier_lookup ON stonks.security_identifier USING btree (id_type, id_value);
+
+CREATE INDEX ix_security_identifier_provider ON stonks.security_identifier USING btree (provider_code);
 
 CREATE INDEX ix_security_identifier_security ON stonks.security_identifier USING btree (security_id);
 
@@ -516,30 +591,23 @@ CREATE INDEX ix_security_title ON stonks.security USING btree (security_title);
 
 CREATE INDEX ix_security_type ON stonks.security USING btree (instrument_type_code);
 
-CREATE INDEX ix_source_evidence_event ON stonks.source_evidence USING btree (event_id);
-
-CREATE INDEX ix_source_evidence_issuer ON stonks.source_evidence USING btree (issuer_id);
-
-CREATE INDEX ix_source_evidence_listing ON stonks.source_evidence USING btree (listing_id);
-
-CREATE INDEX ix_source_evidence_obs ON stonks.source_evidence USING btree (source_obs_id);
-
-CREATE INDEX ix_source_evidence_security ON stonks.source_evidence USING btree (security_id);
-
-CREATE INDEX ix_source_obs_accession ON stonks.source_observation USING btree (accession_no);
-
-CREATE INDEX ix_source_obs_object ON stonks.source_observation USING btree (object_id);
-
-CREATE INDEX ix_source_obs_source_date ON stonks.source_observation USING btree (source_code, source_date);
-
 CREATE UNIQUE INDEX ux_issuer_cik ON stonks.issuer USING btree (cik) WHERE (cik IS NOT NULL);
 
 CREATE UNIQUE INDEX ux_listing_active_lookup ON stonks.listing USING btree (exchange_id, ticker_norm) WHERE ((valid_to IS NULL) AND (ticker_norm IS NOT NULL));
 
-CREATE UNIQUE INDEX ux_source_obs_raw_key ON stonks.source_observation USING btree (source_code, raw_key) WHERE (raw_key IS NOT NULL);
+CREATE UNIQUE INDEX ux_provider_observation_raw_key ON stonks.provider_observation USING btree (provider_code, raw_key) WHERE (raw_key IS NOT NULL);
+
+ALTER TABLE ONLY stonks.classification_code
+    ADD CONSTRAINT fk_classification_code_system FOREIGN KEY (class_system) REFERENCES stonks.classification_system(class_system) ON UPDATE CASCADE;
+
+ALTER TABLE ONLY stonks.classification_system
+    ADD CONSTRAINT fk_classification_system_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
 
 ALTER TABLE ONLY stonks.exchange_alias
     ADD CONSTRAINT fk_exchange_alias_exchange FOREIGN KEY (exchange_id) REFERENCES stonks.exchange(exchange_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY stonks.exchange_alias
+    ADD CONSTRAINT fk_exchange_alias_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
 
 ALTER TABLE ONLY stonks.exchange
     ADD CONSTRAINT fk_exchange_country FOREIGN KEY (country_alpha2) REFERENCES stonks.iso3166_country(alpha2);
@@ -568,6 +636,9 @@ ALTER TABLE ONLY stonks.issuer_classification
 ALTER TABLE ONLY stonks.issuer_classification
     ADD CONSTRAINT fk_issuer_class_issuer FOREIGN KEY (issuer_id) REFERENCES stonks.issuer(issuer_id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY stonks.issuer_classification
+    ADD CONSTRAINT fk_issuer_class_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
+
 ALTER TABLE ONLY stonks.issuer
     ADD CONSTRAINT fk_issuer_country FOREIGN KEY (country_alpha2) REFERENCES stonks.iso3166_country(alpha2);
 
@@ -577,11 +648,20 @@ ALTER TABLE ONLY stonks.issuer_identifier
 ALTER TABLE ONLY stonks.issuer_identifier
     ADD CONSTRAINT fk_issuer_identifier_issuer FOREIGN KEY (issuer_id) REFERENCES stonks.issuer(issuer_id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY stonks.issuer_identifier
+    ADD CONSTRAINT fk_issuer_identifier_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
+
+ALTER TABLE ONLY stonks.issuer_identifier
+    ADD CONSTRAINT fk_issuer_identifier_type FOREIGN KEY (id_type) REFERENCES stonks.identifier_type(id_type) ON UPDATE CASCADE;
+
 ALTER TABLE ONLY stonks.issuer_name_history
     ADD CONSTRAINT fk_issuer_name_confidence FOREIGN KEY (confidence_code) REFERENCES stonks.confidence_level(confidence_code);
 
 ALTER TABLE ONLY stonks.issuer_name_history
     ADD CONSTRAINT fk_issuer_name_issuer FOREIGN KEY (issuer_id) REFERENCES stonks.issuer(issuer_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY stonks.issuer_name_history
+    ADD CONSTRAINT fk_issuer_name_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
 
 ALTER TABLE ONLY stonks.listing
     ADD CONSTRAINT fk_listing_currency FOREIGN KEY (currency_code) REFERENCES stonks.iso4217_currency(code);
@@ -598,6 +678,27 @@ ALTER TABLE ONLY stonks.listing_symbol_history
 ALTER TABLE ONLY stonks.listing_symbol_history
     ADD CONSTRAINT fk_listing_symbol_listing FOREIGN KEY (listing_id) REFERENCES stonks.listing(listing_id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY stonks.listing_symbol_history
+    ADD CONSTRAINT fk_listing_symbol_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
+
+ALTER TABLE ONLY stonks.provider_evidence
+    ADD CONSTRAINT fk_provider_evidence_event FOREIGN KEY (event_id) REFERENCES stonks.security_event(event_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY stonks.provider_evidence
+    ADD CONSTRAINT fk_provider_evidence_issuer FOREIGN KEY (issuer_id) REFERENCES stonks.issuer(issuer_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY stonks.provider_evidence
+    ADD CONSTRAINT fk_provider_evidence_listing FOREIGN KEY (listing_id) REFERENCES stonks.listing(listing_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY stonks.provider_evidence
+    ADD CONSTRAINT fk_provider_evidence_observation FOREIGN KEY (provider_observation_id) REFERENCES stonks.provider_observation(provider_observation_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY stonks.provider_evidence
+    ADD CONSTRAINT fk_provider_evidence_security FOREIGN KEY (security_id) REFERENCES stonks.security(security_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY stonks.provider_observation
+    ADD CONSTRAINT fk_provider_observation_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
+
 ALTER TABLE ONLY stonks.security
     ADD CONSTRAINT fk_security_currency FOREIGN KEY (currency_code) REFERENCES stonks.iso4217_currency(code);
 
@@ -611,31 +712,25 @@ ALTER TABLE ONLY stonks.security_event
     ADD CONSTRAINT fk_security_event_listing FOREIGN KEY (listing_id) REFERENCES stonks.listing(listing_id);
 
 ALTER TABLE ONLY stonks.security_event
+    ADD CONSTRAINT fk_security_event_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
+
+ALTER TABLE ONLY stonks.security_event
     ADD CONSTRAINT fk_security_event_security FOREIGN KEY (security_id) REFERENCES stonks.security(security_id);
 
 ALTER TABLE ONLY stonks.security_identifier
     ADD CONSTRAINT fk_security_identifier_confidence FOREIGN KEY (confidence_code) REFERENCES stonks.confidence_level(confidence_code);
 
 ALTER TABLE ONLY stonks.security_identifier
+    ADD CONSTRAINT fk_security_identifier_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
+
+ALTER TABLE ONLY stonks.security_identifier
     ADD CONSTRAINT fk_security_identifier_security FOREIGN KEY (security_id) REFERENCES stonks.security(security_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY stonks.security_identifier
+    ADD CONSTRAINT fk_security_identifier_type FOREIGN KEY (id_type) REFERENCES stonks.identifier_type(id_type) ON UPDATE CASCADE;
 
 ALTER TABLE ONLY stonks.security
     ADD CONSTRAINT fk_security_issuer FOREIGN KEY (issuer_id) REFERENCES stonks.issuer(issuer_id);
 
 ALTER TABLE ONLY stonks.security
     ADD CONSTRAINT fk_security_type FOREIGN KEY (instrument_type_code) REFERENCES stonks.instrument_type(type_code);
-
-ALTER TABLE ONLY stonks.source_evidence
-    ADD CONSTRAINT fk_source_evidence_event FOREIGN KEY (event_id) REFERENCES stonks.security_event(event_id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY stonks.source_evidence
-    ADD CONSTRAINT fk_source_evidence_issuer FOREIGN KEY (issuer_id) REFERENCES stonks.issuer(issuer_id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY stonks.source_evidence
-    ADD CONSTRAINT fk_source_evidence_listing FOREIGN KEY (listing_id) REFERENCES stonks.listing(listing_id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY stonks.source_evidence
-    ADD CONSTRAINT fk_source_evidence_obs FOREIGN KEY (source_obs_id) REFERENCES stonks.source_observation(source_obs_id) ON DELETE CASCADE;
-
-ALTER TABLE ONLY stonks.source_evidence
-    ADD CONSTRAINT fk_source_evidence_security FOREIGN KEY (security_id) REFERENCES stonks.security(security_id) ON DELETE CASCADE;
