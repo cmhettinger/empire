@@ -1,0 +1,5 @@
+# Instrument class/type support for securities.
+
+instrument_class
+instrument_type
+security

@@ -1,0 +1,7 @@
+# Central security-master chain.
+
+issuer
+security
+listing
+listing_symbol_history
+exchange

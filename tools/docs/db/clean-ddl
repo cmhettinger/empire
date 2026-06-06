@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: clean-ddl MODE
+
+Modes:
+  full    Clean pg_dump schema output.
+  tables  Clean pg_dump schema output and keep table definitions plus primary keys.
+EOF
+}
+
+clean_pg_dump() {
+  sed \
+    -e '/^\\restrict /d' \
+    -e '/^\\unrestrict /d' \
+    -e '/^-- PostgreSQL database dump/d' \
+    -e '/^-- Dumped from database version/d' \
+    -e '/^-- Dumped by pg_dump version/d' \
+    -e '/^-- Name: .*; Type: .*; Schema: .*; Owner: .*$/d' \
+    -e '/^--$/d' \
+  | sed '/^$/N;/^\n$/D'
+}
+
+extract_tables_only() {
+  awk '
+    BEGIN { in_create=0; in_pk=0 }
+    /^CREATE TABLE / { in_create=1; print; next }
+    in_create==1 { print; if ($0 ~ /;[[:space:]]*$/) in_create=0; next }
+    /^ALTER TABLE ONLY / {
+      if ($0 ~ /ADD CONSTRAINT/ && $0 ~ /PRIMARY KEY/) { in_pk=1; print; next }
+    }
+    in_pk==1 { print; if ($0 ~ /;[[:space:]]*$/) in_pk=0; next }
+  '
+}
+
+main() {
+  local mode="${1:-}"
+
+  case "$mode" in
+    full)
+      clean_pg_dump
+      ;;
+    tables)
+      clean_pg_dump | extract_tables_only
+      ;;
+    *)
+      usage
+      exit 2
+      ;;
+  esac
+}
+
+main "$@"

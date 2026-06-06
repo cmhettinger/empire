@@ -1,0 +1,318 @@
+# Documentation generation configuration.
+#
+# Canonical docs belong under docs/. Temporary generator inputs, raw dumps,
+# and debugging artifacts belong under tmp/docs/.
+
+REPO_ROOT ?= $(shell git rev-parse --show-toplevel)
+
+DOCS_DIR ?= $(REPO_ROOT)/docs
+DOCS_TMP_DIR ?= $(REPO_ROOT)/tmp/docs
+
+DOCS_DB_DIR ?= $(DOCS_DIR)/db
+DOCS_DB_TMP_DIR ?= $(DOCS_TMP_DIR)/db
+DOCS_DB_SCHEMAS ?= core stonks
+DOCS_DB_DEFAULT_SCHEMA ?= stonks
+
+SCHEMA ?= $(DOCS_DB_DEFAULT_SCHEMA)
+GROUP ?=
+
+TOOLS_DOCS_DB_DIR = $(REPO_ROOT)/tools/docs/db
+DOCS_DB_SCHEMA_DIR = $(DOCS_DB_DIR)/$(SCHEMA)
+DOCS_DB_SCHEMA_GENERATED_DIR = $(DOCS_DB_SCHEMA_DIR)/generated
+DOCS_DB_SCHEMA_TMP_DIR = $(DOCS_DB_TMP_DIR)/$(SCHEMA)
+DOCS_DB_SCHEMA_GROUPS_DIR = $(REPO_ROOT)/tools/docs/db/schemas/$(SCHEMA)/groups
+DOCS_DB_SCHEMA_GROUP_FILE = $(DOCS_DB_SCHEMA_GROUPS_DIR)/$(GROUP).txt
+DOCS_DB_SCHEMA_GENERATED_README = $(DOCS_DB_SCHEMA_GENERATED_DIR)/README.md
+DOCS_DB_SCHEMA_FILE = $(DOCS_DB_SCHEMA_GENERATED_DIR)/schema.sql
+DOCS_DB_SCHEMA_TABLES_FILE = $(DOCS_DB_SCHEMA_TMP_DIR)/ddl/schema.tables.sql
+DOCS_DB_SCHEMA_RAW_FILE = $(DOCS_DB_SCHEMA_TMP_DIR)/ddl/schema.raw.sql
+DOCS_DB_SCHEMASPY_DIR = $(DOCS_DB_SCHEMA_TMP_DIR)/schemaspy
+DOCS_DB_SCHEMASPY_CACHE_DIR = $(DOCS_DB_TMP_DIR)/.cache
+DOCS_DB_PG_DIAGRAM_DIR = $(DOCS_DB_SCHEMA_GENERATED_DIR)/pg-diagram
+DOCS_DB_PG_DIAGRAM_TMP_DIR = $(DOCS_DB_SCHEMA_TMP_DIR)/pg-diagram
+DOCS_DB_PG_DIAGRAM_SQL_FILE = $(DOCS_DB_PG_DIAGRAM_TMP_DIR)/schema.pg-diagram.sql
+DOCS_DB_PG_DIAGRAM_DOT_FILE = $(DOCS_DB_PG_DIAGRAM_TMP_DIR)/relations.dot
+DOCS_DB_PG_DIAGRAM_GROUP_DIR = $(DOCS_DB_SCHEMA_GENERATED_DIR)/pg-diagram-groups/$(GROUP)
+DOCS_DB_PG_DIAGRAM_GROUP_TMP_DIR = $(DOCS_DB_SCHEMA_TMP_DIR)/pg-diagram-groups/$(GROUP)
+DOCS_DB_PG_DIAGRAM_GROUP_SQL_FILE = $(DOCS_DB_PG_DIAGRAM_GROUP_TMP_DIR)/schema.pg-diagram.sql
+DOCS_DB_PG_DIAGRAM_GROUP_DOT_FILE = $(DOCS_DB_PG_DIAGRAM_GROUP_TMP_DIR)/relations.dot
+DOCS_DB_ERD_META_FILE = $(DOCS_DB_SCHEMA_TMP_DIR)/erd/meta.tsv
+DOCS_DB_ERD_MMD_FILE = $(DOCS_DB_SCHEMA_TMP_DIR)/erd/erd.mmd
+DOCS_DB_ERD_RELATIONS_MMD_FILE = $(DOCS_DB_SCHEMA_TMP_DIR)/erd/erd-relations.mmd
+DOCS_DB_ERD_FILE = $(DOCS_DB_SCHEMA_GENERATED_DIR)/erd.md
+DOCS_DB_ERD_RELATIONS_FILE = $(DOCS_DB_SCHEMA_GENERATED_DIR)/erd-relations.md
+DOCS_DB_ERD_GROUP_MMD_FILE = $(DOCS_DB_SCHEMA_TMP_DIR)/erd-groups/$(GROUP).mmd
+DOCS_DB_ERD_GROUP_RELATIONS_MMD_FILE = $(DOCS_DB_SCHEMA_TMP_DIR)/erd-groups/$(GROUP)-relations.mmd
+DOCS_DB_ERD_GROUP_FILE = $(DOCS_DB_SCHEMA_GENERATED_DIR)/erd-groups/$(GROUP).md
+DOCS_DB_ERD_GROUP_RELATIONS_FILE = $(DOCS_DB_SCHEMA_GENERATED_DIR)/erd-groups/$(GROUP)-relations.md
+
+.PHONY: \
+	docs-db \
+	docs-db-canon \
+	docs-db-schema \
+	docs-db-schema-all \
+	docs-db-pg-diagram \
+	docs-db-pg-diagram-all \
+	docs-db-pg-diagram-group \
+	docs-db-pg-diagram-groups \
+	docs-db-pg-diagram-groups-all \
+	docs-db-schemaspy \
+	docs-db-schemaspy-all \
+	docs-db-erd-meta \
+	docs-db-erd-mmd \
+	docs-db-erd \
+	docs-db-erd-all \
+	docs-db-erd-group \
+	docs-db-erd-groups \
+	docs-db-erd-groups-all \
+	docs-db-list \
+	docs-db-print-vars \
+	docs-db-prepare \
+	docs-db-prepare-all \
+	docs-db-validate-schema \
+	docs-db-validate-group
+
+docs-db: docs-db-canon docs-db-pg-diagram-all docs-db-pg-diagram-groups-all docs-db-schemaspy-all ## Generate all DB docs
+
+docs-db-canon: docs-db-schema-all docs-db-erd-all docs-db-erd-groups-all ## Generate canonical DB docs for all configured schemas
+
+docs-db-list: ## List configured DB doc schemas and ERD groups
+	@echo "Configured DB doc schemas:"
+	@for schema in $(DOCS_DB_SCHEMAS); do \
+		echo "  $$schema"; \
+		groups_dir="$(REPO_ROOT)/tools/docs/db/schemas/$$schema/groups"; \
+		if [[ -d "$$groups_dir" ]]; then \
+			for group_file in "$$groups_dir"/*.txt; do \
+				[[ -e "$$group_file" ]] || continue; \
+				echo "    group: $$(basename "$$group_file" .txt)"; \
+			done; \
+		fi; \
+	done
+
+docs-db-print-vars: ## Show DB docs paths for SCHEMA=<schema>
+	@echo "SCHEMA=$(SCHEMA)"
+	@echo "DOCS_DB_SCHEMA_DIR=$(DOCS_DB_SCHEMA_DIR)"
+	@echo "DOCS_DB_SCHEMA_GENERATED_DIR=$(DOCS_DB_SCHEMA_GENERATED_DIR)"
+	@echo "DOCS_DB_SCHEMA_TMP_DIR=$(DOCS_DB_SCHEMA_TMP_DIR)"
+	@echo "DOCS_DB_SCHEMA_GROUPS_DIR=$(DOCS_DB_SCHEMA_GROUPS_DIR)"
+	@echo "DOCS_DB_SCHEMA_FILE=$(DOCS_DB_SCHEMA_FILE)"
+	@echo "DOCS_DB_ERD_FILE=$(DOCS_DB_ERD_FILE)"
+	@echo "DOCS_DB_ERD_RELATIONS_FILE=$(DOCS_DB_ERD_RELATIONS_FILE)"
+	@echo "DOCS_DB_PG_DIAGRAM_DIR=$(DOCS_DB_PG_DIAGRAM_DIR)"
+	@echo "DOCS_DB_PG_DIAGRAM_TMP_DIR=$(DOCS_DB_PG_DIAGRAM_TMP_DIR)"
+
+docs-db-prepare: docs-db-validate-schema ## Create docs/db and tmp/docs/db directories for SCHEMA=<schema>
+	@mkdir -p "$(DOCS_DB_SCHEMA_DIR)"
+	@mkdir -p "$(DOCS_DB_SCHEMA_GENERATED_DIR)"
+	@mkdir -p "$(DOCS_DB_SCHEMA_TMP_DIR)"
+	@mkdir -p "$(DOCS_DB_SCHEMA_TMP_DIR)/ddl"
+	@mkdir -p "$(DOCS_DB_SCHEMA_TMP_DIR)/erd"
+	@mkdir -p "$(DOCS_DB_SCHEMASPY_DIR)"
+	@mkdir -p "$(DOCS_DB_PG_DIAGRAM_DIR)"
+	@mkdir -p "$(DOCS_DB_PG_DIAGRAM_TMP_DIR)"
+	@{ \
+		echo "# Generated Documentation"; \
+		echo ""; \
+		echo "Files in this directory are generated by Empire documentation Make targets."; \
+		echo "Do not edit these files by hand; update the source schema, group files, or generator instead."; \
+		echo ""; \
+		echo "Generated at: $$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; \
+		echo ""; \
+		echo "Schema: $(SCHEMA)"; \
+	} > "$(DOCS_DB_SCHEMA_GENERATED_README)"
+	@echo "Prepared docs directories for schema: $(SCHEMA)"
+	@echo "  generated: $(DOCS_DB_SCHEMA_GENERATED_DIR)"
+	@echo "  temporary: $(DOCS_DB_SCHEMA_TMP_DIR)"
+
+docs-db-prepare-all: ## Create docs/db and tmp/docs/db directories for all configured schemas
+	@for schema in $(DOCS_DB_SCHEMAS); do \
+		$(MAKE) --no-print-directory docs-db-prepare SCHEMA="$$schema"; \
+	done
+
+docs-db-validate-schema: ## Validate SCHEMA=<schema> is configured for DB docs
+	@if [[ -z "$(SCHEMA)" ]]; then \
+		echo "ERROR: SCHEMA is required"; \
+		exit 1; \
+	fi
+	@found=0; \
+	for schema in $(DOCS_DB_SCHEMAS); do \
+		if [[ "$$schema" == "$(SCHEMA)" ]]; then \
+			found=1; \
+		fi; \
+	done; \
+	if [[ "$$found" -ne 1 ]]; then \
+		echo "ERROR: schema '$(SCHEMA)' is not in DOCS_DB_SCHEMAS: $(DOCS_DB_SCHEMAS)"; \
+		exit 1; \
+	fi
+
+docs-db-validate-group: docs-db-validate-schema ## Validate GROUP=<group> exists for SCHEMA=<schema>
+	@if [[ -z "$(GROUP)" ]]; then \
+		echo "ERROR: GROUP is required. Example: make docs-db-validate-group SCHEMA=stonks GROUP=security-master"; \
+		exit 1; \
+	fi
+	@if [[ ! -f "$(DOCS_DB_SCHEMA_GROUP_FILE)" ]]; then \
+		echo "ERROR: group file not found: $(DOCS_DB_SCHEMA_GROUP_FILE)"; \
+		exit 1; \
+	fi
+	@echo "Validated docs DB ERD group: SCHEMA=$(SCHEMA) GROUP=$(GROUP)"
+	@echo "  $(DOCS_DB_SCHEMA_GROUP_FILE)"
+
+docs-db-schema: docs-db-prepare ## Generate canonical DDL docs for SCHEMA=<schema>
+	@$(COMPOSE) exec -T -e DOCS_DB_SCHEMA="$(SCHEMA)" postgres sh -c 'pg_dump --schema-only --schema "$$DOCS_DB_SCHEMA" --no-comments --no-owner --no-privileges -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' > "$(DOCS_DB_SCHEMA_RAW_FILE)"
+	@"$(TOOLS_DOCS_DB_DIR)/clean-ddl" full < "$(DOCS_DB_SCHEMA_RAW_FILE)" > "$(DOCS_DB_SCHEMA_FILE)"
+	@"$(TOOLS_DOCS_DB_DIR)/clean-ddl" tables < "$(DOCS_DB_SCHEMA_RAW_FILE)" > "$(DOCS_DB_SCHEMA_TABLES_FILE)"
+	@echo "Wrote: $(DOCS_DB_SCHEMA_FILE)"
+	@echo "Wrote: $(DOCS_DB_SCHEMA_TABLES_FILE)"
+
+docs-db-schema-all: ## Generate canonical DDL docs for all configured schemas
+	@for schema in $(DOCS_DB_SCHEMAS); do \
+		$(MAKE) --no-print-directory docs-db-schema SCHEMA="$$schema"; \
+	done
+
+docs-db-pg-diagram: docs-db-schema docs-db-erd-meta ## Generate pg-diagram SVG/PNG docs for SCHEMA=<schema>
+	@python3 "$(TOOLS_DOCS_DB_DIR)/pg-diagram-sql-filter.py" \
+		"$(DOCS_DB_SCHEMA_RAW_FILE)" \
+		"$(DOCS_DB_PG_DIAGRAM_SQL_FILE)" \
+		--schema "$(SCHEMA)"
+	@python3 "$(TOOLS_DOCS_DB_DIR)/relations-dot-generate.py" \
+		"$(DOCS_DB_ERD_META_FILE)" \
+		"$(DOCS_DB_PG_DIAGRAM_DOT_FILE)"
+	@SQL_FILE="$(DOCS_DB_PG_DIAGRAM_SQL_FILE)" \
+	DOT_FILE="$(DOCS_DB_PG_DIAGRAM_DOT_FILE)" \
+	OUT_DIR="$(DOCS_DB_PG_DIAGRAM_DIR)" \
+	"$(TOOLS_DOCS_DB_DIR)/pg-diagram-render"
+	@echo "Wrote: $(DOCS_DB_PG_DIAGRAM_DIR)/erd.svg"
+	@echo "Wrote: $(DOCS_DB_PG_DIAGRAM_DIR)/erd.png"
+	@echo "Wrote: $(DOCS_DB_PG_DIAGRAM_DIR)/erd-relations.svg"
+	@echo "Wrote: $(DOCS_DB_PG_DIAGRAM_DIR)/erd-relations.png"
+
+docs-db-pg-diagram-all: ## Generate pg-diagram SVG/PNG docs for all configured schemas
+	@for schema in $(DOCS_DB_SCHEMAS); do \
+		$(MAKE) --no-print-directory docs-db-pg-diagram SCHEMA="$$schema"; \
+	done
+
+docs-db-pg-diagram-group: docs-db-validate-group docs-db-schema docs-db-erd-meta ## Generate grouped pg-diagram SVG/PNG docs for SCHEMA=<schema> GROUP=<group>
+	@mkdir -p "$(DOCS_DB_PG_DIAGRAM_GROUP_DIR)"
+	@mkdir -p "$(DOCS_DB_PG_DIAGRAM_GROUP_TMP_DIR)"
+	@python3 "$(TOOLS_DOCS_DB_DIR)/pg-diagram-sql-filter.py" \
+		"$(DOCS_DB_SCHEMA_RAW_FILE)" \
+		"$(DOCS_DB_PG_DIAGRAM_GROUP_SQL_FILE)" \
+		--schema "$(SCHEMA)" \
+		--tables-file "$(DOCS_DB_SCHEMA_GROUP_FILE)"
+	@python3 "$(TOOLS_DOCS_DB_DIR)/relations-dot-generate.py" \
+		"$(DOCS_DB_ERD_META_FILE)" \
+		"$(DOCS_DB_PG_DIAGRAM_GROUP_DOT_FILE)" \
+		--tables-file "$(DOCS_DB_SCHEMA_GROUP_FILE)"
+	@SQL_FILE="$(DOCS_DB_PG_DIAGRAM_GROUP_SQL_FILE)" \
+	DOT_FILE="$(DOCS_DB_PG_DIAGRAM_GROUP_DOT_FILE)" \
+	OUT_DIR="$(DOCS_DB_PG_DIAGRAM_GROUP_DIR)" \
+	"$(TOOLS_DOCS_DB_DIR)/pg-diagram-render"
+	@echo "Wrote: $(DOCS_DB_PG_DIAGRAM_GROUP_DIR)/erd.svg"
+	@echo "Wrote: $(DOCS_DB_PG_DIAGRAM_GROUP_DIR)/erd.png"
+	@echo "Wrote: $(DOCS_DB_PG_DIAGRAM_GROUP_DIR)/erd-relations.svg"
+	@echo "Wrote: $(DOCS_DB_PG_DIAGRAM_GROUP_DIR)/erd-relations.png"
+
+docs-db-pg-diagram-groups: docs-db-validate-schema ## Generate grouped pg-diagram SVG/PNG docs for every group in SCHEMA=<schema>
+	@found=0; \
+	if [[ ! -d "$(DOCS_DB_SCHEMA_GROUPS_DIR)" ]]; then \
+		echo "No ERD group directory for schema: $(SCHEMA)"; \
+		exit 0; \
+	fi; \
+	for group_file in "$(DOCS_DB_SCHEMA_GROUPS_DIR)"/*.txt; do \
+		[[ -e "$$group_file" ]] || continue; \
+		found=1; \
+		group="$$(basename "$$group_file" .txt)"; \
+		$(MAKE) --no-print-directory docs-db-pg-diagram-group SCHEMA="$(SCHEMA)" GROUP="$$group" || exit $$?; \
+	done; \
+	if [[ "$$found" -eq 0 ]]; then \
+		echo "No ERD groups found for schema: $(SCHEMA)"; \
+	fi
+
+docs-db-pg-diagram-groups-all: ## Generate grouped pg-diagram SVG/PNG docs for every configured schema
+	@for schema in $(DOCS_DB_SCHEMAS); do \
+		$(MAKE) --no-print-directory docs-db-pg-diagram-groups SCHEMA="$$schema"; \
+	done
+
+docs-db-schemaspy: docs-db-prepare ## Generate SchemaSpy HTML docs under tmp/docs for SCHEMA=<schema>
+	@container_id="$$( $(COMPOSE) ps -q postgres )"; \
+	if [[ -z "$$container_id" ]]; then \
+		echo "ERROR: Postgres container is not running. Start it with: make db-up"; \
+		exit 1; \
+	fi; \
+	SCHEMA="$(SCHEMA)" \
+	POSTGRES_CONTAINER_ID="$$container_id" \
+	OUT_DIR="$(DOCS_DB_SCHEMASPY_DIR)" \
+	CACHE_DIR="$(DOCS_DB_SCHEMASPY_CACHE_DIR)" \
+	"$(TOOLS_DOCS_DB_DIR)/schemaspy-generate"
+
+docs-db-schemaspy-all: ## Generate SchemaSpy HTML docs under tmp/docs for all configured schemas
+	@for schema in $(DOCS_DB_SCHEMAS); do \
+		$(MAKE) --no-print-directory docs-db-schemaspy SCHEMA="$$schema"; \
+	done
+
+docs-db-erd-meta: docs-db-prepare ## Generate Mermaid ERD metadata TSV for SCHEMA=<schema>
+	@$(COMPOSE) exec -T -e DOCS_DB_SCHEMA="$(SCHEMA)" postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -v erd_schema="$$DOCS_DB_SCHEMA"' < "$(TOOLS_DOCS_DB_DIR)/mermaid-erd-meta.sql" > "$(DOCS_DB_ERD_META_FILE)"
+	@echo "Wrote: $(DOCS_DB_ERD_META_FILE)"
+
+docs-db-erd-mmd: docs-db-erd-meta ## Generate Mermaid ERD sources for SCHEMA=<schema>
+	@python3 "$(TOOLS_DOCS_DB_DIR)/mermaid-erd-generate.py" "$(DOCS_DB_ERD_META_FILE)" "$(DOCS_DB_ERD_MMD_FILE)"
+	@echo "Wrote: $(DOCS_DB_ERD_MMD_FILE)"
+	@python3 "$(TOOLS_DOCS_DB_DIR)/mermaid-erd-generate.py" "$(DOCS_DB_ERD_META_FILE)" "$(DOCS_DB_ERD_RELATIONS_MMD_FILE)" --compact
+	@echo "Wrote: $(DOCS_DB_ERD_RELATIONS_MMD_FILE)"
+
+docs-db-erd: docs-db-erd-mmd ## Generate canonical Mermaid ERD Markdown files for SCHEMA=<schema>
+	@printf '```mermaid\n' > "$(DOCS_DB_ERD_FILE)"
+	@cat "$(DOCS_DB_ERD_MMD_FILE)" >> "$(DOCS_DB_ERD_FILE)"
+	@printf '```\n' >> "$(DOCS_DB_ERD_FILE)"
+	@echo "Wrote: $(DOCS_DB_ERD_FILE)"
+	@printf '```mermaid\n' > "$(DOCS_DB_ERD_RELATIONS_FILE)"
+	@cat "$(DOCS_DB_ERD_RELATIONS_MMD_FILE)" >> "$(DOCS_DB_ERD_RELATIONS_FILE)"
+	@printf '```\n' >> "$(DOCS_DB_ERD_RELATIONS_FILE)"
+	@echo "Wrote: $(DOCS_DB_ERD_RELATIONS_FILE)"
+
+docs-db-erd-all: ## Generate canonical Mermaid ERD Markdown files for all configured schemas
+	@for schema in $(DOCS_DB_SCHEMAS); do \
+		$(MAKE) --no-print-directory docs-db-erd SCHEMA="$$schema"; \
+	done
+
+docs-db-erd-group: docs-db-validate-group docs-db-erd-meta ## Generate grouped Mermaid ERD Markdown for SCHEMA=<schema> GROUP=<group>
+	@mkdir -p "$(DOCS_DB_SCHEMA_GENERATED_DIR)/erd-groups"
+	@mkdir -p "$(DOCS_DB_SCHEMA_TMP_DIR)/erd-groups"
+	@python3 "$(TOOLS_DOCS_DB_DIR)/mermaid-erd-generate.py" \
+		"$(DOCS_DB_ERD_META_FILE)" \
+		"$(DOCS_DB_ERD_GROUP_MMD_FILE)" \
+		--tables-file "$(DOCS_DB_SCHEMA_GROUP_FILE)"
+	@python3 "$(TOOLS_DOCS_DB_DIR)/mermaid-erd-generate.py" \
+		"$(DOCS_DB_ERD_META_FILE)" \
+		"$(DOCS_DB_ERD_GROUP_RELATIONS_MMD_FILE)" \
+		--tables-file "$(DOCS_DB_SCHEMA_GROUP_FILE)" \
+		--compact
+	@printf '```mermaid\n' > "$(DOCS_DB_ERD_GROUP_FILE)"
+	@cat "$(DOCS_DB_ERD_GROUP_MMD_FILE)" >> "$(DOCS_DB_ERD_GROUP_FILE)"
+	@printf '```\n' >> "$(DOCS_DB_ERD_GROUP_FILE)"
+	@echo "Wrote: $(DOCS_DB_ERD_GROUP_FILE)"
+	@printf '```mermaid\n' > "$(DOCS_DB_ERD_GROUP_RELATIONS_FILE)"
+	@cat "$(DOCS_DB_ERD_GROUP_RELATIONS_MMD_FILE)" >> "$(DOCS_DB_ERD_GROUP_RELATIONS_FILE)"
+	@printf '```\n' >> "$(DOCS_DB_ERD_GROUP_RELATIONS_FILE)"
+	@echo "Wrote: $(DOCS_DB_ERD_GROUP_RELATIONS_FILE)"
+
+docs-db-erd-groups: docs-db-validate-schema ## Generate grouped Mermaid ERD Markdown for every group in SCHEMA=<schema>
+	@found=0; \
+	if [[ ! -d "$(DOCS_DB_SCHEMA_GROUPS_DIR)" ]]; then \
+		echo "No ERD group directory for schema: $(SCHEMA)"; \
+		exit 0; \
+	fi; \
+	for group_file in "$(DOCS_DB_SCHEMA_GROUPS_DIR)"/*.txt; do \
+		[[ -e "$$group_file" ]] || continue; \
+		found=1; \
+		group="$$(basename "$$group_file" .txt)"; \
+		$(MAKE) --no-print-directory docs-db-erd-group SCHEMA="$(SCHEMA)" GROUP="$$group" || exit $$?; \
+	done; \
+	if [[ "$$found" -eq 0 ]]; then \
+		echo "No ERD groups found for schema: $(SCHEMA)"; \
+	fi
+
+docs-db-erd-groups-all: ## Generate grouped Mermaid ERD Markdown for every configured schema
+	@for schema in $(DOCS_DB_SCHEMAS); do \
+		$(MAKE) --no-print-directory docs-db-erd-groups SCHEMA="$$schema"; \
+	done

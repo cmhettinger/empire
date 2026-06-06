@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: schemaspy-generate
+
+Required env:
+  SCHEMA
+  POSTGRES_CONTAINER_ID
+  OUT_DIR
+
+Optional env:
+  CACHE_DIR                 default: tmp/docs/db/.cache
+  JDBC_VERSION              default: 42.7.4
+  SCHEMASPY_IMAGE           default: schemaspy/schemaspy:7.0.2
+  POSTGRES_CONTAINER_PORT   default: 5432
+EOF
+}
+
+require() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "ERROR: missing required command: $1" >&2
+    exit 1
+  }
+}
+
+repo_root() {
+  if command -v git >/dev/null 2>&1 && git rev-parse --show-toplevel >/dev/null 2>&1; then
+    git rev-parse --show-toplevel
+  else
+    cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd
+  fi
+}
+
+container_env() {
+  local name="$1"
+  docker exec "$POSTGRES_CONTAINER_ID" sh -c "printenv '$name'"
+}
+
+main() {
+  require curl
+  require docker
+  require mkdir
+
+  [[ "${1:-}" != "-h" && "${1:-}" != "--help" ]] || {
+    usage
+    exit 0
+  }
+
+  [[ -n "${SCHEMA:-}" ]] || {
+    echo "ERROR: SCHEMA is required" >&2
+    exit 1
+  }
+  [[ -n "${POSTGRES_CONTAINER_ID:-}" ]] || {
+    echo "ERROR: POSTGRES_CONTAINER_ID is required" >&2
+    exit 1
+  }
+  [[ -n "${OUT_DIR:-}" ]] || {
+    echo "ERROR: OUT_DIR is required" >&2
+    exit 1
+  }
+
+  local root
+  root="$(repo_root)"
+
+  local cache_dir="${CACHE_DIR:-${root}/tmp/docs/db/.cache}"
+  local jdbc_version="${JDBC_VERSION:-42.7.4}"
+  local jdbc_jar="postgresql-${jdbc_version}.jar"
+  local jdbc_path="${cache_dir}/${jdbc_jar}"
+  local jdbc_url="https://jdbc.postgresql.org/download/${jdbc_jar}"
+  local legacy_jdbc_path="${root}/tmp/tools/db/.cache/${jdbc_jar}"
+  local schemaspy_image="${SCHEMASPY_IMAGE:-schemaspy/schemaspy:7.0.2}"
+  local postgres_port="${POSTGRES_CONTAINER_PORT:-5432}"
+
+  mkdir -p "$OUT_DIR"
+  mkdir -p "$cache_dir"
+
+  if [[ ! -f "$jdbc_path" ]]; then
+    if [[ -f "$legacy_jdbc_path" ]]; then
+      cp "$legacy_jdbc_path" "$jdbc_path"
+    else
+      echo "Downloading PostgreSQL JDBC driver ${jdbc_jar}..."
+      curl -fsSL -o "$jdbc_path" "$jdbc_url"
+    fi
+  fi
+
+  local postgres_user postgres_password postgres_db
+  postgres_user="$(container_env POSTGRES_USER)"
+  postgres_password="$(container_env POSTGRES_PASSWORD)"
+  postgres_db="$(container_env POSTGRES_DB)"
+
+  [[ -n "$postgres_user" ]] || {
+    echo "ERROR: POSTGRES_USER is not set in Postgres container" >&2
+    exit 1
+  }
+  [[ -n "$postgres_password" ]] || {
+    echo "ERROR: POSTGRES_PASSWORD is not set in Postgres container" >&2
+    exit 1
+  }
+  [[ -n "$postgres_db" ]] || {
+    echo "ERROR: POSTGRES_DB is not set in Postgres container" >&2
+    exit 1
+  }
+
+  echo "Running SchemaSpy: schema=${SCHEMA} output=${OUT_DIR}"
+  docker run --rm \
+    --network "container:${POSTGRES_CONTAINER_ID}" \
+    -v "${OUT_DIR}:/output" \
+    -v "${jdbc_path}:/drivers/postgresql-jdbc.jar:ro" \
+    "$schemaspy_image" \
+    -t pgsql \
+    -host localhost \
+    -port "$postgres_port" \
+    -db "$postgres_db" \
+    -s "$SCHEMA" \
+    -u "$postgres_user" \
+    -p "$postgres_password" \
+    -dp /drivers/postgresql-jdbc.jar
+
+  echo "SchemaSpy docs generated:"
+  echo "  ${OUT_DIR}/index.html"
+}
+
+main "$@"

@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: pg-diagram-render
+
+Required env:
+  SQL_FILE
+  DOT_FILE
+  OUT_DIR
+
+Optional env:
+  PG_DIAGRAM_PIP_SPEC  default: pg-diagram
+EOF
+}
+
+main() {
+  [[ "${1:-}" != "-h" && "${1:-}" != "--help" ]] || {
+    usage
+    exit 0
+  }
+
+  [[ -n "${SQL_FILE:-}" ]] || {
+    echo "ERROR: SQL_FILE is required" >&2
+    exit 1
+  }
+  [[ -n "${DOT_FILE:-}" ]] || {
+    echo "ERROR: DOT_FILE is required" >&2
+    exit 1
+  }
+  [[ -n "${OUT_DIR:-}" ]] || {
+    echo "ERROR: OUT_DIR is required" >&2
+    exit 1
+  }
+
+  mkdir -p "$OUT_DIR"
+
+  local sql_dir dot_dir out_dir
+  sql_dir="$(cd "$(dirname "$SQL_FILE")" && pwd)"
+  dot_dir="$(cd "$(dirname "$DOT_FILE")" && pwd)"
+  out_dir="$(cd "$OUT_DIR" && pwd)"
+
+  local sql_name dot_name
+  sql_name="$(basename "$SQL_FILE")"
+  dot_name="$(basename "$DOT_FILE")"
+
+  local pip_spec="${PG_DIAGRAM_PIP_SPEC:-pg-diagram}"
+
+  docker run --rm \
+    -v "${sql_dir}:/sql:ro" \
+    -v "${dot_dir}:/dot:ro" \
+    -v "${out_dir}:/out" \
+    -e PG_DIAGRAM_PIP_SPEC="$pip_spec" \
+    python:3.12-slim \
+    bash -lc '
+      set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+      export PIP_DISABLE_PIP_VERSION_CHECK=1
+
+      apt-get update -qq
+      apt-get install -y -qq --no-install-recommends graphviz >/dev/null
+      pip install --no-cache-dir -q --root-user-action=ignore "$PG_DIAGRAM_PIP_SPEC"
+
+      pg_diagram -f svg -o /out/erd.svg "/sql/'"$sql_name"'"
+      pg_diagram -f png -o /out/erd.png "/sql/'"$sql_name"'"
+      dot -Tsvg "/dot/'"$dot_name"'" -o /out/erd-relations.svg
+      dot -Tpng "/dot/'"$dot_name"'" -o /out/erd-relations.png
+    '
+}
+
+main "$@"

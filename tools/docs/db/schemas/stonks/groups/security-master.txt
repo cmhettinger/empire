@@ -1,0 +1,26 @@
+# Tables in the current stonks security-master schema.
+#
+# One table name per line. Names are scoped to SCHEMA=stonks by the docs
+# generation targets.
+
+classification_code
+confidence_level
+exchange
+exchange_alias
+instrument_class
+instrument_type
+iso10383_mic
+iso10383_mic_cat
+iso3166_country
+iso4217_currency
+issuer
+issuer_classification
+issuer_identifier
+issuer_name_history
+listing
+listing_symbol_history
+security
+security_event
+security_identifier
+source_evidence
+source_observation
