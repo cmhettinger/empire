@@ -11,6 +11,7 @@ python = ">=3.11,<4.0"
 empire-core = { path = "../empire-core" }
 PyYAML = ">=6.0"
 requests = ">=2.31"
+curl-cffi = ">=0.15.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"

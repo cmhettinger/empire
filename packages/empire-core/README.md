@@ -58,8 +58,9 @@ jellyfin
 Example local/dev mapping:
 
 ```text
-global   -> /Users/chris/Documents/project/empire/empire-object-store/global
-jellyfin -> /Users/chris/Documents/project/empire/empire-object-store/jellyfin
+config   -> /Users/chris/Documents/project/empire/object-store/config
+global   -> /Users/chris/Documents/project/empire/object-store/global
+jellyfin -> /Users/chris/Documents/project/empire/object-store/jellyfin
 ```
 
 Example server mapping:
@@ -318,6 +319,13 @@ Expiration is controlled by `expires_at` on each stored object.
 deleted_count = object_store.delete_expired_objects(limit=100)
 ```
 
+For scheduled maintenance that should keep cleaning until no eligible expired
+objects remain, use the batch-oriented cleanup helper:
+
+```python
+result = object_store.cleanup_expired_objects(batch_size=100)
+```
+
 Expired files are deleted from the filesystem. Missing files are still marked
 deleted. Failed deletes increment `delete_attempts` and record
 `last_delete_error`.
@@ -326,6 +334,13 @@ Metadata tombstones can be purged later:
 
 ```python
 purged_count = object_store.purge_deleted_objects(limit=100)
+```
+
+For scheduled maintenance that should keep purging until no eligible tombstones
+remain, use the batch-oriented purge helper:
+
+```python
+result = object_store.purge_deleted_objects_all(batch_size=100)
 ```
 
 Deleted metadata for one run can be purged through the run-scoped helper:

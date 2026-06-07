@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 from empire_weather.config import WeatherCollectionConfig
+from empire_weather.exceptions import WeatherProviderError
 from empire_weather.models import ProviderLocationData, WeatherCollectionResult
 from empire_weather.normalize import normalize_weather_payload
 from empire_weather.providers import AccuWeatherHealthActivitiesProvider, NWSProvider, OpenWeatherProvider
+
+
+logger = logging.getLogger(__name__)
 
 
 class WeatherCollector:
@@ -50,11 +55,19 @@ class WeatherCollector:
             raw_responses.extend(openweather_data.raw_responses)
             raw_responses.extend(nws_data.raw_responses)
             if self.config.providers.accuweather.enabled:
-                accuweather_data = self.accuweather.collect_location(
-                    location,
-                    collected_at=generated_at,
-                    store_raw=self.config.store_raw_responses,
-                )
+                try:
+                    accuweather_data = self.accuweather.collect_location(
+                        location,
+                        collected_at=generated_at,
+                        store_raw=self.config.store_raw_responses,
+                    )
+                except WeatherProviderError as exc:
+                    logger.warning(
+                        "Skipping optional AccuWeather data for location %s: %s",
+                        location.key,
+                        exc,
+                    )
+                    continue
                 provider_data.append(accuweather_data)
                 raw_responses.extend(accuweather_data.raw_responses)
 

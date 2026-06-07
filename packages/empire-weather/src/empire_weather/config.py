@@ -19,7 +19,11 @@ DEFAULT_OPENWEATHER_BASE_URL = "https://api.openweathermap.org"
 DEFAULT_NWS_BASE_URL = "https://api.weather.gov"
 DEFAULT_NWS_USER_AGENT = "empire-weather/0.1"
 DEFAULT_ACCUWEATHER_BASE_URL = "https://www.accuweather.com"
-DEFAULT_ACCUWEATHER_USER_AGENT = "empire-weather/0.1 personal daily weather digest"
+DEFAULT_ACCUWEATHER_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/125.0.0.0 Safari/537.36"
+)
 
 
 def required_env(name: str) -> str:

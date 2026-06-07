@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
-import requests
+from curl_cffi import requests
 
 from empire_weather.config import AccuWeatherConfig, WeatherLocationConfig
 from empire_weather.exceptions import WeatherProviderError
@@ -77,7 +77,8 @@ class AccuWeatherHealthActivitiesProvider:
 
     def __init__(self, config: AccuWeatherConfig, *, session: requests.Session | None = None):
         self.config = config
-        self.session = session or requests.Session()
+        self.session = session or requests.Session(impersonate="chrome")
+        self._warmed_origins: set[str] = set()
 
     def collect_location(
         self,
@@ -131,10 +132,8 @@ class AccuWeatherHealthActivitiesProvider:
         )
 
     def _get_html(self, url: str, *, endpoint_name: str) -> str:
-        headers = {
-            "Accept": "text/html,application/xhtml+xml",
-            "User-Agent": self.config.user_agent,
-        }
+        self._warm_session(url)
+        headers = self._browser_headers(referer=self.config.base_url)
         try:
             response = self.session.get(url, headers=headers, timeout=self.config.timeout_seconds)
         except requests.RequestException as exc:
@@ -145,6 +144,42 @@ class AccuWeatherHealthActivitiesProvider:
                 f"status={response.status_code} body={response.text[:500]}"
             )
         return response.text
+
+    def _warm_session(self, url: str) -> None:
+        parsed = urlparse(url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        if origin in self._warmed_origins:
+            return
+        self._warmed_origins.add(origin)
+        try:
+            self.session.get(
+                origin,
+                headers=self._browser_headers(),
+                timeout=self.config.timeout_seconds,
+            )
+        except requests.RequestException:
+            return
+
+    def _browser_headers(self, *, referer: str | None = None) -> dict[str, str]:
+        headers = {
+            "Accept": (
+                "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                "image/avif,image/webp,image/apng,*/*;q=0.8"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1",
+            "User-Agent": self.config.user_agent,
+        }
+        if referer:
+            headers["Referer"] = referer
+            headers["Sec-Fetch-Site"] = "same-origin"
+        return headers
 
 
 def parse_health_activity_indexes(html: str) -> dict[str, list[dict[str, str]]]:

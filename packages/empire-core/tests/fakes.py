@@ -172,7 +172,7 @@ class InMemoryObjectRepository:
         expires_at: datetime | None,
         metadata: JsonDict,
     ) -> StoredObject:
-        root = self.roots["test_root"]
+        root = self._root_by_id(storage_root_id)
         stored = StoredObject(
             object_id=uuid4(),
             run_id=run_id,
@@ -282,13 +282,34 @@ class InMemoryObjectRepository:
             and (object_scope is None or obj.object_scope == object_scope)
         ]
 
-    def find_expired_objects(self, *, limit: int) -> list[StoredObject]:
+    def find_expired_objects(
+        self,
+        *,
+        limit: int,
+        after_expires_at: datetime | None = None,
+        after_object_id: UUID | None = None,
+    ) -> list[StoredObject]:
         now = datetime.now(UTC)
-        return [
+        objects = [
             obj
             for obj in self.objects.values()
-            if obj.deleted_at is None and obj.expires_at is not None and obj.expires_at <= now
-        ][:limit]
+            if obj.deleted_at is None
+            and obj.expires_at is not None
+            and obj.expires_at <= now
+        ]
+        objects.sort(
+            key=lambda obj: (
+                obj.expires_at or datetime.min.replace(tzinfo=UTC),
+                obj.object_id,
+            )
+        )
+        if after_expires_at is not None and after_object_id is not None:
+            objects = [
+                obj
+                for obj in objects
+                if (obj.expires_at, obj.object_id) > (after_expires_at, after_object_id)
+            ]
+        return objects[:limit]
 
     def mark_deleted(self, object_id: UUID, purge_after: datetime | None) -> None:
         obj = self.objects[object_id]
@@ -308,13 +329,34 @@ class InMemoryObjectRepository:
             updated_at=datetime.now(UTC),
         )
 
-    def find_deleted_objects_for_purge(self, *, limit: int) -> list[StoredObject]:
+    def find_deleted_objects_for_purge(
+        self,
+        *,
+        limit: int,
+        after_purge_after: datetime | None = None,
+        after_object_id: UUID | None = None,
+    ) -> list[StoredObject]:
         now = datetime.now(UTC)
-        return [
+        objects = [
             obj
             for obj in self.objects.values()
-            if obj.deleted_at is not None and obj.purge_after is not None and obj.purge_after <= now
-        ][:limit]
+            if obj.deleted_at is not None
+            and obj.purge_after is not None
+            and obj.purge_after <= now
+        ]
+        objects.sort(
+            key=lambda obj: (
+                obj.purge_after or datetime.min.replace(tzinfo=UTC),
+                obj.object_id,
+            )
+        )
+        if after_purge_after is not None and after_object_id is not None:
+            objects = [
+                obj
+                for obj in objects
+                if (obj.purge_after, obj.object_id) > (after_purge_after, after_object_id)
+            ]
+        return objects[:limit]
 
     def find_deleted_objects_by_run_id(
         self, run_id: UUID, *, ignore_purge_after: bool
@@ -333,3 +375,9 @@ class InMemoryObjectRepository:
 
     def purge_metadata(self, object_id: UUID) -> None:
         self.objects.pop(object_id, None)
+
+    def _root_by_id(self, storage_root_id: int) -> StorageRoot:
+        for root in self.roots.values():
+            if root.storage_root_id == storage_root_id:
+                return root
+        raise LookupError(f"Storage root not found: {storage_root_id}")

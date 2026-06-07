@@ -34,3 +34,4 @@ tmp/
 object-store/*
 !object-store/config/
 !object-store/config/**
+object-store/config/.DS_Store

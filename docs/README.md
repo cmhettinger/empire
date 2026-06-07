@@ -275,8 +275,9 @@ deploy/env/local.env
 For local development, the initial roots are:
 
 ```env
-EMPIRE_STORAGE_ROOT_GLOBAL=/Users/chris/Documents/project/empire/empire-object-store/global
-EMPIRE_STORAGE_ROOT_JELLYFIN=/Users/chris/Documents/project/empire/empire-object-store/jellyfin
+EMPIRE_STORAGE_ROOT_CONFIG=/Users/chris/Documents/project/empire/object-store/config
+EMPIRE_STORAGE_ROOT_GLOBAL=/Users/chris/Documents/project/empire/object-store/global
+EMPIRE_STORAGE_ROOT_JELLYFIN=/Users/chris/Documents/project/empire/object-store/jellyfin
 ```
 
 Initialize or update `core.storage_root` from the environment:

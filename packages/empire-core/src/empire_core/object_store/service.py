@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID
@@ -18,6 +19,32 @@ from empire_core.run_context.models import RunContext
 logger = logging.getLogger(__name__)
 
 OBJECT_SCOPES = {"run", "reference", "audit", "manual"}
+
+
+@dataclass(frozen=True)
+class ObjectCleanupRootStat:
+    storage_root_name: str
+    cleaned_count: int = 0
+    cleaned_bytes: int = 0
+
+
+@dataclass(frozen=True)
+class ObjectCleanupResult:
+    cleaned_count: int = 0
+    cleaned_bytes: int = 0
+    root_stats: list[ObjectCleanupRootStat] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ObjectPurgeRootStat:
+    storage_root_name: str
+    purged_count: int = 0
+
+
+@dataclass(frozen=True)
+class ObjectPurgeResult:
+    purged_count: int = 0
+    root_stats: list[ObjectPurgeRootStat] = field(default_factory=list)
 
 
 class ObjectStore:
@@ -227,6 +254,51 @@ class ObjectStore:
                 deleted_count += 1
         return deleted_count
 
+    def cleanup_expired_objects(self, *, batch_size: int = 100) -> ObjectCleanupResult:
+        if batch_size <= 0:
+            raise ValidationError("batch_size must be positive")
+
+        root_stats: dict[str, ObjectCleanupRootStat] = {}
+        cleaned_count = 0
+        cleaned_bytes = 0
+        after_expires_at: datetime | None = None
+        after_object_id: UUID | None = None
+
+        while True:
+            expired_objects = self.repository.find_expired_objects(
+                limit=batch_size,
+                after_expires_at=after_expires_at,
+                after_object_id=after_object_id,
+            )
+            if not expired_objects:
+                break
+
+            for stored in expired_objects:
+                after_expires_at = stored.expires_at
+                after_object_id = stored.object_id
+                if self._delete_stored_object(stored):
+                    size_bytes = stored.size_bytes or 0
+                    root_name = stored.storage_root_name or "<unknown>"
+                    existing = root_stats.get(root_name)
+                    if existing is None:
+                        existing = ObjectCleanupRootStat(storage_root_name=root_name)
+                    root_stats[root_name] = ObjectCleanupRootStat(
+                        storage_root_name=root_name,
+                        cleaned_count=existing.cleaned_count + 1,
+                        cleaned_bytes=existing.cleaned_bytes + size_bytes,
+                    )
+                    cleaned_count += 1
+                    cleaned_bytes += size_bytes
+
+        return ObjectCleanupResult(
+            cleaned_count=cleaned_count,
+            cleaned_bytes=cleaned_bytes,
+            root_stats=sorted(
+                root_stats.values(),
+                key=lambda stat: stat.storage_root_name,
+            ),
+        )
+
     def purge_deleted_objects(self, *, limit: int = 100) -> int:
         if limit <= 0:
             raise ValidationError("limit must be positive")
@@ -240,6 +312,51 @@ class ObjectStore:
                 logger.warning("Failed to purge deleted object %s", stored.object_id)
                 self.repository.record_delete_error(stored.object_id, str(exc))
         return purged_count
+
+    def purge_deleted_objects_all(self, *, batch_size: int = 100) -> ObjectPurgeResult:
+        if batch_size <= 0:
+            raise ValidationError("batch_size must be positive")
+
+        root_stats: dict[str, ObjectPurgeRootStat] = {}
+        purged_count = 0
+        after_purge_after: datetime | None = None
+        after_object_id: UUID | None = None
+
+        while True:
+            deleted_objects = self.repository.find_deleted_objects_for_purge(
+                limit=batch_size,
+                after_purge_after=after_purge_after,
+                after_object_id=after_object_id,
+            )
+            if not deleted_objects:
+                break
+
+            for stored in deleted_objects:
+                after_purge_after = stored.purge_after
+                after_object_id = stored.object_id
+                try:
+                    self._backend_for_object(stored).delete(stored.object_key, stored.filename)
+                    self.repository.purge_metadata(stored.object_id)
+                    root_name = stored.storage_root_name or "<unknown>"
+                    existing = root_stats.get(root_name)
+                    if existing is None:
+                        existing = ObjectPurgeRootStat(storage_root_name=root_name)
+                    root_stats[root_name] = ObjectPurgeRootStat(
+                        storage_root_name=root_name,
+                        purged_count=existing.purged_count + 1,
+                    )
+                    purged_count += 1
+                except Exception as exc:
+                    logger.warning("Failed to purge deleted object %s", stored.object_id)
+                    self.repository.record_delete_error(stored.object_id, str(exc))
+
+        return ObjectPurgeResult(
+            purged_count=purged_count,
+            root_stats=sorted(
+                root_stats.values(),
+                key=lambda stat: stat.storage_root_name,
+            ),
+        )
 
     def purge_deleted_objects_by_run_id(
         self,

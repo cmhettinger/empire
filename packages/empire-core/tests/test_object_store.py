@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from empire_core import ObjectStore, RunService
+from empire_core import ObjectStore, RunService, StorageRoot
 from empire_core.exceptions import ValidationError
 
 from tests.fakes import InMemoryObjectRepository, InMemoryRunRepository
@@ -246,6 +246,68 @@ def test_expired_object_deletion_marks_deleted(tmp_path):
     assert not (tmp_path / "manual" / "tmp" / "old.txt").exists()
 
 
+def test_expired_object_cleanup_drains_all_batches(tmp_path):
+    repo = InMemoryObjectRepository(str(tmp_path))
+    store = ObjectStore(repo, tombstone_days=30)
+    for index in range(150):
+        store.put_bytes(
+            run_context=None,
+            storage_root="test_root",
+            object_key="manual/tmp",
+            filename=f"old-{index}.txt",
+            data=b"x",
+            expires_at=datetime.now(UTC) - timedelta(seconds=1),
+        )
+
+    result = store.cleanup_expired_objects(batch_size=100)
+
+    assert result.cleaned_count == 150
+    assert result.cleaned_bytes == 150
+    assert result.root_stats[0].storage_root_name == "test_root"
+    assert result.root_stats[0].cleaned_count == 150
+    assert result.root_stats[0].cleaned_bytes == 150
+    assert all(obj.deleted_at is not None for obj in repo.objects.values())
+
+
+def test_expired_object_cleanup_reports_stats_by_storage_root(tmp_path):
+    repo = InMemoryObjectRepository(str(tmp_path / "primary"))
+    repo.roots["archive_root"] = StorageRoot(
+        storage_root_id=2,
+        root_name="archive_root",
+        backend_type="filesystem",
+        base_uri=str(tmp_path / "archive"),
+    )
+    store = ObjectStore(repo, tombstone_days=30)
+    store.put_bytes(
+        run_context=None,
+        storage_root="test_root",
+        object_key="manual/tmp",
+        filename="first.txt",
+        data=b"12345",
+        expires_at=datetime.now(UTC) - timedelta(seconds=1),
+    )
+    store.put_bytes(
+        run_context=None,
+        storage_root="archive_root",
+        object_key="manual/tmp",
+        filename="second.txt",
+        data=b"1234567890",
+        expires_at=datetime.now(UTC) - timedelta(seconds=1),
+    )
+
+    result = store.cleanup_expired_objects(batch_size=1)
+
+    assert result.cleaned_count == 2
+    assert result.cleaned_bytes == 15
+    assert {
+        stat.storage_root_name: (stat.cleaned_count, stat.cleaned_bytes)
+        for stat in result.root_stats
+    } == {
+        "archive_root": (1, 10),
+        "test_root": (1, 5),
+    }
+
+
 def test_delete_object_marks_deleted_and_removes_file(tmp_path):
     repo = InMemoryObjectRepository(str(tmp_path))
     store = ObjectStore(repo)
@@ -313,6 +375,69 @@ def test_purge_deleted_objects_by_run_id_respects_purge_after(tmp_path):
 
     assert purged_count == 0
     assert stored.object_id in repo.objects
+
+
+def test_purge_deleted_objects_all_drains_all_batches(tmp_path):
+    repo = InMemoryObjectRepository(str(tmp_path))
+    store = ObjectStore(repo, tombstone_days=0)
+    for index in range(150):
+        stored = store.put_bytes(
+            run_context=None,
+            storage_root="test_root",
+            object_key="manual/tmp",
+            filename=f"old-{index}.txt",
+            data=b"x",
+            expires_at=datetime.now(UTC) - timedelta(seconds=1),
+        )
+        store.delete_object(stored.object_id)
+
+    result = store.purge_deleted_objects_all(batch_size=100)
+
+    assert result.purged_count == 150
+    assert result.root_stats[0].storage_root_name == "test_root"
+    assert result.root_stats[0].purged_count == 150
+    assert repo.objects == {}
+
+
+def test_purge_deleted_objects_all_reports_stats_by_storage_root(tmp_path):
+    repo = InMemoryObjectRepository(str(tmp_path / "primary"))
+    repo.roots["archive_root"] = StorageRoot(
+        storage_root_id=2,
+        root_name="archive_root",
+        backend_type="filesystem",
+        base_uri=str(tmp_path / "archive"),
+    )
+    store = ObjectStore(repo, tombstone_days=0)
+    first = store.put_bytes(
+        run_context=None,
+        storage_root="test_root",
+        object_key="manual/tmp",
+        filename="first.txt",
+        data=b"first",
+        expires_at=datetime.now(UTC) - timedelta(seconds=1),
+    )
+    second = store.put_bytes(
+        run_context=None,
+        storage_root="archive_root",
+        object_key="manual/tmp",
+        filename="second.txt",
+        data=b"second",
+        expires_at=datetime.now(UTC) - timedelta(seconds=1),
+    )
+    store.delete_object(first.object_id)
+    store.delete_object(second.object_id)
+
+    result = store.purge_deleted_objects_all(batch_size=1)
+
+    assert result.purged_count == 2
+    assert {
+        stat.storage_root_name: stat.purged_count
+        for stat in result.root_stats
+    } == {
+        "archive_root": 1,
+        "test_root": 1,
+    }
+    assert repo.objects == {}
 
 
 def test_purge_deleted_objects_by_run_id_can_ignore_purge_after(tmp_path):

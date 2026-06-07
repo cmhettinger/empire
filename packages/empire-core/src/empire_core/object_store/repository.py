@@ -52,13 +52,25 @@ class ObjectRepository(Protocol):
         object_scope: str | None,
     ) -> list[StoredObject]: ...
 
-    def find_expired_objects(self, *, limit: int) -> list[StoredObject]: ...
+    def find_expired_objects(
+        self,
+        *,
+        limit: int,
+        after_expires_at: datetime | None = None,
+        after_object_id: UUID | None = None,
+    ) -> list[StoredObject]: ...
 
     def mark_deleted(self, object_id: UUID, purge_after: datetime | None) -> None: ...
 
     def record_delete_error(self, object_id: UUID, error_message: str) -> None: ...
 
-    def find_deleted_objects_for_purge(self, *, limit: int) -> list[StoredObject]: ...
+    def find_deleted_objects_for_purge(
+        self,
+        *,
+        limit: int,
+        after_purge_after: datetime | None = None,
+        after_object_id: UUID | None = None,
+    ) -> list[StoredObject]: ...
 
     def find_deleted_objects_by_run_id(
         self, run_id: UUID, *, ignore_purge_after: bool
@@ -275,13 +287,27 @@ class PostgresObjectRepository:
         )
         return [_stored_object_from_row(row) for row in rows]
 
-    def find_expired_objects(self, *, limit: int) -> list[StoredObject]:
+    def find_expired_objects(
+        self,
+        *,
+        limit: int,
+        after_expires_at: datetime | None = None,
+        after_object_id: UUID | None = None,
+    ) -> list[StoredObject]:
         rows = self._fetchall(
             _stored_object_select(
-                "o.deleted_at IS NULL AND o.expires_at IS NOT NULL AND o.expires_at <= now()",
-                "ORDER BY o.expires_at LIMIT %s",
+                """
+                o.deleted_at IS NULL
+                AND o.expires_at IS NOT NULL
+                AND o.expires_at <= now()
+                AND (
+                    %s::timestamptz IS NULL
+                    OR (o.expires_at, o.object_id) > (%s::timestamptz, %s::uuid)
+                )
+                """,
+                "ORDER BY o.expires_at, o.object_id LIMIT %s",
             ),
-            (limit,),
+            (after_expires_at, after_expires_at, after_object_id, limit),
         )
         return [_stored_object_from_row(row) for row in rows]
 
@@ -309,13 +335,27 @@ class PostgresObjectRepository:
             (error_message, object_id),
         )
 
-    def find_deleted_objects_for_purge(self, *, limit: int) -> list[StoredObject]:
+    def find_deleted_objects_for_purge(
+        self,
+        *,
+        limit: int,
+        after_purge_after: datetime | None = None,
+        after_object_id: UUID | None = None,
+    ) -> list[StoredObject]:
         rows = self._fetchall(
             _stored_object_select(
-                "o.deleted_at IS NOT NULL AND o.purge_after IS NOT NULL AND o.purge_after <= now()",
-                "ORDER BY o.purge_after LIMIT %s",
+                """
+                o.deleted_at IS NOT NULL
+                AND o.purge_after IS NOT NULL
+                AND o.purge_after <= now()
+                AND (
+                    %s::timestamptz IS NULL
+                    OR (o.purge_after, o.object_id) > (%s::timestamptz, %s::uuid)
+                )
+                """,
+                "ORDER BY o.purge_after, o.object_id LIMIT %s",
             ),
-            (limit,),
+            (after_purge_after, after_purge_after, after_object_id, limit),
         )
         return [_stored_object_from_row(row) for row in rows]
 

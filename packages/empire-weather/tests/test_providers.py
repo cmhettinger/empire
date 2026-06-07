@@ -109,6 +109,7 @@ def test_accuweather_provider_collects_health_activity_html():
     config = WeatherCollectionConfig.from_mapping(CONFIG)
     session = FakeSession(
         {
+            "/": "<html></html>",
             "/en/us/ashburn/20147/health-activities/2160760": """
                 <html><body>
                   <section>Allergies Tree Pollen High Ragweed Pollen Low Mold Moderate Grass Pollen Low Dust & Dander Very High</section>
@@ -143,7 +144,15 @@ def test_accuweather_provider_collects_health_activity_html():
     assert result.raw_responses[0].filename == "health_activities.html"
     assert result.raw_responses[0].content_type == "text/html"
     assert "Tree Pollen High" in result.raw_responses[0].payload
-    assert session.requests[0]["headers"]["User-Agent"] == "test-agent"
+    assert [request["path"] for request in session.requests] == [
+        "/",
+        "/en/us/ashburn/20147/health-activities/2160760",
+    ]
+    health_page_headers = session.requests[1]["headers"]
+    assert health_page_headers["User-Agent"] == "test-agent"
+    assert health_page_headers["Accept-Language"] == "en-US,en;q=0.9"
+    assert health_page_headers["Referer"] == "https://accuweather.test"
+    assert health_page_headers["Sec-Fetch-Mode"] == "navigate"
 
 
 def test_parse_health_activity_indexes_groups_known_categories():
@@ -174,7 +183,8 @@ class FakeSession:
         self.requests = []
 
     def get(self, url, **kwargs):
-        path = "/" + url.split("/", 3)[3]
+        parts = url.split("/", 3)
+        path = "/" + parts[3] if len(parts) > 3 else "/"
         self.requests.append({"url": url, "path": path, **kwargs})
         return FakeResponse(self.responses[path])
 
