@@ -1,0 +1,90 @@
+stonks_securities:
+  name: stonks_securities
+  version: 1
+
+  sec:
+    user_agent: "Empire Stonks Securities/0.1 (chris@example.com)"
+    base_url: https://www.sec.gov
+    archives_url: https://www.sec.gov/Archives
+  timeout_seconds: 60
+
+  max_retries: 5
+  retry_backoff_seconds: 5
+  respect_rate_limits: true
+  rate_limit:
+    requests_per_second: 5
+    burst_size: 10
+    throttle_on_429: true
+    retry_after_header: true
+
+  storage:
+    store_raw_files: true
+    delete_processed_files_after_processing: true
+    retention_days_raw: 5
+    retention_days_processed: 5
+
+  providers:
+
+    sec_company_tickers_exchange:
+      provider_code: SEC_COMPANY_TICKERS_EXCHANGE
+      enabled: true
+      url: https://www.sec.gov/files/company_tickers_exchange.json
+      expected_format: json
+      description: >
+        SEC company-to-ticker mapping including exchange information.
+
+    sec_company_tickers:
+      provider_code: SEC_COMPANY_TICKERS
+      enabled: true
+      url: https://www.sec.gov/files/company_tickers.json
+      expected_format: json
+      description: >
+        SEC company-to-ticker mapping with CIK identifiers.
+
+    sec_submissions_zip:
+      provider_code: SEC_SUBMISSIONS_ZIP
+      enabled: true
+      url: https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip
+      expected_format: zip
+      description: >
+        Bulk submission records containing issuer metadata and filing history.
+
+    sec_quarterly_master_index:
+      provider_code: SEC_MASTER_INDEX_QUARTERLY
+      enabled: true
+      url_template: https://www.sec.gov/Archives/edgar/full-index/{year}/QTR{quarter}/master.idx
+      expected_format: idx
+      description: >
+        Historical EDGAR filing index used to reconstruct filing history
+        and discover issuers, forms, and accession numbers.
+
+    sec_daily_master_index:
+      provider_code: SEC_MASTER_INDEX_DAILY
+      enabled: true
+      url_template: https://www.sec.gov/Archives/edgar/daily-index/{year}/QTR{quarter}/master.{date_yyyymmdd}.idx
+      expected_format: idx
+      description: >
+        Daily EDGAR master index used after go-live to discover newly accepted
+        filings without reprocessing quarterly index files.
+
+    sec_filing_header:
+      provider_code: SEC_FILING_HEADER
+      enabled: false
+      url_template: https://www.sec.gov/Archives/edgar/data/{cik}/{accession_no_dashes}/{accession_number}.hdr.sgml
+      expected_format: sgml
+      description: >
+        On-demand EDGAR filing header used only to resolve issuer, filer,
+        accession, or filing-date conflicts when normalized metadata disagrees.
+
+  processing:
+
+    historical_backfill:
+      start_date: "1995-01-01"
+      end_date: "current"
+
+    daily_refresh:
+      enabled: true
+
+    validation:
+      verify_content_type: true
+      verify_non_empty_file: true
