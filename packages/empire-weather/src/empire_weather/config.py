@@ -24,6 +24,7 @@ DEFAULT_ACCUWEATHER_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/125.0.0.0 Safari/537.36"
 )
+DEFAULT_IMAGERY_RETENTION_DAYS = 3
 
 
 def required_env(name: str) -> str:
@@ -223,6 +224,84 @@ class WeatherProviderConfig:
 
 
 @dataclass(frozen=True)
+class WeatherImageryProductConfig:
+    """One configured weather image asset."""
+
+    name: str
+    provider: str
+    output_file: str
+    content_type: str
+    url: str
+    enabled: bool = True
+
+    @classmethod
+    def from_mapping(cls, name: str, data: dict[str, Any]) -> "WeatherImageryProductConfig":
+        if not isinstance(data, dict):
+            raise WeatherConfigError(f"weather.imagery.products.{name} must be a mapping.")
+        return cls(
+            name=_as_key(name, "weather.imagery.products[]"),
+            provider=_as_key(data.get("provider"), f"weather.imagery.products.{name}.provider"),
+            output_file=_as_filename(data.get("output_file"), f"weather.imagery.products.{name}.output_file"),
+            content_type=_as_str(data.get("content_type"), f"weather.imagery.products.{name}.content_type"),
+            url=_as_str(data.get("url"), f"weather.imagery.products.{name}.url"),
+            enabled=_as_bool(data.get("enabled", True), f"weather.imagery.products.{name}.enabled"),
+        )
+
+
+@dataclass(frozen=True)
+class WeatherImageryConfig:
+    """Weather image download configuration."""
+
+    products: list[WeatherImageryProductConfig] = field(default_factory=list)
+    enabled: bool = False
+    retention_days: int = DEFAULT_IMAGERY_RETENTION_DAYS
+    continue_on_error: bool = True
+
+    @classmethod
+    def from_mapping(cls, data: dict[str, Any] | None) -> "WeatherImageryConfig":
+        if data is None:
+            return cls()
+        if not isinstance(data, dict):
+            raise WeatherConfigError("weather.imagery must be a mapping.")
+
+        products_data = data.get("products", {})
+        if not isinstance(products_data, dict):
+            raise WeatherConfigError("weather.imagery.products must be a mapping.")
+        products = [
+            WeatherImageryProductConfig.from_mapping(name, product_data)
+            for name, product_data in products_data.items()
+        ]
+        _validate_unique([product.name for product in products], "weather.imagery.products[]")
+        _validate_unique(
+            [product.output_file for product in products],
+            "weather.imagery.products[].output_file",
+        )
+
+        retention_days = _as_int(
+            data.get("retention_days", DEFAULT_IMAGERY_RETENTION_DAYS),
+            "weather.imagery.retention_days",
+        )
+        if retention_days < 1:
+            raise WeatherConfigError("weather.imagery.retention_days must be greater than zero.")
+
+        return cls(
+            enabled=_as_bool(data.get("enabled", False), "weather.imagery.enabled"),
+            retention_days=retention_days,
+            continue_on_error=_as_bool(
+                data.get("continue_on_error", True),
+                "weather.imagery.continue_on_error",
+            ),
+            products=products,
+        )
+
+    @property
+    def enabled_products(self) -> list[WeatherImageryProductConfig]:
+        if not self.enabled:
+            return []
+        return [product for product in self.products if product.enabled]
+
+
+@dataclass(frozen=True)
 class WeatherCollectionConfig:
     """Run configuration for weather collection."""
 
@@ -233,6 +312,7 @@ class WeatherCollectionConfig:
     units: str = DEFAULT_UNITS
     store_raw_responses: bool = DEFAULT_STORE_RAW_RESPONSES
     retention_days: int = DEFAULT_RETENTION_DAYS
+    imagery: WeatherImageryConfig = field(default_factory=WeatherImageryConfig)
 
     @classmethod
     def from_file(cls, path: str | Path) -> "WeatherCollectionConfig":
@@ -276,6 +356,7 @@ class WeatherCollectionConfig:
                 "weather.store_raw_responses",
             ),
             retention_days=retention_days,
+            imagery=WeatherImageryConfig.from_mapping(weather.get("imagery")),
         )
 
     @property
@@ -300,6 +381,13 @@ def _as_key(value: Any, field_name: str) -> str:
     if not all(char.islower() or char.isdigit() or char == "_" for char in key):
         raise WeatherConfigError(f"{field_name} must use lowercase letters, digits, and underscores.")
     return key
+
+
+def _as_filename(value: Any, field_name: str) -> str:
+    filename = _as_str(value, field_name)
+    if "/" in filename or "\\" in filename:
+        raise WeatherConfigError(f"{field_name} must be a filename, not a path.")
+    return filename
 
 
 def _as_int(value: Any, field_name: str) -> int:

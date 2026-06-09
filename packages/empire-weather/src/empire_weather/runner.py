@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from typing import Protocol
 
 from empire_core import ObjectStore, RunContext, RunService, StoredObject
 
 from empire_weather.collector import WeatherCollector
-from empire_weather.config import WeatherCollectionConfig
+from empire_weather.config import WeatherCollectionConfig, WeatherImageryProductConfig
+from empire_weather.exceptions import WeatherProviderError
 from empire_weather.models import WeatherCollectionResult
+from empire_weather.providers.imagery import WeatherImageDownload, WeatherImageryProvider
 
 
 DEFAULT_DOMAIN = "weather"
@@ -23,6 +27,17 @@ DEFAULT_OUTPUT_CONTENT_TYPE = "application/json"
 DEFAULT_OUTPUT_OBJECT_KIND = "normalized_payload"
 DEFAULT_RAW_CONTENT_TYPE = "application/json"
 DEFAULT_RAW_OBJECT_KIND = "raw_provider_response"
+DEFAULT_IMAGE_OBJECT_KIND = "weather_image"
+
+
+logger = logging.getLogger(__name__)
+
+
+class WeatherImageryDownloader(Protocol):
+    """Downloader interface for weather image products."""
+
+    def download(self, product: WeatherImageryProductConfig) -> WeatherImageDownload:
+        ...
 
 
 @dataclass(frozen=True)
@@ -33,6 +48,7 @@ class WeatherCollectionRunResult:
     collection_result: WeatherCollectionResult
     stored_object: StoredObject
     raw_object_count: int
+    image_object_count: int
 
 
 def run_weather_collection_to_object_store(
@@ -48,6 +64,7 @@ def run_weather_collection_to_object_store(
     generated_at: datetime | None = None,
     storage_root: str | None = None,
     storage_key_prefix: str | None = None,
+    imagery_downloader: WeatherImageryDownloader | None = None,
 ) -> WeatherCollectionRunResult:
     """Run weather collection and store normalized JSON and raw responses."""
 
@@ -59,6 +76,7 @@ def run_weather_collection_to_object_store(
         DEFAULT_STORAGE_KEY,
     )
     expires_at = generated_at + timedelta(days=config.retention_days)
+    image_expires_at = generated_at + timedelta(days=config.imagery.retention_days)
 
     ctx = run_service.start_run(
         domain=DEFAULT_DOMAIN,
@@ -87,6 +105,16 @@ def run_weather_collection_to_object_store(
             effective_date=effective_date,
             run_id=str(ctx.run_id),
         )
+        images = _download_and_store_images(
+            config=config,
+            downloader=imagery_downloader or WeatherImageryProvider(),
+            object_store=object_store,
+            run_context=ctx,
+            storage_root=resolved_storage_root,
+            object_key=object_key,
+            expires_at=image_expires_at,
+        )
+        collection_result.payload["images"] = images
         stored = object_store.put_bytes(
             run_context=ctx,
             storage_root=resolved_storage_root,
@@ -102,6 +130,7 @@ def run_weather_collection_to_object_store(
                 "schema_version": collection_result.schema_version,
                 "location_count": collection_result.location_count,
                 "raw_response_count": len(collection_result.raw_responses),
+                "image_count": len(images),
             },
         )
         raw_count = 0
@@ -135,6 +164,7 @@ def run_weather_collection_to_object_store(
                 "stored_object_id": str(stored.object_id),
                 "location_count": collection_result.location_count,
                 "raw_object_count": raw_count,
+                "image_object_count": len(images),
                 "object_key": object_key,
                 "filename": DEFAULT_OUTPUT_FILENAME,
             },
@@ -144,6 +174,7 @@ def run_weather_collection_to_object_store(
             collection_result=collection_result,
             stored_object=stored,
             raw_object_count=raw_count,
+            image_object_count=len(images),
         )
     except Exception as exc:
         _rollback_if_possible(object_store)
@@ -163,6 +194,52 @@ def _run_output_key(
 ) -> str:
     prefix = storage_key_prefix.strip("/")
     return f"{prefix}/runs/{effective_date:%Y}/{effective_date:%m}/{effective_date:%d}/{run_id}"
+
+
+def _download_and_store_images(
+    *,
+    config: WeatherCollectionConfig,
+    downloader: WeatherImageryDownloader,
+    object_store: ObjectStore,
+    run_context: RunContext,
+    storage_root: str,
+    object_key: str,
+    expires_at: datetime,
+) -> list[dict[str, str]]:
+    images: list[dict[str, str]] = []
+    for product in config.imagery.enabled_products:
+        try:
+            downloaded = downloader.download(product)
+            stored = object_store.put_bytes(
+                run_context=run_context,
+                storage_root=storage_root,
+                object_key=f"{object_key}/images",
+                filename=product.output_file,
+                data=downloaded.data,
+                content_type=downloaded.content_type,
+                object_kind=DEFAULT_IMAGE_OBJECT_KIND,
+                expires_at=expires_at,
+                metadata={
+                    "name": product.name,
+                    "provider": product.provider,
+                    "source_url": product.url,
+                },
+            )
+        except WeatherProviderError as exc:
+            if not config.imagery.continue_on_error:
+                raise
+            logger.warning("Skipping weather imagery product %s after download failure: %s", product.name, exc)
+            continue
+
+        images.append(
+            {
+                "name": product.name,
+                "output_file": product.output_file,
+                "content_type": product.content_type,
+                "object_id": str(stored.object_id),
+            }
+        )
+    return images
 
 
 def _rollback_if_possible(object_store: ObjectStore) -> None:

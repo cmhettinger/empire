@@ -6,6 +6,8 @@ from empire_weather.config import (
     NWSGridConfig,
     OpenWeatherConfig,
     WeatherCollectionConfig,
+    WeatherImageryConfig,
+    WeatherImageryProductConfig,
     WeatherLocationConfig,
     WeatherProviderConfig,
 )
@@ -30,6 +32,8 @@ __all__ = [
     "OpenWeatherConfig",
     "OpenWeatherProvider",
     "WeatherCollectionConfig",
+    "WeatherImageryConfig",
+    "WeatherImageryProductConfig",
     "WeatherCollectionRunResult",
     "WeatherCollector",
     "WeatherLocationConfig",

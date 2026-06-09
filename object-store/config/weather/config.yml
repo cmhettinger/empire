@@ -41,3 +41,351 @@ weather:
     accuweather:
       enabled: true
       user_agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36
+
+  imagery:
+    enabled: true
+    retention_days: 3
+    continue_on_error: true
+
+    products:
+
+      # ============================================================
+      # GOES-EAST SATELLITE
+      # Update Frequency: ~5 minutes
+      # ============================================================
+
+      satellite_geocolor_conus:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_geocolor_conus.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/1250x750.jpg
+
+      satellite_geocolor_southeast:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_geocolor_southeast.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/se/GEOCOLOR/1200x1200.jpg
+
+      satellite_us_atlantic_coast:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_us_atlantic_coast.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/EUS/GEOCOLOR/2000x2000.jpg
+
+      satellite_tropical_atlantic:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_tropical_atlantic.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/taw/GEOCOLOR/1800x1080.jpg
+
+      satellite_caribbean:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_caribbean.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/car/GEOCOLOR/2000x2000.jpg
+
+      satellite_infrared_conus:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_infrared_conus.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/13/1250x750.jpg
+
+      satellite_water_vapor_conus:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_water_vapor_conus.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/09/1250x750.jpg
+
+      satellite_visible_conus:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_visible_conus.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/02/1250x750.jpg
+
+      satellite_glm_lightning_conus:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_glm_lightning_conus.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/GLM/CONUS/EXTENT3/1250x750.jpg
+
+      satellite_glm_lightning_atlantic_coast:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_glm_lightning_atlantic.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/GLM/SECTOR/eus/EXTENT3/2000x2000.jpg
+
+      satellite_airmass_conus:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_airmass_conus.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/AirMass/1250x750.jpg
+
+      satellite_sandwich_conus:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_sandwich_conus.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/Sandwich/1250x750.jpg
+
+      satellite_fire_temperature_conus:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_fire_temperature_conus.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/FireTemperature/1250x750.jpg
+
+      satellite_dust_conus:
+        enabled: true
+        provider: goes_star
+        output_file: satellite_dust_conus.jpg
+        content_type: image/jpeg
+        url: https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/Dust/1250x750.jpg
+
+      # ============================================================
+      # WPC NATIONAL FORECAST CHARTS
+      # Update Frequency: Several times daily
+      # ============================================================
+
+      national_forecast_day1:
+        enabled: true
+        provider: wpc
+        output_file: national_forecast_day1.png
+        content_type: image/png
+        url: https://www.wpc.ncep.noaa.gov/NationalForecastChart/staticmaps/noaad1.png
+
+      national_forecast_day2:
+        enabled: true
+        provider: wpc
+        output_file: national_forecast_day2.png
+        content_type: image/png
+        url: https://www.wpc.ncep.noaa.gov/NationalForecastChart/staticmaps/noaad2.png
+
+      national_forecast_day3:
+        enabled: true
+        provider: wpc
+        output_file: national_forecast_day3.png
+        content_type: image/png
+        url: https://www.wpc.ncep.noaa.gov/NationalForecastChart/staticmaps/noaad3.png
+
+      # ============================================================
+      # WPC QPF / PRECIPITATION
+      # Update Frequency: Several times daily
+      # ============================================================
+
+      qpf_day1:
+        enabled: true
+        provider: wpc
+        output_file: qpf_day1.gif
+        content_type: image/gif
+        url: https://www.wpc.ncep.noaa.gov/qpf/94qwbg.gif
+
+      qpf_day2:
+        enabled: true
+        provider: wpc
+        output_file: qpf_day2.gif
+        content_type: image/gif
+        url: https://www.wpc.ncep.noaa.gov/qpf/98qwbg.gif
+
+      qpf_day3:
+        enabled: true
+        provider: wpc
+        output_file: qpf_day3.gif
+        content_type: image/gif
+        url: https://www.wpc.ncep.noaa.gov/qpf/99qwbg.gif
+
+      excessive_rainfall_day1:
+        enabled: true
+        provider: wpc
+        output_file: excessive_rainfall_day1.gif
+        content_type: image/gif
+        url: https://www.wpc.ncep.noaa.gov/qpf/94ewbg.gif
+
+      excessive_rainfall_day2:
+        enabled: true
+        provider: wpc
+        output_file: excessive_rainfall_day2.gif
+        content_type: image/gif
+        url: https://www.wpc.ncep.noaa.gov/qpf/98ewbg.gif
+
+      excessive_rainfall_day3:
+        enabled: true
+        provider: wpc
+        output_file: excessive_rainfall_day3.gif
+        content_type: image/gif
+        url: https://www.wpc.ncep.noaa.gov/qpf/99ewbg.gif
+
+      # ============================================================
+      # SPC SEVERE WEATHER
+      # Day 1: Multiple times daily
+      # Day 2-3: Typically daily
+      # ============================================================
+
+      spc_day1_categorical:
+        enabled: true
+        provider: spc
+        output_file: spc_day1_categorical.png
+        content_type: image/png
+        url: https://www.spc.noaa.gov/products/outlook/day1otlk.png
+
+      spc_day2_categorical:
+        enabled: true
+        provider: spc
+        output_file: spc_day2_categorical.png
+        content_type: image/png
+        url: https://www.spc.noaa.gov/products/outlook/day2otlk.png
+
+      spc_day3_categorical:
+        enabled: true
+        provider: spc
+        output_file: spc_day3_categorical.png
+        content_type: image/png
+        url: https://www.spc.noaa.gov/products/outlook/day3otlk.png
+
+      spc_day1_tornado:
+        enabled: true
+        provider: spc
+        output_file: spc_day1_tornado.png
+        content_type: image/png
+        url: https://www.spc.noaa.gov/products/outlook/day1probotlk_torn.png
+
+      spc_day1_hail:
+        enabled: true
+        provider: spc
+        output_file: spc_day1_hail.png
+        content_type: image/png
+        url: https://www.spc.noaa.gov/products/outlook/day1probotlk_hail.png
+
+      spc_day1_wind:
+        enabled: true
+        provider: spc
+        output_file: spc_day1_wind.png
+        content_type: image/png
+        url: https://www.spc.noaa.gov/products/outlook/day1probotlk_wind.png
+
+      spc_day2_tornado:
+        enabled: true
+        provider: spc
+        output_file: spc_day2_tornado.png
+        content_type: image/png
+        url: https://www.spc.noaa.gov/products/outlook/day2probotlk_torn.png
+
+      spc_day2_hail:
+        enabled: true
+        provider: spc
+        output_file: spc_day2_hail.png
+        content_type: image/png
+        url: https://www.spc.noaa.gov/products/outlook/day2probotlk_hail.png
+
+      spc_day2_wind:
+        enabled: true
+        provider: spc
+        output_file: spc_day2_wind.png
+        content_type: image/png
+        url: https://www.spc.noaa.gov/products/outlook/day2probotlk_wind.png
+
+      # ============================================================
+      # NHC TROPICAL WEATHER
+      # Update Frequency: Usually every 6 hours during season
+      # ============================================================
+
+      tropical_atlantic_2day:
+        enabled: true
+        provider: nhc
+        output_file: tropical_atlantic_2day.png
+        content_type: image/png
+        url: https://www.nhc.noaa.gov/xgtwo/resize/xgtwo_atl_2d0_w1920.png
+
+      tropical_atlantic_7day:
+        enabled: true
+        provider: nhc
+        output_file: tropical_atlantic_7day.png
+        content_type: image/png
+        url: https://www.nhc.noaa.gov/xgtwo/resize/xgtwo_atl_7d0_w1920.png
+
+      # ============================================================
+      # DROUGHT MONITOR
+      # Update Frequency: Weekly
+      # New Release: Thursdays
+      # Data Effective: Previous Tuesday
+      # ============================================================
+
+      drought_monitor_current:
+        enabled: true
+        provider: drought_monitor
+        output_file: drought_monitor_current.png
+        content_type: image/png
+        url: https://droughtmonitor.unl.edu/data/png/current/current_usdm.png
+
+      # ============================================================
+      # WINTER WEATHER
+      # Source: WPC/NWS
+      # ============================================================
+
+      snowfall_forecast_day1:
+        enabled: true
+        provider: wpc
+        output_file: snowfall_forecast_day1.gif
+        content_type: image/gif
+        url: https://www.wpc.ncep.noaa.gov/pwpf_24hr/prb_24hsnow_ge01_2026060912f024.gif
+
+      ice_forecast:
+        enabled: true
+        provider: wpc
+        output_file: ice_forecast.gif
+        content_type: image/gif
+        url: https://www.wpc.ncep.noaa.gov/pwpf_24hr/prb_24hicez_ge.01_2026060912f072.gif
+
+      # ============================================================
+      # AIR QUALITY / ENVIRONMENTAL
+      # Source: NOAA/EPA
+      # ============================================================
+
+      uv_index:
+        enabled: true
+        provider: noaa
+        output_file: uv_index.gif
+        content_type: image/gif
+        url: https://www.cpc.ncep.noaa.gov/products/stratosphere/uv_index/gif_files/uvi_usa_f1_wmo.gif
+
+      current_heat_risk_ashburn_va:
+        enabled: true
+        provider: noaa
+        output_file: current_heat_index.png
+        content_type: image/png
+        url: https://www.wpc.ncep.noaa.gov/heatrisk/graphics/HeatRisk_Day1_VA.png
+
+      current_wind_chill:
+        enabled: true
+        provider: noaa
+        output_file: current_wind_chill.gif
+        content_type: image/gif
+        url: https://www.wpc.ncep.noaa.gov/sfc/sfcobs/sfcgifwc20Z_small.gif
+
+      # ============================================================
+      # MARINE / COASTAL
+      # ============================================================
+
+      sea_surface_temperature_atlantic_coast:
+        enabled: true
+        provider: noaa
+        output_file: sea_surface_temperature.png
+        content_type: image/png
+        url: https://www.ospo.noaa.gov/data/sst/contour/usatlant.fc.gif
+
+      sea_surface_temperature_north_america:
+        enabled: true
+        provider: noaa
+        output_file: sea_surface_temperature.gif
+        content_type: image/gif
+        url: https://www.ospo.noaa.gov/data/sst/contour/namerica.fc.gif

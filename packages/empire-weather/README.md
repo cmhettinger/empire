@@ -25,6 +25,13 @@ Run artifacts are stored under:
 ${EMPIRE_STORAGE_KEY_WEATHER}/runs/YYYY/MM/DD/<run_id>/
 ```
 
+When `weather.imagery.enabled` is true, enabled imagery products from the config
+are downloaded during object-store-backed runs and stored under:
+
+```text
+${EMPIRE_STORAGE_KEY_WEATHER}/runs/YYYY/MM/DD/<run_id>/images/
+```
+
 ## Current Collection Coverage
 
 The consolidated `weather.json` payload is one Empire run-level weather snapshot
@@ -49,6 +56,8 @@ For each location, the normalized payload currently includes:
 - NWS weather alerts, watches, and warnings when active.
 - OpenWeather alert details when OpenWeather returns alert IDs.
 - NWS forecast discussion text from the relevant forecast office.
+- Configured weather imagery, stored as run objects under `images/` and
+  referenced from the top-level `images` array in `weather.json`.
 - Source provenance for major sections so downstream reporting can show whether
   data came from OpenWeather or NWS.
 - Raw provider responses stored as object-store artifacts for debugging and
@@ -62,11 +71,8 @@ such as `today` or `tomorrow`.
 The original weather wishlist also included several data and asset types that
 are not part of the first implementation yet:
 
-- Radar images.
-- Satellite imagery.
-- Precipitation map images.
-- Temperature map images.
-- Air quality graphics.
+- Radar loops and dynamic map products beyond configured static image URLs.
+- Air quality graphics beyond configured static image URLs.
 - Air quality forecast/history beyond the current Air Pollution API snapshot.
 - Pollen graphics.
 - Other weather-related screenshots or image assets.

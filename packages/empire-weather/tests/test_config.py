@@ -66,6 +66,71 @@ def test_openweather_key_can_come_from_env(monkeypatch):
     assert config.providers.openweather.api_key == "env-key"
 
 
+def test_imagery_config_from_mapping():
+    config_data = {
+        "weather": {
+            **CONFIG["weather"],
+            "imagery": {
+                "enabled": True,
+                "retention_days": 3,
+                "continue_on_error": False,
+                "products": {
+                    "satellite_geocolor_conus": {
+                        "enabled": True,
+                        "provider": "goes_star",
+                        "output_file": "satellite_geocolor_conus.jpg",
+                        "content_type": "image/jpeg",
+                        "url": "https://example.test/satellite.jpg",
+                    },
+                    "spc_day1_categorical": {
+                        "enabled": False,
+                        "provider": "spc",
+                        "output_file": "spc_day1_categorical.png",
+                        "content_type": "image/png",
+                        "url": "https://example.test/spc.png",
+                    },
+                },
+            },
+        }
+    }
+
+    config = WeatherCollectionConfig.from_mapping(config_data)
+
+    assert config.imagery.enabled is True
+    assert config.imagery.retention_days == 3
+    assert config.imagery.continue_on_error is False
+    assert [product.name for product in config.imagery.enabled_products] == ["satellite_geocolor_conus"]
+    assert config.imagery.products[0].output_file == "satellite_geocolor_conus.jpg"
+    assert config.imagery.products[0].content_type == "image/jpeg"
+
+
+def test_imagery_output_files_must_be_unique():
+    config_data = {
+        "weather": {
+            **CONFIG["weather"],
+            "imagery": {
+                "products": {
+                    "first": {
+                        "provider": "wpc",
+                        "output_file": "same.png",
+                        "content_type": "image/png",
+                        "url": "https://example.test/first.png",
+                    },
+                    "second": {
+                        "provider": "wpc",
+                        "output_file": "same.png",
+                        "content_type": "image/png",
+                        "url": "https://example.test/second.png",
+                    },
+                }
+            },
+        }
+    }
+
+    with pytest.raises(WeatherConfigError, match="output_file"):
+        WeatherCollectionConfig.from_mapping(config_data)
+
+
 def test_location_keys_must_be_unique():
     config_data = {
         "weather": {

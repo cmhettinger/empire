@@ -57,6 +57,7 @@ def main(argv: list[str] | None = None) -> None:
     print(f"run_id: {run_result.run_context.run_id}")
     print(f"location_count: {run_result.collection_result.location_count}")
     print(f"raw_object_count: {run_result.raw_object_count}")
+    print(f"image_object_count: {run_result.image_object_count}")
     print(f"stored_object_id: {run_result.stored_object.object_id}")
     print(f"object_key: {run_result.stored_object.object_key}")
     print(f"filename: {run_result.stored_object.filename}")

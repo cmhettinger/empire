@@ -42,15 +42,17 @@ def weather_daily_scrape():
             )
 
         log.info(
-            "Completed weather collection run %s with %s locations and %s raw responses",
+            "Completed weather collection run %s with %s locations, %s raw responses, and %s images",
             result.run_context.run_id,
             result.collection_result.location_count,
             result.raw_object_count,
+            result.image_object_count,
         )
         return {
             "run_id": str(result.run_context.run_id),
             "location_count": result.collection_result.location_count,
             "raw_object_count": result.raw_object_count,
+            "image_object_count": result.image_object_count,
             "stored_object_id": str(result.stored_object.object_id),
             "object_key": result.stored_object.object_key,
             "filename": result.stored_object.filename,
