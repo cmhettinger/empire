@@ -2,6 +2,7 @@
 
 from empire_stonks_securities.config import (
     DailyRefreshConfig,
+    DownloadConfig,
     HistoricalBackfillConfig,
     ProviderConfig,
     RateLimitConfig,
@@ -20,6 +21,7 @@ from empire_stonks_securities.object_store import (
 __all__ = [
     "DEFAULT_CONFIG_LOGICAL_NAME",
     "DailyRefreshConfig",
+    "DownloadConfig",
     "HistoricalBackfillConfig",
     "ProviderConfig",
     "RateLimitConfig",

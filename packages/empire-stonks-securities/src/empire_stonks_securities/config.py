@@ -131,6 +131,35 @@ class StorageConfig:
 
 
 @dataclass(frozen=True)
+class DownloadConfig:
+    """Download behavior for source files."""
+
+    checksum_validation: bool = True
+    resume_partial_downloads: bool = True
+    overwrite_existing: bool = False
+
+    @classmethod
+    def from_mapping(cls, data: dict[str, Any] | None) -> "DownloadConfig":
+        if data is not None and not isinstance(data, dict):
+            raise StonksSecuritiesConfigError("stonks_securities.download must be a mapping.")
+        data = data or {}
+        return cls(
+            checksum_validation=_as_bool(
+                data.get("checksum_validation", True),
+                "stonks_securities.download.checksum_validation",
+            ),
+            resume_partial_downloads=_as_bool(
+                data.get("resume_partial_downloads", True),
+                "stonks_securities.download.resume_partial_downloads",
+            ),
+            overwrite_existing=_as_bool(
+                data.get("overwrite_existing", False),
+                "stonks_securities.download.overwrite_existing",
+            ),
+        )
+
+
+@dataclass(frozen=True)
 class ProviderConfig:
     """One configured securities reference-data provider endpoint."""
 
@@ -192,7 +221,7 @@ class HistoricalBackfillConfig:
     """Historical backfill date range."""
 
     start_date: str
-    end_date: str
+    end_date: str | None
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any] | None) -> "HistoricalBackfillConfig":
@@ -206,7 +235,7 @@ class HistoricalBackfillConfig:
                 data.get("start_date"),
                 "stonks_securities.processing.historical_backfill.start_date",
             ),
-            end_date=_as_str(
+            end_date=_optional_str(
                 data.get("end_date"),
                 "stonks_securities.processing.historical_backfill.end_date",
             ),
@@ -297,6 +326,7 @@ class StonksSecuritiesConfig:
     respect_rate_limits: bool = True
     rate_limit: RateLimitConfig = field(default_factory=RateLimitConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
+    download: DownloadConfig = field(default_factory=DownloadConfig)
 
     @classmethod
     def from_file(cls, path: str | Path) -> "StonksSecuritiesConfig":
@@ -369,6 +399,7 @@ class StonksSecuritiesConfig:
             ),
             rate_limit=RateLimitConfig.from_mapping(config.get("rate_limit")),
             storage=StorageConfig.from_mapping(config.get("storage")),
+            download=DownloadConfig.from_mapping(config.get("download")),
             providers=providers,
             processing=ProcessingConfig.from_mapping(config.get("processing")),
         )
@@ -382,6 +413,12 @@ def _as_str(value: Any, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise StonksSecuritiesConfigError(f"{field_name} must be a non-empty string.")
     return value.strip()
+
+
+def _optional_str(value: Any, field_name: str) -> str | None:
+    if value is None:
+        return None
+    return _as_str(value, field_name)
 
 
 def _as_int(value: Any, field_name: str) -> int:

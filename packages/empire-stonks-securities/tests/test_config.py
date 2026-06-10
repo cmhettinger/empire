@@ -31,6 +31,11 @@ CONFIG = {
             "retention_days_raw": 5,
             "retention_days_processed": 5,
         },
+        "download": {
+            "checksum_validation": True,
+            "resume_partial_downloads": True,
+            "overwrite_existing": False,
+        },
         "providers": {
             "sec_company_tickers": {
                 "provider_code": "SEC_COMPANY_TICKERS",
@@ -71,6 +76,8 @@ def test_config_from_mapping():
     assert config.timeout_seconds == 60
     assert config.rate_limit.requests_per_second == 5
     assert config.storage.store_raw_files is True
+    assert config.download.checksum_validation is True
+    assert config.download.overwrite_existing is False
     assert len(config.providers) == 2
     assert len(config.enabled_providers) == 2
     assert config.providers[0].provider_code == "SEC_COMPANY_TICKERS"
@@ -94,6 +101,33 @@ def test_seed_config_file_parses():
         "SEC_MASTER_INDEX_DAILY",
         "SEC_FILING_HEADER",
     ]
+    assert config.rate_limit.burst_size == 5
+    assert config.download.resume_partial_downloads is True
+    assert config.processing.historical_backfill.end_date is None
+
+
+def test_historical_backfill_end_date_can_be_null():
+    config_data = {"stonks_securities": dict(CONFIG["stonks_securities"])}
+    processing = dict(CONFIG["stonks_securities"]["processing"])
+    historical_backfill = dict(processing["historical_backfill"])
+    historical_backfill["end_date"] = None
+    processing["historical_backfill"] = historical_backfill
+    config_data["stonks_securities"]["processing"] = processing
+
+    config = StonksSecuritiesConfig.from_mapping(config_data)
+
+    assert config.processing.historical_backfill.end_date is None
+
+
+def test_download_config_defaults_when_omitted():
+    config_data = {"stonks_securities": dict(CONFIG["stonks_securities"])}
+    del config_data["stonks_securities"]["download"]
+
+    config = StonksSecuritiesConfig.from_mapping(config_data)
+
+    assert config.download.checksum_validation is True
+    assert config.download.resume_partial_downloads is True
+    assert config.download.overwrite_existing is False
 
 
 def test_provider_code_is_required():

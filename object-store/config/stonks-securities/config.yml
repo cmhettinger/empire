@@ -13,15 +13,18 @@ stonks_securities:
   respect_rate_limits: true
   rate_limit:
     requests_per_second: 5
-    burst_size: 10
+    burst_size: 5
     throttle_on_429: true
     retry_after_header: true
 
   storage:
-    store_raw_files: true
-    delete_processed_files_after_processing: true
     retention_days_raw: 5
     retention_days_processed: 5
+
+  download:
+    checksum_validation: true
+    resume_partial_downloads: true
+    overwrite_existing: false
 
   providers:
 
@@ -80,7 +83,7 @@ stonks_securities:
 
     historical_backfill:
       start_date: "1995-01-01"
-      end_date: "current"
+      end_date: null
 
     daily_refresh:
       enabled: true
