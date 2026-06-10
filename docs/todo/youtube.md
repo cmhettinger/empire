@@ -6,7 +6,6 @@ This document tracks upcoming work for the *empire-youtube* package.
 
 | Priority | Task | Possible Sources | Notes |
 | :--- | :--- | :--- | :--- |
-| High | buildout jellyfin docker container yml |  |  |
 | High | setup production jellyfin config yml |  |  |
 | Medium | procure HPe Mini server | amazon.com |  |
 | Medium | buildout server with ubuntu and docker |  |  |
