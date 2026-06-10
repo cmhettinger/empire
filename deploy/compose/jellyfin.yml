@@ -1,0 +1,18 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:${EMPIRE_JELLYFIN_VERSION:-latest}
+    container_name: ${EMPIRE_JELLYFIN_CONTAINER:-empire-jellyfin}
+    profiles:
+      - jellyfin
+    restart: unless-stopped
+
+    ports:
+      - "${EMPIRE_JELLYFIN_HOST_PORT:-8096}:8096"
+
+    volumes:
+      - ${EMPIRE_STORAGE_ROOT_JELLYFIN}/config:/config
+      - ${EMPIRE_STORAGE_ROOT_JELLYFIN}/cache:/cache
+      - ${EMPIRE_STORAGE_ROOT_JELLYFIN}/media:/media:ro
+
+    networks:
+      - empire-net

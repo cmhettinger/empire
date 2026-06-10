@@ -9,3 +9,4 @@ include:
   - pgbouncer.yml
   - flyway.yml
   - airflow.yml
+  - jellyfin.yml
