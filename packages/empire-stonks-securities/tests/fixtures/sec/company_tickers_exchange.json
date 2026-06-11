@@ -1,0 +1,8 @@
+{
+  "fields": ["cik", "name", "ticker", "exchange"],
+  "data": [
+    [320193, " Apple Inc. ", " aapl ", " Nasdaq "],
+    [789019, "Microsoft Corp", "MSFT", null],
+    [0, "Broken Corp", "BROK", "NYSE"]
+  ]
+}

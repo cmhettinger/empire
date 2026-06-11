@@ -131,12 +131,60 @@ class StorageConfig:
 
 
 @dataclass(frozen=True)
+class QuarterlyMasterIndexConfig:
+    """Quarterly EDGAR master index acquisition range."""
+
+    start_year: int = 1995
+    end_year: int | None = None
+    quarters: tuple[int, ...] = (1, 2, 3, 4)
+
+    @classmethod
+    def from_mapping(cls, data: dict[str, Any] | None) -> "QuarterlyMasterIndexConfig":
+        if data is not None and not isinstance(data, dict):
+            raise StonksSecuritiesConfigError(
+                "stonks_securities.download.quarterly_master_index must be a mapping."
+            )
+        data = data or {}
+        quarters_data = data.get("quarters", [1, 2, 3, 4])
+        if not isinstance(quarters_data, list) or not quarters_data:
+            raise StonksSecuritiesConfigError(
+                "stonks_securities.download.quarterly_master_index.quarters must be a non-empty list."
+            )
+        quarters = tuple(
+            _as_int(
+                quarter,
+                "stonks_securities.download.quarterly_master_index.quarters[]",
+            )
+            for quarter in quarters_data
+        )
+        invalid_quarters = [quarter for quarter in quarters if quarter < 1 or quarter > 4]
+        if invalid_quarters:
+            raise StonksSecuritiesConfigError(
+                "stonks_securities.download.quarterly_master_index.quarters must contain values 1-4."
+            )
+        return cls(
+            start_year=_as_int(
+                data.get("start_year", 1995),
+                "stonks_securities.download.quarterly_master_index.start_year",
+            ),
+            end_year=_optional_int(
+                data.get("end_year"),
+                "stonks_securities.download.quarterly_master_index.end_year",
+            ),
+            quarters=quarters,
+        )
+
+
+@dataclass(frozen=True)
 class DownloadConfig:
     """Download behavior for source files."""
 
     checksum_validation: bool = True
     resume_partial_downloads: bool = True
     overwrite_existing: bool = False
+    quarterly_master_index: QuarterlyMasterIndexConfig = field(
+        default_factory=QuarterlyMasterIndexConfig
+    )
 
     @classmethod
     def from_mapping(cls, data: dict[str, Any] | None) -> "DownloadConfig":
@@ -155,6 +203,9 @@ class DownloadConfig:
             overwrite_existing=_as_bool(
                 data.get("overwrite_existing", False),
                 "stonks_securities.download.overwrite_existing",
+            ),
+            quarterly_master_index=QuarterlyMasterIndexConfig.from_mapping(
+                data.get("quarterly_master_index")
             ),
         )
 
@@ -428,6 +479,12 @@ def _as_int(value: Any, field_name: str) -> int:
         return int(value)
     except (TypeError, ValueError) as exc:
         raise StonksSecuritiesConfigError(f"{field_name} must be an integer.") from exc
+
+
+def _optional_int(value: Any, field_name: str) -> int | None:
+    if value is None:
+        return None
+    return _as_int(value, field_name)
 
 
 def _as_float(value: Any, field_name: str) -> float:

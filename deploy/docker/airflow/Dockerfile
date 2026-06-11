@@ -40,3 +40,7 @@ RUN pip install --no-cache-dir /opt/empire/packages/empire-youtube
 COPY packages/empire-weather /opt/empire/packages/empire-weather
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-weather
+
+COPY packages/empire-stonks-securities /opt/empire/packages/empire-stonks-securities
+
+RUN pip install --no-cache-dir /opt/empire/packages/empire-stonks-securities

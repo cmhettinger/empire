@@ -35,6 +35,11 @@ CONFIG = {
             "checksum_validation": True,
             "resume_partial_downloads": True,
             "overwrite_existing": False,
+            "quarterly_master_index": {
+                "start_year": 1995,
+                "end_year": None,
+                "quarters": [1, 2, 3, 4],
+            },
         },
         "providers": {
             "sec_company_tickers": {
@@ -82,6 +87,8 @@ def test_config_from_mapping():
     assert len(config.enabled_providers) == 2
     assert config.providers[0].provider_code == "SEC_COMPANY_TICKERS"
     assert config.providers[1].url_template is not None
+    assert config.download.quarterly_master_index.start_year == 1995
+    assert config.download.quarterly_master_index.quarters == (1, 2, 3, 4)
     assert config.processing.historical_backfill.start_date == "1995-01-01"
     assert config.processing.daily_refresh.enabled is True
     assert config.processing.validation.verify_non_empty_file is True
@@ -103,6 +110,8 @@ def test_seed_config_file_parses():
     ]
     assert config.rate_limit.burst_size == 5
     assert config.download.resume_partial_downloads is True
+    assert config.download.quarterly_master_index.end_year is None
+    assert config.providers[3].url_template.endswith("/master.zip")
     assert config.processing.historical_backfill.end_date is None
 
 

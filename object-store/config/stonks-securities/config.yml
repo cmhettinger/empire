@@ -25,6 +25,10 @@ stonks_securities:
     checksum_validation: true
     resume_partial_downloads: true
     overwrite_existing: false
+    quarterly_master_index:
+      start_year: 1995
+      end_year: null
+      quarters: [1, 2, 3, 4]
 
   providers:
 
@@ -55,10 +59,10 @@ stonks_securities:
     sec_quarterly_master_index:
       provider_code: SEC_MASTER_INDEX_QUARTERLY
       enabled: true
-      url_template: https://www.sec.gov/Archives/edgar/full-index/{year}/QTR{quarter}/master.idx
-      expected_format: idx
+      url_template: https://www.sec.gov/Archives/edgar/full-index/{year}/QTR{quarter}/master.zip
+      expected_format: zip
       description: >
-        Historical EDGAR filing index used to reconstruct filing history
+        Historical EDGAR filing index ZIP used to reconstruct filing history
         and discover issuers, forms, and accession numbers.
 
     sec_daily_master_index:
