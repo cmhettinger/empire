@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/stonks-securities-collect [--config-file PATH] [--config-object-id OBJECT_ID]
+                                [--config-logical-name NAME]
+                                [--storage-root NAME] [--storage-key KEY]
+                                [--env-file PATH]
+                                source SOURCE...
+  bin/stonks-securities-collect [--config-file PATH] [--config-object-id OBJECT_ID]
+                                [--config-logical-name NAME]
+                                [--storage-root NAME] [--storage-key KEY]
+                                [--env-file PATH]
+                                quarterly --start-year YEAR --end-year YEAR
+
+Examples:
+  bin/stonks-securities-collect --config-file object-store/config/stonks-securities/config.yml source sec_submissions_zip
+  bin/stonks-securities-collect --config-file object-store/config/stonks-securities/config.yml quarterly --start-year 2024 --end-year 2026
+
+Description:
+  Collects configured SEC source files into the Empire object store.
+
+Options:
+  --config-file PATH          Load stonks securities config from a local YAML file.
+  --config-object-id ID       Load stonks securities config from a specific stored object id.
+  --config-logical-name NAME  Load stonks securities config from an object-store logical name.
+                              Defaults to stonks-securities-config.
+  --storage-root NAME         Object-store root name. Defaults to global.
+  --storage-key KEY           Object key prefix. Defaults to
+                              EMPIRE_STORAGE_KEY_STONKS_SECURITIES or stonks/securities.
+  --acquisition-date DATE     Date segment for object keys, YYYY-MM-DD. Defaults to today.
+  --acquisition-id ID         Run/acquisition segment for object keys. Defaults to manual.
+  --temp-dir PATH             Temporary working directory. Defaults to EMPIRE_TEMP_DIR.
+  --force                     Download even when file and metadata sidecar already exist.
+  --env-file PATH             Load an environment file before running.
+                              Defaults to deploy/env/local.env.
+  -h, --help                  Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      ARGS+=("$@")
+      break
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "ERROR: env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${REPO_ROOT}/packages/empire-stonks-securities/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-stonks-securities/src:${REPO_ROOT}/packages/empire-core/src${PYTHONPATH:+:${PYTHONPATH}}"
+
+if ! "${PYTHON_BIN}" -c 'import empire_core, requests, yaml' >/dev/null 2>&1; then
+  echo "ERROR: empire-stonks-securities dependencies are not installed for ${PYTHON_BIN}." >&2
+  echo "       Run: cd packages/empire-stonks-securities && poetry install" >&2
+  exit 1
+fi
+
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+  "${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-stonks-securities/src/empire_stonks_securities/scripts/collect.py"
+else
+  "${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-stonks-securities/src/empire_stonks_securities/scripts/collect.py" "${ARGS[@]}"
+fi
