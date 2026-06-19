@@ -78,11 +78,16 @@ class _SecurityUpsertOutcome:
 def upsert_sec_securities_from_provider_observations(
     *,
     connection: Any,
+    source_run_id: str | UUID | None = None,
     limit: int | None = None,
 ) -> SecSecurityUpsertResult:
     """Select eligible SEC ticker observations and upsert provisional securities."""
 
-    observations = select_sec_security_observations(connection=connection, limit=limit)
+    observations = select_sec_security_observations(
+        connection=connection,
+        source_run_id=source_run_id,
+        limit=limit,
+    )
     result = upsert_sec_securities(connection=connection, observations=observations)
     logger.info(
         "Completed SEC security upsert: observations_scanned=%s observations_skipped=%s "
@@ -107,29 +112,37 @@ def upsert_sec_securities_from_provider_observations(
 def select_sec_security_observations(
     *,
     connection: Any,
+    source_run_id: str | UUID | None = None,
     limit: int | None = None,
 ) -> list[SecSecurityObservation]:
     """Fetch SEC ticker provider observations eligible for security upsert."""
 
+    run_join = ""
+    run_filter = ""
+    params: list[Any] = [list(ELIGIBLE_SEC_OBSERVATION_PROVIDERS)]
+    if source_run_id is not None:
+        run_join = "JOIN core.stored_object so ON so.object_id = po.object_id"
+        run_filter = "AND so.run_id = %s"
+        params.append(source_run_id)
     sql = """
         SELECT
-            provider_observation_id,
-            provider_code,
-            provider_date,
-            observed_at,
-            summary_json
-        FROM stonks.provider_observation
-        WHERE provider_code = ANY(%s)
-        ORDER BY observed_at NULLS LAST, created_at, provider_observation_id
-    """
-    if limit is None:
-        params = (list(ELIGIBLE_SEC_OBSERVATION_PROVIDERS),)
-    else:
+            po.provider_observation_id,
+            po.provider_code,
+            po.provider_date,
+            po.observed_at,
+            po.summary_json
+        FROM stonks.provider_observation po
+        {run_join}
+        WHERE po.provider_code = ANY(%s)
+          {run_filter}
+        ORDER BY po.observed_at NULLS LAST, po.created_at, po.provider_observation_id
+    """.format(run_join=run_join, run_filter=run_filter)
+    if limit is not None:
         sql += " LIMIT %s"
-        params = (list(ELIGIBLE_SEC_OBSERVATION_PROVIDERS), limit)
+        params.append(limit)
 
     with connection.cursor() as cursor:
-        cursor.execute(sql, params)
+        cursor.execute(sql, tuple(params))
         return [_observation_from_row(cursor, row) for row in cursor.fetchall()]
 
 
