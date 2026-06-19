@@ -155,6 +155,22 @@ A security belongs to one issuer.
 
 A security may have multiple listings.
 
+### Phase 2A SEC Ticker Observations
+
+Phase 2A creates provisional issuer-linked securities from SEC ticker observations
+after issuers have been established by CIK. These rows use the observed
+`issuer + ticker_norm` as a temporary identity anchor so later security-master
+steps have a concrete security record to enrich.
+
+The SEC ticker files do not prove that the instrument is common stock. For that
+reason, Phase 2A writes these securities with the conservative `UNKNOWN`
+instrument type and stores the observed ticker as a `TICKER` security identifier.
+Later enrichment may promote the instrument type to `COMMON_STOCK`, `ETF`, `ADR`,
+`PREFERRED`, or another more specific type when stronger evidence is available.
+
+Phase 2A does not create listings or `listing_symbol_history` rows. Exchange and
+listing normalization are separate follow-on steps.
+
 ---
 
 ## listing
@@ -168,6 +184,22 @@ Examples:
 - SPY on NYSE Arca
 
 A listing belongs to one security and one exchange.
+
+### Phase 2A SEC Exchange Observations
+
+Phase 2A creates current active listings from
+`sec_company_tickers_exchange` observations after issuers and provisional
+securities exist. The listing identity is the existing security, the resolved
+exchange, and the observed current ticker.
+
+Exchange names are resolved through the existing `exchange` and `exchange_alias`
+reference tables. Unknown exchange names are skipped and logged; this step does
+not create new exchange records.
+
+`sec_company_tickers` observations generally do not create listings because that
+source does not include exchange information. Historical ticker reconstruction,
+delisting detection, inactive listing closure, and exchange-specific enrichment
+are future milestones.
 
 ---
 
