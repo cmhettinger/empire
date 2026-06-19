@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/stonks-securities-daily-summary [--output console|temp|PATH] [--object-store] [--env-file PATH]
+
+Description:
+  Generates the final stonks securities daily refresh summary report.
+
+Options:
+  --output VALUE          console, temp, or a JSON file path. Defaults to console.
+  --json                  Print full JSON when --output console is used.
+  --temp-dir PATH         Temp directory for --output temp.
+  --source-run-id ID      Limit source/evidence metrics to a specific core run id.
+  --validation-report-object-id ID
+                          Use this stored validation report object for summary linkage.
+  --conflict-report-object-id ID
+                          Use this stored conflict report object for summary linkage.
+  --stale-warn-hours N    Warn when source objects are at least this old. Defaults to 36.
+  --stale-fail-hours N    Fail when source objects are at least this old. Defaults to 96.
+  --object-store          Also store the report in the Empire object store.
+  --storage-root NAME     Object-store root for --object-store. Defaults to global.
+  --storage-key KEY       Object-store key prefix.
+  --env-file PATH         Load an environment file before running.
+                          Defaults to deploy/env/local.env.
+  -h, --help              Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "ERROR: env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHON_BIN="${REPO_ROOT}/packages/empire-stonks-securities/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-stonks-securities/src:${REPO_ROOT}/packages/empire-core/src${PYTHONPATH:+:${PYTHONPATH}}"
+
+if ! "${PYTHON_BIN}" -c 'import empire_core' >/dev/null 2>&1; then
+  echo "ERROR: empire-stonks-securities dependencies are not installed for ${PYTHON_BIN}." >&2
+  echo "       Run: cd packages/empire-stonks-securities && poetry install" >&2
+  exit 1
+fi
+
+"${PYTHON_BIN}" "${REPO_ROOT}/packages/empire-stonks-securities/src/empire_stonks_securities/scripts/daily_summary.py" "${ARGS[@]}"

@@ -4,6 +4,7 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
+from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.sdk import dag, get_current_context, task
 from empire_core import EmpireDatabase, ObjectStore
 from empire_stonks_securities import (
@@ -73,7 +74,20 @@ def stonks_securities_daily_conflicts():
             "object_id": str(stored.object_id),
         }
 
-    generate_conflict_report()
+    conflict_result = generate_conflict_report()
+    trigger_summary = TriggerDagRunOperator(
+        task_id="trigger_stonks_securities_daily_refresh_summary",
+        trigger_dag_id="stonks_securities_daily_refresh_summary",
+        conf={
+            "input_run_id": "{{ dag_run.conf['input_run_id'] }}",
+            "validation_report_object_id": "{{ dag_run.conf.get('validation_report_object_id') }}",
+            "conflict_report_object_id": (
+                "{{ ti.xcom_pull(task_ids='generate_conflict_report')['object_id'] }}"
+            ),
+        },
+    )
+
+    conflict_result >> trigger_summary
 
 
 def _input_run_id_from_conf(conf: dict) -> UUID:
