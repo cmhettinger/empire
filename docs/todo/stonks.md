@@ -8,5 +8,4 @@ SEC data.
 
 | Priority | Task | Possible Sources | Notes |
 | :--- | :--- | :--- | :--- |
-| High | generate plan for using SEC data to backfill tables  |  |  |
-| High | create emplire-stonks-securities package  |  |  |
+| High | work off red team review findings  |  |  |
