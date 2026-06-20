@@ -9,3 +9,4 @@ SEC data.
 | Priority | Task | Possible Sources | Notes |
 | :--- | :--- | :--- | :--- |
 | High | work off red team review findings  |  |  |
+| High | does not create issuer/security rows or close/deactivate listings | | |
