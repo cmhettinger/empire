@@ -162,6 +162,13 @@ after issuers have been established by CIK. These rows use the observed
 `issuer + ticker_norm` as a temporary identity anchor so later security-master
 steps have a concrete security record to enrich.
 
+This is a current-state bootstrap resolver, not final historical identity.
+Ticker is stored as observed medium-confidence evidence, not treated as a
+permanent security identity. The resulting `UNKNOWN` securities are future-
+upgradable records: later backfill, fund/class datasets, exchange directories,
+filings, or provider identifiers can add stronger identifiers and promote or
+reconcile the provisional records without corrupting the raw SEC evidence.
+
 The SEC ticker files do not prove that the instrument is common stock. For that
 reason, Phase 2A writes these securities with the conservative `UNKNOWN`
 instrument type and stores the observed ticker as a `TICKER` security identifier.
@@ -190,7 +197,9 @@ A listing belongs to one security and one exchange.
 Phase 2A creates current active listings from
 `sec_company_tickers_exchange` observations after issuers and provisional
 securities exist. The listing identity is the existing security, the resolved
-exchange, and the observed current ticker.
+exchange, and not the ticker. The observed current ticker is copied onto the
+listing for convenience, but symbol changes are represented in
+`listing_symbol_history`.
 
 Exchange names are resolved through the existing `exchange` and `exchange_alias`
 reference tables. Unknown exchange names are skipped and logged; this step does
@@ -215,6 +224,11 @@ Examples:
 | GOOGL | 2015 | NULL |
 
 Used to preserve ticker changes without losing history.
+
+Each listing may have only one current active symbol at a time. Current rows have
+`valid_to IS NULL`; when an unambiguous new ticker is observed for the same
+security/exchange listing, the prior active symbol is closed and a new active
+symbol is inserted. Missing SEC rows do not close listings or symbols.
 
 ---
 
@@ -511,3 +525,15 @@ Everything else exists to support that structure while preserving:
 - Full provider lineage
 
 This design is intended to support a complete historical security master dating back to 1995 and sourced primarily from SEC EDGAR, exchange directories, and related reference datasets.
+
+---
+
+# Reporting Status Semantics
+
+Phase 2A reports use a shared status model:
+
+- `PASS`: run completed with zero warnings and zero failures.
+- `WARN`: run completed with usable output, one or more warnings, and zero failures.
+- `FAIL`: one or more failures make the output untrustworthy.
+
+Reports also include `healthy`: `true` for `PASS` and `WARN`, `false` for `FAIL`.

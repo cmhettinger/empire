@@ -15,6 +15,10 @@ from empire_stonks_securities.issuers import ELIGIBLE_SEC_OBSERVATION_PROVIDERS
 
 logger = logging.getLogger(__name__)
 
+# Phase 2A SEC ticker files do not prove durable security identity or instrument
+# type. These constants mark rows as provisional bootstrap records that later
+# reconciliation/backfill can promote when stronger identifiers or type evidence
+# arrive.
 PROVISIONAL_INSTRUMENT_TYPE = "UNKNOWN"
 TICKER_IDENTIFIER_TYPE = "TICKER"
 SECURITY_IDENTIFIER_CONFIDENCE = "MEDIUM"
@@ -115,15 +119,9 @@ def select_sec_security_observations(
     source_run_id: str | UUID | None = None,
     limit: int | None = None,
 ) -> list[SecSecurityObservation]:
-    """Fetch SEC ticker provider observations eligible for security upsert."""
+    """Fetch SEC ticker observations that still require security reconciliation."""
 
-    run_join = ""
-    run_filter = ""
     params: list[Any] = [list(ELIGIBLE_SEC_OBSERVATION_PROVIDERS)]
-    if source_run_id is not None:
-        run_join = "JOIN core.stored_object so ON so.object_id = po.object_id"
-        run_filter = "AND so.run_id = %s"
-        params.append(source_run_id)
     sql = """
         SELECT
             po.provider_observation_id,
@@ -132,11 +130,18 @@ def select_sec_security_observations(
             po.observed_at,
             po.summary_json
         FROM stonks.provider_observation po
-        {run_join}
         WHERE po.provider_code = ANY(%s)
-          {run_filter}
+          AND NOT EXISTS (
+              SELECT 1
+              FROM stonks.provider_evidence pe
+              WHERE pe.provider_observation_id = po.provider_observation_id
+                AND pe.security_id IS NOT NULL
+                AND pe.listing_id IS NULL
+                AND pe.event_id IS NULL
+                AND pe.created_at >= po.created_at
+          )
         ORDER BY po.observed_at NULLS LAST, po.created_at, po.provider_observation_id
-    """.format(run_join=run_join, run_filter=run_filter)
+    """
     if limit is not None:
         sql += " LIMIT %s"
         params.append(limit)
@@ -182,7 +187,7 @@ def upsert_sec_securities(
                 continue
             counts.issuers_resolved += 1
 
-            security = _upsert_security(
+            security = _upsert_provisional_security_from_sec_ticker(
                 cursor=cursor,
                 issuer_id=issuer_id,
                 ticker_norm=parsed["ticker_norm"],
@@ -254,7 +259,7 @@ def _resolve_issuer_id(
     return row[0] if row is not None else None
 
 
-def _upsert_security(
+def _upsert_provisional_security_from_sec_ticker(
     *,
     cursor: Any,
     issuer_id: UUID,
@@ -262,6 +267,15 @@ def _upsert_security(
     company_name: str | None,
     seen_date: date | None,
 ) -> _SecurityUpsertOutcome:
+    """Resolve/create a provisional current-state security from weak SEC ticker evidence.
+
+    This resolver intentionally preserves the Phase 2A behavior of one
+    provisional security per issuer/current observed ticker. Ticker is recorded
+    as medium-confidence evidence, not permanent identity. Future backfill or
+    security-type enrichment should add stronger identifiers and reconcile or
+    promote these provisional records outside this bootstrap resolver.
+    """
+
     security = _find_security_by_issuer_ticker(
         cursor=cursor,
         issuer_id=issuer_id,

@@ -115,15 +115,9 @@ def select_sec_issuer_observations(
     source_run_id: str | UUID | None = None,
     limit: int | None = None,
 ) -> list[SecIssuerObservation]:
-    """Fetch SEC ticker provider observations eligible for issuer upsert."""
+    """Fetch SEC ticker observations that still require issuer reconciliation."""
 
-    run_join = ""
-    run_filter = ""
     params: list[Any] = [list(ELIGIBLE_SEC_OBSERVATION_PROVIDERS)]
-    if source_run_id is not None:
-        run_join = "JOIN core.stored_object so ON so.object_id = po.object_id"
-        run_filter = "AND so.run_id = %s"
-        params.append(source_run_id)
     sql = """
         SELECT
             po.provider_observation_id,
@@ -132,11 +126,19 @@ def select_sec_issuer_observations(
             po.observed_at,
             po.summary_json
         FROM stonks.provider_observation po
-        {run_join}
         WHERE po.provider_code = ANY(%s)
-          {run_filter}
+          AND NOT EXISTS (
+              SELECT 1
+              FROM stonks.provider_evidence pe
+              WHERE pe.provider_observation_id = po.provider_observation_id
+                AND pe.issuer_id IS NOT NULL
+                AND pe.security_id IS NULL
+                AND pe.listing_id IS NULL
+                AND pe.event_id IS NULL
+                AND pe.created_at >= po.created_at
+          )
         ORDER BY po.observed_at NULLS LAST, po.created_at, po.provider_observation_id
-    """.format(run_join=run_join, run_filter=run_filter)
+    """
     if limit is not None:
         sql += " LIMIT %s"
         params.append(limit)

@@ -32,11 +32,12 @@ def stonks_securities_daily_refresh_summary():
         conf = dag_run.conf or {}
         input_run_id = _input_run_id_from_conf(conf)
         generated_at = datetime.now(UTC)
+        logical_date = str(context.get("logical_date"))
         run_context = DailySummaryRunContext(
             dag_id=dag_run.dag_id,
             run_id=dag_run.run_id,
             source_run_id=str(input_run_id),
-            logical_date=str(context.get("logical_date")),
+            logical_date=logical_date,
             environment="airflow",
         )
 
@@ -47,6 +48,9 @@ def stonks_securities_daily_refresh_summary():
                 object_store=object_store,
                 run_context=run_context,
                 source_run_id=str(input_run_id),
+                verify_report_object_id=_optional_object_id(
+                    conf.get("verify_report_object_id")
+                ),
                 validation_report_object_id=_optional_object_id(
                     conf.get("validation_report_object_id")
                 ),
@@ -59,6 +63,7 @@ def stonks_securities_daily_refresh_summary():
                 report=report,
                 object_store=object_store,
                 generated_at=generated_at,
+                logical_date=logical_date,
             )
 
         summary = report["summary"]

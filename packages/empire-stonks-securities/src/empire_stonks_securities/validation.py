@@ -13,6 +13,7 @@ from empire_core import ObjectStore
 from empire_core.db.postgres import row_to_dict
 
 from empire_stonks_securities.acquisition import DEFAULT_STORAGE_ROOT, default_storage_key
+from empire_stonks_securities.report_paths import run_report_object_key, run_report_path
 
 
 REPORT_NAME = "stonks_securities_validation"
@@ -83,6 +84,7 @@ def generate_phase_2a_validation_report(
     return {
         "report_name": REPORT_NAME,
         "generated_at": generated_at.isoformat(),
+        "healthy": status in {"PASS", "WARN"},
         "run_context": resolved_run_context.to_dict(),
         "summary": summary,
         "source_coverage": source_coverage,
@@ -105,7 +107,9 @@ def evaluate_validation_status(
 ) -> str:
     if failures:
         return "FAIL"
-    return "SUCCESS"
+    if warnings:
+        return "WARN"
+    return "PASS"
 
 
 def evaluate_validation_findings(
@@ -145,8 +149,8 @@ def evaluate_validation_findings(
     )
     _warn_if(
         warnings,
-        "ticker_exchange_observations_missing_listing_evidence",
-        evidence_coverage["ticker_exchange_observations_missing_listing_evidence"],
+        "ticker_exchange_observations_eligible_missing_listing_evidence",
+        evidence_coverage["ticker_exchange_observations_eligible_missing_listing_evidence"],
     )
     _warn_if(
         warnings,
@@ -174,6 +178,16 @@ def evaluate_validation_findings(
         failures,
         "same_exchange_ticker_multiple_securities",
         conflict_candidates["same_exchange_ticker_multi_security_count"],
+    )
+    _fail_if(
+        failures,
+        "same_security_exchange_multiple_active_listings",
+        conflict_candidates["same_security_exchange_active_listing_count"],
+    )
+    _fail_if(
+        failures,
+        "same_listing_multiple_active_symbols",
+        conflict_candidates["same_listing_multiple_active_symbols_count"],
     )
     _fail_if(failures, "listings_missing_security", listing_quality["listings_missing_security"])
     _fail_if(failures, "listings_missing_exchange", listing_quality["listings_missing_exchange"])
@@ -204,11 +218,18 @@ def default_validation_report_path(
     *,
     temp_dir: str | Path | None = None,
     generated_at: datetime | None = None,
+    logical_date: Any = None,
 ) -> Path:
     generated_at = generated_at or datetime.now(UTC)
     root = Path(temp_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp"))
     filename = f"stonks_securities_validation_{generated_at:%Y%m%dT%H%M%SZ}.json"
-    return root / "stonks" / "securities" / "validation" / filename
+    return run_report_path(
+        root=root,
+        report_type="validation",
+        filename=filename,
+        logical_date=logical_date,
+        generated_at=generated_at,
+    )
 
 
 def write_validation_report_to_object_store(
@@ -218,17 +239,15 @@ def write_validation_report_to_object_store(
     storage_root: str = DEFAULT_STORAGE_ROOT,
     storage_key: str | None = None,
     generated_at: datetime | None = None,
+    logical_date: Any = None,
 ):
     generated_at = generated_at or datetime.now(UTC)
     resolved_storage_key = (storage_key or default_storage_key()).strip("/")
-    object_key = "/".join(
-        [
-            resolved_storage_key,
-            "validation",
-            f"{generated_at:%Y}",
-            f"{generated_at:%m}",
-            f"{generated_at:%d}",
-        ]
+    object_key = run_report_object_key(
+        storage_key=resolved_storage_key,
+        report_type="validation",
+        logical_date=logical_date or report.get("run_context", {}).get("logical_date"),
+        generated_at=generated_at,
     )
     filename = f"stonks_securities_validation_{generated_at:%Y%m%dT%H%M%SZ}.json"
     return object_store.put_bytes(
@@ -583,6 +602,68 @@ def _evidence_coverage(cursor: Any, *, source_run_id: str | None) -> dict[str, A
             """,
             obs_params,
         ),
+        "ticker_exchange_observations_missing_listing_evidence_due_to_missing_exchange": _scalar(
+            cursor,
+            "ticker_exchange_observations_missing_listing_evidence_due_to_missing_exchange",
+            f"""
+            SELECT COUNT(*)
+            FROM {obs_from}
+            WHERE po.provider_code = 'SEC_COMPANY_TICKERS_EXCHANGE'
+              AND NULLIF(TRIM(po.summary_json ->> 'exchange'), '') IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM stonks.provider_evidence pe
+                WHERE pe.provider_observation_id = po.provider_observation_id
+                  AND pe.listing_id IS NOT NULL
+              )
+            """,
+            obs_params,
+        ),
+        "ticker_exchange_observations_missing_listing_evidence_due_to_unmapped_exchange": _scalar(
+            cursor,
+            "ticker_exchange_observations_missing_listing_evidence_due_to_unmapped_exchange",
+            f"""
+            SELECT COUNT(*)
+            FROM {obs_from}
+            WHERE po.provider_code = 'SEC_COMPANY_TICKERS_EXCHANGE'
+              AND NULLIF(TRIM(po.summary_json ->> 'exchange'), '') IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1
+                FROM stonks.exchange_alias ea
+                WHERE ea.provider_code = 'SEC'
+                  AND ea.is_active = TRUE
+                  AND lower(ea.raw_name) = lower(po.summary_json ->> 'exchange')
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM stonks.provider_evidence pe
+                WHERE pe.provider_observation_id = po.provider_observation_id
+                  AND pe.listing_id IS NOT NULL
+              )
+            """,
+            obs_params,
+        ),
+        "ticker_exchange_observations_eligible_missing_listing_evidence": _scalar(
+            cursor,
+            "ticker_exchange_observations_eligible_missing_listing_evidence",
+            f"""
+            SELECT COUNT(*)
+            FROM {obs_from}
+            WHERE po.provider_code = 'SEC_COMPANY_TICKERS_EXCHANGE'
+              AND NULLIF(TRIM(po.summary_json ->> 'exchange'), '') IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM stonks.exchange_alias ea
+                WHERE ea.provider_code = 'SEC'
+                  AND ea.is_active = TRUE
+                  AND lower(ea.raw_name) = lower(po.summary_json ->> 'exchange')
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM stonks.provider_evidence pe
+                WHERE pe.provider_observation_id = po.provider_observation_id
+                  AND pe.listing_id IS NOT NULL
+              )
+            """,
+            obs_params,
+        ),
     }
 
 
@@ -819,6 +900,22 @@ def _conflict_candidates(cursor: Any) -> dict[str, Any]:
         ORDER BY issuer_count DESC, ticker_norm
         """,
     )
+    same_security_exchange_active_listing = _fetchall(
+        cursor,
+        "same_security_exchange_active_listing",
+        """
+        SELECT
+          l.security_id,
+          l.exchange_id,
+          COUNT(DISTINCT l.listing_id) AS listing_count
+        FROM stonks.listing l
+        WHERE l.valid_to IS NULL
+          AND l.status = 'ACTIVE'
+        GROUP BY l.security_id, l.exchange_id
+        HAVING COUNT(DISTINCT l.listing_id) > 1
+        ORDER BY listing_count DESC, l.security_id, l.exchange_id
+        """,
+    )
     cik_multi_names = _fetchall(
         cursor,
         "same_cik_multiple_issuer_names",
@@ -849,6 +946,12 @@ def _conflict_candidates(cursor: Any) -> dict[str, Any]:
         "same_exchange_ticker_multi_security_count": len(same_exchange_ticker_multi_security),
         "same_exchange_ticker_multiple_issuers": same_exchange_ticker_multi_issuer,
         "same_exchange_ticker_multi_issuer_count": len(same_exchange_ticker_multi_issuer),
+        "same_security_exchange_multiple_active_listings": (
+            same_security_exchange_active_listing
+        ),
+        "same_security_exchange_active_listing_count": len(
+            same_security_exchange_active_listing
+        ),
         "same_cik_multiple_issuer_names": cik_multi_names,
         "same_cik_multiple_issuer_names_count": len(cik_multi_names),
         "same_listing_multiple_active_symbols": listing_multi_active_symbols,

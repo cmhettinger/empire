@@ -124,13 +124,9 @@ def select_sec_listing_observations(
     source_run_id: str | UUID | None = None,
     limit: int | None = None,
 ) -> list[SecListingObservation]:
-    run_join = ""
-    run_filter = ""
+    """Fetch SEC exchange observations that still require listing reconciliation."""
+
     params: list[Any] = [SEC_LISTING_PROVIDER_CODE]
-    if source_run_id is not None:
-        run_join = "JOIN core.stored_object so ON so.object_id = po.object_id"
-        run_filter = "AND so.run_id = %s"
-        params.append(source_run_id)
     sql = """
         SELECT
             po.provider_observation_id,
@@ -139,11 +135,16 @@ def select_sec_listing_observations(
             po.observed_at,
             po.summary_json
         FROM stonks.provider_observation po
-        {run_join}
         WHERE po.provider_code = %s
-          {run_filter}
+          AND NOT EXISTS (
+              SELECT 1
+              FROM stonks.provider_evidence pe
+              WHERE pe.provider_observation_id = po.provider_observation_id
+                AND pe.listing_id IS NOT NULL
+                AND pe.created_at >= po.created_at
+          )
         ORDER BY po.observed_at NULLS LAST, po.created_at, po.provider_observation_id
-    """.format(run_join=run_join, run_filter=run_filter)
+    """
     if limit is not None:
         sql += " LIMIT %s"
         params.append(limit)
@@ -368,31 +369,17 @@ def _upsert_listing(
         """
         SELECT listing_id, security_id, exchange_id, ticker_norm, current_ticker, last_seen
         FROM stonks.listing
-        WHERE exchange_id = %s
-          AND ticker_norm = %s
+        WHERE security_id = %s
+          AND exchange_id = %s
           AND valid_to IS NULL
+          AND status = 'ACTIVE'
         LIMIT 1
         """,
-        (exchange_id, ticker_norm),
+        (security_id, exchange_id),
     )
     row = cursor.fetchone()
     if row is not None:
         listing = row_to_dict(cursor, row)
-        if listing["security_id"] != security_id:
-            logger.warning(
-                "Active listing conflict for exchange/ticker: exchange_id=%s ticker_norm=%s "
-                "existing_security_id=%s new_security_id=%s",
-                exchange_id,
-                ticker_norm,
-                listing["security_id"],
-                security_id,
-            )
-            return _ListingUpsertOutcome(
-                listing_id=listing["listing_id"],
-                created=False,
-                updated=False,
-                conflict=True,
-            )
         should_update_ticker = listing.get("current_ticker") != ticker_raw
         should_update_last_seen = (
             seen_date is not None
@@ -466,13 +453,47 @@ def _insert_symbol_history(
         FROM stonks.listing_symbol_history
         WHERE listing_id = %s
           AND ticker_norm = %s
-          AND valid_from IS NOT DISTINCT FROM %s
+          AND valid_to IS NULL
         LIMIT 1
         """,
-        (listing_id, ticker_norm, valid_from),
+        (listing_id, ticker_norm),
     )
     if cursor.fetchone() is not None:
         return False
+
+    if valid_from is None:
+        cursor.execute(
+            """
+            SELECT listing_symbol_id, ticker_norm
+            FROM stonks.listing_symbol_history
+            WHERE listing_id = %s
+              AND valid_to IS NULL
+            LIMIT 1
+            """,
+            (listing_id,),
+        )
+        if cursor.fetchone() is not None:
+            logger.warning(
+                "Blocking ambiguous listing symbol change without effective date: "
+                "listing_id=%s ticker_norm=%s",
+                listing_id,
+                ticker_norm,
+            )
+            return False
+
+    cursor.execute(
+        """
+        UPDATE stonks.listing_symbol_history
+        SET valid_to = CASE
+            WHEN %s::date IS NULL THEN valid_to
+            WHEN valid_from IS NULL OR valid_from <= %s THEN %s
+            ELSE valid_from
+        END
+        WHERE listing_id = %s
+          AND valid_to IS NULL
+        """,
+        (valid_from, valid_from, valid_from, listing_id),
+    )
 
     cursor.execute(
         """

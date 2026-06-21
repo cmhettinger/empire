@@ -39,7 +39,8 @@ def stonks_securities_daily_observations():
         task_id="trigger_stonks_securities_daily_issuers",
         trigger_dag_id="stonks_securities_daily_issuers",
         conf={
-            "input_run_id": "{{ dag_run.conf['input_run_id'] }}"
+            "input_run_id": "{{ dag_run.conf['input_run_id'] }}",
+            "verify_report_object_id": "{{ dag_run.conf.get('verify_report_object_id') }}",
         },
     )
 

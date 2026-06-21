@@ -7,6 +7,7 @@ from empire_stonks_securities.securities import (
     PROVISIONAL_INSTRUMENT_TYPE,
     SECURITY_IDENTIFIER_CONFIDENCE,
     SecSecurityObservation,
+    select_sec_security_observations,
     upsert_sec_securities,
 )
 
@@ -180,6 +181,26 @@ def test_does_not_assume_common_stock():
     assert next(iter(conn.securities.values()))["instrument_type_code"] == "UNKNOWN"
 
 
+def test_security_selector_uses_reconciliation_state_not_run_scope():
+    conn = FakeSelectConnection()
+
+    observations = select_sec_security_observations(
+        connection=conn,
+        source_run_id=uuid4(),
+        limit=10,
+    )
+
+    assert observations == []
+    assert "core.stored_object" not in conn.executed_sql
+    assert "so.run_id" not in conn.executed_sql
+    assert "NOT EXISTS" in conn.executed_sql
+    assert "pe.security_id IS NOT NULL" in conn.executed_sql
+    assert "pe.listing_id IS NULL" in conn.executed_sql
+    assert "pe.created_at >= po.created_at" in conn.executed_sql
+    assert set(conn.params[0]) == {"SEC_COMPANY_TICKERS", "SEC_COMPANY_TICKERS_EXCHANGE"}
+    assert conn.params[1] == 10
+
+
 def security_observation(
     *,
     provider_observation_id: UUID | None = None,
@@ -248,6 +269,33 @@ class FakeConnection:
 
     def commit(self) -> None:
         self.commit_count += 1
+
+
+class FakeSelectConnection:
+    def __init__(self) -> None:
+        self.executed_sql = ""
+        self.params = None
+
+    def cursor(self):
+        return FakeSelectCursor(self)
+
+
+class FakeSelectCursor:
+    def __init__(self, connection: FakeSelectConnection) -> None:
+        self.connection = connection
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def execute(self, sql: str, params=None) -> None:
+        self.connection.executed_sql = " ".join(sql.split())
+        self.connection.params = params
+
+    def fetchall(self):
+        return []
 
 
 class FakeCursor:

@@ -10,3 +10,4 @@ SEC data.
 | :--- | :--- | :--- | :--- |
 | High | work off red team review findings  |  |  |
 | High | does not create issuer/security rows or close/deactivate listings | | |
+| High | SEC gave CBOE, but Empire does not currently map that raw exchange value: 27 rows | | |

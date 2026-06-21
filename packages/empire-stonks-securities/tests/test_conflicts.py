@@ -27,6 +27,7 @@ def test_conflict_report_json_shape_is_stable():
     assert list(report.keys()) == [
         "report_name",
         "generated_at",
+        "healthy",
         "run_context",
         "summary",
         "source_priority",
@@ -34,6 +35,7 @@ def test_conflict_report_json_shape_is_stable():
         "conflicts",
     ]
     assert report["report_name"] == "stonks_securities_phase_2a_conflicts"
+    assert report["healthy"] is True
     assert report["run_context"]["dag_id"] == "test_dag"
     assert report["source_priority"]["sec_company_tickers_exchange"] == 100
     assert report["summary"] == {
@@ -82,6 +84,7 @@ def test_duplicate_cik_identifier_maps_to_multiple_issuers():
 
     conflict = report["conflicts"][0]
     assert report["summary"]["status"] == "FAIL"
+    assert report["healthy"] is False
     assert conflict["category"] == "cik_identifier_multiple_issuers"
     assert conflict["severity"] == "FAIL"
     assert conflict["entity_ids"]["issuer_ids"] == ["issuer-1", "issuer-2"]
@@ -106,6 +109,52 @@ def test_ticker_exchange_mapped_to_multiple_securities_fails():
     assert report["summary"]["status"] == "FAIL"
     assert conflict["category"] == "ticker_exchange_multiple_securities"
     assert conflict["keys"] == {"ticker_norm": "ABC", "exchange_code": "NASDAQ"}
+
+
+def test_security_exchange_multiple_active_listings_warns():
+    conn = FakeConnection()
+    conn.results["security_exchange_multiple_active_listings"] = [
+        {
+            "security_id": "security-1",
+            "exchange_code": "NASDAQ",
+            "listing_count": 2,
+            "listing_ids": ["listing-1", "listing-2"],
+        }
+    ]
+
+    report = generate_phase_2a_conflict_report(connection=conn, generated_at=GENERATED_AT)
+
+    conflict = report["conflicts"][0]
+    assert report["summary"]["status"] == "WARN"
+    assert conflict["category"] == "security_exchange_multiple_active_listings"
+    assert conflict["entity_ids"]["listing_ids"] == ["listing-1", "listing-2"]
+
+
+def test_listing_multiple_current_symbols_includes_listing_security_and_exchange():
+    conn = FakeConnection()
+    conn.results["listing_multiple_current_symbols"] = [
+        {
+            "listing_id": "listing-1",
+            "security_id": "security-1",
+            "exchange_id": "exchange-1",
+            "exchange_code": "NASDAQ",
+            "active_symbol_count": 2,
+            "ticker_norms": ["AAPL", "APPL"],
+        }
+    ]
+
+    report = generate_phase_2a_conflict_report(connection=conn, generated_at=GENERATED_AT)
+
+    conflict = report["conflicts"][0]
+    assert report["summary"]["status"] == "WARN"
+    assert conflict["category"] == "listing_multiple_current_symbols"
+    assert conflict["keys"] == {
+        "exchange_id": "exchange-1",
+        "exchange_code": "NASDAQ",
+        "ticker_norms": ["AAPL", "APPL"],
+    }
+    assert conflict["entity_ids"]["security_ids"] == ["security-1"]
+    assert conflict["entity_ids"]["listing_ids"] == ["listing-1"]
 
 
 def test_same_issuer_ticker_mapped_to_multiple_securities_warns():

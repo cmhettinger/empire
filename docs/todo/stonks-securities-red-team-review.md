@@ -32,14 +32,14 @@ Validation run:
    selectors then scope by joining `provider_observation.object_id` to the
    current `stored_object.run_id`, so a valid unchanged daily scrape can produce
    zero current-run observations and downstream stages may do nothing or
-   under-report.
+   under-report.  **DONE**
 
 2. **Listing identity does not handle ticker changes safely yet.**
    Listing upsert looks up active listings by `(exchange_id, ticker_norm)`, not
    by `(security_id, exchange_id)` plus symbol history. If the same security
    changes ticker on the same exchange, the code can create a second active
    listing and leave the old one active. The schema prevents duplicate active
-   exchange/ticker pairs, but not duplicate active security/exchange listings.
+   exchange/ticker pairs, but not duplicate active security/exchange listings.  **DONE**
 
 ## High Priority Issues
 
@@ -47,29 +47,28 @@ Validation run:
    Provisional securities are resolved by issuer plus ticker identifier. That is
    acceptable as bootstrap, but it can merge or split incorrectly
    once ticker reuse, share classes, preferreds, funds, and historical records
-   arrive.
+   arrive. **DONE**
 
 2. **Active symbol-history safety is incomplete.**
    `listing_symbol_history` allows multiple `valid_to IS NULL` rows per listing.
    Conflict reporting warns, but the schema/code do not prevent it. Before
    backfill, add a policy for closing prior active symbols or blocking ambiguous
-   changes.
+   changes.  **DONE**
 
-3. **Validation status hides warnings behind `SUCCESS`.**
-   Validation returns `FAIL` only for failures and otherwise `SUCCESS`, even when
-   warnings exist. For AI review/dashboarding, this should probably be
-   `PASS/WARN/FAIL`, matching conflict and summary semantics.
+3. **Validation status hides warnings behind legacy success semantics.**
+   Validation now follows `PASS/WARN/FAIL`, matching conflict and summary
+   semantics.  **DONE**
 
 ## Medium Priority Issues
 
 1. Daily summary marks zero observations/evidence as `PASS` because
    `_positive_or_zero` treats `0` as healthy. That can mask the unchanged-file
-   starvation case.
+   starvation case.  **DONE**
 2. Ticker normalization is only `upper()`. That is okay for SEC ingestion, but
    OHLCV/provider mapping will need explicit normalization/display rules for
    class separators and provider-specific symbols.
 3. Verify has no durable report artifact linked into daily summary; summary
-   hardcodes verify stage as `UNKNOWN`.
+   hardcodes verify stage as `UNKNOWN`.  **DONE**
 
 ## Low Priority / Nice To Have
 

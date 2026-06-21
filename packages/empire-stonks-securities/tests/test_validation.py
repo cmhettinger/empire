@@ -26,6 +26,7 @@ def test_validation_report_json_shape_is_stable():
     assert list(report.keys()) == [
         "report_name",
         "generated_at",
+        "healthy",
         "run_context",
         "summary",
         "source_coverage",
@@ -40,6 +41,7 @@ def test_validation_report_json_shape_is_stable():
         "failures",
     ]
     assert report["report_name"] == "stonks_securities_validation"
+    assert report["healthy"] is True
     assert report["run_context"]["dag_id"] == "test_dag"
     assert report["summary"]["observations_total"] == 20831
     assert report["summary"]["issuers_total"] == 8026
@@ -89,24 +91,58 @@ def test_validation_report_scopes_source_run_by_current_source_files():
     assert "so_scope.checksum_sha256 = po_scope.summary_json #>> '{source_file,sha256}'" in listings_sql
 
 
-def test_status_evaluation_success_or_fail():
-    assert evaluate_validation_status(warnings=[], failures=[]) == "SUCCESS"
-    assert evaluate_validation_status(warnings=[{"code": "warn", "count": 1}], failures=[]) == "SUCCESS"
+def test_status_evaluation_pass_warn_or_fail():
+    assert evaluate_validation_status(warnings=[], failures=[]) == "PASS"
+    assert evaluate_validation_status(warnings=[{"code": "warn", "count": 1}], failures=[]) == "WARN"
     assert evaluate_validation_status(warnings=[], failures=[{"code": "fail", "count": 1}]) == "FAIL"
 
 
-def test_validation_report_warns_for_missing_listing_evidence_and_unknown_exchange():
+def test_validation_report_warns_for_missing_or_unmapped_exchange_not_eligible_listing_gap():
     report = generate_phase_2a_validation_report(
         connection=FakeConnection(),
         generated_at=GENERATED_AT,
     )
 
-    assert report["summary"]["status"] == "SUCCESS"
+    assert report["summary"]["status"] == "WARN"
+    assert report["healthy"] is True
     warning_codes = {warning["code"] for warning in report["warnings"]}
     assert "ticker_exchange_observations_missing_exchange" in warning_codes
-    assert "ticker_exchange_observations_missing_listing_evidence" in warning_codes
+    assert "ticker_exchange_observations_eligible_missing_listing_evidence" not in warning_codes
     assert "raw_sec_exchange_values_unmapped" in warning_codes
+    assert (
+        report["evidence_coverage"]["ticker_exchange_observations_missing_listing_evidence"]
+        == 246
+    )
+    assert (
+        report["evidence_coverage"][
+            "ticker_exchange_observations_missing_listing_evidence_due_to_missing_exchange"
+        ]
+        == 219
+    )
+    assert (
+        report["evidence_coverage"][
+            "ticker_exchange_observations_missing_listing_evidence_due_to_unmapped_exchange"
+        ]
+        == 27
+    )
+    assert (
+        report["evidence_coverage"]["ticker_exchange_observations_eligible_missing_listing_evidence"]
+        == 0
+    )
     assert report["failures"] == []
+
+
+def test_validation_report_warns_for_eligible_listing_evidence_gap():
+    conn = FakeConnection()
+    conn.results["ticker_exchange_observations_eligible_missing_listing_evidence"] = 5
+
+    report = generate_phase_2a_validation_report(
+        connection=conn,
+        generated_at=GENERATED_AT,
+    )
+
+    warning_codes = {warning["code"] for warning in report["warnings"]}
+    assert "ticker_exchange_observations_eligible_missing_listing_evidence" in warning_codes
 
 
 def test_validation_report_fails_for_duplicate_cik_and_ticker_exchange_conflict():
@@ -119,9 +155,36 @@ def test_validation_report_fails_for_duplicate_cik_and_ticker_exchange_conflict(
     report = generate_phase_2a_validation_report(connection=conn, generated_at=GENERATED_AT)
 
     assert report["summary"]["status"] == "FAIL"
+    assert report["healthy"] is False
     failure_codes = {failure["code"] for failure in report["failures"]}
     assert "duplicate_cik_issuers" in failure_codes
     assert "same_exchange_ticker_multiple_securities" in failure_codes
+
+
+def test_validation_report_fails_for_duplicate_active_security_exchange_listings():
+    conn = FakeConnection()
+    conn.results["same_security_exchange_active_listing"] = [
+        {"security_id": "security-1", "exchange_id": "exchange-1", "listing_count": 2}
+    ]
+
+    report = generate_phase_2a_validation_report(connection=conn, generated_at=GENERATED_AT)
+
+    assert report["summary"]["status"] == "FAIL"
+    failure_codes = {failure["code"] for failure in report["failures"]}
+    assert "same_security_exchange_multiple_active_listings" in failure_codes
+
+
+def test_validation_report_fails_for_duplicate_active_listing_symbols():
+    conn = FakeConnection()
+    conn.results["same_listing_multiple_active_symbols"] = [
+        {"listing_id": "listing-1", "active_symbol_count": 2}
+    ]
+
+    report = generate_phase_2a_validation_report(connection=conn, generated_at=GENERATED_AT)
+
+    assert report["summary"]["status"] == "FAIL"
+    failure_codes = {failure["code"] for failure in report["failures"]}
+    assert "same_listing_multiple_active_symbols" in failure_codes
 
 
 def test_validation_report_to_json_is_pretty_and_deterministic():
@@ -234,6 +297,9 @@ DEFAULT_RESULTS = {
     "observations_with_cik_missing_issuer_evidence": 0,
     "observations_with_ticker_cik_missing_security_evidence": 0,
     "ticker_exchange_observations_missing_listing_evidence": 246,
+    "ticker_exchange_observations_missing_listing_evidence_due_to_missing_exchange": 219,
+    "ticker_exchange_observations_missing_listing_evidence_due_to_unmapped_exchange": 27,
+    "ticker_exchange_observations_eligible_missing_listing_evidence": 0,
     "active_listings_total": 10170,
     "listings_missing_security": 0,
     "listings_missing_exchange": 0,
@@ -259,6 +325,7 @@ DEFAULT_RESULTS = {
     "evidence_missing_target_rows": 0,
     "same_exchange_ticker_multi_security": [],
     "same_exchange_ticker_multi_issuer": [],
+    "same_security_exchange_active_listing": [],
     "same_cik_multiple_issuer_names": [
         {"cik": "0000036104", "issuer_name_count": 2},
     ],

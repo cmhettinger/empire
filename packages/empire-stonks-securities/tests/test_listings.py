@@ -3,7 +3,11 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
-from empire_stonks_securities.listings import SecListingObservation, upsert_sec_listings
+from empire_stonks_securities.listings import (
+    SecListingObservation,
+    select_sec_listing_observations,
+    upsert_sec_listings,
+)
 
 
 OBSERVED_AT = datetime(2026, 6, 18, 12, 30, tzinfo=UTC)
@@ -115,6 +119,90 @@ def test_rerun_is_idempotent_and_does_not_duplicate_symbol_history():
     assert len([row for row in conn.provider_evidence if row["listing_id"] is not None]) == 1
 
 
+def test_ticker_change_reuses_security_exchange_listing_and_rotates_current_symbol():
+    conn = FakeConnection()
+    issuer_id, security_id, _ = seed_prereqs(conn)
+    first = listing_observation(ticker_norm="AAPL", provider_date=date(2026, 6, 18))
+    second = listing_observation(
+        provider_observation_id=uuid4(),
+        ticker_norm="APPL",
+        provider_date=date(2026, 6, 19),
+    )
+    conn.add_issuer_evidence(first.provider_observation_id, issuer_id)
+    conn.add_security_evidence(first.provider_observation_id, issuer_id, security_id)
+    conn.add_issuer_evidence(second.provider_observation_id, issuer_id)
+    conn.add_security_evidence(second.provider_observation_id, issuer_id, security_id)
+
+    first_result = upsert_sec_listings(connection=conn, observations=[first])
+    second_result = upsert_sec_listings(connection=conn, observations=[second])
+
+    listing = next(iter(conn.listings.values()))
+    assert first_result.listings_created == 1
+    assert second_result.listings_created == 0
+    assert second_result.listings_updated == 1
+    assert len(conn.listings) == 1
+    assert listing["security_id"] == security_id
+    assert listing["ticker_norm"] == "APPL"
+    assert listing["current_ticker"] == "appl"
+    old_symbol = next(row for row in conn.symbol_history if row["ticker_norm"] == "AAPL")
+    new_symbol = next(row for row in conn.symbol_history if row["ticker_norm"] == "APPL")
+    assert old_symbol["valid_to"] == date(2026, 6, 19)
+    assert new_symbol["valid_to"] is None
+    assert len([row for row in conn.provider_evidence if row["listing_id"] is not None]) == 2
+
+
+def test_ticker_change_without_effective_date_does_not_create_second_active_symbol():
+    conn = FakeConnection()
+    issuer_id, security_id, _ = seed_prereqs(conn)
+    first = listing_observation(ticker_norm="AAPL", provider_date=date(2026, 6, 18))
+    second = listing_observation(
+        provider_observation_id=uuid4(),
+        ticker_norm="APPL",
+        provider_date=None,
+        observed_at=None,
+    )
+    conn.add_issuer_evidence(first.provider_observation_id, issuer_id)
+    conn.add_security_evidence(first.provider_observation_id, issuer_id, security_id)
+    conn.add_issuer_evidence(second.provider_observation_id, issuer_id)
+    conn.add_security_evidence(second.provider_observation_id, issuer_id, security_id)
+
+    upsert_sec_listings(connection=conn, observations=[first])
+    result = upsert_sec_listings(connection=conn, observations=[second])
+
+    active_symbols = [row for row in conn.symbol_history if row["valid_to"] is None]
+    assert result.symbol_history_inserted == 0
+    assert result.symbol_history_skipped == 1
+    assert len(active_symbols) == 1
+    assert active_symbols[0]["ticker_norm"] == "AAPL"
+
+
+def test_same_exchange_ticker_for_different_security_is_not_merged():
+    conn = FakeConnection()
+    first_issuer, first_security, _ = seed_prereqs(conn)
+    second_issuer = conn.add_issuer("0000000002")
+    second_security = conn.add_security(second_issuer, "AAPL")
+    first = listing_observation(cik=320193, cik_padded="0000320193", ticker_norm="AAPL")
+    second = listing_observation(
+        provider_observation_id=uuid4(),
+        cik=2,
+        cik_padded="0000000002",
+        ticker_norm="AAPL",
+    )
+    conn.add_issuer_evidence(first.provider_observation_id, first_issuer)
+    conn.add_security_evidence(first.provider_observation_id, first_issuer, first_security)
+    conn.add_issuer_evidence(second.provider_observation_id, second_issuer)
+    conn.add_security_evidence(second.provider_observation_id, second_issuer, second_security)
+
+    result = upsert_sec_listings(connection=conn, observations=[first, second])
+
+    assert result.listings_created == 2
+    assert len(conn.listings) == 2
+    assert {row["security_id"] for row in conn.listings.values()} == {
+        first_security,
+        second_security,
+    }
+
+
 def test_writes_evidence_link_from_observation_to_listing():
     conn = FakeConnection()
     issuer_id, security_id, _ = seed_prereqs(conn)
@@ -143,10 +231,29 @@ def test_does_not_create_issuer_or_security_rows_or_deactivate_listings():
     assert conn.deactivate_listing_writes == 0
 
 
+def test_listing_selector_uses_reconciliation_state_not_run_scope():
+    conn = FakeSelectConnection()
+
+    observations = select_sec_listing_observations(
+        connection=conn,
+        source_run_id=uuid4(),
+        limit=10,
+    )
+
+    assert observations == []
+    assert "core.stored_object" not in conn.executed_sql
+    assert "so.run_id" not in conn.executed_sql
+    assert "NOT EXISTS" in conn.executed_sql
+    assert "pe.listing_id IS NOT NULL" in conn.executed_sql
+    assert "pe.created_at >= po.created_at" in conn.executed_sql
+    assert conn.params == ("SEC_COMPANY_TICKERS_EXCHANGE", 10)
+
+
 def listing_observation(
     *,
     provider_observation_id: UUID | None = None,
     provider_date: date | None = date(2026, 6, 18),
+    observed_at: datetime | None = OBSERVED_AT,
     cik: int | None = 320193,
     cik_padded: str | None = "0000320193",
     ticker_norm: str | None = "AAPL",
@@ -166,7 +273,7 @@ def listing_observation(
         provider_observation_id=provider_observation_id or uuid4(),
         provider_code="SEC_COMPANY_TICKERS_EXCHANGE",
         provider_date=provider_date,
-        observed_at=OBSERVED_AT,
+        observed_at=observed_at,
         summary_json=summary_json,
     )
 
@@ -273,6 +380,33 @@ class FakeConnection:
         pass
 
 
+class FakeSelectConnection:
+    def __init__(self) -> None:
+        self.executed_sql = ""
+        self.params = None
+
+    def cursor(self):
+        return FakeSelectCursor(self)
+
+
+class FakeSelectCursor:
+    def __init__(self, connection: FakeSelectConnection) -> None:
+        self.connection = connection
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def execute(self, sql: str, params=None) -> None:
+        self.connection.executed_sql = " ".join(sql.split())
+        self.connection.params = params
+
+    def fetchall(self):
+        return []
+
+
 class FakeCursor:
     def __init__(self, connection: FakeConnection) -> None:
         self.connection = connection
@@ -289,7 +423,9 @@ class FakeCursor:
             self.connection.issuer_writes += 1
         if "INSERT INTO stonks.security" in normalized or "UPDATE stonks.security" in normalized:
             self.connection.security_writes += 1
-        if "SET status = 'INACTIVE'" in normalized or "valid_to =" in normalized and "UPDATE stonks.listing" in normalized:
+        if "UPDATE stonks.listing SET" in normalized and (
+            "SET status = 'INACTIVE'" in normalized or "valid_to =" in normalized
+        ):
             self.connection.deactivate_listing_writes += 1
 
         if "FROM stonks.provider_evidence" in normalized and "issuer_id IS NOT NULL" in normalized:
@@ -382,18 +518,28 @@ class FakeCursor:
             self.connection.last_result = (row["exchange_id"],) if row else None
             return
 
-        if "FROM stonks.listing WHERE exchange_id" in normalized:
-            exchange_id, ticker_norm = params
+        if "FROM stonks.listing WHERE security_id" in normalized:
+            security_id, exchange_id = params
             self.connection.last_result = next(
                 (
                     row
                     for row in self.connection.listings.values()
-                    if row["exchange_id"] == exchange_id
-                    and row["ticker_norm"] == ticker_norm
+                    if row["security_id"] == security_id
+                    and row["exchange_id"] == exchange_id
                     and row["valid_to"] is None
+                    and row["status"] == "ACTIVE"
                 ),
                 None,
             )
+            return
+
+        if "UPDATE stonks.listing_symbol_history SET valid_to" in normalized:
+            valid_to = params[0]
+            listing_id = params[3]
+            for row in self.connection.symbol_history:
+                if row["listing_id"] == listing_id and row["valid_to"] is None:
+                    row["valid_to"] = valid_to
+            self.connection.last_result = None
             return
 
         if "INSERT INTO stonks.listing_symbol_history" in normalized:
@@ -406,6 +552,7 @@ class FakeCursor:
                     "ticker_norm": params[2],
                     "ticker_display": params[3],
                     "valid_from": params[4],
+                    "valid_to": None,
                     "provider_code": params[5],
                     "confidence_code": params[6],
                 }
@@ -441,14 +588,27 @@ class FakeCursor:
             return
 
         if "FROM stonks.listing_symbol_history" in normalized:
-            listing_id, ticker_norm, valid_from = params
+            if "ticker_norm = %s" in normalized:
+                listing_id, ticker_norm = params
+                self.connection.last_result = next(
+                    (
+                        row
+                        for row in self.connection.symbol_history
+                        if row["listing_id"] == listing_id
+                        and row["ticker_norm"] == ticker_norm
+                        and row["valid_to"] is None
+                    ),
+                    None,
+                )
+                return
+
+            listing_id = params[0]
             self.connection.last_result = next(
                 (
                     row
                     for row in self.connection.symbol_history
                     if row["listing_id"] == listing_id
-                    and row["ticker_norm"] == ticker_norm
-                    and row["valid_from"] == valid_from
+                    and row["valid_to"] is None
                 ),
                 None,
             )

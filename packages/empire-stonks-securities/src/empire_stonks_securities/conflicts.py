@@ -13,6 +13,7 @@ from empire_core import ObjectStore
 from empire_core.db.postgres import row_to_dict
 
 from empire_stonks_securities.acquisition import DEFAULT_STORAGE_ROOT, default_storage_key
+from empire_stonks_securities.report_paths import run_report_object_key, run_report_path
 
 
 CONFLICT_REPORT_NAME = "stonks_securities_phase_2a_conflicts"
@@ -68,6 +69,7 @@ def generate_phase_2a_conflict_report(
     return {
         "report_name": CONFLICT_REPORT_NAME,
         "generated_at": generated_at.isoformat(),
+        "healthy": summary["status"] in {"PASS", "WARN"},
         "run_context": resolved_run_context.to_dict(),
         "summary": summary,
         "source_priority": SOURCE_PRIORITY,
@@ -292,14 +294,19 @@ def detect_conflict_candidates(*, cursor: Any, source_run_id: str | None = None)
             "listing_multiple_current_symbols",
             """
             SELECT
-              listing_id::text AS listing_id,
-              COUNT(DISTINCT ticker_norm) AS active_symbol_count,
-              ARRAY_AGG(DISTINCT ticker_norm ORDER BY ticker_norm) AS ticker_norms
-            FROM stonks.listing_symbol_history
-            WHERE valid_to IS NULL
-            GROUP BY listing_id
-            HAVING COUNT(DISTINCT ticker_norm) > 1
-            ORDER BY active_symbol_count DESC, listing_id
+              h.listing_id::text AS listing_id,
+              l.security_id::text AS security_id,
+              l.exchange_id::text AS exchange_id,
+              e.exchange_code,
+              COUNT(DISTINCT h.ticker_norm) AS active_symbol_count,
+              ARRAY_AGG(DISTINCT h.ticker_norm ORDER BY h.ticker_norm) AS ticker_norms
+            FROM stonks.listing_symbol_history h
+            JOIN stonks.listing l ON l.listing_id = h.listing_id
+            JOIN stonks.exchange e ON e.exchange_id = l.exchange_id
+            WHERE h.valid_to IS NULL
+            GROUP BY h.listing_id, l.security_id, l.exchange_id, e.exchange_code
+            HAVING COUNT(DISTINCT h.ticker_norm) > 1
+            ORDER BY active_symbol_count DESC, h.listing_id
             """,
         ),
         "cik_name_variants": _fetchall(
@@ -508,7 +515,7 @@ def build_conflicts(candidate_rows: dict[str, list[dict[str, Any]]]) -> list[dic
     for row in candidate_rows["active_listing_missing_current_symbol"]:
         add(_conflict("active_listing_missing_current_symbol", "WARN", f"Active listing {row['listing_id']} has no current symbol history.", {"exchange_code": row["exchange_code"]}, security_ids=[row["security_id"]], listing_ids=[row["listing_id"]], recommended_action="Review listing symbol history and add a current symbol if supported by evidence."))
     for row in candidate_rows["listing_multiple_current_symbols"]:
-        add(_conflict("listing_multiple_current_symbols", "WARN", f"Listing {row['listing_id']} has multiple current symbols.", {"ticker_norms": row.get("ticker_norms")}, listing_ids=[row["listing_id"]], recommended_action="Review symbol history validity windows."))
+        add(_conflict("listing_multiple_current_symbols", "WARN", f"Listing {row['listing_id']} has multiple current symbols.", {"exchange_id": row.get("exchange_id"), "exchange_code": row.get("exchange_code"), "ticker_norms": row.get("ticker_norms")}, security_ids=[row["security_id"]], listing_ids=[row["listing_id"]], recommended_action="Review symbol history validity windows and close all but one active symbol before backfill."))
     for row in candidate_rows["cik_name_variants"]:
         severity = "WARN" if int(row.get("material_name_count") or 0) > 1 else "INFO"
         add(_conflict("cik_name_variants", severity, f"CIK {row['cik']} appears with multiple company name variants.", {"cik": row["cik"], "company_names": row.get("company_names")}, recommended_action="Treat minor suffix/punctuation variants as informational; review material name differences."))
@@ -585,11 +592,18 @@ def default_conflict_report_path(
     *,
     temp_dir: str | Path | None = None,
     generated_at: datetime | None = None,
+    logical_date: Any = None,
 ) -> Path:
     generated_at = generated_at or datetime.now(UTC)
     root = Path(temp_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp"))
     filename = f"stonks_securities_conflicts_{generated_at:%Y%m%dT%H%M%SZ}.json"
-    return root / "stonks" / "securities" / "conflicts" / filename
+    return run_report_path(
+        root=root,
+        report_type="conflicts",
+        filename=filename,
+        logical_date=logical_date,
+        generated_at=generated_at,
+    )
 
 
 def write_conflict_report_to_object_store(
@@ -599,17 +613,15 @@ def write_conflict_report_to_object_store(
     storage_root: str = DEFAULT_STORAGE_ROOT,
     storage_key: str | None = None,
     generated_at: datetime | None = None,
+    logical_date: Any = None,
 ):
     generated_at = generated_at or datetime.now(UTC)
     resolved_storage_key = (storage_key or default_storage_key()).strip("/")
-    object_key = "/".join(
-        [
-            resolved_storage_key,
-            "conflicts",
-            f"{generated_at:%Y}",
-            f"{generated_at:%m}",
-            f"{generated_at:%d}",
-        ]
+    object_key = run_report_object_key(
+        storage_key=resolved_storage_key,
+        report_type="conflicts",
+        logical_date=logical_date or report.get("run_context", {}).get("logical_date"),
+        generated_at=generated_at,
     )
     filename = f"stonks_securities_conflicts_{generated_at:%Y%m%dT%H%M%SZ}.json"
     return object_store.put_bytes(

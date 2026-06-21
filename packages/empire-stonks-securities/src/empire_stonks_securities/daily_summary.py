@@ -15,7 +15,9 @@ from empire_core.db.postgres import row_to_dict
 
 from empire_stonks_securities.acquisition import DEFAULT_STORAGE_ROOT, default_storage_key
 from empire_stonks_securities.conflicts import CONFLICT_REPORT_OBJECT_KIND
+from empire_stonks_securities.report_paths import run_report_object_key, run_report_path
 from empire_stonks_securities.validation import REPORT_OBJECT_KIND as VALIDATION_REPORT_OBJECT_KIND
+from empire_stonks_securities.verification import VERIFY_REPORT_OBJECT_KIND
 
 
 DAILY_SUMMARY_REPORT_NAME = "stonks_securities_daily_summary"
@@ -50,6 +52,7 @@ def generate_daily_refresh_summary_report(
     object_store: ObjectStore | None = None,
     run_context: DailySummaryRunContext | None = None,
     source_run_id: str | UUID | None = None,
+    verify_report_object_id: str | UUID | None = None,
     validation_report_object_id: str | UUID | None = None,
     conflict_report_object_id: str | UUID | None = None,
     generated_at: datetime | None = None,
@@ -73,12 +76,24 @@ def generate_daily_refresh_summary_report(
             object_kind=VALIDATION_REPORT_OBJECT_KIND,
             object_id=validation_report_object_id,
             generated_at=generated_at,
+            report_type="validation",
+            logical_date=resolved_run_context.logical_date,
         )
         conflict_object = _linked_report_object(
             cursor,
             object_kind=CONFLICT_REPORT_OBJECT_KIND,
             object_id=conflict_report_object_id,
             generated_at=generated_at,
+            report_type="conflicts",
+            logical_date=resolved_run_context.logical_date,
+        )
+        verify_object = _linked_report_object(
+            cursor,
+            object_kind=VERIFY_REPORT_OBJECT_KIND,
+            object_id=verify_report_object_id,
+            generated_at=generated_at,
+            report_type="verify",
+            logical_date=resolved_run_context.logical_date,
         )
         daily_entity_deltas = _daily_entity_deltas(
             cursor,
@@ -98,11 +113,21 @@ def generate_daily_refresh_summary_report(
     )
     validation_report = summarize_report_object(validation_object, object_store=object_store)
     conflict_report = summarize_report_object(conflict_object, object_store=object_store)
-    pipeline_stage_health = build_pipeline_stage_health(
+    verify_report = summarize_report_object(verify_object, object_store=object_store)
+    zero_delta_analysis = build_zero_delta_analysis(
         input_freshness=input_freshness,
+        snapshot_diff=snapshot_diff,
         daily_entity_deltas=daily_entity_deltas,
         validation_report=validation_report,
         conflict_report=conflict_report,
+    )
+    pipeline_stage_health = build_pipeline_stage_health(
+        input_freshness=input_freshness,
+        daily_entity_deltas=daily_entity_deltas,
+        zero_delta_analysis=zero_delta_analysis,
+        validation_report=validation_report,
+        conflict_report=conflict_report,
+        verify_report=verify_report,
     )
     safety_guards = {
         "listings_closed_by_daily_refresh": 0,
@@ -115,9 +140,11 @@ def generate_daily_refresh_summary_report(
     }
     warnings, failures = evaluate_daily_summary_findings(
         input_freshness=input_freshness,
+        zero_delta_analysis=zero_delta_analysis,
         pipeline_stage_health=pipeline_stage_health,
         validation_report=validation_report,
         conflict_report=conflict_report,
+        verify_report=verify_report,
     )
     summary = {
         "status": evaluate_daily_summary_status(warnings=warnings, failures=failures),
@@ -135,19 +162,33 @@ def generate_daily_refresh_summary_report(
         "listings_updated": daily_entity_deltas["listings_updated"],
         "validation_status": validation_report["status"],
         "conflict_status": conflict_report["status"],
+        "verify_status": verify_report["status"],
     }
     return {
         "report_name": DAILY_SUMMARY_REPORT_NAME,
         "generated_at": generated_at.isoformat(),
+        "healthy": summary["status"] in {"PASS", "WARN"},
         "run_context": resolved_run_context.to_dict(),
         "summary": summary,
         "input_freshness": input_freshness,
         "snapshot_diff": snapshot_diff,
         "pipeline_stage_health": pipeline_stage_health,
         "daily_entity_deltas": daily_entity_deltas,
+        "zero_observations_reason": zero_delta_analysis["zero_observations_reason"],
+        "zero_evidence_reason": zero_delta_analysis["zero_evidence_reason"],
+        "unchanged_sources": zero_delta_analysis["unchanged_sources"],
+        "changed_sources": zero_delta_analysis["changed_sources"],
+        "canonical_observations_available": zero_delta_analysis[
+            "canonical_observations_available"
+        ],
+        "unreconciled_observations_count": zero_delta_analysis[
+            "unreconciled_observations_count"
+        ],
+        "stage_starvation_detected": zero_delta_analysis["stage_starvation_detected"],
         "safety_guards": safety_guards,
         "validation_report": validation_report,
         "conflict_report": conflict_report,
+        "verify_report": verify_report,
         "warnings": warnings,
         "failures": failures,
     }
@@ -256,6 +297,7 @@ def summarize_report_object(
         return {
             "present": False,
             "status": "UNKNOWN",
+            "healthy": None,
             "path": None,
             "object_id": None,
             "warnings_total": None,
@@ -263,9 +305,11 @@ def summarize_report_object(
             "conflicts_total": None,
         }
     summary = _load_report_summary(stored_object, object_store=object_store)
+    status = _normalize_report_status(summary.get("status"))
     return {
         "present": True,
-        "status": _normalize_report_status(summary.get("status")),
+        "status": status,
+        "healthy": summary.get("healthy", status in {"PASS", "WARN"}),
         "path": f"{stored_object['object_key']}/{stored_object['filename']}",
         "object_id": stored_object["object_id"],
         "warnings_total": summary.get("warnings_total"),
@@ -279,31 +323,142 @@ def build_pipeline_stage_health(
     *,
     input_freshness: dict[str, Any],
     daily_entity_deltas: dict[str, Any],
+    zero_delta_analysis: dict[str, Any],
     validation_report: dict[str, Any],
     conflict_report: dict[str, Any],
+    verify_report: dict[str, Any],
 ) -> dict[str, Any]:
     observations_created = daily_entity_deltas["observations_created"]
     issuer_evidence = daily_entity_deltas["issuer_evidence_inserted"]
     security_evidence = daily_entity_deltas["security_evidence_inserted"]
     listing_evidence = daily_entity_deltas["listing_evidence_inserted"]
+    zero_evidence_reason = zero_delta_analysis["zero_evidence_reason"]
     return {
         "scrape": _stage("PASS" if input_freshness["inputs_missing"] == 0 else "FAIL"),
-        "verify": _stage("UNKNOWN", "No durable verify report is currently linked."),
-        "observations": _stage("PASS" if _positive_or_zero(observations_created) else "UNKNOWN"),
-        "issuers": _stage("PASS" if _positive_or_zero(issuer_evidence) else "UNKNOWN"),
-        "securities": _stage("PASS" if _positive_or_zero(security_evidence) else "UNKNOWN"),
-        "listings": _stage("PASS" if _positive_or_zero(listing_evidence) else "UNKNOWN"),
+        "verify": _stage(
+            verify_report["status"] if verify_report["present"] else "UNKNOWN",
+            None if verify_report["present"] else "No durable verify report is currently linked.",
+        ),
+        "observations": _stage(
+            _zero_count_stage_status(
+                count=observations_created,
+                safe_zero_reasons={
+                    "unchanged_sources_no_new_observations",
+                    "canonical_observations_available",
+                },
+                reason=zero_delta_analysis["zero_observations_reason"],
+            )
+        ),
+        "issuers": _stage(
+            _zero_count_stage_status(
+                count=issuer_evidence,
+                safe_zero_reasons={"all_eligible_observations_reconciled"},
+                reason=zero_evidence_reason["issuers"],
+            )
+        ),
+        "securities": _stage(
+            _zero_count_stage_status(
+                count=security_evidence,
+                safe_zero_reasons={"all_eligible_observations_reconciled"},
+                reason=zero_evidence_reason["securities"],
+            )
+        ),
+        "listings": _stage(
+            _zero_count_stage_status(
+                count=listing_evidence,
+                safe_zero_reasons={"all_eligible_observations_reconciled"},
+                reason=zero_evidence_reason["listings"],
+            )
+        ),
         "validation": _stage(validation_report["status"] if validation_report["present"] else "UNKNOWN"),
         "conflicts": _stage(conflict_report["status"] if conflict_report["present"] else "UNKNOWN"),
+    }
+
+
+def build_zero_delta_analysis(
+    *,
+    input_freshness: dict[str, Any],
+    snapshot_diff: dict[str, Any],
+    daily_entity_deltas: dict[str, Any],
+    validation_report: dict[str, Any],
+    conflict_report: dict[str, Any],
+) -> dict[str, Any]:
+    changed_sources = [
+        source_code
+        for source_code, source in snapshot_diff["sources"].items()
+        if source["changed"] is True
+    ]
+    unchanged_sources = [
+        source_code
+        for source_code, source in snapshot_diff["sources"].items()
+        if source["unchanged"] is True
+    ]
+    observations_created = int(daily_entity_deltas["observations_created"] or 0)
+    canonical_observations_available = observations_created > 0
+    unreconciled_by_stage = {
+        "issuers": int(daily_entity_deltas["unreconciled_issuer_observations"] or 0),
+        "securities": int(daily_entity_deltas["unreconciled_security_observations"] or 0),
+        "listings": int(daily_entity_deltas["unreconciled_listing_observations"] or 0),
+    }
+    unreconciled_observations_count = sum(unreconciled_by_stage.values())
+    all_inputs_unchanged = len(unchanged_sources) == len(REQUIRED_DAILY_SOURCES)
+    reports_usable = (
+        validation_report["status"] in {"PASS", "WARN"}
+        and conflict_report["status"] in {"PASS", "WARN"}
+    )
+    zero_observations_reason = _zero_observations_reason(
+        observations_created=observations_created,
+        input_freshness=input_freshness,
+        changed_sources=changed_sources,
+        all_inputs_unchanged=all_inputs_unchanged,
+        reports_usable=reports_usable,
+    )
+    zero_evidence_reason = {
+        "issuers": _zero_evidence_reason(
+            count=daily_entity_deltas["issuer_evidence_inserted"],
+            unreconciled_count=unreconciled_by_stage["issuers"],
+            canonical_observations_available=canonical_observations_available,
+        ),
+        "securities": _zero_evidence_reason(
+            count=daily_entity_deltas["security_evidence_inserted"],
+            unreconciled_count=unreconciled_by_stage["securities"],
+            canonical_observations_available=canonical_observations_available,
+        ),
+        "listings": _zero_evidence_reason(
+            count=daily_entity_deltas["listing_evidence_inserted"],
+            unreconciled_count=unreconciled_by_stage["listings"],
+            canonical_observations_available=canonical_observations_available,
+        ),
+    }
+    stage_starvation_detected = (
+        zero_observations_reason
+        in {
+            "sources_changed_but_no_observations",
+            "no_canonical_observations_for_unchanged_sources",
+            "required_source_missing",
+        }
+        or any(reason == "unreconciled_observations_exist" for reason in zero_evidence_reason.values())
+    )
+    return {
+        "zero_observations_reason": zero_observations_reason,
+        "zero_evidence_reason": zero_evidence_reason,
+        "unchanged_sources": unchanged_sources,
+        "changed_sources": changed_sources,
+        "canonical_observations_available": canonical_observations_available,
+        "unreconciled_observations_count": unreconciled_observations_count,
+        "unreconciled_observations_by_stage": unreconciled_by_stage,
+        "stage_starvation_detected": stage_starvation_detected,
     }
 
 
 def evaluate_daily_summary_findings(
     *,
     input_freshness: dict[str, Any],
+    zero_delta_analysis: dict[str, Any],
     pipeline_stage_health: dict[str, Any],
     validation_report: dict[str, Any],
     conflict_report: dict[str, Any],
+    verify_report: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     warnings: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -342,16 +497,62 @@ def evaluate_daily_summary_findings(
                 }
             )
 
+    zero_observations_reason = zero_delta_analysis["zero_observations_reason"]
+    if zero_observations_reason == "sources_changed_but_no_observations":
+        warnings.append(
+            {
+                "code": "changed_sources_zero_observations",
+                "changed_sources": zero_delta_analysis["changed_sources"],
+                "message": (
+                    "One or more required SEC source files changed, but no canonical "
+                    "observations were available for the current source identity."
+                ),
+            }
+        )
+    elif zero_observations_reason == "no_canonical_observations_for_unchanged_sources":
+        warnings.append(
+            {
+                "code": "unchanged_sources_without_canonical_observations",
+                "message": (
+                    "Required SEC source files were unchanged, but no canonical observations "
+                    "were available to prove the run was safely already reconciled."
+                ),
+            }
+        )
+
+    for stage_name, reason in zero_delta_analysis["zero_evidence_reason"].items():
+        if reason == "unreconciled_observations_exist":
+            warnings.append(
+                {
+                    "code": "zero_evidence_with_unreconciled_observations",
+                    "stage": stage_name,
+                    "unreconciled_observations": zero_delta_analysis[
+                        "unreconciled_observations_by_stage"
+                    ][stage_name],
+                    "message": (
+                        f"No {stage_name} evidence was available for the current source "
+                        "identity while unreconciled eligible observations remain."
+                    ),
+                }
+            )
+
     for report_name, linked_report in (
+        ("verify", verify_report),
         ("validation", validation_report),
         ("conflict", conflict_report),
     ):
         status = linked_report["status"]
         if not linked_report["present"]:
+            finding = {
+                "code": f"{report_name}_report_missing",
+                "message": f"The daily summary could not find a {report_name} report artifact.",
+            }
+            if report_name == "verify":
+                warnings.append(finding)
+                continue
             failures.append(
                 {
-                    "code": f"{report_name}_report_missing",
-                    "message": f"The daily summary could not find a {report_name} report artifact.",
+                    **finding,
                 }
             )
         elif status == "FAIL":
@@ -447,11 +648,18 @@ def default_daily_summary_report_path(
     *,
     temp_dir: str | Path | None = None,
     generated_at: datetime | None = None,
+    logical_date: Any = None,
 ) -> Path:
     generated_at = generated_at or datetime.now(UTC)
     root = Path(temp_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp"))
     filename = f"stonks_securities_daily_summary_{generated_at:%Y%m%dT%H%M%SZ}.json"
-    return root / "stonks" / "securities" / "summary" / filename
+    return run_report_path(
+        root=root,
+        report_type="summary",
+        filename=filename,
+        logical_date=logical_date,
+        generated_at=generated_at,
+    )
 
 
 def write_daily_summary_report_to_object_store(
@@ -461,17 +669,15 @@ def write_daily_summary_report_to_object_store(
     storage_root: str = DEFAULT_STORAGE_ROOT,
     storage_key: str | None = None,
     generated_at: datetime | None = None,
+    logical_date: Any = None,
 ):
     generated_at = generated_at or datetime.now(UTC)
     resolved_storage_key = (storage_key or default_storage_key()).strip("/")
-    object_key = "/".join(
-        [
-            resolved_storage_key,
-            "summary",
-            f"{generated_at:%Y}",
-            f"{generated_at:%m}",
-            f"{generated_at:%d}",
-        ]
+    object_key = run_report_object_key(
+        storage_key=resolved_storage_key,
+        report_type="summary",
+        logical_date=logical_date or report.get("run_context", {}).get("logical_date"),
+        generated_at=generated_at,
     )
     filename = f"stonks_securities_daily_summary_{generated_at:%Y%m%dT%H%M%SZ}.json"
     return object_store.put_bytes(
@@ -584,11 +790,41 @@ def _latest_report_object(
     *,
     object_kind: str,
     generated_at: datetime,
+    report_type: str,
+    logical_date: Any = None,
 ) -> dict[str, Any] | None:
-    day_key = f"stonks/securities/%/{generated_at:%Y}/{generated_at:%m}/{generated_at:%d}"
+    new_key = run_report_object_key(
+        storage_key=default_storage_key(),
+        report_type=report_type,
+        logical_date=logical_date,
+        generated_at=generated_at,
+    )
     rows = _fetchall(
         cursor,
         f"daily_summary_latest_{object_kind}",
+        """
+        SELECT
+          so.object_id::text AS object_id,
+          so.object_key,
+          so.filename,
+          so.object_kind,
+          so.metadata ->> 'generated_at' AS report_generated_at,
+          so.created_at
+        FROM core.stored_object so
+        WHERE so.object_kind = %s
+          AND so.deleted_at IS NULL
+          AND so.object_key = %s
+        ORDER BY so.created_at DESC
+        LIMIT 1
+        """,
+        (object_kind, new_key),
+    )
+    if rows:
+        return rows[0]
+    old_day_key = f"stonks/securities/%/{generated_at:%Y}/{generated_at:%m}/{generated_at:%d}"
+    rows = _fetchall(
+        cursor,
+        f"daily_summary_latest_{object_kind}_legacy",
         """
         SELECT
           so.object_id::text AS object_id,
@@ -604,7 +840,7 @@ def _latest_report_object(
         ORDER BY so.created_at DESC
         LIMIT 1
         """,
-        (object_kind, day_key),
+        (object_kind, old_day_key),
     )
     return rows[0] if rows else None
 
@@ -615,12 +851,16 @@ def _linked_report_object(
     object_kind: str,
     object_id: str | UUID | None,
     generated_at: datetime,
+    report_type: str,
+    logical_date: Any = None,
 ) -> dict[str, Any] | None:
     if object_id is None:
         return _latest_report_object(
             cursor,
             object_kind=object_kind,
             generated_at=generated_at,
+            report_type=report_type,
+            logical_date=logical_date,
         )
     rows = _fetchall(
         cursor,
@@ -663,6 +903,41 @@ def _daily_entity_deltas(
         "issuer_evidence_inserted": _evidence_count(cursor, obs_from, obs_params, "issuer_id"),
         "security_evidence_inserted": _evidence_count(cursor, obs_from, obs_params, "security_id"),
         "listing_evidence_inserted": _evidence_count(cursor, obs_from, obs_params, "listing_id"),
+        "unreconciled_issuer_observations": _unreconciled_evidence_count(
+            cursor,
+            obs_from,
+            obs_params,
+            "issuer_id",
+            """
+            COALESCE(
+                NULLIF(TRIM(po.summary_json ->> 'cik_padded'), ''),
+                NULLIF(TRIM(po.summary_json ->> 'cik'), '')
+            ) IS NOT NULL
+            """,
+        ),
+        "unreconciled_security_observations": _unreconciled_evidence_count(
+            cursor,
+            obs_from,
+            obs_params,
+            "security_id",
+            """
+            COALESCE(
+                NULLIF(TRIM(po.summary_json ->> 'cik_padded'), ''),
+                NULLIF(TRIM(po.summary_json ->> 'cik'), '')
+            ) IS NOT NULL
+              AND COALESCE(
+                NULLIF(TRIM(po.summary_json ->> 'ticker_norm'), ''),
+                NULLIF(TRIM(po.summary_json ->> 'ticker'), '')
+              ) IS NOT NULL
+            """,
+        ),
+        "unreconciled_listing_observations": _unreconciled_evidence_count(
+            cursor,
+            obs_from,
+            obs_params,
+            "listing_id",
+            "po.provider_code = 'SEC_COMPANY_TICKERS_EXCHANGE'",
+        ),
         "issuers_created": _created_count(cursor, "issuer", day_start, day_end),
         "issuers_updated": _updated_count(cursor, "issuer", day_start, day_end),
         "securities_created": _created_count(cursor, "security", day_start, day_end),
@@ -682,6 +957,36 @@ def _evidence_count(cursor: Any, obs_from: str, obs_params: tuple[Any, ...], col
         JOIN {obs_from}
           ON po.provider_observation_id = pe.provider_observation_id
         WHERE pe.{column} IS NOT NULL
+        """,
+        obs_params,
+    )
+
+
+def _unreconciled_evidence_count(
+    cursor: Any,
+    obs_from: str,
+    obs_params: tuple[Any, ...],
+    column: str,
+    eligibility_sql: str,
+) -> int:
+    metric_name = {
+        "issuer_id": "daily_summary_unreconciled_issuer_observations",
+        "security_id": "daily_summary_unreconciled_security_observations",
+        "listing_id": "daily_summary_unreconciled_listing_observations",
+    }[column]
+    return _scalar(
+        cursor,
+        metric_name,
+        f"""
+        SELECT COUNT(*)
+        FROM {obs_from}
+        WHERE {eligibility_sql}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM stonks.provider_evidence pe
+            WHERE pe.provider_observation_id = po.provider_observation_id
+              AND pe.{column} IS NOT NULL
+          )
         """,
         obs_params,
     )
@@ -757,8 +1062,6 @@ def _load_report_summary(
 
 
 def _normalize_report_status(value: Any) -> str:
-    if value == "SUCCESS":
-        return "PASS"
     if value in {"PASS", "WARN", "FAIL"}:
         return str(value)
     return "UNKNOWN"
@@ -771,8 +1074,70 @@ def _stage(status: str, note: str | None = None) -> dict[str, Any]:
     return result
 
 
-def _positive_or_zero(value: Any) -> bool:
-    return value is not None and int(value) >= 0
+def _zero_count_stage_status(
+    *,
+    count: Any,
+    safe_zero_reasons: set[str],
+    reason: str,
+) -> str:
+    if count is None:
+        return "UNKNOWN"
+    if int(count) > 0:
+        return "PASS"
+    if reason in safe_zero_reasons:
+        return "PASS"
+    if reason in {
+        "required_source_missing",
+        "validation_or_conflict_failed",
+    }:
+        return "FAIL"
+    if reason in {
+        "sources_changed_but_no_observations",
+        "no_canonical_observations_for_unchanged_sources",
+        "unreconciled_observations_exist",
+        "no_canonical_observations_available",
+        "insufficient_context",
+    }:
+        return "WARN"
+    return "UNKNOWN"
+
+
+def _zero_observations_reason(
+    *,
+    observations_created: int,
+    input_freshness: dict[str, Any],
+    changed_sources: list[str],
+    all_inputs_unchanged: bool,
+    reports_usable: bool,
+) -> str:
+    if observations_created > 0:
+        return "canonical_observations_available"
+    if input_freshness["inputs_missing"] > 0:
+        return "required_source_missing"
+    if changed_sources:
+        return "sources_changed_but_no_observations"
+    if all_inputs_unchanged and reports_usable:
+        return "no_canonical_observations_for_unchanged_sources"
+    if not reports_usable:
+        return "validation_or_conflict_failed"
+    return "insufficient_context"
+
+
+def _zero_evidence_reason(
+    *,
+    count: Any,
+    unreconciled_count: int,
+    canonical_observations_available: bool,
+) -> str:
+    if count is None:
+        return "insufficient_context"
+    if int(count) > 0:
+        return "evidence_available"
+    if unreconciled_count > 0:
+        return "unreconciled_observations_exist"
+    if canonical_observations_available:
+        return "all_eligible_observations_reconciled"
+    return "no_canonical_observations_available"
 
 
 def _size_delta(current_size: Any, previous_size: Any) -> int | None:

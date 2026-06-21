@@ -33,11 +33,12 @@ def stonks_securities_daily_conflicts():
         conf = dag_run.conf or {}
         input_run_id = _input_run_id_from_conf(conf)
         generated_at = datetime.now(UTC)
+        logical_date = str(context.get("logical_date"))
         run_context = ConflictRunContext(
             dag_id=dag_run.dag_id,
             run_id=dag_run.run_id,
             source_run_id=str(input_run_id),
-            logical_date=str(context.get("logical_date")),
+            logical_date=logical_date,
             environment="airflow",
         )
 
@@ -53,6 +54,7 @@ def stonks_securities_daily_conflicts():
                 report=report,
                 object_store=object_store,
                 generated_at=generated_at,
+                logical_date=logical_date,
             )
 
         summary = report["summary"]
@@ -80,6 +82,7 @@ def stonks_securities_daily_conflicts():
         trigger_dag_id="stonks_securities_daily_refresh_summary",
         conf={
             "input_run_id": "{{ dag_run.conf['input_run_id'] }}",
+            "verify_report_object_id": "{{ dag_run.conf.get('verify_report_object_id') }}",
             "validation_report_object_id": "{{ dag_run.conf.get('validation_report_object_id') }}",
             "conflict_report_object_id": (
                 "{{ ti.xcom_pull(task_ids='generate_conflict_report')['object_id'] }}"

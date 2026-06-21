@@ -110,6 +110,7 @@ from empire_stonks_securities.runner import (
     run_stonks_security_daily_to_object_store,
     run_stonks_securities_daily_to_object_store,
 )
+from empire_stonks_securities.report_paths import run_report_object_key, run_report_path
 from empire_stonks_securities.securities import (
     PROVISIONAL_INSTRUMENT_TYPE,
     SECURITY_EVIDENCE_ROLE,
@@ -137,10 +138,19 @@ from empire_stonks_securities.validation import (
     write_validation_report_to_object_store,
 )
 from empire_stonks_securities.verification import (
+    VERIFY_REPORT_LOGICAL_NAME,
+    VERIFY_REPORT_NAME,
+    VERIFY_REPORT_OBJECT_KIND,
     SecSourceVerifySummary,
     StonksSecuritiesDailyVerifyResult,
+    VerifyRunContext,
+    default_verify_report_path,
+    generate_verify_report,
+    verify_report_to_json,
     verify_sec_source,
     verify_stonks_securities_daily_sources,
+    write_verify_report_to_file,
+    write_verify_report_to_object_store,
 )
 
 __all__ = [
@@ -203,6 +213,9 @@ __all__ = [
     "StorageConfig",
     "TICKER_IDENTIFIER_TYPE",
     "ValidationRunContext",
+    "VERIFY_REPORT_LOGICAL_NAME",
+    "VERIFY_REPORT_NAME",
+    "VERIFY_REPORT_OBJECT_KIND",
     "SecSourceBadRecord",
     "SecSourceFileMetadata",
     "SecSourceParseError",
@@ -210,6 +223,7 @@ __all__ = [
     "SecSourceVerifySummary",
     "ValidationConfig",
     "StonksSecuritiesDailyVerifyResult",
+    "VerifyRunContext",
     "build_configured_source_targets",
     "build_quarterly_master_index_targets",
     "build_sec_observation",
@@ -219,6 +233,7 @@ __all__ = [
     "default_daily_summary_report_path",
     "compute_row_hash",
     "default_validation_report_path",
+    "default_verify_report_path",
     "evaluate_validation_findings",
     "evaluate_conflict_status",
     "evaluate_daily_summary_status",
@@ -227,6 +242,7 @@ __all__ = [
     "generate_phase_2a_validation_report",
     "generate_phase_2a_conflict_report",
     "generate_daily_refresh_summary_report",
+    "generate_verify_report",
     "get_sec_source_parser",
     "load_config_by_logical_name",
     "load_config_from_object_id",
@@ -235,6 +251,8 @@ __all__ = [
     "parse_sec_source_records_run",
     "parse_sec_source_run",
     "run_stonks_security_daily_to_object_store",
+    "run_report_object_key",
+    "run_report_path",
     "run_stonks_securities_daily_observation_writer",
     "run_stonks_securities_daily_to_object_store",
     "select_sec_issuer_observations",
@@ -248,6 +266,7 @@ __all__ = [
     "upsert_sec_securities",
     "upsert_sec_securities_from_provider_observations",
     "validation_report_to_json",
+    "verify_report_to_json",
     "verify_sec_source",
     "verify_stonks_securities_daily_sources",
     "write_validation_report_to_console",
@@ -259,5 +278,7 @@ __all__ = [
     "write_daily_summary_report_to_object_store",
     "write_validation_report_to_file",
     "write_validation_report_to_object_store",
+    "write_verify_report_to_file",
+    "write_verify_report_to_object_store",
     "write_sec_observations",
 ]

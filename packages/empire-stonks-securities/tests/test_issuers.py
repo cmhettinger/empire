@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from empire_stonks_securities.issuers import (
     SecIssuerObservation,
+    select_sec_issuer_observations,
     upsert_sec_issuers,
 )
 
@@ -179,6 +180,26 @@ def test_missing_company_name_preserves_existing_issuer_name():
     assert issuer["current_name"] == "Apple Inc."
 
 
+def test_issuer_selector_uses_reconciliation_state_not_run_scope():
+    conn = FakeSelectConnection()
+
+    observations = select_sec_issuer_observations(
+        connection=conn,
+        source_run_id=uuid4(),
+        limit=10,
+    )
+
+    assert observations == []
+    assert "core.stored_object" not in conn.executed_sql
+    assert "so.run_id" not in conn.executed_sql
+    assert "NOT EXISTS" in conn.executed_sql
+    assert "pe.issuer_id IS NOT NULL" in conn.executed_sql
+    assert "pe.security_id IS NULL" in conn.executed_sql
+    assert "pe.created_at >= po.created_at" in conn.executed_sql
+    assert set(conn.params[0]) == {"SEC_COMPANY_TICKERS", "SEC_COMPANY_TICKERS_EXCHANGE"}
+    assert conn.params[1] == 10
+
+
 def issuer_observation(
     *,
     provider_observation_id: UUID | None = None,
@@ -224,6 +245,33 @@ class FakeConnection:
 
     def commit(self) -> None:
         self.commit_count += 1
+
+
+class FakeSelectConnection:
+    def __init__(self) -> None:
+        self.executed_sql = ""
+        self.params = None
+
+    def cursor(self):
+        return FakeSelectCursor(self)
+
+
+class FakeSelectCursor:
+    def __init__(self, connection: FakeSelectConnection) -> None:
+        self.connection = connection
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def execute(self, sql: str, params=None) -> None:
+        self.connection.executed_sql = " ".join(sql.split())
+        self.connection.params = params
+
+    def fetchall(self):
+        return []
 
 
 class FakeCursor:

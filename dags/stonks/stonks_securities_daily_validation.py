@@ -33,11 +33,12 @@ def stonks_securities_daily_validation():
         conf = dag_run.conf or {}
         input_run_id = _input_run_id_from_conf(conf)
         generated_at = datetime.now(UTC)
+        logical_date = str(context.get("logical_date"))
         run_context = ValidationRunContext(
             dag_id=dag_run.dag_id,
             run_id=dag_run.run_id,
             source_run_id=str(input_run_id),
-            logical_date=str(context.get("logical_date")),
+            logical_date=logical_date,
             environment="airflow",
         )
 
@@ -53,13 +54,15 @@ def stonks_securities_daily_validation():
                 report=report,
                 object_store=object_store,
                 generated_at=generated_at,
+                logical_date=logical_date,
             )
 
         summary = report["summary"]
         log.info(
-            "Stonks securities validation status=%s observations=%s issuers=%s "
+            "Stonks securities validation status=%s healthy=%s observations=%s issuers=%s "
             "securities=%s listings=%s warnings=%s failures=%s path=%s object_id=%s",
             summary["status"],
+            report["healthy"],
             summary["observations_total"],
             summary["issuers_total"],
             summary["securities_total"],
@@ -82,6 +85,7 @@ def stonks_securities_daily_validation():
         trigger_dag_id="stonks_securities_daily_conflicts",
         conf={
             "input_run_id": "{{ dag_run.conf['input_run_id'] }}",
+            "verify_report_object_id": "{{ dag_run.conf.get('verify_report_object_id') }}",
             "validation_report_object_id": (
                 "{{ ti.xcom_pull(task_ids='generate_validation_report')['object_id'] }}"
             ),
