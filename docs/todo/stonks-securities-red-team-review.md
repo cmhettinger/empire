@@ -66,7 +66,7 @@ Validation run:
    starvation case.  **DONE**
 2. Ticker normalization is only `upper()`. That is okay for SEC ingestion, but
    OHLCV/provider mapping will need explicit normalization/display rules for
-   class separators and provider-specific symbols.
+   class separators and provider-specific symbols.  **DONE**
 3. Verify has no durable report artifact linked into daily summary; summary
    hardcodes verify stage as `UNKNOWN`.  **DONE**
 
@@ -76,8 +76,28 @@ Validation run:
    observations can be deduped by content while runs still retain explicit
    membership.
 2. Make DAG trigger conf builders less stringly typed over time. Current wrappers
-   are thin and acceptable, just brittle.
-3. Add tests for unchanged-source reruns and ticker-change listing behavior.
+   are thin and acceptable, just brittle.  **DONE**
+3. Add tests for unchanged-source reruns and ticker-change listing behavior.  **DONE**
+
+
+1 = 
+
+Migration Strategy
+I’d do it in three safe steps:
+Schema only
+Add source_snapshot, run_source_snapshot, nullable provider_observation.source_snapshot_id, indexes, and constraints. No behavioral change yet.
+
+Writer/report integration
+Update scrape/observation writer to populate snapshots and membership. Update validation/daily summary to prefer snapshot membership, with fallback to old checksum matching during transition.
+
+Backfill existing rows
+Backfill source_snapshot from existing provider_observation.summary_json.source_file.sha256 and core.stored_object. Then fill provider_observation.source_snapshot_id.
+
+After that, make source_snapshot_id required for SEC observations and tighten uniqueness around it.
+My Recommendation
+Do this before historical backfill. It is not urgent for daily SEC refresh anymore, because we patched the symptoms, but it is the right foundation before multiplying data volume and replay paths.
+The design is small, explicit, and fits Empire well: reusable package logic, thin DAGs, durable database ownership, and no magic hidden in report heuristics.
+
 
 ## Things That Look Good
 

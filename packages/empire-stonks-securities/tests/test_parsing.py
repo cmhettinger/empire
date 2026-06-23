@@ -65,6 +65,39 @@ def test_company_tickers_successful_parse_and_normalization():
     }
 
 
+@pytest.mark.parametrize(
+    ("ticker", "expected"),
+    [
+        ("brk-b", "BRK-B"),
+        ("brk.b", "BRK.B"),
+        ("bf/b", "BF/B"),
+    ],
+)
+def test_company_tickers_exchange_preserves_sec_ticker_separators(ticker, expected):
+    record = SecCompanyTickerExchangeParser().parse_row(
+        {
+            "cik": 1,
+            "name": "Separator Corp",
+            "ticker": ticker,
+            "exchange": "NYSE",
+        }
+    )
+
+    assert record.ticker_norm == expected
+
+
+def test_company_tickers_preserves_sec_ticker_separators():
+    record = SecCompanyTickerParser().parse_row(
+        {
+            "cik_str": 1,
+            "ticker": "brk.b",
+            "title": "Separator Corp",
+        }
+    )
+
+    assert record.ticker_norm == "BRK.B"
+
+
 def test_malformed_rows_are_returned_without_warning_log(caplog):
     parser = SecCompanyTickerParser()
 

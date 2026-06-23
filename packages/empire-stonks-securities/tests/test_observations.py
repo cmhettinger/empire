@@ -128,6 +128,41 @@ def test_idempotent_rerun_skips_duplicate_observations():
     assert len(conn.observations) == 1
 
 
+def test_unchanged_file_with_new_object_identity_skips_duplicate_observations():
+    conn = FakeConnection()
+    record = ticker_exchange_record()
+    first_metadata = source_metadata("sec_company_tickers_exchange")
+    second_metadata = SecSourceFileMetadata(
+        source_code=first_metadata.source_code,
+        source_url=first_metadata.source_url,
+        downloaded_at=first_metadata.downloaded_at,
+        file_path="/tmp/rerun/company_tickers_exchange.json",
+        object_id=uuid4(),
+        object_key="stonks/securities/runs/2026/06/19/rerun/sec_company_tickers_exchange",
+        size_bytes=first_metadata.size_bytes,
+        sha256=first_metadata.sha256,
+        etag=first_metadata.etag,
+        last_modified=first_metadata.last_modified,
+    )
+
+    first = write_sec_observations(
+        connection=conn,
+        records=[record],
+        source_metadata=first_metadata,
+    )
+    second = write_sec_observations(
+        connection=conn,
+        records=[record],
+        source_metadata=second_metadata,
+    )
+
+    assert first.inserted_count == 1
+    assert second.inserted_count == 0
+    assert second.skipped_count == 1
+    assert len(conn.observations) == 1
+    assert conn.observations[0]["object_id"] == first_metadata.object_id
+
+
 def test_malformed_record_fails_clearly():
     record = SecCompanyTickerRecord(
         source_code="sec_company_tickers",

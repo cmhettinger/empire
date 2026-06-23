@@ -12,6 +12,7 @@ from uuid import UUID
 from empire_core import ObjectStore
 
 from empire_stonks_securities.acquisition import SEC_SOURCE_OBJECT_KIND
+from empire_stonks_securities.symbols import normalize_sec_ticker
 
 
 logger = logging.getLogger(__name__)
@@ -231,7 +232,7 @@ class SecCompanyTickerExchangeParser(SecSourceParser[SecCompanyTickerExchangeRec
             cik_padded=_pad_cik(cik),
             company_name=company_name,
             ticker=ticker,
-            ticker_norm=ticker.upper(),
+            ticker_norm=_required_sec_ticker_norm(ticker),
             exchange=exchange,
             raw=dict(row),
         )
@@ -262,7 +263,7 @@ class SecCompanyTickerParser(SecSourceParser[SecCompanyTickerRecord]):
             cik_padded=_pad_cik(cik),
             company_name=company_name,
             ticker=ticker,
-            ticker_norm=ticker.upper(),
+            ticker_norm=_required_sec_ticker_norm(ticker),
             raw=dict(row),
         )
 
@@ -351,6 +352,13 @@ def _optional_str(row: dict[str, Any], field_name: str) -> str | None:
         value = str(value)
     parsed = value.strip()
     return parsed or None
+
+
+def _required_sec_ticker_norm(ticker: str) -> str:
+    normalized = normalize_sec_ticker(ticker).normalized_symbol
+    if normalized is None:
+        raise SecSourceParseError("ticker cannot be blank")
+    return normalized
 
 
 def _pad_cik(cik: int) -> str:

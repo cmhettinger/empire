@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from uuid import UUID
 
 from airflow.sdk import dag, get_current_context, task
 from empire_core import EmpireDatabase, ObjectStore
 from empire_stonks_securities import (
+    CONFLICT_REPORT_OBJECT_ID_CONF_KEY,
     DailySummaryRunContext,
+    VALIDATION_REPORT_OBJECT_ID_CONF_KEY,
+    VERIFY_REPORT_OBJECT_ID_CONF_KEY,
     generate_daily_refresh_summary_report,
+    input_run_id_from_conf,
+    optional_object_id,
     write_daily_summary_report_to_object_store,
 )
 
@@ -30,7 +34,7 @@ def stonks_securities_daily_refresh_summary():
         context = get_current_context()
         dag_run = context["dag_run"]
         conf = dag_run.conf or {}
-        input_run_id = _input_run_id_from_conf(conf)
+        input_run_id = input_run_id_from_conf(conf)
         generated_at = datetime.now(UTC)
         logical_date = str(context.get("logical_date"))
         run_context = DailySummaryRunContext(
@@ -48,14 +52,14 @@ def stonks_securities_daily_refresh_summary():
                 object_store=object_store,
                 run_context=run_context,
                 source_run_id=str(input_run_id),
-                verify_report_object_id=_optional_object_id(
-                    conf.get("verify_report_object_id")
+                verify_report_object_id=optional_object_id(
+                    conf.get(VERIFY_REPORT_OBJECT_ID_CONF_KEY)
                 ),
-                validation_report_object_id=_optional_object_id(
-                    conf.get("validation_report_object_id")
+                validation_report_object_id=optional_object_id(
+                    conf.get(VALIDATION_REPORT_OBJECT_ID_CONF_KEY)
                 ),
-                conflict_report_object_id=_optional_object_id(
-                    conf.get("conflict_report_object_id")
+                conflict_report_object_id=optional_object_id(
+                    conf.get(CONFLICT_REPORT_OBJECT_ID_CONF_KEY)
                 ),
                 generated_at=generated_at,
             )
@@ -90,22 +94,5 @@ def stonks_securities_daily_refresh_summary():
         }
 
     generate_daily_refresh_summary()
-
-
-def _input_run_id_from_conf(conf: dict) -> UUID:
-    input_run_id = conf.get("input_run_id")
-    if not input_run_id:
-        raise RuntimeError("Provide input_run_id in dag_run.conf.")
-    return UUID(str(input_run_id))
-
-
-def _optional_object_id(value) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    if not text or text.lower() in {"none", "null"}:
-        return None
-    return text
-
 
 stonks_securities_daily_refresh_summary_dag = stonks_securities_daily_refresh_summary()

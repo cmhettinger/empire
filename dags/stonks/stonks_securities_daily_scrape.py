@@ -10,6 +10,7 @@ from empire_stonks_securities import (
     DEFAULT_DAILY_SOURCE_KEYS,
     SecDownloader,
     load_config_by_logical_name,
+    scrape_to_verify_conf,
 )
 
 log = logging.getLogger(__name__)
@@ -79,9 +80,7 @@ def stonks_securities_daily_scrape():
     trigger_verify = TriggerDagRunOperator(
         task_id="trigger_stonks_securities_daily_verify",
         trigger_dag_id="stonks_securities_daily_verify",
-        conf={
-            "input_run_id": "{{ ti.xcom_pull(task_ids='collect_sec_sources')['run_id'] }}"
-        },
+        conf=scrape_to_verify_conf(),
     )
 
     scrape_result >> trigger_verify

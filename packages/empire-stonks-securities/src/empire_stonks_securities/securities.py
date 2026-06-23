@@ -11,6 +11,7 @@ from uuid import UUID
 from empire_core.db.postgres import row_to_dict
 
 from empire_stonks_securities.issuers import ELIGIBLE_SEC_OBSERVATION_PROVIDERS
+from empire_stonks_securities.symbols import normalize_sec_ticker
 
 
 logger = logging.getLogger(__name__)
@@ -448,7 +449,7 @@ def _parse_observation(observation: SecSecurityObservation) -> dict[str, Any] | 
     cik_padded = _cik_padded(summary.get("cik_padded") or summary.get("cik"))
     ticker_norm = _clean_text(summary.get("ticker_norm") or summary.get("ticker"))
     if ticker_norm is not None:
-        ticker_norm = ticker_norm.upper()
+        ticker_norm = normalize_sec_ticker(ticker_norm).normalized_symbol
     if cik_padded is None or ticker_norm is None:
         logger.warning(
             "Skipping SEC security observation without valid CIK/ticker: "

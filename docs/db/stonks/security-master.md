@@ -178,6 +178,22 @@ Later enrichment may promote the instrument type to `COMMON_STOCK`, `ETF`, `ADR`
 Phase 2A does not create listings or `listing_symbol_history` rows. Exchange and
 listing normalization are separate follow-on steps.
 
+### Ticker Normalization Scope
+
+In Phase 2A, `ticker_norm` means the SEC-normalized ticker observed in SEC
+security-master sources. The normalization rule is intentionally
+backward-compatible with the original ingestion behavior: trim surrounding
+whitespace, uppercase letters, and preserve internal punctuation and separators.
+For example, `brk-b`, `brk.b`, and `bf/b` become `BRK-B`, `BRK.B`, and `BF/B`;
+SEC ingestion does not convert dots to dashes, dashes to dots, or remove slashes.
+
+`ticker_norm`, display symbols, provider symbols, and durable canonical symbols
+are not interchangeable. Yahoo, Stooq, EODData, exchange directories, and future
+OHLCV providers may use different symbol conventions for share classes,
+preferreds, warrants, units, rights, foreign tickers, and exchange suffixes.
+Those mappings belong in a future provider-symbol reconciliation phase. SEC
+ingestion should not encode Yahoo/Stooq/EODData assumptions.
+
 ---
 
 ## listing

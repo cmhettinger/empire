@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from uuid import UUID
 
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.sdk import dag, get_current_context, task
@@ -10,6 +9,8 @@ from empire_core import EmpireDatabase, ObjectStore
 from empire_stonks_securities import (
     ValidationRunContext,
     generate_phase_2a_validation_report,
+    input_run_id_from_conf,
+    validation_to_conflicts_conf,
     write_validation_report_to_object_store,
 )
 
@@ -31,7 +32,7 @@ def stonks_securities_daily_validation():
         context = get_current_context()
         dag_run = context["dag_run"]
         conf = dag_run.conf or {}
-        input_run_id = _input_run_id_from_conf(conf)
+        input_run_id = input_run_id_from_conf(conf)
         generated_at = datetime.now(UTC)
         logical_date = str(context.get("logical_date"))
         run_context = ValidationRunContext(
@@ -83,23 +84,9 @@ def stonks_securities_daily_validation():
     trigger_conflicts = TriggerDagRunOperator(
         task_id="trigger_stonks_securities_daily_conflicts",
         trigger_dag_id="stonks_securities_daily_conflicts",
-        conf={
-            "input_run_id": "{{ dag_run.conf['input_run_id'] }}",
-            "verify_report_object_id": "{{ dag_run.conf.get('verify_report_object_id') }}",
-            "validation_report_object_id": (
-                "{{ ti.xcom_pull(task_ids='generate_validation_report')['object_id'] }}"
-            ),
-        },
+        conf=validation_to_conflicts_conf(),
     )
 
     validation_result >> trigger_conflicts
-
-
-def _input_run_id_from_conf(conf: dict) -> UUID:
-    input_run_id = conf.get("input_run_id")
-    if not input_run_id:
-        raise RuntimeError("Provide input_run_id in dag_run.conf.")
-    return UUID(str(input_run_id))
-
 
 stonks_securities_daily_validation_dag = stonks_securities_daily_validation()

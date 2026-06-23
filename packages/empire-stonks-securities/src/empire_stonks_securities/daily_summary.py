@@ -98,6 +98,7 @@ def generate_daily_refresh_summary_report(
         daily_entity_deltas = _daily_entity_deltas(
             cursor,
             source_run_id=source_run_text,
+            current_sources=current_sources,
             generated_at=generated_at,
         )
 
@@ -153,6 +154,7 @@ def generate_daily_refresh_summary_report(
         "inputs_seen": input_freshness["inputs_seen"],
         "inputs_missing": input_freshness["inputs_missing"],
         "inputs_unchanged": snapshot_diff["inputs_unchanged"],
+        "observations_available": daily_entity_deltas["observations_available"],
         "observations_created": daily_entity_deltas["observations_created"],
         "issuers_created": daily_entity_deltas["issuers_created"],
         "issuers_updated": daily_entity_deltas["issuers_updated"],
@@ -394,7 +396,8 @@ def build_zero_delta_analysis(
         if source["unchanged"] is True
     ]
     observations_created = int(daily_entity_deltas["observations_created"] or 0)
-    canonical_observations_available = observations_created > 0
+    observations_available = int(daily_entity_deltas["observations_available"] or 0)
+    canonical_observations_available = observations_available > 0
     unreconciled_by_stage = {
         "issuers": int(daily_entity_deltas["unreconciled_issuer_observations"] or 0),
         "securities": int(daily_entity_deltas["unreconciled_security_observations"] or 0),
@@ -408,6 +411,7 @@ def build_zero_delta_analysis(
     )
     zero_observations_reason = _zero_observations_reason(
         observations_created=observations_created,
+        canonical_observations_available=canonical_observations_available,
         input_freshness=input_freshness,
         changed_sources=changed_sources,
         all_inputs_unchanged=all_inputs_unchanged,
@@ -888,21 +892,40 @@ def _daily_entity_deltas(
     cursor: Any,
     *,
     source_run_id: str | None,
+    current_sources: dict[str, dict[str, Any]],
     generated_at: datetime,
 ) -> dict[str, Any]:
-    day_start = generated_at.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = day_start + timedelta(days=1)
+    run_start, run_end = _run_window(current_sources=current_sources, generated_at=generated_at)
     obs_from, obs_params = _observation_scope_sql(source_run_id)
+    current_object_ids = [row["object_id"] for row in current_sources.values() if row.get("object_id")]
     return {
-        "observations_created": _scalar(
+        "observations_available": _scalar(
             cursor,
-            "daily_summary_observations_created",
+            "daily_summary_observations_available",
             f"SELECT COUNT(*) FROM {obs_from}",
             obs_params,
         ),
-        "issuer_evidence_inserted": _evidence_count(cursor, obs_from, obs_params, "issuer_id"),
-        "security_evidence_inserted": _evidence_count(cursor, obs_from, obs_params, "security_id"),
-        "listing_evidence_inserted": _evidence_count(cursor, obs_from, obs_params, "listing_id"),
+        "observations_created": _scalar(
+            cursor,
+            "daily_summary_observations_created",
+            """
+            SELECT COUNT(*)
+            FROM stonks.provider_observation po
+            WHERE po.object_id = ANY(%s::uuid[])
+              AND po.created_at >= %s
+              AND po.created_at < %s
+            """,
+            (current_object_ids, run_start, run_end),
+        ),
+        "issuer_evidence_inserted": _evidence_count(
+            cursor, obs_from, obs_params, "issuer_id", run_start, run_end
+        ),
+        "security_evidence_inserted": _evidence_count(
+            cursor, obs_from, obs_params, "security_id", run_start, run_end
+        ),
+        "listing_evidence_inserted": _evidence_count(
+            cursor, obs_from, obs_params, "listing_id", run_start, run_end
+        ),
         "unreconciled_issuer_observations": _unreconciled_evidence_count(
             cursor,
             obs_from,
@@ -936,18 +959,52 @@ def _daily_entity_deltas(
             obs_from,
             obs_params,
             "listing_id",
-            "po.provider_code = 'SEC_COMPANY_TICKERS_EXCHANGE'",
+            """
+            po.provider_code = 'SEC_COMPANY_TICKERS_EXCHANGE'
+              AND NULLIF(TRIM(po.summary_json ->> 'exchange'), '') IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM stonks.exchange_alias ea
+                WHERE ea.provider_code = 'SEC'
+                  AND ea.is_active = TRUE
+                  AND lower(ea.raw_name) = lower(po.summary_json ->> 'exchange')
+              )
+            """,
         ),
-        "issuers_created": _created_count(cursor, "issuer", day_start, day_end),
-        "issuers_updated": _updated_count(cursor, "issuer", day_start, day_end),
-        "securities_created": _created_count(cursor, "security", day_start, day_end),
-        "securities_updated": _updated_count(cursor, "security", day_start, day_end),
-        "listings_created": _created_count(cursor, "listing", day_start, day_end),
-        "listings_updated": _updated_count(cursor, "listing", day_start, day_end),
+        "issuers_created": _created_count(cursor, "issuer", run_start, run_end),
+        "issuers_updated": _updated_count(cursor, "issuer", run_start, run_end),
+        "securities_created": _created_count(cursor, "security", run_start, run_end),
+        "securities_updated": _updated_count(cursor, "security", run_start, run_end),
+        "listings_created": _created_count(cursor, "listing", run_start, run_end),
+        "listings_updated": _updated_count(cursor, "listing", run_start, run_end),
     }
 
 
-def _evidence_count(cursor: Any, obs_from: str, obs_params: tuple[Any, ...], column: str) -> int:
+def _run_window(
+    *,
+    current_sources: dict[str, dict[str, Any]],
+    generated_at: datetime,
+) -> tuple[datetime, datetime]:
+    created_values = [
+        parsed
+        for parsed in (_parse_datetime(row.get("created_at")) for row in current_sources.values())
+        if parsed is not None
+    ]
+    run_end = generated_at.astimezone(UTC)
+    if not created_values:
+        return run_end, run_end
+    run_start = min(value.astimezone(UTC) for value in created_values)
+    return run_start, run_end
+
+
+def _evidence_count(
+    cursor: Any,
+    obs_from: str,
+    obs_params: tuple[Any, ...],
+    column: str,
+    run_start: datetime,
+    run_end: datetime,
+) -> int:
     return _scalar(
         cursor,
         f"daily_summary_{column}_evidence_inserted",
@@ -957,8 +1014,10 @@ def _evidence_count(cursor: Any, obs_from: str, obs_params: tuple[Any, ...], col
         JOIN {obs_from}
           ON po.provider_observation_id = pe.provider_observation_id
         WHERE pe.{column} IS NOT NULL
+          AND pe.created_at >= %s
+          AND pe.created_at < %s
         """,
-        obs_params,
+        (*obs_params, run_start, run_end),
     )
 
 
@@ -1105,6 +1164,7 @@ def _zero_count_stage_status(
 def _zero_observations_reason(
     *,
     observations_created: int,
+    canonical_observations_available: bool,
     input_freshness: dict[str, Any],
     changed_sources: list[str],
     all_inputs_unchanged: bool,
@@ -1116,6 +1176,8 @@ def _zero_observations_reason(
         return "required_source_missing"
     if changed_sources:
         return "sources_changed_but_no_observations"
+    if all_inputs_unchanged and reports_usable and canonical_observations_available:
+        return "unchanged_sources_no_new_observations"
     if all_inputs_unchanged and reports_usable:
         return "no_canonical_observations_for_unchanged_sources"
     if not reports_usable:

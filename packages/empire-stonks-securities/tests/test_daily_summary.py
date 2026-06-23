@@ -58,6 +58,7 @@ def test_daily_summary_report_json_shape_is_stable():
     assert report["summary"]["inputs_seen"] == 2
     assert report["summary"]["inputs_missing"] == 0
     assert report["summary"]["inputs_unchanged"] == 1
+    assert report["summary"]["observations_available"] == 20831
     assert report["summary"]["validation_status"] == "PASS"
     assert report["summary"]["conflict_status"] == "WARN"
     assert report["summary"]["verify_status"] == "UNKNOWN"
@@ -204,6 +205,7 @@ def test_unchanged_sources_with_reconciled_observations_are_healthy_zero_evidenc
         _source_row("sec_company_tickers_exchange", sha256="same-exchange"),
         _source_row("sec_company_tickers", sha256="same-tickers"),
     ]
+    conn.results["daily_summary_observations_created"] = 0
     conn.results["daily_summary_issuer_id_evidence_inserted"] = 0
     conn.results["daily_summary_security_id_evidence_inserted"] = 0
     conn.results["daily_summary_listing_id_evidence_inserted"] = 0
@@ -215,6 +217,9 @@ def test_unchanged_sources_with_reconciled_observations_are_healthy_zero_evidenc
     )
 
     assert report["canonical_observations_available"] is True
+    assert report["summary"]["observations_available"] == 20831
+    assert report["summary"]["observations_created"] == 0
+    assert report["zero_observations_reason"] == "unchanged_sources_no_new_observations"
     assert report["unchanged_sources"] == [
         "sec_company_tickers_exchange",
         "sec_company_tickers",
@@ -233,6 +238,11 @@ def test_unchanged_sources_with_reconciled_observations_are_healthy_zero_evidenc
         warning
         for warning in report["warnings"]
         if warning["code"] == "zero_evidence_with_unreconciled_observations"
+    ]
+    assert not [
+        warning
+        for warning in report["warnings"]
+        if warning["code"] == "unchanged_sources_without_canonical_observations"
     ]
 
 
@@ -466,6 +476,7 @@ DEFAULT_RESULTS = {
     ],
     "daily_summary_latest_stonks_securities_verify_report": [],
     "daily_summary_latest_stonks_securities_verify_report_legacy": [],
+    "daily_summary_observations_available": 20831,
     "daily_summary_observations_created": 20831,
     "daily_summary_issuer_id_evidence_inserted": 20831,
     "daily_summary_security_id_evidence_inserted": 20831,
