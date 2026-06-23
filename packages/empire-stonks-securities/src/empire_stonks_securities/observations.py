@@ -35,6 +35,7 @@ SEC_SOURCE_PROVIDER_CODES = {
     SEC_COMPANY_TICKERS_EXCHANGE_SOURCE: SEC_COMPANY_TICKERS_EXCHANGE_PROVIDER,
     SEC_COMPANY_TICKERS_SOURCE: SEC_COMPANY_TICKERS_PROVIDER,
 }
+SEC_SOURCE_PARSER_VERSION = "sec-security-master-v1"
 
 
 SecObservationRecord = SecCompanyTickerExchangeRecord | SecCompanyTickerRecord
@@ -69,6 +70,7 @@ class SecObservationWriteItem:
     observed_at: datetime | None
     object_id: UUID | None
     object_key: str | None
+    source_snapshot_id: UUID | None
     source_url: str | None
     raw_key: str
     row_hash: str
@@ -148,6 +150,7 @@ def write_sec_observations(
         else _single_source_code(record.source_code for record in record_list)
     )
     provider_code = _provider_code_for_source(source_code)
+    source_snapshot_id: UUID | None = None
 
     inserted_count = 0
     skipped_count = 0
@@ -155,6 +158,11 @@ def write_sec_observations(
 
     with connection.cursor() as cursor:
         ensure_sec_observation_providers(cursor)
+        source_snapshot_id = upsert_provider_source_snapshot(
+            cursor=cursor,
+            provider_code=provider_code,
+            source_metadata=source_metadata,
+        )
         for item in prepared:
             try:
                 cursor.execute(
@@ -165,6 +173,7 @@ def write_sec_observations(
                         observed_at,
                         object_id,
                         object_key,
+                        source_snapshot_id,
                         source_url,
                         raw_key,
                         summary_json
@@ -172,7 +181,7 @@ def write_sec_observations(
                     VALUES (
                         %s, %s,
                         COALESCE(%s::timestamptz, now()),
-                        %s, %s, %s, %s, %s::jsonb
+                        %s, %s, %s, %s, %s, %s::jsonb
                     )
                     ON CONFLICT (provider_code, raw_key) WHERE raw_key IS NOT NULL
                     DO NOTHING
@@ -184,6 +193,7 @@ def write_sec_observations(
                         item.observed_at,
                         item.object_id,
                         item.object_key,
+                        source_snapshot_id,
                         item.source_url,
                         item.raw_key,
                         json_dumps(item.summary_json),
@@ -205,6 +215,84 @@ def write_sec_observations(
         skipped_count=skipped_count,
         failed_count=failed_count,
     )
+
+
+def upsert_provider_source_snapshot(
+    *,
+    cursor: Any,
+    provider_code: str,
+    source_metadata: SecSourceFileMetadata | None,
+) -> UUID | None:
+    """Upsert canonical source content identity and link the stored object to it."""
+
+    if source_metadata is None or not source_metadata.sha256:
+        return None
+
+    cursor.execute(
+        """
+        INSERT INTO stonks.provider_source_snapshot (
+            provider_code,
+            source_code,
+            content_sha256,
+            first_seen_object_id,
+            first_seen_run_id,
+            parser_version
+        )
+        VALUES (
+            %s,
+            %s,
+            %s,
+            %s,
+            (SELECT run_id FROM core.stored_object WHERE object_id = %s),
+            %s
+        )
+        ON CONFLICT ON CONSTRAINT uq_provider_source_snapshot_identity
+        DO NOTHING
+        RETURNING source_snapshot_id
+        """,
+        (
+            provider_code,
+            source_metadata.source_code,
+            source_metadata.sha256,
+            source_metadata.object_id,
+            source_metadata.object_id,
+            SEC_SOURCE_PARSER_VERSION,
+        ),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        cursor.execute(
+            """
+            SELECT source_snapshot_id
+            FROM stonks.provider_source_snapshot
+            WHERE provider_code = %s
+              AND source_code = %s
+              AND content_sha256 = %s
+            """,
+            (
+                provider_code,
+                source_metadata.source_code,
+                source_metadata.sha256,
+            ),
+        )
+        row = cursor.fetchone()
+    source_snapshot_id = row[0] if row is not None else None
+    if source_snapshot_id is None or source_metadata.object_id is None:
+        return source_snapshot_id
+
+    cursor.execute(
+        """
+        INSERT INTO stonks.provider_source_snapshot_object (
+            source_snapshot_id,
+            object_id
+        )
+        VALUES (%s, %s)
+        ON CONFLICT ON CONSTRAINT uq_provider_source_snapshot_object_object
+        DO NOTHING
+        """,
+        (source_snapshot_id, source_metadata.object_id),
+    )
+    return source_snapshot_id
 
 
 def run_stonks_securities_daily_observation_writer(
@@ -313,6 +401,7 @@ def build_sec_observation(
         observed_at=downloaded_at,
         object_id=source_metadata.object_id if source_metadata is not None else None,
         object_key=source_metadata.object_key if source_metadata is not None else None,
+        source_snapshot_id=None,
         source_url=source_metadata.source_url if source_metadata is not None else None,
         raw_key=raw_key,
         row_hash=row_hash,

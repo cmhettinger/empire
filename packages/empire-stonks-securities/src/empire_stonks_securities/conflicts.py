@@ -683,12 +683,20 @@ def _observation_scope_sql(source_run_id: str | None) -> tuple[str, tuple[Any, .
             WHERE EXISTS (
                 SELECT 1
                 FROM core.stored_object so
+                LEFT JOIN stonks.provider_source_snapshot_object psso
+                  ON psso.object_id = so.object_id
                 WHERE so.run_id = %s
                   AND so.object_kind = 'sec_source_file'
                   AND (
-                    so.object_id = po.object_id
-                    OR so.checksum_sha256 = po.summary_json #>> '{source_file,sha256}'
-                    OR so.object_key = po.summary_json #>> '{source_file,object_key}'
+                    psso.source_snapshot_id = po.source_snapshot_id
+                    OR (
+                      po.source_snapshot_id IS NULL
+                      AND (
+                        so.object_id = po.object_id
+                        OR so.checksum_sha256 = po.summary_json #>> '{source_file,sha256}'
+                        OR so.object_key = po.summary_json #>> '{source_file,object_key}'
+                      )
+                    )
                   )
             )
         ) po
@@ -712,12 +720,20 @@ def _scoped_listings_sql(source_run_id: str | None) -> tuple[str, tuple[Any, ...
             WHERE EXISTS (
                 SELECT 1
                 FROM core.stored_object so_scope
+                LEFT JOIN stonks.provider_source_snapshot_object psso_scope
+                  ON psso_scope.object_id = so_scope.object_id
                 WHERE so_scope.run_id = %s
                   AND so_scope.object_kind = 'sec_source_file'
                   AND (
-                    so_scope.object_id = po_scope.object_id
-                    OR so_scope.checksum_sha256 = po_scope.summary_json #>> '{source_file,sha256}'
-                    OR so_scope.object_key = po_scope.summary_json #>> '{source_file,object_key}'
+                    psso_scope.source_snapshot_id = po_scope.source_snapshot_id
+                    OR (
+                      po_scope.source_snapshot_id IS NULL
+                      AND (
+                        so_scope.object_id = po_scope.object_id
+                        OR so_scope.checksum_sha256 = po_scope.summary_json #>> '{source_file,sha256}'
+                        OR so_scope.object_key = po_scope.summary_json #>> '{source_file,object_key}'
+                      )
+                    )
                   )
             )
         ) l

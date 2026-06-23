@@ -1090,12 +1090,20 @@ def _observation_scope_sql(source_run_id: str | None) -> tuple[str, tuple[Any, .
             WHERE EXISTS (
                 SELECT 1
                 FROM core.stored_object so
+                LEFT JOIN stonks.provider_source_snapshot_object psso
+                  ON psso.object_id = so.object_id
                 WHERE so.run_id = %s
                   AND so.object_kind = 'sec_source_file'
                   AND (
-                    so.object_id = po.object_id
-                    OR so.checksum_sha256 = po.summary_json #>> '{source_file,sha256}'
-                    OR so.object_key = po.summary_json #>> '{source_file,object_key}'
+                    psso.source_snapshot_id = po.source_snapshot_id
+                    OR (
+                      po.source_snapshot_id IS NULL
+                      AND (
+                        so.object_id = po.object_id
+                        OR so.checksum_sha256 = po.summary_json #>> '{source_file,sha256}'
+                        OR so.object_key = po.summary_json #>> '{source_file,object_key}'
+                      )
+                    )
                   )
             )
         ) po

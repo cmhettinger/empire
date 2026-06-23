@@ -495,6 +495,36 @@ Examples:
 - Exchange symbol directory
 - Corporate action notice
 
+`provider_observation` stores canonical parsed facts. Run identity remains
+ephemeral: it explains when and how a pipeline executed, but it should not be
+required to rediscover observations that were parsed from identical source
+content in an earlier run.
+
+### Provider Source Snapshots
+
+`provider_source_snapshot` records the semantic identity of provider source
+content by `provider_code`, `source_code`, and `content_sha256`.
+`provider_source_snapshot_object` links that content identity to every concrete
+`core.stored_object` that carried it. This lets a new run retain explicit source
+membership even when the provider republishes unchanged files and observation
+deduplication correctly inserts zero new rows.
+
+The object membership link is intentionally retention-aware: if a raw
+`core.stored_object` is purged, its membership row is removed, while the
+canonical `provider_source_snapshot` and parsed observations remain.
+
+Core tables still own execution and artifact metadata:
+
+- `core.core_run` owns run status, timing, parameters, and summaries.
+- `core.stored_object` owns object keys, checksums, storage metadata, and run
+  attachment.
+
+The stonks snapshot tables add only provider-source semantics. They answer:
+"which current run source objects represent source content we have already
+parsed?" Downstream reconciliation and reports can then reason from canonical
+observations without depending on today's `run_id` being present on each
+observation row.
+
 ---
 
 ## provider_evidence

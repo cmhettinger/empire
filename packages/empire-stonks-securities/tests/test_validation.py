@@ -87,7 +87,11 @@ def test_validation_report_scopes_source_run_by_current_source_files():
     listings_sql = conn.sql_by_metric["active_listings_total"]
     assert "core.stored_object so" in observations_sql
     assert "so.run_id = %s" in observations_sql
+    assert "stonks.provider_source_snapshot_object psso" in observations_sql
+    assert "psso.source_snapshot_id = po.source_snapshot_id" in observations_sql
     assert "so.checksum_sha256 = po.summary_json #>> '{source_file,sha256}'" in observations_sql
+    assert "stonks.provider_source_snapshot_object psso_scope" in listings_sql
+    assert "psso_scope.source_snapshot_id = po_scope.source_snapshot_id" in listings_sql
     assert "so_scope.checksum_sha256 = po_scope.summary_json #>> '{source_file,sha256}'" in listings_sql
 
 

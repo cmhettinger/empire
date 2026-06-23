@@ -49,10 +49,18 @@ def test_writes_observations_for_ticker_exchange_records():
     assert inserted["observed_at"] == DOWNLOADED_AT
     assert inserted["object_id"] == metadata.object_id
     assert inserted["object_key"] == metadata.object_key
+    assert inserted["source_snapshot_id"] is not None
     assert inserted["source_url"] == metadata.source_url
     assert inserted["summary_json"]["exchange"] == "Nasdaq"
     assert inserted["summary_json"]["raw"] == record.raw
     assert inserted["summary_json"]["source_file"]["sha256"] == "file-sha"
+    assert len(conn.source_snapshots) == 1
+    assert len(conn.source_snapshot_objects) == 1
+    snapshot = next(iter(conn.source_snapshots.values()))
+    assert snapshot["provider_code"] == "SEC_COMPANY_TICKERS_EXCHANGE"
+    assert snapshot["source_code"] == "sec_company_tickers_exchange"
+    assert snapshot["content_sha256"] == "file-sha"
+    assert conn.source_snapshot_objects[0]["object_id"] == metadata.object_id
 
 
 def test_writes_observations_for_ticker_records():
@@ -161,6 +169,12 @@ def test_unchanged_file_with_new_object_identity_skips_duplicate_observations():
     assert second.skipped_count == 1
     assert len(conn.observations) == 1
     assert conn.observations[0]["object_id"] == first_metadata.object_id
+    assert len(conn.source_snapshots) == 1
+    assert len(conn.source_snapshot_objects) == 2
+    assert {row["object_id"] for row in conn.source_snapshot_objects} == {
+        first_metadata.object_id,
+        second_metadata.object_id,
+    }
 
 
 def test_malformed_record_fails_clearly():
@@ -227,6 +241,8 @@ class FakeConnection:
     def __init__(self) -> None:
         self.observations: list[dict] = []
         self.raw_keys: set[tuple[str, str]] = set()
+        self.source_snapshots: dict[tuple[str, str, str], dict] = {}
+        self.source_snapshot_objects: list[dict] = []
         self.commit_count = 0
         self.last_fetchone = None
 
@@ -248,11 +264,43 @@ class FakeCursor:
         return False
 
     def execute(self, sql: str, params=None) -> None:
+        if "INSERT INTO stonks.provider_source_snapshot_object" in sql:
+            source_snapshot_id = params[0]
+            object_id = params[1]
+            if not any(row["object_id"] == object_id for row in self.connection.source_snapshot_objects):
+                self.connection.source_snapshot_objects.append(
+                    {"source_snapshot_id": source_snapshot_id, "object_id": object_id}
+                )
+            self.connection.last_fetchone = None
+            return
+        if "INSERT INTO stonks.provider_source_snapshot" in sql:
+            key = (params[0], params[1], params[2])
+            if key not in self.connection.source_snapshots:
+                self.connection.source_snapshots[key] = {
+                    "source_snapshot_id": uuid4(),
+                    "provider_code": params[0],
+                    "source_code": params[1],
+                    "content_sha256": params[2],
+                    "first_seen_object_id": params[3],
+                    "parser_version": params[5],
+                }
+                self.connection.last_fetchone = (
+                    self.connection.source_snapshots[key]["source_snapshot_id"],
+                )
+            else:
+                self.connection.last_fetchone = None
+            return
+        if "SELECT source_snapshot_id" in sql and "FROM stonks.provider_source_snapshot" in sql:
+            key = (params[0], params[1], params[2])
+            self.connection.last_fetchone = (
+                self.connection.source_snapshots[key]["source_snapshot_id"],
+            )
+            return
         if "INSERT INTO stonks.provider_observation" not in sql:
             self.connection.last_fetchone = None
             return
         provider_code = params[0]
-        raw_key = params[6]
+        raw_key = params[7]
         dedupe_key = (provider_code, raw_key)
         if dedupe_key in self.connection.raw_keys:
             self.connection.last_fetchone = None
@@ -265,9 +313,10 @@ class FakeCursor:
                 "observed_at": params[2],
                 "object_id": params[3],
                 "object_key": params[4],
-                "source_url": params[5],
+                "source_snapshot_id": params[5],
+                "source_url": params[6],
                 "raw_key": raw_key,
-                "summary_json": json.loads(params[7]),
+                "summary_json": json.loads(params[8]),
             }
         )
         self.connection.last_fetchone = (uuid4(),)
