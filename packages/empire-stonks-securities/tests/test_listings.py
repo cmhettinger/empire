@@ -169,11 +169,16 @@ def test_ticker_change_without_effective_date_does_not_create_second_active_symb
     upsert_sec_listings(connection=conn, observations=[first])
     result = upsert_sec_listings(connection=conn, observations=[second])
 
+    listing = next(iter(conn.listings.values()))
     active_symbols = [row for row in conn.symbol_history if row["valid_to"] is None]
+    assert result.observations_skipped == 1
+    assert result.warning_count == 1
     assert result.symbol_history_inserted == 0
-    assert result.symbol_history_skipped == 1
+    assert result.evidence_inserted == 0
     assert len(active_symbols) == 1
     assert active_symbols[0]["ticker_norm"] == "AAPL"
+    assert listing["ticker_norm"] == "AAPL"
+    assert listing["current_ticker"] == "aapl"
 
 
 def test_same_exchange_ticker_for_different_security_is_not_merged():

@@ -4,28 +4,13 @@ Verdict:
 - Ready for backfill: Not ready to run a historical backfill into canonical issuer/security/listing tables yet. Ready to start a separate backfill design/build phase.
 - Ready for hydration: Ready with caveats for design/build of security type, fund, bond, identifier, and provider-mapping hydration. Do not let hydration promote or merge provisional securities until reconciliation rules exist.
 - Top remaining risks:
-  1. A date-less ticker change can update `listing.current_ticker` / `listing.ticker_norm` before symbol-history insertion refuses to create an ambiguous active symbol, leaving listing state out of sync with symbol history.
-  2. SEC-created security identity is still provisional and ticker-assisted. That is correct for Phase 2A, but broad backfill or hydration needs explicit promotion, merge, split, and confidence semantics before it writes stronger identity facts.
+  1. SEC-created security identity is still provisional and ticker-assisted. That is correct for Phase 2A, but broad backfill or hydration needs explicit promotion, merge, split, and confidence semantics before it writes stronger identity facts.
 
 Overall: the daily SEC Phase 2A path is materially stronger than the previous review. The major prior failures appear fixed: run reports are durable and run-scoped, unchanged source files no longer imply starvation, listing identity is no longer ticker-first, active symbol history is guarded, and validation/reporting now use PASS/WARN/FAIL. I would proceed with the next design phases, not with a large canonical backfill load.
 
 # Critical Issues
 
-## 1. Date-less ticker changes can desynchronize listing current state and symbol history
-
-Evidence:
-- `_upsert_listing` updates `listing.current_ticker` and `listing.ticker_norm` before `_insert_symbol_history` runs.
-- `_insert_symbol_history` refuses an ambiguous ticker change when `valid_from is None` and an active symbol already exists.
-- The regression test verifies that no second active symbol is created, but does not assert that `listing.current_ticker` remains aligned with the old active history row.
-
-Why this matters:
-For current SEC daily files, `seen_date` normally comes from `downloaded_at`, so the happy path has a date. Backfill and provider mapping are more likely to expose partial or date-less observations. In that case the table-level current listing state can say one ticker while `listing_symbol_history` says another.
-
-Impact:
-This can corrupt canonical listing state for ambiguous observations. It is especially risky because downstream provider mapping will likely read the denormalized current ticker.
-
-Recommended fix:
-Make ticker mutation and symbol-history insertion a single decision. If the symbol change is ambiguous, do not update `listing.current_ticker` / `ticker_norm`; emit warning evidence or conflict output instead.
+None open.
 
 # High Priority Issues
 
@@ -35,17 +20,11 @@ SEC-created securities are correctly marked as provisional/current-state bootstr
 
 Before backfill/hydration mutates canonical security identity, build the reconciliation service described in `docs/todo/stonks-securities-provisional-status.md`: promotion, merge/split rules, confidence changes, and identity audit reporting.
 
-## 2. Active listing uniqueness is validated, not enforced
-
-`V2026.06.21.0001__stonks_listing_identity_security_exchange.sql` replaces the old unique ticker lookup with non-unique active indexes. Validation and conflict reports detect `same_security_exchange_multiple_active_listings`, but the database does not prevent duplicate active `(security_id, exchange_id)` listings.
-
-That is reasonable during repair, but before high-volume backfill/provider mapping, add a cleanup plan and then enforce the invariant with a partial unique index once production data is clean.
-
-## 3. Backfill source model needs a clear landing contract
+## 2. Backfill source model needs a clear landing contract
 
 The schema still has the older `source_observation` / `source_evidence` tables alongside the newer `provider_observation` / `provider_evidence` and `provider_source_snapshot` flow. The daily SEC pipeline uses the provider observation model. Historical EDGAR/index/submissions work should not start writing until it is clear whether it will extend the provider model, retire the older source model, or map one into the other.
 
-## 4. Report objects are path-scoped but not run-context-owned
+## 3. Report objects are path-scoped but not run-context-owned
 
 Verify, validation, conflict, and summary reports now write to deterministic run-report paths, which is good. They are stored with `run_context=None` and `object_scope="manual"` even inside Airflow. That does not break the JSON report path, but it weakens object-store lineage and may make future dashboards or cleanup less precise.
 
@@ -79,7 +58,8 @@ The package has good unit coverage for helpers and report shapes. There is still
 - unchanged file starvation: Appears fixed. Canonical source snapshots and summary zero-delta logic distinguish unchanged sources from stage starvation.
 - listing identity by ticker: Appears fixed in code. Listings are resolved by `security_id + exchange_id`; ticker/exchange duplicates are treated as conflict candidates.
 - ticker-shaped security identity: Partially fixed. Code and docs now clearly label SEC-created securities as provisional, but the bootstrap resolver still uses issuer+ticker to find/create provisional security rows.
-- multiple active symbol history rows: Appears fixed for normal dated ticker changes and guarded by a partial unique index when data is clean. The date-less desync issue above remains.
+- multiple active symbol history rows: Fixed for normal dated ticker changes and guarded by a partial unique index when data is clean. Date-less ticker changes are blocked when they would desynchronize listing current state and active symbol history.
+- multiple active listings for one security/exchange: Fixed by `V2026.06.23.0003__stonks_listing_active_security_exchange_guard.sql`, which enforces one active listing per `(security_id, exchange_id)` while allowing historical/closed rows.
 - validation SUCCESS vs PASS/WARN/FAIL: Fixed. Verify, validation, conflict, and summary all report PASS/WARN/FAIL-style status.
 - zero observations/evidence summary issue: Appears fixed. Daily summary distinguishes unchanged sources, canonical observations available, all observations reconciled, and stage starvation.
 - missing verify artifact: Fixed. Verify now writes a durable JSON report and summary links it when present.
@@ -93,8 +73,6 @@ It is safe to begin a separate backfill design/build phase. It is not safe to ru
 Minimum blockers before backfill writes canonical state:
 1. Define the historical observation model and how it coexists with daily `provider_observation`.
 2. Build reconciliation/promotion rules for provisional securities.
-3. Fix the date-less ticker-change state/history desync.
-4. Enforce active listing uniqueness after cleanup.
 
 # Hydration Readiness Assessment
 
@@ -104,13 +82,11 @@ Security type, fund, bond, identifier, and provider mapping phases should write 
 
 # Recommended Next Punchlist
 
-1. Fix listing ticker mutation so symbol-history refusal also prevents `listing.current_ticker` / `ticker_norm` changes.
-2. Write the Phase 2B reconciliation design for provisional security promotion, merge/split, and confidence semantics.
-3. Choose the historical backfill observation/evidence landing model before implementing EDGAR/index/submissions writers.
-4. Clean existing active listing duplicates if any, then add a partial unique index for active `(security_id, exchange_id)`.
-5. Update the package README to reflect the completed daily chain.
-6. Rename the conflict report's internal report name away from `phase_2a`.
-7. Add DAG import/conf-handoff smoke tests for the full Airflow chain.
+1. Write the Phase 2B reconciliation design for provisional security promotion, merge/split, and confidence semantics.
+2. Choose the historical backfill observation/evidence landing model before implementing EDGAR/index/submissions writers.
+3. Update the package README to reflect the completed daily chain.
+4. Rename the conflict report's internal report name away from `phase_2a`.
+5. Add DAG import/conf-handoff smoke tests for the full Airflow chain.
 
 # Verification Performed
 

@@ -409,6 +409,24 @@ def _upsert_listing(
             seen_date is not None
             and (listing.get("last_seen") is None or listing["last_seen"] < seen_date)
         )
+        if (
+            should_update_ticker
+            and seen_date is None
+            and _has_active_symbol_history(cursor=cursor, listing_id=listing["listing_id"])
+        ):
+            logger.warning(
+                "Blocking ambiguous listing ticker change without effective date: "
+                "listing_id=%s current_ticker=%s ticker_norm=%s",
+                listing["listing_id"],
+                listing.get("current_ticker"),
+                ticker_norm,
+            )
+            return _ListingUpsertOutcome(
+                listing_id=listing["listing_id"],
+                created=False,
+                updated=False,
+                conflict=True,
+            )
         if should_update_ticker or should_update_last_seen:
             cursor.execute(
                 """
@@ -460,6 +478,20 @@ def _upsert_listing(
         created=True,
         updated=False,
     )
+
+
+def _has_active_symbol_history(*, cursor: Any, listing_id: UUID) -> bool:
+    cursor.execute(
+        """
+        SELECT listing_symbol_id
+        FROM stonks.listing_symbol_history
+        WHERE listing_id = %s
+          AND valid_to IS NULL
+        LIMIT 1
+        """,
+        (listing_id,),
+    )
+    return cursor.fetchone() is not None
 
 
 def _insert_symbol_history(
