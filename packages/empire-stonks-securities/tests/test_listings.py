@@ -231,22 +231,31 @@ def test_does_not_create_issuer_or_security_rows_or_deactivate_listings():
     assert conn.deactivate_listing_writes == 0
 
 
-def test_listing_selector_uses_reconciliation_state_not_run_scope():
+def test_listing_selector_scopes_to_source_run_snapshots_and_reconciliation_state():
     conn = FakeSelectConnection()
+    source_run_id = uuid4()
 
     observations = select_sec_listing_observations(
         connection=conn,
-        source_run_id=uuid4(),
+        source_run_id=source_run_id,
         limit=10,
     )
 
     assert observations == []
-    assert "core.stored_object" not in conn.executed_sql
-    assert "so.run_id" not in conn.executed_sql
+    assert "core.stored_object so" in conn.executed_sql
+    assert "stonks.provider_source_snapshot_object psso" in conn.executed_sql
+    assert "psso.source_snapshot_id = po.source_snapshot_id" in conn.executed_sql
+    assert "so.run_id = %s::uuid" in conn.executed_sql
+    assert "so.object_kind = 'sec_source_file'" in conn.executed_sql
     assert "NOT EXISTS" in conn.executed_sql
     assert "pe.listing_id IS NOT NULL" in conn.executed_sql
     assert "pe.created_at >= po.created_at" in conn.executed_sql
-    assert conn.params == ("SEC_COMPANY_TICKERS_EXCHANGE", 10)
+    assert conn.params == (
+        "SEC_COMPANY_TICKERS_EXCHANGE",
+        source_run_id,
+        source_run_id,
+        10,
+    )
 
 
 def listing_observation(

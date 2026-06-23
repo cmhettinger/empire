@@ -181,24 +181,30 @@ def test_does_not_assume_common_stock():
     assert next(iter(conn.securities.values()))["instrument_type_code"] == "UNKNOWN"
 
 
-def test_security_selector_uses_reconciliation_state_not_run_scope():
+def test_security_selector_scopes_to_source_run_snapshots_and_reconciliation_state():
     conn = FakeSelectConnection()
+    source_run_id = uuid4()
 
     observations = select_sec_security_observations(
         connection=conn,
-        source_run_id=uuid4(),
+        source_run_id=source_run_id,
         limit=10,
     )
 
     assert observations == []
-    assert "core.stored_object" not in conn.executed_sql
-    assert "so.run_id" not in conn.executed_sql
+    assert "core.stored_object so" in conn.executed_sql
+    assert "stonks.provider_source_snapshot_object psso" in conn.executed_sql
+    assert "psso.source_snapshot_id = po.source_snapshot_id" in conn.executed_sql
+    assert "so.run_id = %s::uuid" in conn.executed_sql
+    assert "so.object_kind = 'sec_source_file'" in conn.executed_sql
     assert "NOT EXISTS" in conn.executed_sql
     assert "pe.security_id IS NOT NULL" in conn.executed_sql
     assert "pe.listing_id IS NULL" in conn.executed_sql
     assert "pe.created_at >= po.created_at" in conn.executed_sql
     assert set(conn.params[0]) == {"SEC_COMPANY_TICKERS", "SEC_COMPANY_TICKERS_EXCHANGE"}
-    assert conn.params[1] == 10
+    assert conn.params[1] == source_run_id
+    assert conn.params[2] == source_run_id
+    assert conn.params[3] == 10
 
 
 def security_observation(

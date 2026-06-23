@@ -25,11 +25,12 @@ def stonks_securities_daily_listings():
     def upsert_sec_listings() -> dict:
         context = get_current_context()
         conf = context["dag_run"].conf or {}
-        input_run_id_from_conf(conf)
+        input_run_id = input_run_id_from_conf(conf)
 
         with EmpireDatabase.connect_from_env() as conn:
             result = upsert_sec_listings_from_provider_observations(
                 connection=conn,
+                source_run_id=input_run_id,
             )
 
         return result.to_dict()

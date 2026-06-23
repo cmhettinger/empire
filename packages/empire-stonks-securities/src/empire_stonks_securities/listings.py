@@ -137,6 +137,28 @@ def select_sec_listing_observations(
             po.summary_json
         FROM stonks.provider_observation po
         WHERE po.provider_code = %s
+          AND (
+              %s::uuid IS NULL
+              OR EXISTS (
+                  SELECT 1
+                  FROM core.stored_object so
+                  LEFT JOIN stonks.provider_source_snapshot_object psso
+                    ON psso.object_id = so.object_id
+                  WHERE so.run_id = %s::uuid
+                    AND so.object_kind = 'sec_source_file'
+                    AND (
+                        psso.source_snapshot_id = po.source_snapshot_id
+                        OR (
+                            po.source_snapshot_id IS NULL
+                            AND (
+                                so.object_id = po.object_id
+                                OR so.checksum_sha256 = po.summary_json #>> '{source_file,sha256}'
+                                OR so.object_key = po.summary_json #>> '{source_file,object_key}'
+                            )
+                        )
+                    )
+              )
+          )
           AND NOT EXISTS (
               SELECT 1
               FROM stonks.provider_evidence pe
@@ -146,6 +168,7 @@ def select_sec_listing_observations(
           )
         ORDER BY po.observed_at NULLS LAST, po.created_at, po.provider_observation_id
     """
+    params.extend([source_run_id, source_run_id])
     if limit is not None:
         sql += " LIMIT %s"
         params.append(limit)
