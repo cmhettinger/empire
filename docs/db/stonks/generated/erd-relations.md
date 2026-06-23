@@ -21,6 +21,8 @@ flowchart LR
   provider["provider"]
   provider_evidence["provider_evidence"]
   provider_observation["provider_observation"]
+  provider_source_snapshot["provider_source_snapshot"]
+  provider_source_snapshot_object["provider_source_snapshot_object"]
   security["security"]
   security_event["security_event"]
   security_identifier["security_identifier"]
@@ -63,6 +65,9 @@ flowchart LR
   provider_observation -->|fk_provider_evidence_observation| provider_evidence
   security -->|fk_provider_evidence_security| provider_evidence
   provider -->|fk_provider_observation_provider| provider_observation
+  provider_source_snapshot -->|provider_observation_source_snapshot_id_fkey| provider_observation
+  provider -->|provider_source_snapshot_provider_code_fkey| provider_source_snapshot
+  provider_source_snapshot -->|provider_source_snapshot_object_source_snapshot_id_fkey| provider_source_snapshot_object
   iso4217_currency -->|fk_security_currency| security
   issuer -->|fk_security_issuer| security
   instrument_type -->|fk_security_type| security

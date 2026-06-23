@@ -1,6 +1,8 @@
 # Provider observations and evidence links.
 
 provider
+provider_source_snapshot
+provider_source_snapshot_object
 provider_observation
 provider_evidence
 issuer

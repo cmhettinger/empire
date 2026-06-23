@@ -271,7 +271,29 @@ CREATE TABLE stonks.provider_observation (
     raw_key text,
     summary_json jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    source_snapshot_id uuid,
     CONSTRAINT ck_provider_observation_provider_upper CHECK (((provider_code)::text = upper((provider_code)::text)))
+);
+
+CREATE TABLE stonks.provider_source_snapshot (
+    source_snapshot_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    provider_code character varying(32) NOT NULL,
+    source_code character varying(64) NOT NULL,
+    content_sha256 character(64) NOT NULL,
+    first_seen_object_id uuid,
+    first_seen_run_id uuid,
+    parser_version character varying(64),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_provider_source_snapshot_content_sha256 CHECK ((content_sha256 ~ '^[a-fA-F0-9]{64}$'::text)),
+    CONSTRAINT ck_provider_source_snapshot_provider_upper CHECK (((provider_code)::text = upper((provider_code)::text)))
+);
+
+CREATE TABLE stonks.provider_source_snapshot_object (
+    source_snapshot_object_id uuid DEFAULT gen_random_uuid() CONSTRAINT provider_source_snapshot_obj_source_snapshot_object_id_not_null NOT NULL,
+    source_snapshot_id uuid NOT NULL,
+    object_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 CREATE TABLE stonks.security (
@@ -442,6 +464,12 @@ ALTER TABLE ONLY stonks.provider_observation
 ALTER TABLE ONLY stonks.provider
     ADD CONSTRAINT provider_pkey PRIMARY KEY (provider_code);
 
+ALTER TABLE ONLY stonks.provider_source_snapshot_object
+    ADD CONSTRAINT provider_source_snapshot_object_pkey PRIMARY KEY (source_snapshot_object_id);
+
+ALTER TABLE ONLY stonks.provider_source_snapshot
+    ADD CONSTRAINT provider_source_snapshot_pkey PRIMARY KEY (source_snapshot_id);
+
 ALTER TABLE ONLY stonks.security_event
     ADD CONSTRAINT security_event_pkey PRIMARY KEY (event_id);
 
@@ -471,6 +499,15 @@ ALTER TABLE ONLY stonks.issuer_name_history
 
 ALTER TABLE ONLY stonks.listing_symbol_history
     ADD CONSTRAINT uq_listing_symbol_history UNIQUE (listing_id, ticker_norm, valid_from);
+
+ALTER TABLE ONLY stonks.provider_source_snapshot
+    ADD CONSTRAINT uq_provider_source_snapshot_identity UNIQUE (provider_code, source_code, content_sha256);
+
+ALTER TABLE ONLY stonks.provider_source_snapshot_object
+    ADD CONSTRAINT uq_provider_source_snapshot_object_object UNIQUE (object_id);
+
+ALTER TABLE ONLY stonks.provider_source_snapshot_object
+    ADD CONSTRAINT uq_provider_source_snapshot_object_pair UNIQUE (source_snapshot_id, object_id);
 
 ALTER TABLE ONLY stonks.security_identifier
     ADD CONSTRAINT uq_security_identifier UNIQUE (id_type, id_value, security_id);
@@ -531,6 +568,8 @@ CREATE INDEX ix_issuer_status ON stonks.issuer USING btree (status);
 
 CREATE INDEX ix_issuer_type ON stonks.issuer USING btree (issuer_type);
 
+CREATE INDEX ix_listing_active_exchange_ticker ON stonks.listing USING btree (exchange_id, ticker_norm) WHERE ((valid_to IS NULL) AND (ticker_norm IS NOT NULL));
+
 CREATE INDEX ix_listing_currency ON stonks.listing USING btree (currency_code);
 
 CREATE INDEX ix_listing_exchange ON stonks.listing USING btree (exchange_id);
@@ -565,6 +604,12 @@ CREATE INDEX ix_provider_observation_object ON stonks.provider_observation USING
 
 CREATE INDEX ix_provider_observation_provider_date ON stonks.provider_observation USING btree (provider_code, provider_date);
 
+CREATE INDEX ix_provider_observation_source_snapshot ON stonks.provider_observation USING btree (source_snapshot_id);
+
+CREATE INDEX ix_provider_source_snapshot_object_snapshot ON stonks.provider_source_snapshot_object USING btree (source_snapshot_id);
+
+CREATE INDEX ix_provider_source_snapshot_source ON stonks.provider_source_snapshot USING btree (source_code, created_at DESC);
+
 CREATE INDEX ix_security_currency ON stonks.security USING btree (currency_code);
 
 CREATE INDEX ix_security_event_issuer ON stonks.security_event USING btree (issuer_id);
@@ -593,7 +638,9 @@ CREATE INDEX ix_security_type ON stonks.security USING btree (instrument_type_co
 
 CREATE UNIQUE INDEX ux_issuer_cik ON stonks.issuer USING btree (cik) WHERE (cik IS NOT NULL);
 
-CREATE UNIQUE INDEX ux_listing_active_lookup ON stonks.listing USING btree (exchange_id, ticker_norm) WHERE ((valid_to IS NULL) AND (ticker_norm IS NOT NULL));
+CREATE UNIQUE INDEX ux_listing_one_active_per_security_exchange ON stonks.listing USING btree (security_id, exchange_id) WHERE ((valid_to IS NULL) AND ((status)::text = 'ACTIVE'::text));
+
+CREATE UNIQUE INDEX ux_listing_symbol_one_active_per_listing ON stonks.listing_symbol_history USING btree (listing_id) WHERE (valid_to IS NULL);
 
 CREATE UNIQUE INDEX ux_provider_observation_raw_key ON stonks.provider_observation USING btree (provider_code, raw_key) WHERE (raw_key IS NOT NULL);
 
@@ -699,6 +746,15 @@ ALTER TABLE ONLY stonks.provider_evidence
 ALTER TABLE ONLY stonks.provider_observation
     ADD CONSTRAINT fk_provider_observation_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
 
+ALTER TABLE ONLY stonks.provider_source_snapshot
+    ADD CONSTRAINT fk_provider_source_snapshot_first_seen_object FOREIGN KEY (first_seen_object_id) REFERENCES core.stored_object(object_id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY stonks.provider_source_snapshot
+    ADD CONSTRAINT fk_provider_source_snapshot_first_seen_run FOREIGN KEY (first_seen_run_id) REFERENCES core.core_run(run_id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY stonks.provider_source_snapshot_object
+    ADD CONSTRAINT fk_provider_source_snapshot_object_object FOREIGN KEY (object_id) REFERENCES core.stored_object(object_id) ON DELETE CASCADE;
+
 ALTER TABLE ONLY stonks.security
     ADD CONSTRAINT fk_security_currency FOREIGN KEY (currency_code) REFERENCES stonks.iso4217_currency(code);
 
@@ -734,3 +790,12 @@ ALTER TABLE ONLY stonks.security
 
 ALTER TABLE ONLY stonks.security
     ADD CONSTRAINT fk_security_type FOREIGN KEY (instrument_type_code) REFERENCES stonks.instrument_type(type_code);
+
+ALTER TABLE ONLY stonks.provider_observation
+    ADD CONSTRAINT provider_observation_source_snapshot_id_fkey FOREIGN KEY (source_snapshot_id) REFERENCES stonks.provider_source_snapshot(source_snapshot_id);
+
+ALTER TABLE ONLY stonks.provider_source_snapshot_object
+    ADD CONSTRAINT provider_source_snapshot_object_source_snapshot_id_fkey FOREIGN KEY (source_snapshot_id) REFERENCES stonks.provider_source_snapshot(source_snapshot_id);
+
+ALTER TABLE ONLY stonks.provider_source_snapshot
+    ADD CONSTRAINT provider_source_snapshot_provider_code_fkey FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code);

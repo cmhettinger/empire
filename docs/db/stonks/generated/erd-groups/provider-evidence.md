@@ -66,6 +66,26 @@ erDiagram
     TEXT raw_key
     JSONB summary_json
     TIMESTAMPTZ created_at
+    UUID source_snapshot_id FK
+  }
+
+  provider_source_snapshot {
+    UUID source_snapshot_id PK
+    VARCHAR provider_code FK
+    VARCHAR source_code
+    CHAR content_sha256
+    UUID first_seen_object_id
+    UUID first_seen_run_id
+    VARCHAR parser_version
+    TIMESTAMPTZ created_at
+    TIMESTAMPTZ updated_at
+  }
+
+  provider_source_snapshot_object {
+    UUID source_snapshot_object_id PK
+    UUID source_snapshot_id FK
+    UUID object_id
+    TIMESTAMPTZ created_at
   }
 
   security {
@@ -103,6 +123,9 @@ erDiagram
   provider_observation ||--o{ provider_evidence : "fk_provider_evidence_observation"
   security ||--o{ provider_evidence : "fk_provider_evidence_security"
   provider ||--o{ provider_observation : "fk_provider_observation_provider"
+  provider_source_snapshot ||--o{ provider_observation : "provider_observation_source_snapshot_id_fkey"
+  provider ||--o{ provider_source_snapshot : "provider_source_snapshot_provider_code_fkey"
+  provider_source_snapshot ||--o{ provider_source_snapshot_object : "provider_source_snapshot_object_source_snapshot_id_fkey"
   issuer ||--o{ security : "fk_security_issuer"
   issuer ||--o{ security_event : "fk_security_event_issuer"
   listing ||--o{ security_event : "fk_security_event_listing"

@@ -16,6 +16,8 @@ iso10383_mic_cat
 iso3166_country
 iso4217_currency
 provider
+provider_source_snapshot
+provider_source_snapshot_object
 issuer
 issuer_classification
 issuer_identifier
