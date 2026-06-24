@@ -22,11 +22,7 @@ Before backfill/hydration mutates canonical security identity, build the reconci
 
 # Medium Priority Issues
 
-## 1. Missing exchange aliases remain warning-level work
-
-Unknown SEC exchanges are handled safely: observations are skipped for listings and surfaced as warnings rather than destructive updates. Before backfill/provider mapping, close the known alias gaps so missing exchange coverage does not create noisy unreconciled queues.
-
-## 2. DAG smoke coverage is mostly package-level
+## 1. DAG smoke coverage is mostly package-level
 
 The package has good unit coverage for helpers and report shapes. There is still limited live DAG import/smoke coverage for the full chain under Airflow, especially the Jinja conf handoff between verify, validation, conflicts, and summary.
 
