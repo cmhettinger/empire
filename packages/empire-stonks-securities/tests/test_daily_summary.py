@@ -31,6 +31,7 @@ def test_daily_summary_report_json_shape_is_stable():
     assert list(report.keys()) == [
         "report_name",
         "generated_at",
+        "status",
         "healthy",
         "run_context",
         "summary",
@@ -53,6 +54,7 @@ def test_daily_summary_report_json_shape_is_stable():
         "failures",
     ]
     assert report["report_name"] == "stonks_securities_daily_summary"
+    assert report["status"] == report["summary"]["status"]
     assert report["healthy"] is True
     assert report["run_context"]["dag_id"] == "test_dag"
     assert report["summary"]["inputs_seen"] == 2

@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from empire_core import ObjectStore
+from empire_core import ObjectStore, RunContext as CoreRunContext
 from empire_core.db.postgres import row_to_dict
 
 from empire_stonks_securities.acquisition import DEFAULT_STORAGE_ROOT, default_storage_key
@@ -84,6 +84,7 @@ def generate_phase_2a_validation_report(
     return {
         "report_name": REPORT_NAME,
         "generated_at": generated_at.isoformat(),
+        "status": status,
         "healthy": status in {"PASS", "WARN"},
         "run_context": resolved_run_context.to_dict(),
         "summary": summary,
@@ -240,6 +241,7 @@ def write_validation_report_to_object_store(
     storage_key: str | None = None,
     generated_at: datetime | None = None,
     logical_date: Any = None,
+    storage_run_context: CoreRunContext | None = None,
 ):
     generated_at = generated_at or datetime.now(UTC)
     resolved_storage_key = (storage_key or default_storage_key()).strip("/")
@@ -251,8 +253,8 @@ def write_validation_report_to_object_store(
     )
     filename = f"stonks_securities_validation_{generated_at:%Y%m%dT%H%M%SZ}.json"
     return object_store.put_bytes(
-        run_context=None,
-        object_scope="manual",
+        run_context=storage_run_context,
+        object_scope="run" if storage_run_context is not None else "manual",
         domain="stonks",
         logical_name=REPORT_LOGICAL_NAME,
         storage_root=storage_root,

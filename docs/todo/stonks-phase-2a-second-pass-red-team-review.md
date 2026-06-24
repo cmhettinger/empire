@@ -20,29 +20,13 @@ SEC-created securities are correctly marked as provisional/current-state bootstr
 
 Before backfill/hydration mutates canonical security identity, build the reconciliation service described in `docs/todo/stonks-securities-provisional-status.md`: promotion, merge/split rules, confidence changes, and identity audit reporting.
 
-## 2. Backfill source model needs a clear landing contract
-
-The schema still has the older `source_observation` / `source_evidence` tables alongside the newer `provider_observation` / `provider_evidence` and `provider_source_snapshot` flow. The daily SEC pipeline uses the provider observation model. Historical EDGAR/index/submissions work should not start writing until it is clear whether it will extend the provider model, retire the older source model, or map one into the other.
-
-## 3. Report objects are path-scoped but not run-context-owned
-
-Verify, validation, conflict, and summary reports now write to deterministic run-report paths, which is good. They are stored with `run_context=None` and `object_scope="manual"` even inside Airflow. That does not break the JSON report path, but it weakens object-store lineage and may make future dashboards or cleanup less precise.
-
 # Medium Priority Issues
 
-## 1. README status is stale
-
-`packages/empire-stonks-securities/README.md` still says normalization and database loading should be added in later phases, even though observations, issuers, securities, listings, validation, conflicts, verify, and daily summary are now implemented. Update it before the next handoff.
-
-## 2. Conflict report naming still carries `phase_2a`
-
-`CONFLICT_REPORT_NAME` is `stonks_securities_phase_2a_conflicts` while the logical name is `stonks_securities_conflicts`. The artifact works, but durable report names should describe the report, not the milestone.
-
-## 3. Missing exchange aliases remain warning-level work
+## 1. Missing exchange aliases remain warning-level work
 
 Unknown SEC exchanges are handled safely: observations are skipped for listings and surfaced as warnings rather than destructive updates. Before backfill/provider mapping, close the known alias gaps so missing exchange coverage does not create noisy unreconciled queues.
 
-## 4. DAG smoke coverage is mostly package-level
+## 2. DAG smoke coverage is mostly package-level
 
 The package has good unit coverage for helpers and report shapes. There is still limited live DAG import/smoke coverage for the full chain under Airflow, especially the Jinja conf handoff between verify, validation, conflicts, and summary.
 
@@ -60,6 +44,10 @@ The package has good unit coverage for helpers and report shapes. There is still
 - ticker-shaped security identity: Partially fixed. Code and docs now clearly label SEC-created securities as provisional, but the bootstrap resolver still uses issuer+ticker to find/create provisional security rows.
 - multiple active symbol history rows: Fixed for normal dated ticker changes and guarded by a partial unique index when data is clean. Date-less ticker changes are blocked when they would desynchronize listing current state and active symbol history.
 - multiple active listings for one security/exchange: Fixed by `V2026.06.23.0003__stonks_listing_active_security_exchange_guard.sql`, which enforces one active listing per `(security_id, exchange_id)` while allowing historical/closed rows.
+- source/provider observation table split: OBE. The early `source_observation` / `source_evidence` tables are renamed by `V2026.06.06.0002__stonks_security_master_naming_cleanup.sql`; the current schema uses `provider_observation`, `provider_evidence`, and `provider_source_snapshot`.
+- report object lineage: Fixed for new DAG-generated reports. Verify, validation, conflict, and daily summary reports still use deterministic run-report paths, but Airflow writers now store them with the source scrape run context and `object_scope = 'run'`.
+- conflict report name: Fixed. The durable conflict report name is now `stonks_securities_conflicts`; existing historical report artifacts keep their old JSON content.
+- README status: Fixed. The package README now describes the implemented daily DAG chain, current report artifacts, run-scoped report storage, and the remaining provisional-security caveat.
 - validation SUCCESS vs PASS/WARN/FAIL: Fixed. Verify, validation, conflict, and summary all report PASS/WARN/FAIL-style status.
 - zero observations/evidence summary issue: Appears fixed. Daily summary distinguishes unchanged sources, canonical observations available, all observations reconciled, and stage starvation.
 - missing verify artifact: Fixed. Verify now writes a durable JSON report and summary links it when present.
@@ -71,8 +59,7 @@ The package has good unit coverage for helpers and report shapes. There is still
 It is safe to begin a separate backfill design/build phase. It is not safe to run broad historical backfill into canonical issuer/security/listing state yet.
 
 Minimum blockers before backfill writes canonical state:
-1. Define the historical observation model and how it coexists with daily `provider_observation`.
-2. Build reconciliation/promotion rules for provisional securities.
+1. Build reconciliation/promotion rules for provisional securities.
 
 # Hydration Readiness Assessment
 
@@ -83,10 +70,7 @@ Security type, fund, bond, identifier, and provider mapping phases should write 
 # Recommended Next Punchlist
 
 1. Write the Phase 2B reconciliation design for provisional security promotion, merge/split, and confidence semantics.
-2. Choose the historical backfill observation/evidence landing model before implementing EDGAR/index/submissions writers.
-3. Update the package README to reflect the completed daily chain.
-4. Rename the conflict report's internal report name away from `phase_2a`.
-5. Add DAG import/conf-handoff smoke tests for the full Airflow chain.
+2. Add DAG import/conf-handoff smoke tests for the full Airflow chain.
 
 # Verification Performed
 

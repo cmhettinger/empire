@@ -27,14 +27,18 @@ def test_conflict_report_json_shape_is_stable():
     assert list(report.keys()) == [
         "report_name",
         "generated_at",
+        "status",
         "healthy",
         "run_context",
         "summary",
         "source_priority",
         "conflicts_by_category",
         "conflicts",
+        "warnings",
+        "failures",
     ]
-    assert report["report_name"] == "stonks_securities_phase_2a_conflicts"
+    assert report["report_name"] == "stonks_securities_conflicts"
+    assert report["status"] == report["summary"]["status"]
     assert report["healthy"] is True
     assert report["run_context"]["dag_id"] == "test_dag"
     assert report["source_priority"]["sec_company_tickers_exchange"] == 100
@@ -244,7 +248,7 @@ def test_console_and_file_output(tmp_path, capsys):
     write_conflict_report_to_console(report)
     write_conflict_report_to_file(report, output_path)
 
-    assert json.loads(capsys.readouterr().out)["report_name"] == "stonks_securities_phase_2a_conflicts"
+    assert json.loads(capsys.readouterr().out)["report_name"] == "stonks_securities_conflicts"
     assert json.loads(output_path.read_text(encoding="utf-8"))["summary"]["conflicts_total"] == 0
 
 

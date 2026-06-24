@@ -9,14 +9,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from empire_core import ObjectStore
+from empire_core import ObjectStore, RunContext as CoreRunContext
 from empire_core.db.postgres import row_to_dict
 
 from empire_stonks_securities.acquisition import DEFAULT_STORAGE_ROOT, default_storage_key
 from empire_stonks_securities.report_paths import run_report_object_key, run_report_path
 
 
-CONFLICT_REPORT_NAME = "stonks_securities_phase_2a_conflicts"
+CONFLICT_REPORT_NAME = "stonks_securities_conflicts"
 CONFLICT_REPORT_OBJECT_KIND = "stonks_securities_conflict_report"
 CONFLICT_REPORT_LOGICAL_NAME = "stonks_securities_conflicts"
 
@@ -66,15 +66,20 @@ def generate_phase_2a_conflict_report(
 
     conflicts = build_conflicts(candidate_rows)
     summary = summarize_conflicts(conflicts)
+    warnings = conflict_findings(conflicts, severity="WARN")
+    failures = conflict_findings(conflicts, severity="FAIL")
     return {
         "report_name": CONFLICT_REPORT_NAME,
         "generated_at": generated_at.isoformat(),
+        "status": summary["status"],
         "healthy": summary["status"] in {"PASS", "WARN"},
         "run_context": resolved_run_context.to_dict(),
         "summary": summary,
         "source_priority": SOURCE_PRIORITY,
         "conflicts_by_category": conflicts_by_category(conflicts),
         "conflicts": conflicts,
+        "warnings": warnings,
+        "failures": failures,
     }
 
 
@@ -547,6 +552,20 @@ def summarize_conflicts(conflicts: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def conflict_findings(
+    conflicts: list[dict[str, Any]], *, severity: str
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "code": conflict["category"],
+            "message": conflict["message"],
+            "conflict": conflict,
+        }
+        for conflict in conflicts
+        if conflict["severity"] == severity
+    ]
+
+
 def evaluate_conflict_status(conflicts: list[dict[str, Any]]) -> str:
     severities = {conflict["severity"] for conflict in conflicts}
     if "FAIL" in severities:
@@ -614,6 +633,7 @@ def write_conflict_report_to_object_store(
     storage_key: str | None = None,
     generated_at: datetime | None = None,
     logical_date: Any = None,
+    storage_run_context: CoreRunContext | None = None,
 ):
     generated_at = generated_at or datetime.now(UTC)
     resolved_storage_key = (storage_key or default_storage_key()).strip("/")
@@ -625,8 +645,8 @@ def write_conflict_report_to_object_store(
     )
     filename = f"stonks_securities_conflicts_{generated_at:%Y%m%dT%H%M%SZ}.json"
     return object_store.put_bytes(
-        run_context=None,
-        object_scope="manual",
+        run_context=storage_run_context,
+        object_scope="run" if storage_run_context is not None else "manual",
         domain="stonks",
         logical_name=CONFLICT_REPORT_LOGICAL_NAME,
         storage_root=storage_root,

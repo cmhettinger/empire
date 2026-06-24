@@ -137,6 +137,7 @@ def test_verify_report_passes_with_clean_required_source(tmp_path):
     report = generate_verify_report(result=result)
 
     assert report["summary"]["status"] == "PASS"
+    assert report["status"] == "PASS"
     assert report["healthy"] is True
     assert report["warnings"] == []
     assert report["failures"] == []
@@ -186,6 +187,30 @@ def test_verify_report_fails_on_checksum_mismatch(tmp_path):
 
 def test_write_verify_report_to_object_store_uses_run_report_path(tmp_path):
     object_store = ObjectStore(FakeObjectRepository(tmp_path))
+    run_id = uuid4()
+    report = {
+        "report_name": "stonks_securities_verify",
+        "generated_at": "2026-06-21T13:22:00+00:00",
+        "run_context": {"logical_date": "2026-06-21T13:22:00+00:00"},
+        "healthy": True,
+        "summary": {"status": "PASS"},
+    }
+
+    stored = write_verify_report_to_object_store(
+        report=report,
+        object_store=object_store,
+        generated_at=datetime(2026, 6, 21, 13, 22, tzinfo=UTC),
+        storage_run_context=FakeRunContext(run_id),
+    )
+
+    assert stored.object_key == "stonks/securities/runs/2026/06/21/run-reports/verify"
+    assert stored.object_kind == "stonks_securities_verify_report"
+    assert stored.object_scope == "run"
+    assert stored.run_id == run_id
+
+
+def test_write_verify_report_to_object_store_defaults_to_manual_scope(tmp_path):
+    object_store = ObjectStore(FakeObjectRepository(tmp_path))
     report = {
         "report_name": "stonks_securities_verify",
         "generated_at": "2026-06-21T13:22:00+00:00",
@@ -200,8 +225,8 @@ def test_write_verify_report_to_object_store_uses_run_report_path(tmp_path):
         generated_at=datetime(2026, 6, 21, 13, 22, tzinfo=UTC),
     )
 
-    assert stored.object_key == "stonks/securities/runs/2026/06/21/run-reports/verify"
-    assert stored.object_kind == "stonks_securities_verify_report"
+    assert stored.object_scope == "manual"
+    assert stored.run_id is None
 
 
 def _put_source(

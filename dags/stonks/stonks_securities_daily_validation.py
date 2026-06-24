@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.sdk import dag, get_current_context, task
-from empire_core import EmpireDatabase, ObjectStore
+from empire_core import EmpireDatabase, ObjectStore, RunService
 from empire_stonks_securities import (
     ValidationRunContext,
     generate_phase_2a_validation_report,
@@ -45,6 +45,9 @@ def stonks_securities_daily_validation():
 
         with EmpireDatabase.connect_from_env() as conn:
             object_store = ObjectStore.from_connection(conn)
+            storage_run_context = RunService.from_connection(conn).get_run_context(
+                input_run_id
+            )
             report = generate_phase_2a_validation_report(
                 connection=conn,
                 run_context=run_context,
@@ -56,6 +59,7 @@ def stonks_securities_daily_validation():
                 object_store=object_store,
                 generated_at=generated_at,
                 logical_date=logical_date,
+                storage_run_context=storage_run_context,
             )
 
         summary = report["summary"]
