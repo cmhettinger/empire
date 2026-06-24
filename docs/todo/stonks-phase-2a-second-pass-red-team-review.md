@@ -20,12 +20,6 @@ SEC-created securities are correctly marked as provisional/current-state bootstr
 
 Before backfill/hydration mutates canonical security identity, build the reconciliation service described in `docs/todo/stonks-securities-provisional-status.md`: promotion, merge/split rules, confidence changes, and identity audit reporting.
 
-# Medium Priority Issues
-
-## 1. DAG smoke coverage is mostly package-level
-
-The package has good unit coverage for helpers and report shapes. There is still limited live DAG import/smoke coverage for the full chain under Airflow, especially the Jinja conf handoff between verify, validation, conflicts, and summary.
-
 # Low Priority / Nice To Have
 
 - Add a short operator doc for interpreting PASS/WARN/FAIL reports and which warnings are expected on healthy zero-change days.
