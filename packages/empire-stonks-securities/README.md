@@ -221,6 +221,41 @@ Report-specific sections carry the detailed payload, such as source coverage,
 listing quality, conflict categories, pipeline stage health, and linked report
 summaries.
 
+### Interpreting Reports
+
+Report status is intentionally operational:
+
+- `PASS` means the report completed with no warnings or failures.
+- `WARN` means the report completed with usable output and no failures, but an
+  operator should review the warning list.
+- `FAIL` means the report found a failure that makes the output untrustworthy
+  for handoff or downstream use.
+
+`healthy` is `true` for `PASS` and `WARN`, and `false` for `FAIL`.
+
+Healthy zero-change SEC days are expected. When SEC serves the same source files
+again, the scrape and verify stages can still succeed while observations,
+evidence, issuers, securities, and listings create no new rows. In that case the
+daily summary should explain the zero delta with
+`zero_observations_reason = "unchanged_sources_no_new_observations"`.
+
+Expected warnings on an otherwise healthy current daily run:
+
+- `ticker_exchange_observations_missing_exchange`: SEC source rows with no raw
+  exchange value. These are visible for review but are not guessed into a
+  listing.
+- `validation_report_warn` in the daily summary when the linked validation
+  report is `WARN` only because of expected validation warnings.
+
+Warnings that should be investigated before treating the run as clean:
+
+- `raw_sec_exchange_values_unmapped`: a new SEC exchange value needs an
+  explicit `exchange_alias` mapping or a deliberate decision to leave it
+  unmapped.
+- conflict report warnings or non-zero conflict counts.
+- missing source files, checksum failures, report read failures, stage
+  starvation, or any report with `failures_total > 0`.
+
 ## Status
 
 Implemented:
