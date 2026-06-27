@@ -47,6 +47,13 @@ from empire_youtube.runner import (
     run_youtube_scraper_to_object_store,
 )
 from empire_youtube.scraper import YouTubeScraper
+from empire_youtube.stager import (
+    YouTubeStageResult,
+    build_video_from_ytdlp_metadata,
+    parse_youtube_video_id,
+    stage_folder_name,
+    stage_youtube_video,
+)
 
 __all__ = [
     "DEFAULT_CONFIG_LOGICAL_NAME",
@@ -71,10 +78,12 @@ __all__ = [
     "YouTubeScrapeProcessor",
     "YouTubeScraper",
     "YouTubeScraperConfig",
+    "YouTubeStageResult",
     "YouTubeChannelResolver",
     "DEFAULT_YOUTUBE_DAYS_TO_KEEP",
     "YOUTUBE_DAYS_TO_KEEP_ENV",
     "DEFAULT_LIBRARY_PLAN_FILENAME",
+    "build_video_from_ytdlp_metadata",
     "download_entry_to_object_store",
     "find_download_entry",
     "iter_download_entries",
@@ -82,9 +91,12 @@ __all__ = [
     "load_config_from_object_id",
     "load_library_plan_from_object_id",
     "load_library_plan_from_run_id",
+    "parse_youtube_video_id",
     "resolve_channel",
     "run_youtube_processor_to_object_store",
     "run_youtube_scraper_to_object_store",
+    "stage_folder_name",
+    "stage_youtube_video",
     "write_result_to_file",
     "youtube_expires_at",
 ]
