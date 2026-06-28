@@ -25,6 +25,10 @@ COPY deploy/docker/airflow/airflow-requirements.txt /requirements.txt
 
 RUN pip install --no-cache-dir -r /requirements.txt
 
+COPY resources/branding /opt/empire/resources/branding
+
+ENV EMPIRE_BRANDING_ROOT=/opt/empire/resources/branding
+
 COPY packages/empire-mail /opt/empire/packages/empire-mail
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-mail
@@ -40,6 +44,10 @@ RUN pip install --no-cache-dir /opt/empire/packages/empire-youtube
 COPY packages/empire-weather /opt/empire/packages/empire-weather
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-weather
+
+COPY packages/empire-reports /opt/empire/packages/empire-reports
+
+RUN pip install --no-cache-dir /opt/empire/packages/empire-reports
 
 COPY packages/empire-stonks-securities /opt/empire/packages/empire-stonks-securities
 
