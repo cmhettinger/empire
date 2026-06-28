@@ -15,6 +15,14 @@ from empire_core.db.postgres import row_to_dict
 
 from empire_stonks_securities.acquisition import DEFAULT_STORAGE_ROOT, default_storage_key
 from empire_stonks_securities.conflicts import CONFLICT_REPORT_OBJECT_KIND
+from empire_stonks_securities.reports.daily_refresh_summary.data import (
+    load_canonical_market_snapshot,
+)
+from empire_stonks_securities.reports.daily_refresh_summary.pdf.render import (
+    DAILY_SUMMARY_PDF_LOGICAL_NAME,
+    DAILY_SUMMARY_PDF_OBJECT_KIND,
+    render_daily_refresh_summary_pdf,
+)
 from empire_stonks_securities.report_paths import run_report_object_key, run_report_path
 from empire_stonks_securities.validation import REPORT_OBJECT_KIND as VALIDATION_REPORT_OBJECT_KIND
 from empire_stonks_securities.verification import VERIFY_REPORT_OBJECT_KIND
@@ -23,6 +31,7 @@ from empire_stonks_securities.verification import VERIFY_REPORT_OBJECT_KIND
 DAILY_SUMMARY_REPORT_NAME = "stonks_securities_daily_summary"
 DAILY_SUMMARY_REPORT_OBJECT_KIND = "stonks_securities_daily_summary_report"
 DAILY_SUMMARY_REPORT_LOGICAL_NAME = "stonks_securities_daily_summary"
+DAILY_SUMMARY_PDF_RETENTION_DAYS = 7
 REQUIRED_DAILY_SOURCES = ("sec_company_tickers_exchange", "sec_company_tickers")
 DEFAULT_STALE_WARN_HOURS = 36
 DEFAULT_STALE_FAIL_HOURS = 96
@@ -101,6 +110,7 @@ def generate_daily_refresh_summary_report(
             current_sources=current_sources,
             generated_at=generated_at,
         )
+        market_snapshot = load_canonical_market_snapshot(cursor)
 
     input_freshness = evaluate_input_freshness(
         current_sources=current_sources,
@@ -165,6 +175,10 @@ def generate_daily_refresh_summary_report(
         "validation_status": validation_report["status"],
         "conflict_status": conflict_report["status"],
         "verify_status": verify_report["status"],
+        "canonical_issuers_total": market_snapshot["totals"]["issuers_total"],
+        "canonical_securities_total": market_snapshot["totals"]["securities_total"],
+        "canonical_listings_total": market_snapshot["totals"]["listings_total"],
+        "canonical_markets_represented": market_snapshot["markets_represented"],
     }
     return {
         "report_name": DAILY_SUMMARY_REPORT_NAME,
@@ -189,9 +203,17 @@ def generate_daily_refresh_summary_report(
         ],
         "stage_starvation_detected": zero_delta_analysis["stage_starvation_detected"],
         "safety_guards": safety_guards,
+        "market_snapshot": market_snapshot,
         "validation_report": validation_report,
         "conflict_report": conflict_report,
         "verify_report": verify_report,
+        "human_review_items": build_human_review_items(
+            daily_warnings=warnings,
+            daily_failures=failures,
+            validation_report=validation_report,
+            conflict_report=conflict_report,
+            verify_report=verify_report,
+        ),
         "warnings": warnings,
         "failures": failures,
     }
@@ -307,7 +329,8 @@ def summarize_report_object(
             "failures_total": None,
             "conflicts_total": None,
         }
-    summary = _load_report_summary(stored_object, object_store=object_store)
+    payload = _load_report_payload(stored_object, object_store=object_store)
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
     status = _normalize_report_status(summary.get("status"))
     return {
         "present": True,
@@ -319,7 +342,41 @@ def summarize_report_object(
         "failures_total": summary.get("failures_total"),
         "conflicts_total": summary.get("conflicts_total"),
         "generated_at": stored_object.get("report_generated_at") or stored_object.get("created_at"),
+        "review_items": _report_review_items(payload),
     }
+
+
+def build_human_review_items(
+    *,
+    daily_warnings: list[dict[str, Any]],
+    daily_failures: list[dict[str, Any]],
+    validation_report: dict[str, Any],
+    conflict_report: dict[str, Any],
+    verify_report: dict[str, Any],
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for severity, findings in (("FAIL", daily_failures), ("WARN", daily_warnings)):
+        for finding in findings:
+            if str(finding.get("code", "")).endswith("_report_warn"):
+                continue
+            items.append(
+                {
+                    "source_report": "daily_summary",
+                    "severity": severity,
+                    "code": finding.get("code"),
+                    "count": _finding_count(finding),
+                    "message": finding.get("message") or _humanize_code(finding.get("code")),
+                    "path": finding.get("path"),
+                }
+            )
+    for report_name, report in (
+        ("verify", verify_report),
+        ("validation", validation_report),
+        ("conflicts", conflict_report),
+    ):
+        for item in report.get("review_items", []):
+            items.append({**item, "source_report": report_name, "path": report.get("path")})
+    return items
 
 
 def build_pipeline_stage_health(
@@ -698,6 +755,63 @@ def write_daily_summary_report_to_object_store(
         content_type="application/json",
         object_kind=DAILY_SUMMARY_REPORT_OBJECT_KIND,
         metadata={"report_name": DAILY_SUMMARY_REPORT_NAME, "generated_at": report["generated_at"]},
+    )
+
+
+def write_daily_summary_pdf_to_object_store(
+    *,
+    report: dict[str, Any],
+    object_store: ObjectStore,
+    storage_root: str = DEFAULT_STORAGE_ROOT,
+    storage_key: str | None = None,
+    generated_at: datetime | None = None,
+    logical_date: Any = None,
+    storage_run_context: CoreRunContext | None = None,
+    output_dir: str | Path | None = None,
+):
+    generated_at = generated_at or datetime.now(UTC)
+    resolved_storage_key = (storage_key or default_storage_key()).strip("/")
+    object_key = run_report_object_key(
+        storage_key=resolved_storage_key,
+        report_type="summary",
+        logical_date=logical_date or report.get("run_context", {}).get("logical_date"),
+        generated_at=generated_at,
+    )
+    filename = f"stonks_securities_daily_summary_{generated_at:%Y%m%dT%H%M%SZ}.pdf"
+    render_root = Path(output_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp"))
+    render_dir = run_report_path(
+        root=render_root,
+        report_type="summary",
+        filename="pdf-render",
+        logical_date=logical_date or report.get("run_context", {}).get("logical_date"),
+        generated_at=generated_at,
+    ).parent
+    result = render_daily_refresh_summary_pdf(
+        report=report,
+        output_dir=render_dir,
+        generated_at=generated_at,
+        filename=filename,
+    )
+    expires_at = generated_at + timedelta(days=DAILY_SUMMARY_PDF_RETENTION_DAYS)
+    return object_store.put_file(
+        run_context=storage_run_context,
+        object_scope="run" if storage_run_context is not None else "manual",
+        domain="stonks",
+        logical_name=DAILY_SUMMARY_PDF_LOGICAL_NAME,
+        storage_root=storage_root,
+        object_key=object_key,
+        filename=filename,
+        source_path=result.primary_artifact.path,
+        move=False,
+        content_type="application/pdf",
+        object_kind=DAILY_SUMMARY_PDF_OBJECT_KIND,
+        expires_at=expires_at,
+        metadata={
+            "report_name": DAILY_SUMMARY_REPORT_NAME,
+            "report_id": result.report.report_id,
+            "generated_at": report["generated_at"],
+            "retention_days": DAILY_SUMMARY_PDF_RETENTION_DAYS,
+        },
     )
 
 
@@ -1114,7 +1228,84 @@ def _observation_scope_sql(source_run_id: str | None) -> tuple[str, tuple[Any, .
     )
 
 
-def _load_report_summary(
+def _report_review_items(report: dict[str, Any]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for severity, key in (("FAIL", "failures"), ("WARN", "warnings")):
+        for finding in report.get(key, [])[:25]:
+            items.append(
+                {
+                    "severity": severity,
+                    "code": finding.get("code"),
+                    "count": _finding_count(finding),
+                    "message": _review_message(finding),
+                    "recommended_action": _recommended_action(finding),
+                }
+            )
+    if items:
+        return items
+
+    conflicts_by_category = report.get("conflicts_by_category")
+    if isinstance(conflicts_by_category, dict):
+        for category, counts in list(conflicts_by_category.items())[:25]:
+            if not isinstance(counts, dict):
+                continue
+            total = int(counts.get("total") or 0)
+            if total == 0:
+                continue
+            severity = "FAIL" if int(counts.get("failures") or 0) else "WARN"
+            items.append(
+                {
+                    "severity": severity,
+                    "code": category,
+                    "count": total,
+                    "message": f"{_humanize_code(category)} has {total} open item(s).",
+                    "recommended_action": "Review the conflict report category details.",
+                }
+            )
+    return items
+
+
+def _review_message(finding: dict[str, Any]) -> str:
+    if finding.get("message"):
+        return str(finding["message"])
+    code = finding.get("code")
+    count = _finding_count(finding)
+    if count is not None:
+        return f"{_humanize_code(code)} count is {count}."
+    return _humanize_code(code)
+
+
+def _recommended_action(finding: dict[str, Any]) -> str | None:
+    conflict = finding.get("conflict")
+    if isinstance(conflict, dict) and conflict.get("recommended_action"):
+        return str(conflict["recommended_action"])
+    return None
+
+
+def _finding_count(finding: dict[str, Any]) -> int | None:
+    for key in (
+        "count",
+        "conflicts_total",
+        "failures_total",
+        "warnings_total",
+        "unreconciled_observations",
+    ):
+        value = finding.get(key)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _humanize_code(value: Any) -> str:
+    text = str(value or "review_item").replace("_", " ").strip()
+    return text[:1].upper() + text[1:]
+
+
+def _load_report_payload(
     stored_object: dict[str, Any],
     *,
     object_store: ObjectStore | None,
@@ -1126,8 +1317,7 @@ def _load_report_summary(
         report = json.loads(data.decode("utf-8"))
     except Exception:
         return {}
-    summary = report.get("summary")
-    return summary if isinstance(summary, dict) else {}
+    return report if isinstance(report, dict) else {}
 
 
 def _normalize_report_status(value: Any) -> str:

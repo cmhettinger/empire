@@ -13,6 +13,7 @@ from empire_stonks_securities import (
     generate_daily_refresh_summary_report,
     input_run_id_from_conf,
     optional_object_id,
+    write_daily_summary_pdf_to_object_store,
     write_daily_summary_report_to_object_store,
 )
 
@@ -73,12 +74,19 @@ def stonks_securities_daily_refresh_summary():
                 logical_date=logical_date,
                 storage_run_context=storage_run_context,
             )
+            stored_pdf = write_daily_summary_pdf_to_object_store(
+                report=report,
+                object_store=object_store,
+                generated_at=generated_at,
+                logical_date=logical_date,
+                storage_run_context=storage_run_context,
+            )
 
         summary = report["summary"]
         log.info(
             "Stonks securities daily summary status=%s inputs_seen=%s inputs_missing=%s "
             "inputs_unchanged=%s validation_status=%s conflict_status=%s warnings=%s "
-            "failures=%s path=%s object_id=%s",
+            "failures=%s path=%s object_id=%s pdf_path=%s pdf_object_id=%s",
             summary["status"],
             summary["inputs_seen"],
             summary["inputs_missing"],
@@ -89,12 +97,17 @@ def stonks_securities_daily_refresh_summary():
             summary["failures_total"],
             f"{stored.object_key}/{stored.filename}",
             stored.object_id,
+            f"{stored_pdf.object_key}/{stored_pdf.filename}",
+            stored_pdf.object_id,
         )
         return {
             "summary": summary,
             "object_key": stored.object_key,
             "filename": stored.filename,
             "object_id": str(stored.object_id),
+            "pdf_object_key": stored_pdf.object_key,
+            "pdf_filename": stored_pdf.filename,
+            "pdf_object_id": str(stored_pdf.object_id),
         }
 
     generate_daily_refresh_summary()

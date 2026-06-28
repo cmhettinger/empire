@@ -47,9 +47,11 @@ def test_daily_summary_report_json_shape_is_stable():
         "unreconciled_observations_count",
         "stage_starvation_detected",
         "safety_guards",
+        "market_snapshot",
         "validation_report",
         "conflict_report",
         "verify_report",
+        "human_review_items",
         "warnings",
         "failures",
     ]
@@ -71,6 +73,17 @@ def test_daily_summary_report_json_shape_is_stable():
     assert report["unreconciled_observations_count"] == 0
     assert report["stage_starvation_detected"] is False
     assert report["safety_guards"]["listings_closed_by_daily_refresh"] == 0
+    assert report["summary"]["canonical_issuers_total"] == 8026
+    assert report["summary"]["canonical_securities_total"] == 10453
+    assert report["summary"]["canonical_listings_total"] == 10170
+    assert report["summary"]["canonical_markets_represented"] == 3
+    assert report["market_snapshot"]["scope"] == "canonical_current_active_listings"
+    assert report["market_snapshot"]["markets"][-1]["exchange_code"] == "XNYS"
+    assert any(
+        item["source_report"] == "daily_summary"
+        and item["code"] == "verify_report_missing"
+        for item in report["human_review_items"]
+    )
 
 
 def test_freshness_pass_warn_fail_and_missing_source():
@@ -195,6 +208,21 @@ def test_daily_summary_links_verify_report_when_present():
     assert report["pipeline_stage_health"]["verify"]["status"] == "PASS"
     assert report["summary"]["verify_status"] == "PASS"
     assert not any(warning["code"] == "verify_report_missing" for warning in report["warnings"])
+
+
+def test_daily_summary_includes_linked_report_review_items():
+    report = generate_daily_refresh_summary_report(
+        connection=FakeConnection(),
+        object_store=FakeObjectStore(validation_status="WARN", conflict_status="PASS"),
+        generated_at=GENERATED_AT,
+    )
+
+    assert any(
+        item["source_report"] == "validation"
+        and item["code"] == "ticker_exchange_observations_missing_exchange"
+        and item["count"] == 212
+        for item in report["human_review_items"]
+    )
 
 
 def test_unchanged_sources_with_reconciled_observations_are_healthy_zero_evidence():
@@ -372,7 +400,23 @@ class FakeObjectStore:
                         "status": self.validation_status,
                         "warnings_total": 1 if self.validation_status == "WARN" else 0,
                         "failures_total": 1 if self.validation_status == "FAIL" else 0,
-                    }
+                    },
+                    "warnings": [
+                        {
+                            "code": "ticker_exchange_observations_missing_exchange",
+                            "count": 212,
+                        }
+                    ]
+                    if self.validation_status == "WARN"
+                    else [],
+                    "failures": [
+                        {
+                            "code": "validation_failed",
+                            "count": 1,
+                        }
+                    ]
+                    if self.validation_status == "FAIL"
+                    else [],
                 }
             ).encode("utf-8")
         if object_id_text == "00000000-0000-0000-0000-000000000002":
@@ -492,4 +536,32 @@ DEFAULT_RESULTS = {
     "daily_summary_security_updated": 0,
     "daily_summary_listing_created": 10170,
     "daily_summary_listing_updated": 0,
+    "daily_summary_canonical_market_totals": {
+        "issuers_total": 8026,
+        "securities_total": 10453,
+        "listings_total": 10170,
+    },
+    "daily_summary_canonical_markets": [
+        {
+            "exchange_code": "XNAS",
+            "exchange_name": "NASDAQ",
+            "issuers_total": 3900,
+            "securities_total": 5200,
+            "listings_total": 5300,
+        },
+        {
+            "exchange_code": "ARCX",
+            "exchange_name": "NYSE ARCA",
+            "issuers_total": 2400,
+            "securities_total": 3000,
+            "listings_total": 3100,
+        },
+        {
+            "exchange_code": "XNYS",
+            "exchange_name": "NEW YORK STOCK EXCHANGE",
+            "issuers_total": 1726,
+            "securities_total": 2253,
+            "listings_total": 1770,
+        },
+    ],
 }

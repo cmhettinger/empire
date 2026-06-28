@@ -9,6 +9,7 @@ packages = [{ include = "empire_stonks_securities", from = "src" }]
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
 empire-core = { path = "../empire-core" }
+empire-reports = { path = "../empire-reports" }
 PyYAML = ">=6.0"
 requests = ">=2.31"
 
@@ -21,4 +22,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "../empire-core/src"]
+pythonpath = ["src", "../empire-core/src", "../empire-reports/src"]
