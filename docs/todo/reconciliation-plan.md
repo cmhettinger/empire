@@ -66,6 +66,14 @@ Each task is intended to fit in one focused work session. A task is complete
 only when the code/doc changes are made, the listed verification passes, and the
 status checkbox is updated.
 
+Default working pattern: use one Codex chat per task ID, such as `P0.1`,
+`D1.1`, or `S2.1`. Start the chat by naming the task ID and asking Codex to
+read this document, complete that task, run the listed verification, and update
+the checkbox plus `Done:` note. Adjacent tiny tasks may be combined when they
+are naturally coupled, but large tasks should be split in this document rather
+than stretched across a long chat. New chats should start by reading the prior
+task's `Done:` note and the current live repo state.
+
 Status format:
 
 - `[ ]` Not started
@@ -287,3 +295,62 @@ Backfill readiness after this plan:
 - Not automatically ready to mutate confirmed identity history at scale until
   the backfill design defines source priority, temporal rules, conflict handling,
   and review/reporting expectations.
+
+## OHLCV Readiness Guidance
+
+Do not block all OHLCV work on perfect historical security-master coverage.
+Daily current OHLCV and historical OHLCV backfill have different readiness
+thresholds.
+
+Daily current OHLCV can begin after the early reconciliation foundations are in
+place:
+
+- The consolidated SEC daily refresh DAG is stable.
+- `security.identity_status` exists and distinguishes `PROVISIONAL` from
+  `CONFIRMED`.
+- Evidence and audit basics exist.
+- Reconciliation dry-run reporting exists.
+- Duplicate provisional candidate detection exists at least as warnings.
+- Consumers have a clear policy that OHLCV may attach to `listing_id`, but must
+  respect listing quality and security identity status.
+
+At that point, daily OHLCV should be added as an additive provider pipeline for
+current active listings. It should preserve immutable provider observations and
+attach normalized bars cautiously, so later identity/backfill improvements can
+change interpretation without destroying raw price facts.
+
+Preferred high-level storage shape:
+
+```text
+ohlcv_provider_observation
+  provider
+  observed_symbol
+  observed_exchange / venue
+  price_date
+  open/high/low/close/volume
+  raw provider metadata
+
+ohlcv_bar
+  listing_id nullable or confidence-scoped
+  provider_observation_id
+  price_date
+  normalized open/high/low/close/volume
+  adjustment status
+```
+
+Historical OHLCV backfill should wait for a separate security/listing backfill
+design. Historical bars are where ticker reuse, exchange changes, delistings,
+splits, symbol changes, and successor identities become material. The system
+does not need full historical execution before historical OHLCV work starts, but
+it does need temporal identity rules and conflict handling before historical
+bars mutate normalized canonical facts at scale.
+
+Practical readiness summary:
+
+- Daily current OHLCV: begin after phases 0-6 are complete and reports show
+  current listings are stable enough for cautious attachment.
+- Historical OHLCV backfill: begin after the security/listing backfill design
+  defines temporal identity, source priority, adjustment, and conflict rules.
+- Never treat OHLCV ingestion as a reason to silently promote, merge, split, or
+  overwrite security identity. It should write additive observations first and
+  let reconciliation decide identity meaning.
