@@ -143,5 +143,13 @@ Potential future classifications include:
 - Confidence Scoring
 - Manual Review Queue (optional)
 - Identity Audit Report
-- Reconciliation Report JSON
+- Reconciliation Report JSON:
+  - dry-run report name/logical name `stonks_securities_reconciliation_dry_run`
+  - dry-run object kind `stonks_securities_reconciliation_dry_run_report`
+  - apply report name/logical name `stonks_securities_reconciliation_apply`
+  - apply object kind `stonks_securities_reconciliation_apply_report`
+  - object-store keys under
+    `stonks/securities/runs/YYYY/MM/DD/run-reports/reconciliation/{dry-run,apply}`
+- CLI entrypoint `stonks-securities-reconcile`; dry-run is the default, and
+  apply requires `--apply`
 - Promotion Metrics Dashboard

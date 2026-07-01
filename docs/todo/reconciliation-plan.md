@@ -96,7 +96,45 @@ Done: 2026-07-01. Updated `packages/empire-stonks-securities/README.md` and `doc
 | P0.2 | [x] | Name the consolidated SEC refresh DAG | Decide the final DAG id for the consolidated daily SEC refresh, the legacy DAG retirement approach, and whether old DAG ids remain as temporary compatibility wrappers. | P0.1 |
 
 Done: 2026-07-01. Chose `stonks_securities_sec_daily_scrape` as the consolidated daily SEC scrape DAG id, with the future DAG file expected at `dags/stonks/stonks_securities_sec_daily_scrape.py`. In Empire DAG naming, `scrape` means the scheduled internet-facing workflow that pulls provider data and processes it through the package-owned daily chain; it can contain subtasks for source collection, verification, observations, issuer/security/listing upserts, validation, conflict reporting, and daily summary reporting. Legacy per-stage DAG ids should remain unchanged only while D1.3-D1.7 introduce and verify the consolidated DAG. Do not add compatibility wrapper DAGs for old stage ids; stage-level wrappers would make partial-entry semantics ambiguous and could duplicate downstream work. D1.8 should retire the old trigger-chain DAG files and clean up Airflow metadata/operator docs after the consolidated DAG is proven. Verification: `rg -n "P0\\.2|stonks_securities_sec_daily_scrape|compatibility wrapper|D1\\.8" docs/todo/reconciliation-plan.md`.
-| P0.3 | [ ] | Name reconciliation outputs | Decide report name, object kind, logical name, object-store path, and CLI command naming for reconciliation dry-run/apply outputs. | P0.1 |
+| P0.3 | [x] | Name reconciliation outputs | Decide report name, object kind, logical name, object-store path, and CLI command naming for reconciliation dry-run/apply outputs. | P0.1 |
+
+Done: 2026-07-01. Chose the reconciliation report and CLI naming contract in the `Reconciliation Output Naming` section below. Dry-run and apply produce distinct JSON report artifacts under the existing run-report object-store layout, and the CLI entrypoint is `stonks-securities-reconcile` with dry-run as the default and `--apply` as the explicit mutating mode. Verification: `rg -n "Reconciliation Output Naming|stonks_securities_reconciliation_dry_run|stonks_securities_reconciliation_apply|stonks-securities-reconcile|P0\\.3" docs/todo/reconciliation-plan.md docs/todo/stonks-securities-provisional-status.md`.
+
+## Reconciliation Output Naming
+
+Use the existing stonks securities run-report convention for reconciliation
+artifacts. Reconciliation reports are JSON first; PDF rendering can be added
+later as a sibling artifact only after the JSON contract is stable.
+
+Dry-run output:
+
+- Report name: `stonks_securities_reconciliation_dry_run`
+- Object kind: `stonks_securities_reconciliation_dry_run_report`
+- Logical name: `stonks_securities_reconciliation_dry_run`
+- Object-store key: `stonks/securities/runs/YYYY/MM/DD/run-reports/reconciliation/dry-run`
+- Filename: `stonks_securities_reconciliation_dry_run_YYYYMMDDTHHMMSSZ.json`
+
+Apply output:
+
+- Report name: `stonks_securities_reconciliation_apply`
+- Object kind: `stonks_securities_reconciliation_apply_report`
+- Logical name: `stonks_securities_reconciliation_apply`
+- Object-store key: `stonks/securities/runs/YYYY/MM/DD/run-reports/reconciliation/apply`
+- Filename: `stonks_securities_reconciliation_apply_YYYYMMDDTHHMMSSZ.json`
+
+The report payload should include a top-level `mode` field with either
+`dry_run` or `apply`, even though the object kinds are already mode-specific.
+That keeps operator output self-describing when a report is copied outside the
+object store.
+
+CLI naming:
+
+- Entrypoint: `stonks-securities-reconcile`
+- Default mode: dry-run
+- Apply mode: `stonks-securities-reconcile --apply`
+- Expected context flags: `--source-run-id`, `--logical-date`, `--output`, and
+  `--write-object-store`, matching the existing package pattern of reusable
+  logic with a thin CLI wrapper.
 
 ## Phase 1: Consolidate The Existing SEC Daily Chain
 
