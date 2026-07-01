@@ -45,17 +45,22 @@ Provisional Security
 Confirmed Security Identity
 ```
 
-Promotion should always be **one-way**:
+Identity lifecycle should stay deliberately small. It starts with only two
+states:
 
 ```
 PROVISIONAL
       ↓
 CONFIRMED
-      ↓
-ENRICHED
 ```
 
 Never silently downgrade an already confirmed security.
+
+Descriptive enrichment is separate from identity lifecycle. Attributes such as
+security type, sector, industry, fund category, asset class, fundamentals, or
+analytics-ready classifications should be stored as separate evidence,
+classification, or enrichment data. They should not create an `ENRICHED`
+identity lifecycle state.
 
 ---
 

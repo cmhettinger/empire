@@ -90,7 +90,9 @@ so this remains useful as a working reference.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| P0.1 | [ ] | Lock identity lifecycle wording | Package docs or this plan clearly state that identity lifecycle starts with only `PROVISIONAL` and `CONFIRMED`; descriptive enrichment is separate. | Current plan |
+| P0.1 | [x] | Lock identity lifecycle wording | Package docs or this plan clearly state that identity lifecycle starts with only `PROVISIONAL` and `CONFIRMED`; descriptive enrichment is separate. | Current plan |
+
+Done: 2026-07-01. Updated `packages/empire-stonks-securities/README.md` and `docs/todo/stonks-securities-provisional-status.md` so lifecycle wording is locked to `PROVISIONAL` -> `CONFIRMED` only, with descriptive enrichment documented as separate evidence/classification data. Verification: `rg -n "ENRICHED|PROVISIONAL|CONFIRMED|identity lifecycle" docs/todo/stonks-securities-provisional-status.md packages/empire-stonks-securities/README.md docs/todo/reconciliation-plan.md`.
 | P0.2 | [ ] | Name the consolidated SEC refresh DAG | Decide the final DAG id for the consolidated daily SEC refresh, the legacy DAG retirement approach, and whether old DAG ids remain as temporary compatibility wrappers. | P0.1 |
 | P0.3 | [ ] | Name reconciliation outputs | Decide report name, object kind, logical name, object-store path, and CLI command naming for reconciliation dry-run/apply outputs. | P0.1 |
 

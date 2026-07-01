@@ -277,3 +277,17 @@ SEC-created securities are provisional bootstrap records. The daily path is
 usable for the current SEC issuer -> security -> listing backbone, but broad
 historical backfill or provider hydration should not promote, merge, split, or
 overwrite canonical security identity until explicit reconciliation rules exist.
+
+### Identity Lifecycle Convention
+
+Security identity lifecycle starts with only two states:
+
+```text
+PROVISIONAL -> CONFIRMED
+```
+
+SEC-created securities remain `PROVISIONAL` until deterministic, auditable
+reconciliation promotes them to `CONFIRMED`. Descriptive enrichment is separate
+from lifecycle status: security type, sector, industry, fund category, asset
+class, fundamentals, and similar attributes should be represented as evidence,
+classification, or enrichment data, not as an `ENRICHED` identity state.
