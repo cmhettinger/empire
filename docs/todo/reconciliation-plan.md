@@ -145,7 +145,7 @@ orchestration cleanup, not a rewrite of package business logic.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | D1.1 | [x] | Inventory current DAG chain behavior | Document the existing scrape -> verify -> observations -> issuers -> securities -> listings -> validation -> conflicts -> summary order, conf payload, run id handoff, report outputs, and task ids that should survive. | P0.2 |
-| D1.2 | [ ] | Add a package-level daily refresh orchestrator shape | Add or identify package functions that can run each stage with explicit `source_run_id`/run context, without depending on cross-DAG conf handoff. | D1.1 |
+| D1.2 | [x] | Add a package-level daily refresh orchestrator shape | Add or identify package functions that can run each stage with explicit `source_run_id`/run context, without depending on cross-DAG conf handoff. | D1.1 |
 | D1.3 | [ ] | Create consolidated DAG skeleton | Add the consolidated SEC refresh DAG with task groups or tasks in the intended order, initially calling the existing stage functions without deleting legacy DAGs. DAG import smoke test passes. | D1.2 |
 | D1.4 | [ ] | Wire scrape and verify stages | Consolidated DAG can collect SEC sources and run verification with the same run id and report path behavior as the old chain. Targeted tests pass. | D1.3 |
 | D1.5 | [ ] | Wire observation and entity stages | Consolidated DAG can run observations, issuers, securities, and listings in order with the same idempotent behavior as the old chain. Targeted tests pass. | D1.4 |
@@ -154,6 +154,8 @@ orchestration cleanup, not a rewrite of package business logic.
 | D1.8 | [ ] | Retire old trigger-chain DAGs | Remove or disable the old per-stage trigger DAGs after the consolidated DAG is verified. Update docs and tests so there is one normal SEC daily refresh entrypoint. | D1.7 |
 
 Done: 2026-07-02. Added the `D1.1 Current SEC Daily Chain Inventory` section below with current DAG order, trigger conf payloads, run-id/report handoff, durable outputs, and task ids to preserve. Verification: `rg -n "D1\\.1|Current SEC Daily Chain Inventory|trigger_stonks_securities_daily_verify|stonks_securities_daily_summary" docs/todo/reconciliation-plan.md`.
+
+Done: 2026-07-02. Added package-owned daily refresh stage wrappers in `empire_stonks_securities.daily_refresh`, exported explicit `DailyRefreshRunContext`/stage result helpers, and covered source-run context plus report object-id handoff in `tests/test_daily_refresh.py`. The future consolidated DAG can now call package functions directly instead of relying on cross-DAG `dag_run.conf` templating. Verification: `packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests` (`159 passed`).
 
 ## D1.1 Current SEC Daily Chain Inventory
 
