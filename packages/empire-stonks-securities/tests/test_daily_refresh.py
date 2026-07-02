@@ -13,7 +13,11 @@ from empire_stonks_securities.daily_refresh import (
     DailyRefreshStageResult,
     collect_sec_sources_stage,
     generate_daily_refresh_summary_stage,
+    upsert_sec_issuers_stage,
+    upsert_sec_listings_stage,
+    upsert_sec_securities_stage,
     verify_sec_sources_stage,
+    write_sec_observations_stage,
 )
 from empire_stonks_securities.runner import DEFAULT_DAILY_JOB_NAME
 
@@ -172,6 +176,120 @@ def test_verify_stage_uses_explicit_source_run_context(monkeypatch):
     }
 
 
+def test_observation_and_entity_stages_use_explicit_source_run_id(monkeypatch):
+    calls = []
+
+    def fake_observation_writer(*, connection, object_store, input_run_id):
+        calls.append(
+            {
+                "stage": "observations",
+                "connection": connection,
+                "object_store": object_store,
+                "source_run_id": input_run_id,
+            }
+        )
+        return FakeStageFunctionResult({"observations_inserted": 2})
+
+    def fake_issuer_upsert(*, connection, source_run_id):
+        calls.append(
+            {
+                "stage": "issuers",
+                "connection": connection,
+                "source_run_id": source_run_id,
+            }
+        )
+        return FakeStageFunctionResult({"issuers_created": 1})
+
+    def fake_security_upsert(*, connection, source_run_id):
+        calls.append(
+            {
+                "stage": "securities",
+                "connection": connection,
+                "source_run_id": source_run_id,
+            }
+        )
+        return FakeStageFunctionResult({"securities_created": 1})
+
+    def fake_listing_upsert(*, connection, source_run_id):
+        calls.append(
+            {
+                "stage": "listings",
+                "connection": connection,
+                "source_run_id": source_run_id,
+            }
+        )
+        return FakeStageFunctionResult({"listings_created": 1})
+
+    monkeypatch.setattr(
+        daily_refresh,
+        "run_stonks_securities_daily_observation_writer",
+        fake_observation_writer,
+    )
+    monkeypatch.setattr(
+        daily_refresh,
+        "upsert_sec_issuers_from_provider_observations",
+        fake_issuer_upsert,
+    )
+    monkeypatch.setattr(
+        daily_refresh,
+        "upsert_sec_securities_from_provider_observations",
+        fake_security_upsert,
+    )
+    monkeypatch.setattr(
+        daily_refresh,
+        "upsert_sec_listings_from_provider_observations",
+        fake_listing_upsert,
+    )
+
+    observations = write_sec_observations_stage(
+        connection="connection",
+        object_store="object-store",
+        source_run_id=SOURCE_RUN_ID,
+    )
+    issuers = upsert_sec_issuers_stage(
+        connection="connection",
+        source_run_id=observations.source_run_id,
+    )
+    securities = upsert_sec_securities_stage(
+        connection="connection",
+        source_run_id=issuers.source_run_id,
+    )
+    listings = upsert_sec_listings_stage(
+        connection="connection",
+        source_run_id=securities.source_run_id,
+    )
+
+    assert [call["stage"] for call in calls] == [
+        "observations",
+        "issuers",
+        "securities",
+        "listings",
+    ]
+    assert all(str(call["source_run_id"]) == str(SOURCE_RUN_ID) for call in calls)
+    assert calls[0]["object_store"] == "object-store"
+    assert all(call["connection"] == "connection" for call in calls)
+    assert observations.to_dict() == {
+        "stage": "observations",
+        "source_run_id": str(SOURCE_RUN_ID),
+        "observations_inserted": 2,
+    }
+    assert issuers.to_dict() == {
+        "stage": "issuers",
+        "source_run_id": str(SOURCE_RUN_ID),
+        "issuers_created": 1,
+    }
+    assert securities.to_dict() == {
+        "stage": "securities",
+        "source_run_id": str(SOURCE_RUN_ID),
+        "securities_created": 1,
+    }
+    assert listings.to_dict() == {
+        "stage": "listings",
+        "source_run_id": str(SOURCE_RUN_ID),
+        "listings_created": 1,
+    }
+
+
 def test_summary_stage_passes_report_object_ids(monkeypatch):
     calls = {}
     run_service = FakeRunService()
@@ -286,6 +404,14 @@ class FakeStoredObject:
     object_key: str
     filename: str
     object_id: str
+
+
+@dataclass(frozen=True)
+class FakeStageFunctionResult:
+    payload: dict[str, object]
+
+    def to_dict(self):
+        return self.payload
 
 
 class FakeRunService:
