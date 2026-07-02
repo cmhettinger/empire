@@ -11,9 +11,11 @@ from empire_stonks_securities.daily_refresh import (
     DailyRefreshReportRef,
     DailyRefreshRunContext,
     DailyRefreshStageResult,
+    collect_sec_sources_stage,
     generate_daily_refresh_summary_stage,
     verify_sec_sources_stage,
 )
+from empire_stonks_securities.runner import DEFAULT_DAILY_JOB_NAME
 
 
 SOURCE_RUN_ID = UUID("00000000-0000-0000-0000-000000000123")
@@ -35,6 +37,70 @@ def test_daily_refresh_context_builds_report_context():
     assert report_context.source_run_id == str(SOURCE_RUN_ID)
     assert report_context.logical_date == "2026-07-02T00:00:00+00:00"
     assert report_context.environment == "airflow"
+
+
+def test_collect_stage_preserves_legacy_daily_scrape_run_contract(monkeypatch):
+    calls = {}
+
+    def fake_run_stonks_securities_daily_to_object_store(**kwargs):
+        calls["run"] = kwargs
+        return FakeAcquisitionRunResult(
+            run_context=FakeRunContext(run_id=SOURCE_RUN_ID),
+            results=[
+                FakeDownloadResult(
+                    source_code="sec_company_tickers_exchange",
+                    status="downloaded",
+                    object_key="stonks/securities/sec/company_tickers_exchange",
+                    filename="company_tickers_exchange.json",
+                    metadata_filename="company_tickers_exchange.metadata.json",
+                    object_id="exchange-object",
+                    metadata_object_id="exchange-metadata-object",
+                ),
+                FakeDownloadResult(
+                    source_code="sec_company_tickers",
+                    status="skipped",
+                    object_key="stonks/securities/sec/company_tickers",
+                    filename="company_tickers.json",
+                    metadata_filename="company_tickers.metadata.json",
+                    object_id="tickers-object",
+                    metadata_object_id="tickers-metadata-object",
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(
+        daily_refresh,
+        "run_stonks_securities_daily_to_object_store",
+        fake_run_stonks_securities_daily_to_object_store,
+    )
+
+    result = collect_sec_sources_stage(
+        config=FakeConfig(name="stonks-securities", version="1"),
+        downloader="downloader",
+        run_service="run-service",
+        object_store="object-store",
+        run_type="airflow",
+        runner="airflow",
+        runner_ref={"dag_id": DEFAULT_DAILY_REFRESH_DAG_ID},
+        source_keys=("sec_company_tickers_exchange", "sec_company_tickers"),
+    )
+
+    assert calls["run"]["run_type"] == "airflow"
+    assert calls["run"]["runner"] == "airflow"
+    assert calls["run"]["runner_ref"] == {"dag_id": DEFAULT_DAILY_REFRESH_DAG_ID}
+    assert calls["run"]["source_keys"] == (
+        "sec_company_tickers_exchange",
+        "sec_company_tickers",
+    )
+    payload = result.to_dict()
+    assert payload["stage"] == "scrape"
+    assert payload["source_run_id"] == str(SOURCE_RUN_ID)
+    assert payload["run_id"] == str(SOURCE_RUN_ID)
+    assert payload["downloaded_count"] == 1
+    assert payload["skipped_count"] == 1
+    assert payload["source_count"] == 2
+    assert payload["sources"][0]["object_id"] == "exchange-object"
+    assert DEFAULT_DAILY_JOB_NAME == "stonks_securities_daily_scrape"
 
 
 def test_verify_stage_uses_explicit_source_run_context(monkeypatch):
@@ -94,6 +160,7 @@ def test_verify_stage_uses_explicit_source_run_context(monkeypatch):
     assert calls["generate"]["run_context"].source_run_id == str(SOURCE_RUN_ID)
     assert calls["write"]["storage_run_context"] == run_service.context
     assert calls["write"]["logical_date"] == "2026-07-02"
+    assert calls["write"]["object_store"] == "object-store"
     assert result.to_dict() == {
         "stage": "verify",
         "source_run_id": str(SOURCE_RUN_ID),
@@ -228,3 +295,43 @@ class FakeRunService:
     def get_run_context(self, source_run_id):
         assert source_run_id == SOURCE_RUN_ID
         return self.context
+
+
+@dataclass(frozen=True)
+class FakeConfig:
+    name: str
+    version: str
+
+
+@dataclass(frozen=True)
+class FakeRunContext:
+    run_id: UUID
+
+
+@dataclass(frozen=True)
+class FakeDownloadResult:
+    source_code: str
+    status: str
+    object_key: str
+    filename: str
+    metadata_filename: str
+    object_id: str
+    metadata_object_id: str
+
+    @property
+    def skipped(self):
+        return self.status == "skipped"
+
+
+@dataclass(frozen=True)
+class FakeAcquisitionRunResult:
+    run_context: FakeRunContext
+    results: list[FakeDownloadResult]
+
+    @property
+    def downloaded_count(self):
+        return sum(1 for result in self.results if result.status == "downloaded")
+
+    @property
+    def skipped_count(self):
+        return sum(1 for result in self.results if result.skipped)
