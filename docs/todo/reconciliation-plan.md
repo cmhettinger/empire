@@ -144,7 +144,7 @@ orchestration cleanup, not a rewrite of package business logic.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| D1.1 | [ ] | Inventory current DAG chain behavior | Document the existing scrape -> verify -> observations -> issuers -> securities -> listings -> validation -> conflicts -> summary order, conf payload, run id handoff, report outputs, and task ids that should survive. | P0.2 |
+| D1.1 | [x] | Inventory current DAG chain behavior | Document the existing scrape -> verify -> observations -> issuers -> securities -> listings -> validation -> conflicts -> summary order, conf payload, run id handoff, report outputs, and task ids that should survive. | P0.2 |
 | D1.2 | [ ] | Add a package-level daily refresh orchestrator shape | Add or identify package functions that can run each stage with explicit `source_run_id`/run context, without depending on cross-DAG conf handoff. | D1.1 |
 | D1.3 | [ ] | Create consolidated DAG skeleton | Add the consolidated SEC refresh DAG with task groups or tasks in the intended order, initially calling the existing stage functions without deleting legacy DAGs. DAG import smoke test passes. | D1.2 |
 | D1.4 | [ ] | Wire scrape and verify stages | Consolidated DAG can collect SEC sources and run verification with the same run id and report path behavior as the old chain. Targeted tests pass. | D1.3 |
@@ -152,6 +152,133 @@ orchestration cleanup, not a rewrite of package business logic.
 | D1.6 | [ ] | Wire validation, conflicts, and summary stages | Consolidated DAG can write validation, conflict, and daily summary reports with the same durable run-report behavior as the old chain. Targeted tests pass. | D1.5 |
 | D1.7 | [ ] | Add consolidated DAG regression tests | Add DAG import, task-order, and run-context smoke tests for the consolidated DAG. Keep package-local tests runnable from the repo root. | D1.6 |
 | D1.8 | [ ] | Retire old trigger-chain DAGs | Remove or disable the old per-stage trigger DAGs after the consolidated DAG is verified. Update docs and tests so there is one normal SEC daily refresh entrypoint. | D1.7 |
+
+Done: 2026-07-02. Added the `D1.1 Current SEC Daily Chain Inventory` section below with current DAG order, trigger conf payloads, run-id/report handoff, durable outputs, and task ids to preserve. Verification: `rg -n "D1\\.1|Current SEC Daily Chain Inventory|trigger_stonks_securities_daily_verify|stonks_securities_daily_summary" docs/todo/reconciliation-plan.md`.
+
+## D1.1 Current SEC Daily Chain Inventory
+
+This inventory captures the current multi-DAG SEC daily chain before it is
+collapsed into `stonks_securities_sec_daily_scrape`.
+
+### Current Order
+
+The existing stage order is:
+
+1. `stonks_securities_daily_scrape`
+2. `stonks_securities_daily_verify`
+3. `stonks_securities_daily_observations`
+4. `stonks_securities_daily_issuers`
+5. `stonks_securities_daily_securities`
+6. `stonks_securities_daily_listings`
+7. `stonks_securities_daily_validation`
+8. `stonks_securities_daily_conflicts`
+9. `stonks_securities_daily_refresh_summary`
+
+All existing DAGs are unscheduled manual DAGs with `catchup=False` and
+`max_active_runs=1`. The consolidated DAG should keep that conservative
+single-active-run behavior unless scheduling is changed deliberately later.
+
+### Stage Behavior And Task IDs
+
+Task ids that should survive in the consolidated DAG, either as exact task ids
+or as the terminal names inside task groups:
+
+| Stage | Current DAG id | Current task id | Package function or behavior | Downstream trigger task |
+|-------|----------------|-----------------|------------------------------|-------------------------|
+| Scrape | `stonks_securities_daily_scrape` | `collect_sec_sources` | Loads config by logical name, creates an Empire run through `RunService`, downloads `DEFAULT_DAILY_SOURCE_KEYS`, and writes SEC source files plus metadata to object storage. | `trigger_stonks_securities_daily_verify` |
+| Verify | `stonks_securities_daily_verify` | `verify_sec_sources` | Runs `verify_stonks_securities_daily_sources`, builds `stonks_securities_verify`, and writes the verify JSON report. | `trigger_stonks_securities_daily_observations` |
+| Observations | `stonks_securities_daily_observations` | `write_sec_observations` | Runs `run_stonks_securities_daily_observation_writer` for the source run. | `trigger_stonks_securities_daily_issuers` |
+| Issuers | `stonks_securities_daily_issuers` | `upsert_sec_issuers` | Runs `upsert_sec_issuers_from_provider_observations` for the source run. | `trigger_stonks_securities_daily_securities` |
+| Securities | `stonks_securities_daily_securities` | `upsert_sec_securities` | Runs `upsert_sec_securities_from_provider_observations` for the source run. | `trigger_stonks_securities_daily_listings` |
+| Listings | `stonks_securities_daily_listings` | `upsert_sec_listings` | Runs `upsert_sec_listings_from_provider_observations` for the source run. | `trigger_stonks_securities_daily_validation` |
+| Validation | `stonks_securities_daily_validation` | `generate_validation_report` | Runs `generate_phase_2a_validation_report` and writes the validation JSON report. | `trigger_stonks_securities_daily_conflicts` |
+| Conflicts | `stonks_securities_daily_conflicts` | `generate_conflict_report` | Runs `generate_phase_2a_conflict_report` and writes the conflict JSON report. | `trigger_stonks_securities_daily_refresh_summary` |
+| Summary | `stonks_securities_daily_refresh_summary` | `generate_daily_refresh_summary` | Runs `generate_daily_refresh_summary_report`, writes the summary JSON report, and renders/writes the summary PDF report. | None |
+
+The consolidated DAG should remove the trigger tasks but preserve the semantic
+handoff points above so logs, tests, and future operator docs remain legible.
+
+### Conf Payload And Handoff Contract
+
+The current chain passes state through `dag_run.conf` using
+`empire_stonks_securities.dag_conf`.
+
+Required key:
+
+- `input_run_id`: the Empire run id created by `collect_sec_sources`.
+
+Optional accumulated report keys:
+
+- `verify_report_object_id`
+- `validation_report_object_id`
+- `conflict_report_object_id`
+
+Current trigger behavior:
+
+- Scrape to verify uses `scrape_to_verify_conf()`, which sets `input_run_id`
+  from `collect_sec_sources` XCom field `run_id`.
+- Verify to observations uses `verify_to_observations_conf()`, which carries
+  `input_run_id` and sets `verify_report_object_id` from `verify_sec_sources`
+  XCom field `object_id`.
+- Observations, issuers, securities, and listings use `pass_through_conf()`,
+  carrying `input_run_id` and the optional `verify_report_object_id`.
+- Validation to conflicts uses `validation_to_conflicts_conf()`, carrying
+  `input_run_id`, `verify_report_object_id`, and the validation report object
+  id from `generate_validation_report`.
+- Conflicts to summary uses `conflicts_to_summary_conf()`, carrying
+  `input_run_id`, `verify_report_object_id`, `validation_report_object_id`,
+  and the conflict report object id from `generate_conflict_report`.
+
+The consolidated DAG should replace cross-DAG conf templating with explicit
+in-DAG return values or a package-level daily refresh context object. It should
+continue to treat the scrape run id as the source run id for all downstream
+reads, writes, reports, and `RunService.get_run_context(input_run_id)` calls.
+
+### Durable Outputs To Preserve
+
+Scrape output:
+
+- Empire run: domain `stonks`, job name `stonks_securities_daily_scrape`,
+  subject key `sec_daily_sources`.
+- Source keys: `sec_company_tickers_exchange` and `sec_company_tickers`.
+- Object kinds: `sec_source_file` and `sec_source_file_metadata`.
+- Object scope: run-scoped when written with the scrape run context.
+
+Run-report outputs use the shared object-store layout:
+
+```text
+stonks/securities/runs/YYYY/MM/DD/run-reports/<report_type>
+```
+
+Current report contracts:
+
+| Stage | Report name / logical name | Object kind | Report type | Filename pattern |
+|-------|----------------------------|-------------|-------------|------------------|
+| Verify | `stonks_securities_verify` | `stonks_securities_verify_report` | `verify` | `stonks_securities_verify_YYYYMMDDTHHMMSSZ.json` |
+| Validation | `stonks_securities_validation` | `stonks_securities_validation_report` | `validation` | `stonks_securities_validation_YYYYMMDDTHHMMSSZ.json` |
+| Conflicts | `stonks_securities_conflicts` | `stonks_securities_conflict_report` | `conflicts` | `stonks_securities_conflicts_YYYYMMDDTHHMMSSZ.json` |
+| Summary JSON | `stonks_securities_daily_summary` | `stonks_securities_daily_summary_report` | `summary` | `stonks_securities_daily_summary_YYYYMMDDTHHMMSSZ.json` |
+| Summary PDF | `stonks_securities_daily_summary_pdf` | `stonks_securities_daily_summary_pdf` | `summary` | `stonks_securities_daily_summary_YYYYMMDDTHHMMSSZ.pdf` |
+
+The summary stage should continue to accept linked verify, validation, and
+conflict report object ids when available. If an object id is absent, the
+existing summary report logic can fall back to latest matching report objects,
+but the consolidated DAG should pass the explicit object ids produced in the
+same run.
+
+### Consolidation Notes For D1.2-D1.7
+
+- Keep Airflow thin: orchestration should call package functions and should not
+  embed SEC business rules in the DAG file.
+- Prefer one source-run context created by the scrape stage. Downstream stages
+  should receive `source_run_id` explicitly rather than reading cross-DAG
+  `dag_run.conf`.
+- Preserve reporting `run_context` fields: `dag_id`, Airflow `run_id`,
+  `source_run_id`, `logical_date`, and `environment="airflow"`.
+- Preserve current stage order. Validation and conflict reports are inputs to
+  the summary report, not replacements for it.
+- Keep the legacy DAG ids unchanged until D1.8 retires them after consolidated
+  DAG regression tests pass.
 
 ## Phase 2: Lifecycle And Audit Schema
 
