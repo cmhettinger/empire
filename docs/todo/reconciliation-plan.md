@@ -347,10 +347,12 @@ Goal: allow explicit, high-confidence promotion from `PROVISIONAL` to
 | A5.4 | [ ] | Add apply-mode report content | Include applied promotions, skipped candidates, blockers, and audit references in reconciliation reports. | A5.3 |
 | A5.5 | [ ] | Prove idempotent apply behavior | Tests prove applying the same safe candidate twice does not duplicate audit/evidence rows or change confirmed identities incorrectly. | A5.4 |
 
-## Phase 6: Duplicate Candidate Detection
+## Phase 6: Duplicate And Successor Candidate Detection
 
 Goal: surface possible duplicate provisional identities as recommendations, not
-automatic merges.
+automatic merges. This phase must also distinguish true duplicates from
+successor corporate actions where the ticker/exchange continues but the issuer
+and security should remain separate.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
@@ -358,6 +360,10 @@ automatic merges.
 | M6.2 | [ ] | Implement duplicate candidate queries | Add package query logic for duplicate provisional candidates. Unit tests cover expected candidate grouping. | M6.1 |
 | M6.3 | [ ] | Add duplicate candidates to dry-run report | Reconciliation dry-run report includes candidate groups, supporting evidence, and why automatic merge is not performed. | M6.2 |
 | M6.4 | [ ] | Add validation/conflict integration | Existing validation/conflict or daily-health reports include duplicate candidate counts without changing canonical identities. | M6.3 |
+| M6.5 | [ ] | Define successor listing rules | Document rules for corporate-action successor cases where ticker/exchange continues but CIK, domicile, issue type, or security class changes. Rules must explicitly say not to merge issuers/securities when evidence indicates a redomiciliation or successor security. | C4.6 |
+| M6.6 | [ ] | Implement successor listing candidate queries | Add package query logic that detects same ticker/exchange active across multiple issuers/securities and classifies possible successor listing lifecycle fixes separately from duplicate merge candidates. Unit tests cover ticker unchanged with issuer/security changed. | M6.5 |
+| M6.7 | [ ] | Add CBAT redomiciliation regression fixture | Add a focused fixture for `CBAT`: old CIK `0001117171` / CBAK Energy Technology, Inc. ending `2026-06-24`, new CIK `0002086841` / CBAK Energy Technology Ltd starting `2026-06-25`, ticker unchanged on NASDAQ. Test proves the expected action is to close the old listing/symbol history and keep both issuers and securities separate. | M6.6 |
+| M6.8 | [ ] | Add successor candidates to reconciliation report | Reconciliation dry-run report includes successor listing candidates with old/new issuer, old/new security, ticker/exchange, proposed `valid_to`/`valid_from`, supporting source evidence, and an explicit `do_not_merge` rationale. | M6.7 |
 
 ## Phase 7: CLI, Reconciliation DAG, And Operator Docs
 
