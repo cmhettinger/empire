@@ -149,7 +149,7 @@ orchestration cleanup, not a rewrite of package business logic.
 | D1.3 | [x] | Create consolidated DAG skeleton | Add the consolidated SEC refresh DAG with task groups or tasks in the intended order, initially calling the existing stage functions without deleting legacy DAGs. DAG import smoke test passes. | D1.2 |
 | D1.4 | [x] | Wire scrape and verify stages | Consolidated DAG can collect SEC sources and run verification with the same run id and report path behavior as the old chain. Targeted tests pass. | D1.3 |
 | D1.5 | [x] | Wire observation and entity stages | Consolidated DAG can run observations, issuers, securities, and listings in order with the same idempotent behavior as the old chain. Targeted tests pass. | D1.4 |
-| D1.6 | [ ] | Wire validation, conflicts, and summary stages | Consolidated DAG can write validation, conflict, and daily summary reports with the same durable run-report behavior as the old chain. Targeted tests pass. | D1.5 |
+| D1.6 | [x] | Wire validation, conflicts, and summary stages | Consolidated DAG can write validation, conflict, and daily summary reports with the same durable run-report behavior as the old chain. Targeted tests pass. | D1.5 |
 | D1.7 | [ ] | Add consolidated DAG regression tests | Add DAG import, task-order, and run-context smoke tests for the consolidated DAG. Keep package-local tests runnable from the repo root. | D1.6 |
 | D1.8 | [ ] | Retire old trigger-chain DAGs | Remove or disable the old per-stage trigger DAGs after the consolidated DAG is verified. Update docs and tests so there is one normal SEC daily refresh entrypoint. | D1.7 |
 
@@ -162,6 +162,8 @@ Done: 2026-07-02. Added the consolidated SEC refresh DAG skeleton at `dags/stonk
 Done: 2026-07-02. Added focused daily-refresh tests proving the consolidated scrape stage preserves the legacy daily scrape run contract and the verify stage uses the same source run id while writing the existing verify run-report artifact. Files changed: `packages/empire-stonks-securities/tests/test_daily_refresh.py`, `docs/todo/reconciliation-plan.md`. Verification: `packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests/test_daily_refresh.py` (`5 passed`).
 
 Done: 2026-07-02. Added focused daily-refresh tests proving the consolidated observation, issuer, security, and listing stage wrappers run in order with the same explicit source run id and package-owned idempotent upsert functions as the old chain. Files changed: `packages/empire-stonks-securities/tests/test_daily_refresh.py`, `docs/todo/reconciliation-plan.md`. Verification: `packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests/test_daily_refresh.py` (`6 passed`).
+
+Done: 2026-07-03. Added focused daily-refresh tests proving the consolidated validation, conflict, and daily summary stage wrappers write the existing durable run-report artifacts, preserve source-run context, and pass verify/validation/conflict report object ids into the summary stage. Files changed: `packages/empire-stonks-securities/tests/test_daily_refresh.py`, `docs/todo/reconciliation-plan.md`. Verification: `packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests/test_daily_refresh.py` (`7 passed`).
 
 ## D1.1 Current SEC Daily Chain Inventory
 

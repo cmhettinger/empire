@@ -12,7 +12,9 @@ from empire_stonks_securities.daily_refresh import (
     DailyRefreshRunContext,
     DailyRefreshStageResult,
     collect_sec_sources_stage,
+    generate_conflict_report_stage,
     generate_daily_refresh_summary_stage,
+    generate_validation_report_stage,
     upsert_sec_issuers_stage,
     upsert_sec_listings_stage,
     upsert_sec_securities_stage,
@@ -358,6 +360,174 @@ def test_summary_stage_passes_report_object_ids(monkeypatch):
     assert calls["write_pdf"]["storage_run_context"] == run_service.context
     assert result.to_dict()["object_id"] == "summary-object"
     assert result.to_dict()["pdf_object_id"] == "summary-pdf-object"
+
+
+def test_validation_conflict_and_summary_stages_write_legacy_reports(monkeypatch):
+    calls = {}
+    run_service = FakeRunService()
+
+    def fake_generate_validation_report(**kwargs):
+        calls["generate_validation"] = kwargs
+        return {
+            "generated_at": GENERATED_AT.isoformat(),
+            "summary": {
+                "status": "PASS",
+                "observations_total": 2,
+                "issuers_total": 1,
+                "securities_total": 1,
+                "listings_total": 1,
+                "warnings_total": 0,
+                "failures_total": 0,
+            },
+        }
+
+    def fake_write_validation_report(**kwargs):
+        calls["write_validation"] = kwargs
+        return FakeStoredObject(
+            object_key="stonks/securities/runs/2026/07/02/run-reports/validation",
+            filename="stonks_securities_validation_20260702T120000Z.json",
+            object_id="validation-object",
+        )
+
+    def fake_generate_conflict_report(**kwargs):
+        calls["generate_conflict"] = kwargs
+        return {
+            "generated_at": GENERATED_AT.isoformat(),
+            "summary": {
+                "status": "WARN",
+                "conflicts_total": 1,
+                "info_total": 0,
+                "warnings_total": 1,
+                "failures_total": 0,
+            },
+        }
+
+    def fake_write_conflict_report(**kwargs):
+        calls["write_conflict"] = kwargs
+        return FakeStoredObject(
+            object_key="stonks/securities/runs/2026/07/02/run-reports/conflicts",
+            filename="stonks_securities_conflicts_20260702T120000Z.json",
+            object_id="conflict-object",
+        )
+
+    def fake_generate_daily_refresh_summary_report(**kwargs):
+        calls["generate_summary"] = kwargs
+        return {
+            "generated_at": GENERATED_AT.isoformat(),
+            "summary": {
+                "status": "WARN",
+                "validation_status": "PASS",
+                "conflict_status": "WARN",
+            },
+        }
+
+    def fake_write_daily_summary_report_to_object_store(**kwargs):
+        calls["write_summary_json"] = kwargs
+        return FakeStoredObject(
+            object_key="stonks/securities/runs/2026/07/02/run-reports/summary",
+            filename="stonks_securities_daily_summary_20260702T120000Z.json",
+            object_id="summary-object",
+        )
+
+    def fake_write_daily_summary_pdf_to_object_store(**kwargs):
+        calls["write_summary_pdf"] = kwargs
+        return FakeStoredObject(
+            object_key="stonks/securities/runs/2026/07/02/run-reports/summary",
+            filename="stonks_securities_daily_summary_20260702T120000Z.pdf",
+            object_id="summary-pdf-object",
+        )
+
+    monkeypatch.setattr(
+        daily_refresh,
+        "generate_phase_2a_validation_report",
+        fake_generate_validation_report,
+    )
+    monkeypatch.setattr(
+        daily_refresh,
+        "write_validation_report_to_object_store",
+        fake_write_validation_report,
+    )
+    monkeypatch.setattr(
+        daily_refresh,
+        "generate_phase_2a_conflict_report",
+        fake_generate_conflict_report,
+    )
+    monkeypatch.setattr(
+        daily_refresh,
+        "write_conflict_report_to_object_store",
+        fake_write_conflict_report,
+    )
+    monkeypatch.setattr(
+        daily_refresh,
+        "generate_daily_refresh_summary_report",
+        fake_generate_daily_refresh_summary_report,
+    )
+    monkeypatch.setattr(
+        daily_refresh,
+        "write_daily_summary_report_to_object_store",
+        fake_write_daily_summary_report_to_object_store,
+    )
+    monkeypatch.setattr(
+        daily_refresh,
+        "write_daily_summary_pdf_to_object_store",
+        fake_write_daily_summary_pdf_to_object_store,
+    )
+
+    run_context = DailyRefreshRunContext(
+        run_id="scheduled-run",
+        logical_date="2026-07-02",
+        environment="airflow",
+    )
+
+    validation = generate_validation_report_stage(
+        connection="connection",
+        object_store="object-store",
+        run_service=run_service,
+        source_run_id=SOURCE_RUN_ID,
+        run_context=run_context,
+        generated_at=GENERATED_AT,
+    )
+    conflict = generate_conflict_report_stage(
+        connection="connection",
+        object_store="object-store",
+        run_service=run_service,
+        source_run_id=validation.source_run_id,
+        run_context=run_context,
+        generated_at=GENERATED_AT,
+    )
+    assert validation.report is not None
+    assert conflict.report is not None
+    summary = generate_daily_refresh_summary_stage(
+        connection="connection",
+        object_store="object-store",
+        run_service=run_service,
+        source_run_id=conflict.source_run_id,
+        run_context=run_context,
+        verify_report_object_id="verify-object",
+        validation_report_object_id=validation.report.object_id,
+        conflict_report_object_id=conflict.report.object_id,
+        generated_at=GENERATED_AT,
+    )
+
+    assert calls["generate_validation"]["source_run_id"] == str(SOURCE_RUN_ID)
+    assert calls["generate_validation"]["run_context"].source_run_id == str(SOURCE_RUN_ID)
+    assert calls["generate_conflict"]["source_run_id"] == str(SOURCE_RUN_ID)
+    assert calls["generate_conflict"]["run_context"].source_run_id == str(SOURCE_RUN_ID)
+    assert calls["generate_summary"]["source_run_id"] == str(SOURCE_RUN_ID)
+    assert calls["generate_summary"]["verify_report_object_id"] == "verify-object"
+    assert calls["generate_summary"]["validation_report_object_id"] == "validation-object"
+    assert calls["generate_summary"]["conflict_report_object_id"] == "conflict-object"
+    assert calls["write_validation"]["storage_run_context"] == run_service.context
+    assert calls["write_conflict"]["storage_run_context"] == run_service.context
+    assert calls["write_summary_json"]["storage_run_context"] == run_service.context
+    assert calls["write_summary_pdf"]["storage_run_context"] == run_service.context
+    assert calls["write_validation"]["logical_date"] == "2026-07-02"
+    assert calls["write_conflict"]["logical_date"] == "2026-07-02"
+    assert calls["write_summary_json"]["logical_date"] == "2026-07-02"
+    assert validation.to_dict()["object_key"].endswith("/run-reports/validation")
+    assert conflict.to_dict()["object_key"].endswith("/run-reports/conflicts")
+    assert summary.to_dict()["object_key"].endswith("/run-reports/summary")
+    assert summary.to_dict()["pdf_object_id"] == "summary-pdf-object"
 
 
 def test_stage_result_serializes_report_refs():
