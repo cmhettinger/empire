@@ -35,6 +35,15 @@ def test_consolidated_sec_daily_scrape_dag_imports(monkeypatch):
     assert [task.task_id for task in dag.tasks] == EXPECTED_TASK_ORDER
 
 
+def test_consolidated_sec_daily_scrape_is_only_stonks_securities_daily_dag():
+    repo_root = Path(__file__).resolve().parents[3]
+    dag_files = sorted(
+        path.name for path in (repo_root / "dags" / "stonks").glob("stonks_securities*.py")
+    )
+
+    assert dag_files == ["stonks_securities_sec_daily_scrape.py"]
+
+
 def test_consolidated_sec_daily_scrape_dag_preserves_stage_order(monkeypatch):
     module, _fake_sdk = _load_dag_module(monkeypatch)
 

@@ -123,8 +123,8 @@ Each sidecar includes `source_code`, `source_url`, `downloaded_at`,
 moved into the object store through `ObjectStore.put_file()`.
 
 The CLI acquisition command only downloads and caches SEC source files. The
-daily Airflow chain described below performs verification, observation loading,
-canonical upserts, and report generation.
+daily Airflow refresh described below performs verification, observation
+loading, canonical upserts, and report generation.
 
 ## Airflow
 
@@ -133,39 +133,39 @@ canonical upserts, and report generation.
 `EMPIRE_STORAGE_KEY_STONKS_SECURITIES` through to all Airflow services alongside
 the other Empire storage keys.
 
-The daily SEC security-master chain is manual-only today. It starts with:
+The daily SEC security-master refresh is manual-only today and has one normal
+Airflow entrypoint:
 
 ```text
-dags/stonks/stonks_securities_daily_scrape.py
+dags/stonks/stonks_securities_sec_daily_scrape.py
 ```
 
-The scrape DAG currently downloads:
+The DAG currently downloads:
 
 ```text
 sec_company_tickers_exchange
 sec_company_tickers
 ```
 
-The DAG loads the published `stonks-securities-config` object, starts a core run,
-uses that run id as the acquisition folder, and writes each SEC file plus its
-metadata sidecar to the global object store.
+It loads the published `stonks-securities-config` object, starts a core run,
+uses that run id as the source-run folder, writes each SEC file plus its
+metadata sidecar to the global object store, and then runs the remaining refresh
+stages as in-DAG tasks. The retired per-stage trigger DAGs are not normal
+operator entrypoints.
 
-The scrape DAG then triggers the rest of the chain with the same source
-`run_id`:
+After deploying DAG changes, verify the active Airflow DAG list with:
 
-```text
-stonks_securities_daily_verify
-stonks_securities_daily_observations
-stonks_securities_daily_issuers
-stonks_securities_daily_securities
-stonks_securities_daily_listings
-stonks_securities_daily_validation
-stonks_securities_daily_conflicts
-stonks_securities_daily_refresh_summary
+```bash
+make airflow-dags
 ```
 
-The stages are intentionally thin Airflow wrappers. Package code performs the
-work:
+The current DAG list should include `stonks_securities_sec_daily_scrape` for
+this workflow and should not include the retired
+`stonks_securities_daily_*` per-stage DAG ids. `make airflow-dag-history` may
+still show historical versions from before retirement.
+
+The Airflow tasks are intentionally thin wrappers. Package code performs the
+work in this order:
 
 - verify parses the two downloaded SEC JSON files, validates checksums, and
   writes a durable verify report.
