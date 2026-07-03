@@ -299,7 +299,7 @@ confirmed identities and record explainable reconciliation decisions.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| S2.1 | [ ] | Design lifecycle migration | Draft the Flyway migration shape for `stonks.security.identity_status`, default/backfill behavior, constraints, indexes, and any minimal promotion metadata. | P0.1 |
+| S2.1 | [ ] | Design lifecycle migration | Draft the Flyway migration shape for `stonks.security.identity_status`, default/backfill behavior, constraints, and indexes. Keep promotion/evaluation history in the audit-table design rather than embedding it in canonical security state. | P0.1 |
 | S2.2 | [ ] | Implement lifecycle migration | Add the migration and validate it with `make db-validate` or the repo-standard DB validation target. | S2.1 |
 | S2.3 | [ ] | Update package queries/models for lifecycle | Update security query/upsert/report code so existing rows are treated as `PROVISIONAL` and no existing ingestion path silently confirms identities. Package tests pass. | S2.2 |
 | S2.4 | [ ] | Design reconciliation audit tables | Draft immutable audit/evaluation table shapes for decision type, rule version, confidence, explanation, run id, previous/new state, and linked evidence/security/listing ids. | S2.2 |
@@ -331,7 +331,7 @@ the safety rail before any automatic promotion exists.
 | C4.2 | [ ] | Implement confidence evaluator | Add package code that turns stored evidence into confidence results with rule id, score/level, explanation, evidence ids, and refusal reasons. Unit tests cover deterministic output. | C4.1 |
 | C4.3 | [ ] | Implement promotion candidate evaluator | Add dry-run evaluation for provisional securities without mutating identity state. Unit tests cover candidate and blocked cases. | C4.2 |
 | C4.4 | [ ] | Write evaluation audit rows in dry-run mode | Store evaluation results with run context while leaving `security.identity_status` unchanged. Tests prove dry-run does not promote. | C4.3 |
-| C4.5 | [ ] | Add dry-run JSON report builder | Produce a report payload with lifecycle counts, candidates, blocked securities, missing evidence classes, duplicate candidates, warnings, and failures. | C4.4 |
+| C4.5 | [ ] | Add dry-run JSON report builder | Produce a report payload with lifecycle counts, promotion candidates, blocked securities, missing evidence classes, warnings, and failures. Duplicate and successor sections are added later in Phase 6. | C4.4 |
 | C4.6 | [ ] | Store dry-run report artifact | Persist the dry-run JSON report under the agreed object-store run-report path with the agreed object kind/logical name. Tests cover report path and metadata. | C4.5 |
 
 ## Phase 5: Safe Apply Mode
@@ -353,6 +353,11 @@ Goal: surface possible duplicate provisional identities as recommendations, not
 automatic merges. This phase must also distinguish true duplicates from
 successor corporate actions where the ticker/exchange continues but the issuer
 and security should remain separate.
+
+Phase 6 is report-only unless a later task explicitly adds an apply workflow for
+listing lifecycle changes. It may recommend duplicate review, successor
+classification, and listing/symbol-history date fixes, but it must not merge,
+split, close, or mutate canonical identities by itself.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
@@ -377,7 +382,7 @@ reconciliation DAG.
 | O7.3 | [ ] | Wire CLI apply mode | CLI apply mode requires an explicit flag and runs safe promotions plus apply report content. Targeted CLI tests pass. | A5.5 |
 | O7.4 | [ ] | Add reconciliation DAG skeleton | Add one thin reconciliation DAG that can run after the consolidated SEC refresh DAG or manually. DAG import smoke test passes. | D1.8, O7.2 |
 | O7.5 | [ ] | Wire reconciliation DAG run context | DAG passes source run/report context explicitly and calls package-owned sequencing. Tests cover context handoff. | O7.4 |
-| O7.6 | [ ] | Update operator docs | Document consolidated SEC refresh, reconciliation dry-run/apply, report interpretation, and exact local verification/rebuild commands. | O7.5 |
+| O7.6 | [ ] | Update operator docs | Document consolidated SEC refresh, reconciliation dry-run/apply, report interpretation, and exact local verification/rebuild commands. | O7.5, O7.3 |
 
 ## Phase 8: Final Verification And Cleanup
 
