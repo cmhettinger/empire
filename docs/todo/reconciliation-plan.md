@@ -102,7 +102,7 @@ confirmed identities and record explainable reconciliation decisions.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | S2.1 | [x] | Design lifecycle migration | Draft the Flyway migration shape for `security.identity_status`, default/backfill behavior, constraints, and indexes. Keep promotion/evaluation history in the audit-table design rather than embedding it in canonical security state. | P0.1 |
-| S2.2 | [ ] | Implement lifecycle migration | Add the migration and validate it with `make db-validate` or the repo-standard DB validation target. | S2.1 |
+| S2.2 | [x] | Implement lifecycle migration | Add the migration and validate it with `make db-validate` or the repo-standard DB validation target. | S2.1 |
 | S2.3 | [ ] | Update package queries/models for lifecycle | Update security query/upsert/report code so existing rows are treated as `PROVISIONAL` and no existing ingestion path silently confirms identities. Package tests pass. | S2.2 |
 | S2.4 | [ ] | Design reconciliation audit tables | Draft immutable audit/evaluation table shapes for decision type, rule version, confidence, explanation, run id, previous/new state, and linked evidence/security/listing ids. | S2.2 |
 | S2.5 | [ ] | Implement reconciliation audit migration | Add audit/evaluation tables and validate schema. Include indexes needed for security-level history and run-level reporting. | S2.4 |
@@ -134,6 +134,11 @@ Done: 2026-07-04, drafted lifecycle migration shape in
 `docs/todo/reconciliation-plan.md`; verified with
 `rg -n "S2.1|identity_status|PROVISIONAL|CONFIRMED" docs/todo/reconciliation-plan.md`
 and `git diff --check`.
+
+Done: 2026-07-04, added
+`db/flyway/sql/V2026.07.04.0001__stonks_security_identity_lifecycle.sql`.
+Verified with `git diff --check`, `make db-migrate`, and `make db-validate`;
+Flyway applied migration `2026.07.04.0001` and validated 26 migrations.
 
 ## Phase 3: Evidence Collection
 
