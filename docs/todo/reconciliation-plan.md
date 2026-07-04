@@ -101,12 +101,39 @@ confirmed identities and record explainable reconciliation decisions.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| S2.1 | [ ] | Design lifecycle migration | Draft the Flyway migration shape for `stonks.identity_status`, default/backfill behavior, constraints, and indexes. Keep promotion/evaluation history in the audit-table design rather than embedding it in canonical security state. | P0.1 |
+| S2.1 | [x] | Design lifecycle migration | Draft the Flyway migration shape for `security.identity_status`, default/backfill behavior, constraints, and indexes. Keep promotion/evaluation history in the audit-table design rather than embedding it in canonical security state. | P0.1 |
 | S2.2 | [ ] | Implement lifecycle migration | Add the migration and validate it with `make db-validate` or the repo-standard DB validation target. | S2.1 |
 | S2.3 | [ ] | Update package queries/models for lifecycle | Update security query/upsert/report code so existing rows are treated as `PROVISIONAL` and no existing ingestion path silently confirms identities. Package tests pass. | S2.2 |
 | S2.4 | [ ] | Design reconciliation audit tables | Draft immutable audit/evaluation table shapes for decision type, rule version, confidence, explanation, run id, previous/new state, and linked evidence/security/listing ids. | S2.2 |
 | S2.5 | [ ] | Implement reconciliation audit migration | Add audit/evaluation tables and validate schema. Include indexes needed for security-level history and run-level reporting. | S2.4 |
 | S2.6 | [ ] | Add audit write helpers | Add small package helpers for inserting evaluation and applied-decision rows. Unit tests cover immutability expectations and required fields. | S2.5 |
+
+S2.1 design:
+
+- Add a nullable-safe canonical lifecycle column to `stonks.security`, not a
+  separate `stonks.identity_status` table for the first migration:
+  `identity_status VARCHAR(24) NOT NULL DEFAULT 'PROVISIONAL'`.
+- Backfill existing rows to `PROVISIONAL` in the same migration before the final
+  `NOT NULL` guarantee is relied on. Existing SEC bootstrap rows are
+  provisional by contract, and pre-lifecycle rows should not be silently
+  promoted.
+- Add `ck_security_identity_status` with exactly two allowed values:
+  `PROVISIONAL` and `CONFIRMED`. Do not add `ENRICHED`; descriptive enrichment
+  remains separate from identity lifecycle.
+- Add `ix_security_identity_status ON stonks.security (identity_status)` for
+  lifecycle count/report queries.
+- Add `ix_security_provisional_issuer ON stonks.security (issuer_id,
+  last_seen DESC, security_id) WHERE identity_status = 'PROVISIONAL'` for the
+  first reconciliation candidate scans.
+- Do not store rule ids, confidence, explanations, previous/new state, evidence
+  links, or promotion history on `stonks.security`. Those belong in the S2.4/S2.5
+  immutable reconciliation audit/evaluation tables. The canonical security row
+  should only carry current identity status.
+
+Done: 2026-07-04, drafted lifecycle migration shape in
+`docs/todo/reconciliation-plan.md`; verified with
+`rg -n "S2.1|identity_status|PROVISIONAL|CONFIRMED" docs/todo/reconciliation-plan.md`
+and `git diff --check`.
 
 ## Phase 3: Evidence Collection
 
