@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 from empire_stonks_securities.securities import (
+    IDENTITY_STATUS_PROVISIONAL,
     PROVISIONAL_INSTRUMENT_TYPE,
     SECURITY_IDENTIFIER_CONFIDENCE,
     SecSecurityObservation,
@@ -29,6 +30,7 @@ def test_creates_security_from_ticker_exchange_observation():
     security = next(iter(conn.securities.values()))
     assert security["issuer_id"] == issuer_id
     assert security["instrument_type_code"] == PROVISIONAL_INSTRUMENT_TYPE
+    assert security["identity_status"] == IDENTITY_STATUS_PROVISIONAL
     assert security["security_title"] == "Apple Inc."
     assert conn.security_identifiers[0]["id_value"] == "AAPL"
     assert conn.security_identifiers[0]["confidence_code"] == SECURITY_IDENTIFIER_CONFIDENCE
@@ -179,6 +181,27 @@ def test_does_not_assume_common_stock():
     upsert_sec_securities(connection=conn, observations=[observation])
 
     assert next(iter(conn.securities.values()))["instrument_type_code"] == "UNKNOWN"
+
+
+def test_existing_security_remains_provisional_on_refresh():
+    conn = FakeConnection()
+    issuer_id = conn.add_issuer("0000320193", "Apple Inc.")
+    first = security_observation(company_name="Apple Inc.")
+    second = security_observation(
+        provider_observation_id=uuid4(),
+        company_name="Apple Incorporated",
+        provider_date=date(2026, 6, 19),
+    )
+    conn.add_issuer_evidence(first.provider_observation_id, issuer_id)
+    conn.add_issuer_evidence(second.provider_observation_id, issuer_id)
+
+    upsert_sec_securities(connection=conn, observations=[first])
+    result = upsert_sec_securities(connection=conn, observations=[second])
+
+    security = next(iter(conn.securities.values()))
+    assert result.securities_updated == 1
+    assert security["identity_status"] == IDENTITY_STATUS_PROVISIONAL
+    assert security["security_title"] == "Apple Incorporated"
 
 
 def test_security_selector_scopes_to_source_run_snapshots_and_reconciliation_state():
@@ -375,9 +398,10 @@ class FakeCursor:
                 "security_id": security_id,
                 "issuer_id": params[0],
                 "instrument_type_code": params[1],
-                "security_title": params[2],
-                "first_seen": params[3],
-                "last_seen": params[4],
+                "identity_status": params[2],
+                "security_title": params[3],
+                "first_seen": params[4],
+                "last_seen": params[5],
             }
             self.connection.last_result = (security_id,)
             return

@@ -28,6 +28,9 @@ def test_canonical_market_snapshot_groups_smaller_markets():
     assert snapshot["totals"] == {
         "issuers_total": 17,
         "securities_total": 23,
+        "securities_provisional_total": 20,
+        "securities_confirmed_total": 3,
+        "securities_unknown_identity_status_total": 0,
         "listings_total": 29,
     }
     assert [market["exchange_code"] for market in snapshot["markets"]] == [
@@ -41,6 +44,9 @@ def test_canonical_market_snapshot_groups_smaller_markets():
         "market_count": 2,
         "issuers_total": 3,
         "securities_total": 5,
+        "securities_provisional_total": 5,
+        "securities_confirmed_total": 0,
+        "securities_unknown_identity_status_total": 0,
         "listings_total": 7,
     }
 
@@ -118,6 +124,9 @@ class FakeConnection:
             "daily_summary_canonical_market_totals": {
                 "issuers_total": 17,
                 "securities_total": 23,
+                "securities_provisional_total": 20,
+                "securities_confirmed_total": 3,
+                "securities_unknown_identity_status_total": 0,
                 "listings_total": 29,
             },
             "daily_summary_canonical_markets": [
@@ -126,6 +135,9 @@ class FakeConnection:
                     "exchange_name": "NASDAQ",
                     "issuers_total": 10,
                     "securities_total": 12,
+                    "securities_provisional_total": 10,
+                    "securities_confirmed_total": 2,
+                    "securities_unknown_identity_status_total": 0,
                     "listings_total": 13,
                 },
                 {
@@ -133,6 +145,9 @@ class FakeConnection:
                     "exchange_name": "NEW YORK STOCK EXCHANGE",
                     "issuers_total": 4,
                     "securities_total": 6,
+                    "securities_provisional_total": 5,
+                    "securities_confirmed_total": 1,
+                    "securities_unknown_identity_status_total": 0,
                     "listings_total": 9,
                 },
                 {
@@ -140,6 +155,9 @@ class FakeConnection:
                     "exchange_name": "NYSE ARCA",
                     "issuers_total": 2,
                     "securities_total": 3,
+                    "securities_provisional_total": 3,
+                    "securities_confirmed_total": 0,
+                    "securities_unknown_identity_status_total": 0,
                     "listings_total": 5,
                 },
                 {
@@ -147,6 +165,9 @@ class FakeConnection:
                     "exchange_name": "OTC MARKETS",
                     "issuers_total": 1,
                     "securities_total": 2,
+                    "securities_provisional_total": 2,
+                    "securities_confirmed_total": 0,
+                    "securities_unknown_identity_status_total": 0,
                     "listings_total": 2,
                 },
             ],

@@ -103,7 +103,7 @@ confirmed identities and record explainable reconciliation decisions.
 |----|--------|------|---------------|------------|
 | S2.1 | [x] | Design lifecycle migration | Draft the Flyway migration shape for `security.identity_status`, default/backfill behavior, constraints, and indexes. Keep promotion/evaluation history in the audit-table design rather than embedding it in canonical security state. | P0.1 |
 | S2.2 | [x] | Implement lifecycle migration | Add the migration and validate it with `make db-validate` or the repo-standard DB validation target. | S2.1 |
-| S2.3 | [ ] | Update package queries/models for lifecycle | Update security query/upsert/report code so existing rows are treated as `PROVISIONAL` and no existing ingestion path silently confirms identities. Package tests pass. | S2.2 |
+| S2.3 | [x] | Update package queries/models for lifecycle | Update security query/upsert/report code so existing rows are treated as `PROVISIONAL` and no existing ingestion path silently confirms identities. Package tests pass. | S2.2 |
 | S2.4 | [ ] | Design reconciliation audit tables | Draft immutable audit/evaluation table shapes for decision type, rule version, confidence, explanation, run id, previous/new state, and linked evidence/security/listing ids. | S2.2 |
 | S2.5 | [ ] | Implement reconciliation audit migration | Add audit/evaluation tables and validate schema. Include indexes needed for security-level history and run-level reporting. | S2.4 |
 | S2.6 | [ ] | Add audit write helpers | Add small package helpers for inserting evaluation and applied-decision rows. Unit tests cover immutability expectations and required fields. | S2.5 |
@@ -139,6 +139,12 @@ Done: 2026-07-04, added
 `db/flyway/sql/V2026.07.04.0001__stonks_security_identity_lifecycle.sql`.
 Verified with `git diff --check`, `make db-migrate`, and `make db-validate`;
 Flyway applied migration `2026.07.04.0001` and validated 26 migrations.
+
+Done: 2026-07-05, updated package security upsert/query/report code to keep
+SEC-created identities explicitly `PROVISIONAL` and report lifecycle counts.
+Verified with
+`packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests`
+and `git diff --check`.
 
 ## Phase 3: Evidence Collection
 

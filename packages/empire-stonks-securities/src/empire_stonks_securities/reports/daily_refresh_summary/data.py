@@ -24,6 +24,15 @@ def load_canonical_market_snapshot(
         SELECT
           COUNT(DISTINCT i.issuer_id) AS issuers_total,
           COUNT(DISTINCT s.security_id) AS securities_total,
+          COUNT(DISTINCT s.security_id) FILTER (
+            WHERE COALESCE(s.identity_status, 'PROVISIONAL') = 'PROVISIONAL'
+          ) AS securities_provisional_total,
+          COUNT(DISTINCT s.security_id) FILTER (
+            WHERE COALESCE(s.identity_status, 'PROVISIONAL') = 'CONFIRMED'
+          ) AS securities_confirmed_total,
+          COUNT(DISTINCT s.security_id) FILTER (
+            WHERE COALESCE(s.identity_status, 'PROVISIONAL') NOT IN ('PROVISIONAL', 'CONFIRMED')
+          ) AS securities_unknown_identity_status_total,
           COUNT(DISTINCT l.listing_id) AS listings_total
         FROM stonks.listing l
         JOIN stonks.security s ON s.security_id = l.security_id
@@ -41,6 +50,15 @@ def load_canonical_market_snapshot(
           e.exchange_name,
           COUNT(DISTINCT i.issuer_id) AS issuers_total,
           COUNT(DISTINCT s.security_id) AS securities_total,
+          COUNT(DISTINCT s.security_id) FILTER (
+            WHERE COALESCE(s.identity_status, 'PROVISIONAL') = 'PROVISIONAL'
+          ) AS securities_provisional_total,
+          COUNT(DISTINCT s.security_id) FILTER (
+            WHERE COALESCE(s.identity_status, 'PROVISIONAL') = 'CONFIRMED'
+          ) AS securities_confirmed_total,
+          COUNT(DISTINCT s.security_id) FILTER (
+            WHERE COALESCE(s.identity_status, 'PROVISIONAL') NOT IN ('PROVISIONAL', 'CONFIRMED')
+          ) AS securities_unknown_identity_status_total,
           COUNT(DISTINCT l.listing_id) AS listings_total
         FROM stonks.listing l
         JOIN stonks.exchange e ON e.exchange_id = l.exchange_id
@@ -80,6 +98,15 @@ def _group_smaller_markets(
         "market_count": len(hidden),
         "issuers_total": sum(int(row.get("issuers_total") or 0) for row in hidden),
         "securities_total": sum(int(row.get("securities_total") or 0) for row in hidden),
+        "securities_provisional_total": sum(
+            int(row.get("securities_provisional_total") or 0) for row in hidden
+        ),
+        "securities_confirmed_total": sum(
+            int(row.get("securities_confirmed_total") or 0) for row in hidden
+        ),
+        "securities_unknown_identity_status_total": sum(
+            int(row.get("securities_unknown_identity_status_total") or 0) for row in hidden
+        ),
         "listings_total": sum(int(row.get("listings_total") or 0) for row in hidden),
     }
     return [*visible, other]
@@ -99,6 +126,11 @@ def _counts(row: dict[str, Any] | None) -> dict[str, int]:
     return {
         "issuers_total": int(row.get("issuers_total") or 0),
         "securities_total": int(row.get("securities_total") or 0),
+        "securities_provisional_total": int(row.get("securities_provisional_total") or 0),
+        "securities_confirmed_total": int(row.get("securities_confirmed_total") or 0),
+        "securities_unknown_identity_status_total": int(
+            row.get("securities_unknown_identity_status_total") or 0
+        ),
         "listings_total": int(row.get("listings_total") or 0),
     }
 

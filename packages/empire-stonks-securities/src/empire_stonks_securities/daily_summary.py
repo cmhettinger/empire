@@ -177,6 +177,15 @@ def generate_daily_refresh_summary_report(
         "verify_status": verify_report["status"],
         "canonical_issuers_total": market_snapshot["totals"]["issuers_total"],
         "canonical_securities_total": market_snapshot["totals"]["securities_total"],
+        "canonical_securities_provisional_total": market_snapshot["totals"][
+            "securities_provisional_total"
+        ],
+        "canonical_securities_confirmed_total": market_snapshot["totals"][
+            "securities_confirmed_total"
+        ],
+        "canonical_securities_unknown_identity_status_total": market_snapshot["totals"][
+            "securities_unknown_identity_status_total"
+        ],
         "canonical_listings_total": market_snapshot["totals"]["listings_total"],
         "canonical_markets_represented": market_snapshot["markets_represented"],
     }

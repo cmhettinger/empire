@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # reconciliation/backfill can promote when stronger identifiers or type evidence
 # arrive.
 PROVISIONAL_INSTRUMENT_TYPE = "UNKNOWN"
+IDENTITY_STATUS_PROVISIONAL = "PROVISIONAL"
 TICKER_IDENTIFIER_TYPE = "TICKER"
 SECURITY_IDENTIFIER_CONFIDENCE = "MEDIUM"
 SECURITY_EVIDENCE_ROLE = "CREATED_FROM"
@@ -312,14 +313,22 @@ def _upsert_provisional_security_from_sec_ticker(
             INSERT INTO stonks.security (
                 issuer_id,
                 instrument_type_code,
+                identity_status,
                 security_title,
                 first_seen,
                 last_seen
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING security_id
             """,
-            (issuer_id, PROVISIONAL_INSTRUMENT_TYPE, title, seen_date, seen_date),
+            (
+                issuer_id,
+                PROVISIONAL_INSTRUMENT_TYPE,
+                IDENTITY_STATUS_PROVISIONAL,
+                title,
+                seen_date,
+                seen_date,
+            ),
         )
         return _SecurityUpsertOutcome(
             security_id=cursor.fetchone()[0],
@@ -371,7 +380,13 @@ def _find_security_by_issuer_ticker(
 ) -> dict[str, Any] | None:
     cursor.execute(
         """
-        SELECT s.security_id, s.issuer_id, s.instrument_type_code, s.security_title, s.last_seen
+        SELECT
+            s.security_id,
+            s.issuer_id,
+            s.instrument_type_code,
+            COALESCE(s.identity_status, 'PROVISIONAL') AS identity_status,
+            s.security_title,
+            s.last_seen
         FROM stonks.security s
         JOIN stonks.security_identifier si
           ON si.security_id = s.security_id

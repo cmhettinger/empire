@@ -75,6 +75,9 @@ def test_daily_summary_report_json_shape_is_stable():
     assert report["safety_guards"]["listings_closed_by_daily_refresh"] == 0
     assert report["summary"]["canonical_issuers_total"] == 8026
     assert report["summary"]["canonical_securities_total"] == 10453
+    assert report["summary"]["canonical_securities_provisional_total"] == 10453
+    assert report["summary"]["canonical_securities_confirmed_total"] == 0
+    assert report["summary"]["canonical_securities_unknown_identity_status_total"] == 0
     assert report["summary"]["canonical_listings_total"] == 10170
     assert report["summary"]["canonical_markets_represented"] == 3
     assert report["market_snapshot"]["scope"] == "canonical_current_active_listings"
@@ -539,6 +542,9 @@ DEFAULT_RESULTS = {
     "daily_summary_canonical_market_totals": {
         "issuers_total": 8026,
         "securities_total": 10453,
+        "securities_provisional_total": 10453,
+        "securities_confirmed_total": 0,
+        "securities_unknown_identity_status_total": 0,
         "listings_total": 10170,
     },
     "daily_summary_canonical_markets": [
@@ -547,6 +553,9 @@ DEFAULT_RESULTS = {
             "exchange_name": "NASDAQ",
             "issuers_total": 3900,
             "securities_total": 5200,
+            "securities_provisional_total": 5200,
+            "securities_confirmed_total": 0,
+            "securities_unknown_identity_status_total": 0,
             "listings_total": 5300,
         },
         {
@@ -554,6 +563,9 @@ DEFAULT_RESULTS = {
             "exchange_name": "NYSE ARCA",
             "issuers_total": 2400,
             "securities_total": 3000,
+            "securities_provisional_total": 3000,
+            "securities_confirmed_total": 0,
+            "securities_unknown_identity_status_total": 0,
             "listings_total": 3100,
         },
         {
@@ -561,6 +573,9 @@ DEFAULT_RESULTS = {
             "exchange_name": "NEW YORK STOCK EXCHANGE",
             "issuers_total": 1726,
             "securities_total": 2253,
+            "securities_provisional_total": 2253,
+            "securities_confirmed_total": 0,
+            "securities_unknown_identity_status_total": 0,
             "listings_total": 1770,
         },
     ],
