@@ -106,7 +106,7 @@ confirmed identities and record explainable reconciliation decisions.
 | S2.3 | [x] | Update package queries/models for lifecycle | Update security query/upsert/report code so existing rows are treated as `PROVISIONAL` and no existing ingestion path silently confirms identities. Package tests pass. | S2.2 |
 | S2.4 | [x] | Design reconciliation audit tables | Draft immutable audit/evaluation table shapes for decision type, rule version, confidence, explanation, run id, previous/new state, and linked evidence/security/listing ids. | S2.2 |
 | S2.5 | [x] | Implement reconciliation audit migration | Add audit/evaluation tables and validate schema. Include indexes needed for security-level history and run-level reporting. | S2.4 |
-| S2.6 | [ ] | Add audit write helpers | Add small package helpers for inserting evaluation and applied-decision rows. Unit tests cover immutability expectations and required fields. | S2.5 |
+| S2.6 | [x] | Add audit write helpers | Add small package helpers for inserting evaluation and applied-decision rows. Unit tests cover immutability expectations and required fields. | S2.5 |
 
 S2.1 design:
 
@@ -250,6 +250,14 @@ Done: 2026-07-06, added
 with reconciliation evaluation, evidence-link, and applied-decision tables plus
 history/reporting indexes. Verified with `make db-validate` and
 `git diff --check`.
+
+Done: 2026-07-06, added package reconciliation audit write helpers in
+`packages/empire-stonks-securities/src/empire_stonks_securities/reconciliation_audit.py`
+with focused immutability and required-field tests in
+`packages/empire-stonks-securities/tests/test_reconciliation_audit.py`.
+Verified with
+`packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests`
+and `git diff --check`.
 
 ## Phase 3: Evidence Collection
 
