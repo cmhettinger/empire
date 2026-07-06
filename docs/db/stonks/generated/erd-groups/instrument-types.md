@@ -28,6 +28,7 @@ erDiagram
     DATE last_seen
     TIMESTAMPTZ created_at
     TIMESTAMPTZ updated_at
+    VARCHAR identity_status
   }
 
   instrument_class ||--o{ instrument_type : "fk_instrument_type_class"

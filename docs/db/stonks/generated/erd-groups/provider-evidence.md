@@ -100,6 +100,7 @@ erDiagram
     DATE last_seen
     TIMESTAMPTZ created_at
     TIMESTAMPTZ updated_at
+    VARCHAR identity_status
   }
 
   security_event {

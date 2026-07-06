@@ -308,6 +308,8 @@ CREATE TABLE stonks.security (
     last_seen date,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    identity_status character varying(24) DEFAULT 'PROVISIONAL'::character varying NOT NULL,
+    CONSTRAINT ck_security_identity_status CHECK (((identity_status)::text = ANY ((ARRAY['PROVISIONAL'::character varying, 'CONFIRMED'::character varying])::text[]))),
     CONSTRAINT ck_security_status CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'INACTIVE'::character varying, 'RETIRED'::character varying, 'UNKNOWN'::character varying])::text[])))
 );
 
@@ -628,7 +630,11 @@ CREATE INDEX ix_security_identifier_provider ON stonks.security_identifier USING
 
 CREATE INDEX ix_security_identifier_security ON stonks.security_identifier USING btree (security_id);
 
+CREATE INDEX ix_security_identity_status ON stonks.security USING btree (identity_status);
+
 CREATE INDEX ix_security_issuer ON stonks.security USING btree (issuer_id);
+
+CREATE INDEX ix_security_provisional_issuer ON stonks.security USING btree (issuer_id, last_seen DESC, security_id) WHERE ((identity_status)::text = 'PROVISIONAL'::text);
 
 CREATE INDEX ix_security_status ON stonks.security USING btree (status);
 

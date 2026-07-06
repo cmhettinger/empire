@@ -77,6 +77,7 @@ erDiagram
     DATE last_seen
     TIMESTAMPTZ created_at
     TIMESTAMPTZ updated_at
+    VARCHAR identity_status
   }
 
   exchange ||--o{ listing : "fk_listing_exchange"
