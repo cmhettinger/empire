@@ -6,7 +6,12 @@ from uuid import UUID, uuid4
 import pytest
 
 from empire_stonks_securities.reconciliation_evidence import (
+    EVIDENCE_TYPE_SEC_ISSUER_SECURITY_MATCH,
+    EVIDENCE_TYPE_SEC_SOURCE_SNAPSHOT_CONTINUITY,
+    EVIDENCE_TYPE_SEC_TICKER_EXCHANGE_STABILITY,
+    derive_security_reconciliation_evidence,
     select_provisional_security_evidence_inputs,
+    write_derived_security_reconciliation_evidence,
 )
 
 
@@ -68,6 +73,57 @@ def test_selection_does_not_skip_already_derived_evidence():
 def test_rejects_negative_limit():
     with pytest.raises(ValueError, match="non-negative"):
         select_provisional_security_evidence_inputs(connection=FakeConnection([]), limit=-1)
+
+
+def test_derives_stable_sec_evidence_with_distinct_snapshot_counts():
+    row = _row()
+    row["supporting_observations"][0]["summary_json"]["exchange"] = "NASDAQ"
+    row["supporting_observations"].append(
+        {
+            **row["supporting_observations"][0],
+            "provider_evidence_id": uuid4(),
+            "provider_observation_id": uuid4(),
+            "source_snapshot_id": uuid4(),
+            "content_sha256": "b" * 64,
+            "observed_at": datetime(2026, 7, 11, 12, tzinfo=UTC),
+        }
+    )
+    evidence_input = select_provisional_security_evidence_inputs(
+        connection=FakeConnection([row])
+    )[0]
+
+    first = derive_security_reconciliation_evidence(evidence_input)
+    second = derive_security_reconciliation_evidence(evidence_input)
+
+    assert first == second
+    assert {item.evidence_type for item in first} == {
+        EVIDENCE_TYPE_SEC_ISSUER_SECURITY_MATCH,
+        EVIDENCE_TYPE_SEC_TICKER_EXCHANGE_STABILITY,
+        EVIDENCE_TYPE_SEC_SOURCE_SNAPSHOT_CONTINUITY,
+    }
+    stability = next(item for item in first if item.evidence_type == EVIDENCE_TYPE_SEC_TICKER_EXCHANGE_STABILITY)
+    assert stability.summary_json["normalized_values"]["distinct_snapshot_count"] == 2
+    assert stability.summary_json["normalized_values"]["insufficient_repeat"] is False
+
+
+def test_writer_reuses_existing_evidence_and_does_not_duplicate_lineage_bridges():
+    evidence_input = select_provisional_security_evidence_inputs(
+        connection=FakeConnection([_row()])
+    )[0]
+    evidence = derive_security_reconciliation_evidence(evidence_input)[0]
+    existing_id = uuid4()
+    conn = WriterConnection([(existing_id,), None, (existing_id,)])
+
+    first = write_derived_security_reconciliation_evidence(connection=conn, evidence=evidence)
+    second = write_derived_security_reconciliation_evidence(connection=conn, evidence=evidence)
+
+    assert first == type(first)(existing_id, True)
+    assert second == type(second)(existing_id, False)
+    assert conn.commits == 2
+    joined = " ".join(conn.executed_sql)
+    assert "ON CONFLICT ON CONSTRAINT uq_sec_recon_evidence_identity DO NOTHING" in joined
+    assert joined.count("security_reconciliation_evidence_provider_evidence") == 2
+    assert joined.count("security_reconciliation_evidence_source_snapshot") == 2
 
 
 def _row() -> dict:
@@ -157,3 +213,33 @@ class FakeCursor:
 
     def fetchall(self) -> list[dict]:
         return self.connection.rows
+
+
+class WriterConnection:
+    def __init__(self, fetchone_rows) -> None:
+        self.fetchone_rows = list(fetchone_rows)
+        self.executed_sql: list[str] = []
+        self.commits = 0
+
+    def cursor(self) -> "WriterCursor":
+        return WriterCursor(self)
+
+    def commit(self) -> None:
+        self.commits += 1
+
+
+class WriterCursor:
+    def __init__(self, connection: WriterConnection) -> None:
+        self.connection = connection
+
+    def __enter__(self) -> "WriterCursor":
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> bool:
+        return False
+
+    def execute(self, sql: str, params=None) -> None:
+        self.connection.executed_sql.append(" ".join(sql.split()))
+
+    def fetchone(self):
+        return self.connection.fetchone_rows.pop(0) if self.connection.fetchone_rows else None

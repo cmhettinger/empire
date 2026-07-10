@@ -109,7 +109,7 @@ confidence and promotion decisions.
 | E3.2 | [x] | Design evidence storage changes | Decide whether existing `provider_evidence` is enough or whether a new security-level reconciliation evidence table is needed. Document the chosen shape before implementing. | E3.1 |
 | E3.3 | [x] | Implement evidence storage migration | Add the selected storage changes and validate schema. Preserve `provider_observation` and `provider_evidence` as the source trail. | E3.2 |
 | E3.4 | [x] | Build evidence collector query layer | Add package queries that select provisional securities and their supporting SEC observations, source snapshots, issuer identifiers, security identifiers, and listings. Unit tests cover ordering and idempotent selection. | E3.3 |
-| E3.5 | [ ] | Build evidence collector writer | Write derived evidence idempotently with stable keys or conflict handling. Unit tests prove reruns do not duplicate evidence. | E3.4 |
+| E3.5 | [x] | Build evidence collector writer | Write derived evidence idempotently with stable keys or conflict handling. Unit tests prove reruns do not duplicate evidence. | E3.4 |
 | E3.6 | [ ] | Add evidence collection summary | Return counts for scanned securities, evidence inserted/skipped, missing evidence, and warnings. Summary is JSON-ready for reports and CLI output. | E3.5 |
 
 Done: 2026-07-10 — documented the initial SEC reconciliation evidence contract
@@ -132,6 +132,13 @@ evidence selection in `packages/empire-stonks-securities/src/empire_stonks_secur
 with focused ordering/idempotent-selection tests; verified with
 `packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests`
 and `git diff --check`.
+
+Done: 2026-07-10 — added deterministic SEC derived-evidence summaries and an
+idempotent transactional writer with immutable lineage bridges in
+`packages/empire-stonks-securities/src/empire_stonks_securities/reconciliation_evidence.py`,
+plus rerun coverage in `packages/empire-stonks-securities/tests/test_reconciliation_evidence.py`;
+verified with `packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests`
+(`168 passed`) and `git diff --check`.
 
 ## Phase 4: Confidence And Promotion Dry Run
 
