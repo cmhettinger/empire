@@ -171,9 +171,91 @@ parser, and identifier mapping are implemented and validated.
   that a security is common stock or that its current issuer/ticker mapping is
   wrong.
 
-The next task decides the durable storage shape for these derived summaries.
-It must preserve `provider_observation` and `provider_evidence` as the source
-trail and keep collection, confidence evaluation, and promotion separate.
+## Reconciliation Evidence Storage Decision
+
+`provider_evidence` is necessary but is not sufficient storage for this
+contract. It is the immutable provider-lineage link from one
+`provider_observation` to one or more canonical targets. Its role values
+(`CREATED_FROM`, `UPDATED_FROM`, and similar source facts) describe that raw
+relationship; they cannot express a typed, normalized, security-level summary
+of multiple observations, its distinct source snapshots, or an idempotent
+derived-evidence key. Reusing it for reconciliation summaries would conflate
+raw SEC ingestion with later reconciliation interpretation and make a changed
+summary indistinguishable from a new provider fact.
+
+Add a new append-only derived-evidence layer in `stonks` in E3.3. It belongs
+beside the existing reconciliation evaluation/decision audit tables, but is
+not an evaluation result and must not depend on a reconciliation run. A
+collector can therefore build evidence before a dry run, and multiple dry runs
+can evaluate the same stored evidence.
+
+### Selected Tables
+
+`security_reconciliation_evidence` stores one normalized evidence summary for
+one candidate `security_id`.
+
+- `reconciliation_evidence_id UUID` is the primary key.
+- `security_id UUID NOT NULL` references `security`; `issuer_id` and
+  `listing_id` are nullable foreign keys for the resolved targets described by
+  the summary.
+- `evidence_type VARCHAR(64) NOT NULL` is constrained initially to
+  `SEC_ISSUER_SECURITY_MATCH`, `SEC_TICKER_EXCHANGE_STABILITY`,
+  `SEC_SOURCE_SNAPSHOT_CONTINUITY`, and `SEC_SERIES_CLASS_IDENTIFIER`.
+- `evidence_role VARCHAR(24) NOT NULL` is constrained to `SUPPORTS`,
+  `CONFLICTS`, `BLOCKS`, or `CONTEXT`. This classifies the collected fact; it
+  does not itself decide promotion.
+- `evidence_key CHAR(64) NOT NULL` is a SHA-256 fingerprint of the canonical,
+  versioned summary input: evidence type, target IDs, normalized observed
+  values, provider/source identity, and distinct supporting source snapshot
+  IDs. It has a unique constraint with `security_id` and `evidence_type`.
+  Re-running unchanged collection therefore returns the same record; a changed
+  evidence set produces a new immutable summary instead of overwriting history.
+- `summary_json JSONB NOT NULL` contains the type-specific contract fields,
+  including normalized CIK/ticker/exchange values, snapshot count, first/last
+  observed times, insufficient-repeat marker where relevant, and conflict or
+  missing-data context. It is not a replacement for relational source links.
+- `collector_version VARCHAR(32) NOT NULL` and `created_at TIMESTAMPTZ NOT
+  NULL DEFAULT now()` make the derivation reproducible as collector logic
+  changes. No update timestamp is needed because rows are immutable.
+
+`security_reconciliation_evidence_provider_evidence` is the required source
+trail bridge. Its primary key is
+`(reconciliation_evidence_id, provider_evidence_id)`, and both columns are
+foreign keys. Every derived evidence record must have at least one bridge row;
+the E3.3 writer enforces that invariant transactionally. Each linked
+`provider_evidence` already identifies its exact `provider_observation`, so
+the raw observation remains directly recoverable without duplicating mutable
+observation fields.
+
+`security_reconciliation_evidence_source_snapshot` records the distinct
+semantic content snapshots used by a summary. Its primary key is
+`(reconciliation_evidence_id, source_snapshot_id)`, with a foreign key to
+`provider_source_snapshot`. It is required for snapshot-continuity and
+ticker/exchange-stability summaries when snapshots are available; it may be
+empty only for legacy evidence whose supporting observation predates snapshot
+linkage. The bridge keeps snapshot identity durable even when raw stored-object
+membership is later removed under retention policy.
+
+The migration should index `(security_id, evidence_type, created_at DESC)` for
+per-security evaluation, `(evidence_type, evidence_role, created_at DESC)` for
+reporting, and each bridge's foreign-key column for reverse lineage. It should
+not add a run ID: `core_run` is execution context, while source snapshots and
+the immutable evidence key provide semantic identity.
+
+### Evaluation Boundary
+
+`security_reconciliation_evaluation_evidence` continues to link a dry-run
+evaluation to the raw `provider_evidence` records that explain it. Before the
+confidence evaluator is implemented, add a parallel evaluation-to-derived-
+evidence bridge (or an equivalently explicit nullable derived-evidence link)
+so an evaluation can cite both the summary it used and the underlying provider
+trail. Do not store confidence scores, candidate decisions, or lifecycle
+transitions in `security_reconciliation_evidence`; those remain the exclusive
+responsibility of the evaluation and decision audit tables.
+
+This selected shape preserves raw SEC lineage, gives derived evidence stable
+idempotent identity, retains the source-snapshot continuity unit, and leaves
+collection, confidence evaluation, and promotion independently rerunnable.
 
 ---
 
