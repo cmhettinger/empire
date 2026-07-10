@@ -107,7 +107,7 @@ confidence and promotion decisions.
 |----|--------|------|---------------|------------|
 | E3.1 | [x] | Define first evidence types | Document the first evidence types, such as issuer match, stable ticker/exchange observation, source snapshot continuity, and SEC series/class evidence placeholder. | S2.6 |
 | E3.2 | [x] | Design evidence storage changes | Decide whether existing `provider_evidence` is enough or whether a new security-level reconciliation evidence table is needed. Document the chosen shape before implementing. | E3.1 |
-| E3.3 | [ ] | Implement evidence storage migration | Add the selected storage changes and validate schema. Preserve `provider_observation` and `provider_evidence` as the source trail. | E3.2 |
+| E3.3 | [x] | Implement evidence storage migration | Add the selected storage changes and validate schema. Preserve `provider_observation` and `provider_evidence` as the source trail. | E3.2 |
 | E3.4 | [ ] | Build evidence collector query layer | Add package queries that select provisional securities and their supporting SEC observations, source snapshots, issuer identifiers, security identifiers, and listings. Unit tests cover ordering and idempotent selection. | E3.3 |
 | E3.5 | [ ] | Build evidence collector writer | Write derived evidence idempotently with stable keys or conflict handling. Unit tests prove reruns do not duplicate evidence. | E3.4 |
 | E3.6 | [ ] | Add evidence collection summary | Return counts for scanned securities, evidence inserted/skipped, missing evidence, and warnings. Summary is JSON-ready for reports and CLI output. | E3.5 |
@@ -120,6 +120,11 @@ Done: 2026-07-10 — selected an append-only
 `security_reconciliation_evidence` layer with provider-evidence and
 source-snapshot bridge tables in `docs/todo/stonks-securities-provisional-status.md`;
 verified with `git diff --check`.
+
+Done: 2026-07-10 — added the derived evidence, provider-evidence lineage,
+source-snapshot lineage, and evaluation-to-derived-evidence tables in
+`db/flyway/sql/V2026.07.10.0001__stonks_security_reconciliation_evidence.sql`;
+verified with `make db-validate` and `git diff --check`.
 
 ## Phase 4: Confidence And Promotion Dry Run
 
