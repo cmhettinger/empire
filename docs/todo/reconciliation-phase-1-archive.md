@@ -207,3 +207,168 @@ same run.
 - D1.8 retired the legacy per-stage DAG ids after the consolidated DAG
   regression tests passed. The normal SEC daily refresh entrypoint is now
   `stonks_securities_sec_daily_scrape`.
+
+## Phase 2: Lifecycle And Audit Schema
+
+Goal: add the minimal database contract needed to distinguish provisional from
+confirmed identities and record explainable reconciliation decisions.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| S2.1 | [x] | Design lifecycle migration | Draft the Flyway migration shape for `security.identity_status`, default/backfill behavior, constraints, and indexes. Keep promotion/evaluation history in the audit-table design rather than embedding it in canonical security state. | P0.1 |
+| S2.2 | [x] | Implement lifecycle migration | Add the migration and validate it with `make db-validate` or the repo-standard DB validation target. | S2.1 |
+| S2.3 | [x] | Update package queries/models for lifecycle | Update security query/upsert/report code so existing rows are treated as `PROVISIONAL` and no existing ingestion path silently confirms identities. Package tests pass. | S2.2 |
+| S2.4 | [x] | Design reconciliation audit tables | Draft immutable audit/evaluation table shapes for decision type, rule version, confidence, explanation, run id, previous/new state, and linked evidence/security/listing ids. | S2.2 |
+| S2.5 | [x] | Implement reconciliation audit migration | Add audit/evaluation tables and validate schema. Include indexes needed for security-level history and run-level reporting. | S2.4 |
+| S2.6 | [x] | Add audit write helpers | Add small package helpers for inserting evaluation and applied-decision rows. Unit tests cover immutability expectations and required fields. | S2.5 |
+
+S2.1 design:
+
+- Add a nullable-safe canonical lifecycle column to `stonks.security`, not a
+  separate `stonks.identity_status` table for the first migration:
+  `identity_status VARCHAR(24) NOT NULL DEFAULT 'PROVISIONAL'`.
+- Backfill existing rows to `PROVISIONAL` in the same migration before the final
+  `NOT NULL` guarantee is relied on. Existing SEC bootstrap rows are
+  provisional by contract, and pre-lifecycle rows should not be silently
+  promoted.
+- Add `ck_security_identity_status` with exactly two allowed values:
+  `PROVISIONAL` and `CONFIRMED`. Do not add `ENRICHED`; descriptive enrichment
+  remains separate from identity lifecycle.
+- Add `ix_security_identity_status ON stonks.security (identity_status)` for
+  lifecycle count/report queries.
+- Add `ix_security_provisional_issuer ON stonks.security (issuer_id,
+  last_seen DESC, security_id) WHERE identity_status = 'PROVISIONAL'` for the
+  first reconciliation candidate scans.
+- Do not store rule ids, confidence, explanations, previous/new state, evidence
+  links, or promotion history on `stonks.security`. Those belong in the S2.4/S2.5
+  immutable reconciliation audit/evaluation tables. The canonical security row
+  should only carry current identity status.
+
+Done: 2026-07-04, drafted lifecycle migration shape in
+`docs/todo/reconciliation-plan.md`; verified with
+`rg -n "S2.1|identity_status|PROVISIONAL|CONFIRMED" docs/todo/reconciliation-plan.md`
+and `git diff --check`.
+
+Done: 2026-07-04, added
+`db/flyway/sql/V2026.07.04.0001__stonks_security_identity_lifecycle.sql`.
+Verified with `git diff --check`, `make db-migrate`, and `make db-validate`;
+Flyway applied migration `2026.07.04.0001` and validated 26 migrations.
+
+Done: 2026-07-05, updated package security upsert/query/report code to keep
+SEC-created identities explicitly `PROVISIONAL` and report lifecycle counts.
+Verified with
+`packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests`
+and `git diff --check`.
+
+S2.4 design:
+
+- Add immutable reconciliation audit tables in the `stonks` schema, not columns
+  on `stonks.security`. The canonical security row keeps only the current
+  `identity_status`; rule ids, confidence, explanations, run context, evidence
+  links, and state-transition history stay append-only in audit tables.
+- Create `stonks.security_reconciliation_evaluation` for every deterministic
+  dry-run or apply-mode judgment:
+  - `evaluation_id UUID PRIMARY KEY DEFAULT gen_random_uuid()`.
+  - `run_id UUID NOT NULL REFERENCES core.core_run(run_id)`.
+  - `security_id UUID NOT NULL REFERENCES stonks.security(security_id)`.
+  - Optional target/context links:
+    `issuer_id UUID REFERENCES stonks.issuer(issuer_id)`,
+    `listing_id UUID REFERENCES stonks.listing(listing_id)`,
+    `related_security_id UUID REFERENCES stonks.security(security_id)`, and
+    `related_listing_id UUID REFERENCES stonks.listing(listing_id)`. These cover
+    promotion evaluations now and later duplicate/successor pair candidates
+    without requiring separate early tables.
+  - `decision_type VARCHAR(40) NOT NULL` with a narrow check constraint for the
+    first workflow values:
+    `PROMOTION_CANDIDATE`, `PROMOTION_BLOCKED`, `NO_ACTION`,
+    `DUPLICATE_CANDIDATE`, `SUCCESSOR_LISTING_CANDIDATE`, and
+    `MANUAL_REVIEW_REQUIRED`.
+  - `rule_id VARCHAR(80) NOT NULL` and `rule_version VARCHAR(32) NOT NULL`.
+    Keep the rule identity explicit rather than introducing a generic rules
+    registry before the rules stabilize.
+  - `confidence_code VARCHAR(16) NOT NULL REFERENCES stonks.confidence_level(confidence_code)`
+    plus nullable `confidence_score NUMERIC(6,5)` with
+    `confidence_score >= 0 AND confidence_score <= 1`.
+  - `previous_identity_status VARCHAR(24) NOT NULL` and
+    `evaluated_identity_status VARCHAR(24) NOT NULL`, each constrained to
+    `PROVISIONAL` or `CONFIRMED`. Dry-run candidate rows can therefore record a
+    proposed transition without mutating `stonks.security`.
+  - `explanation TEXT NOT NULL`, `reason_codes TEXT[] NOT NULL DEFAULT '{}'`,
+    `details_json JSONB NOT NULL DEFAULT '{}'::jsonb`, and
+    `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`.
+  - Add a target check requiring at least one direct security target:
+    `security_id IS NOT NULL`. Keep `issuer_id`, `listing_id`, and related ids
+    optional context rather than separate targets for the first version.
+  - Add an idempotency guard for duplicate writes within one run:
+    unique on `(run_id, security_id, COALESCE(listing_id, zero_uuid),
+    COALESCE(related_security_id, zero_uuid),
+    COALESCE(related_listing_id, zero_uuid), decision_type, rule_id,
+    rule_version)`. In SQL, implement this as a unique expression index using
+    the all-zero UUID literal for nullable ids. Different runs should append new
+    rows so history remains complete.
+- Create `stonks.security_reconciliation_evaluation_evidence` as the immutable
+  many-to-many link from evaluations to existing source evidence:
+  - `evaluation_id UUID NOT NULL REFERENCES stonks.security_reconciliation_evaluation(evaluation_id)`.
+  - `provider_evidence_id UUID NOT NULL REFERENCES stonks.provider_evidence(provider_evidence_id)`.
+  - Optional `evidence_role VARCHAR(24) NOT NULL DEFAULT 'SUPPORTS'` constrained
+    to `SUPPORTS`, `CONFLICTS`, `BLOCKS`, and `CONTEXT`.
+  - `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`.
+  - Primary key `(evaluation_id, provider_evidence_id, evidence_role)`.
+  - Keep links to `provider_evidence` instead of copying observation payloads;
+    later evidence-collection tasks can add derived reconciliation evidence if
+    the existing provider trail is not enough.
+- Create `stonks.security_reconciliation_decision` for applied state changes:
+  - `decision_id UUID PRIMARY KEY DEFAULT gen_random_uuid()`.
+  - `evaluation_id UUID NOT NULL REFERENCES stonks.security_reconciliation_evaluation(evaluation_id)`.
+  - `run_id UUID NOT NULL REFERENCES core.core_run(run_id)`.
+  - `security_id UUID NOT NULL REFERENCES stonks.security(security_id)`.
+  - `decision_type VARCHAR(40) NOT NULL`, initially constrained to
+    `PROMOTE_TO_CONFIRMED`.
+  - `previous_identity_status VARCHAR(24) NOT NULL` and
+    `new_identity_status VARCHAR(24) NOT NULL`, constrained to
+    `PROVISIONAL` or `CONFIRMED`, plus a transition check allowing only
+    `PROVISIONAL` -> `CONFIRMED` for the first apply workflow.
+  - `applied_at TIMESTAMPTZ NOT NULL DEFAULT now()`,
+    `applied_by TEXT`, `explanation TEXT NOT NULL`, and
+    `details_json JSONB NOT NULL DEFAULT '{}'::jsonb`.
+  - Add `UNIQUE (evaluation_id)` so one evaluation cannot create duplicate
+    applied decisions, and add a partial unique index on `(security_id)` where
+    `decision_type = 'PROMOTE_TO_CONFIRMED'` to prevent duplicate promotion
+    audit rows for the same security.
+- Do not add update timestamps to these audit tables. They are append-only:
+  corrections should be represented by a later evaluation/decision row tied to a
+  later `core.core_run`, not by editing prior history.
+- Add indexes for the first read paths:
+  - Evaluation history: `(security_id, created_at DESC, evaluation_id)`.
+  - Run-level reporting: `(run_id, decision_type, created_at DESC)`.
+  - Candidate scans: `(decision_type, confidence_code, created_at DESC)`.
+  - Related-entity review: `(related_security_id)` and `(related_listing_id)`
+    where those columns are not null.
+  - Evidence reverse lookup:
+    `security_reconciliation_evaluation_evidence(provider_evidence_id)`.
+  - Applied decision history: `(security_id, applied_at DESC, decision_id)` and
+    `(run_id, applied_at DESC)`.
+- Use normal foreign keys with no cascading deletes from audit rows to canonical
+  securities/listings or provider evidence. Reconciliation history should not
+  disappear silently if cleanup code is introduced later; any retention policy
+  should make an explicit audit-retention decision.
+
+Done: 2026-07-06, drafted immutable reconciliation evaluation, evidence-link,
+and applied-decision table shapes in `docs/todo/reconciliation-plan.md`.
+Verified with
+`rg -n "S2.4|security_reconciliation_evaluation|security_reconciliation_decision|PROMOTE_TO_CONFIRMED" docs/todo/reconciliation-plan.md`
+and `git diff --check`.
+
+Done: 2026-07-06, added
+`db/flyway/sql/V2026.07.06.0001__stonks_security_reconciliation_audit.sql`
+with reconciliation evaluation, evidence-link, and applied-decision tables plus
+history/reporting indexes. Verified with `make db-validate` and
+`git diff --check`.
+
+Done: 2026-07-06, added package reconciliation audit write helpers in
+`packages/empire-stonks-securities/src/empire_stonks_securities/reconciliation_audit.py`
+with focused immutability and required-field tests in
+`packages/empire-stonks-securities/tests/test_reconciliation_audit.py`.
+Verified with
+`packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests`
+and `git diff --check`.
