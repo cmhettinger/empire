@@ -345,6 +345,58 @@ CREATE TABLE stonks.security_identifier (
     CONSTRAINT ck_security_identifier_type_upper CHECK (((id_type)::text = upper((id_type)::text)))
 );
 
+CREATE TABLE stonks.security_reconciliation_decision (
+    decision_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    evaluation_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    security_id uuid NOT NULL,
+    decision_type character varying(40) NOT NULL,
+    previous_identity_status character varying(24) CONSTRAINT security_reconciliation_decis_previous_identity_status_not_null NOT NULL,
+    new_identity_status character varying(24) NOT NULL,
+    applied_at timestamp with time zone DEFAULT now() NOT NULL,
+    applied_by text,
+    explanation text NOT NULL,
+    details_json jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT ck_sec_recon_decision_new_status CHECK (((new_identity_status)::text = ANY ((ARRAY['PROVISIONAL'::character varying, 'CONFIRMED'::character varying])::text[]))),
+    CONSTRAINT ck_sec_recon_decision_prev_status CHECK (((previous_identity_status)::text = ANY ((ARRAY['PROVISIONAL'::character varying, 'CONFIRMED'::character varying])::text[]))),
+    CONSTRAINT ck_sec_recon_decision_transition CHECK ((((previous_identity_status)::text = 'PROVISIONAL'::text) AND ((new_identity_status)::text = 'CONFIRMED'::text))),
+    CONSTRAINT ck_sec_recon_decision_type CHECK (((decision_type)::text = 'PROMOTE_TO_CONFIRMED'::text))
+);
+
+CREATE TABLE stonks.security_reconciliation_evaluation (
+    evaluation_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    run_id uuid NOT NULL,
+    security_id uuid NOT NULL,
+    issuer_id uuid,
+    listing_id uuid,
+    related_security_id uuid,
+    related_listing_id uuid,
+    decision_type character varying(40) NOT NULL,
+    rule_id character varying(80) NOT NULL,
+    rule_version character varying(32) NOT NULL,
+    confidence_code character varying(16) NOT NULL,
+    confidence_score numeric(6,5),
+    previous_identity_status character varying(24) CONSTRAINT security_reconciliation_evalu_previous_identity_status_not_null NOT NULL,
+    evaluated_identity_status character varying(24) CONSTRAINT security_reconciliation_eval_evaluated_identity_status_not_null NOT NULL,
+    explanation text NOT NULL,
+    reason_codes text[] DEFAULT '{}'::text[] NOT NULL,
+    details_json jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_sec_recon_eval_conf_score CHECK (((confidence_score IS NULL) OR ((confidence_score >= (0)::numeric) AND (confidence_score <= (1)::numeric)))),
+    CONSTRAINT ck_sec_recon_eval_decision_type CHECK (((decision_type)::text = ANY ((ARRAY['PROMOTION_CANDIDATE'::character varying, 'PROMOTION_BLOCKED'::character varying, 'NO_ACTION'::character varying, 'DUPLICATE_CANDIDATE'::character varying, 'SUCCESSOR_LISTING_CANDIDATE'::character varying, 'MANUAL_REVIEW_REQUIRED'::character varying])::text[]))),
+    CONSTRAINT ck_sec_recon_eval_prev_status CHECK (((previous_identity_status)::text = ANY ((ARRAY['PROVISIONAL'::character varying, 'CONFIRMED'::character varying])::text[]))),
+    CONSTRAINT ck_sec_recon_eval_status CHECK (((evaluated_identity_status)::text = ANY ((ARRAY['PROVISIONAL'::character varying, 'CONFIRMED'::character varying])::text[]))),
+    CONSTRAINT ck_sec_recon_eval_target CHECK ((security_id IS NOT NULL))
+);
+
+CREATE TABLE stonks.security_reconciliation_evaluation_evidence (
+    evaluation_id uuid CONSTRAINT security_reconciliation_evaluation_evide_evaluation_id_not_null NOT NULL,
+    provider_evidence_id uuid CONSTRAINT security_reconciliation_evaluatio_provider_evidence_id_not_null NOT NULL,
+    evidence_role character varying(24) DEFAULT 'SUPPORTS'::character varying CONSTRAINT security_reconciliation_evaluation_evide_evidence_role_not_null NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_sec_recon_eval_evidence_role CHECK (((evidence_role)::text = ANY ((ARRAY['SUPPORTS'::character varying, 'CONFLICTS'::character varying, 'BLOCKS'::character varying, 'CONTEXT'::character varying])::text[])))
+);
+
 CREATE UNLOGGED TABLE stonks.stg_iso10383_mic (
     mic text,
     operating_mic text,
@@ -457,6 +509,9 @@ ALTER TABLE ONLY stonks.listing
 ALTER TABLE ONLY stonks.listing_symbol_history
     ADD CONSTRAINT listing_symbol_history_pkey PRIMARY KEY (listing_symbol_id);
 
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation_evidence
+    ADD CONSTRAINT pk_sec_recon_eval_evidence PRIMARY KEY (evaluation_id, provider_evidence_id, evidence_role);
+
 ALTER TABLE ONLY stonks.provider_evidence
     ADD CONSTRAINT provider_evidence_pkey PRIMARY KEY (provider_evidence_id);
 
@@ -480,6 +535,12 @@ ALTER TABLE ONLY stonks.security_identifier
 
 ALTER TABLE ONLY stonks.security
     ADD CONSTRAINT security_pkey PRIMARY KEY (security_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_decision
+    ADD CONSTRAINT security_reconciliation_decision_pkey PRIMARY KEY (decision_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation
+    ADD CONSTRAINT security_reconciliation_evaluation_pkey PRIMARY KEY (evaluation_id);
 
 ALTER TABLE ONLY stonks.classification_code
     ADD CONSTRAINT uq_classification_code UNIQUE (class_system, code);
@@ -510,6 +571,9 @@ ALTER TABLE ONLY stonks.provider_source_snapshot_object
 
 ALTER TABLE ONLY stonks.provider_source_snapshot_object
     ADD CONSTRAINT uq_provider_source_snapshot_object_pair UNIQUE (source_snapshot_id, object_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_decision
+    ADD CONSTRAINT uq_sec_recon_decision_eval UNIQUE (evaluation_id);
 
 ALTER TABLE ONLY stonks.security_identifier
     ADD CONSTRAINT uq_security_identifier UNIQUE (id_type, id_value, security_id);
@@ -612,6 +676,22 @@ CREATE INDEX ix_provider_source_snapshot_object_snapshot ON stonks.provider_sour
 
 CREATE INDEX ix_provider_source_snapshot_source ON stonks.provider_source_snapshot USING btree (source_code, created_at DESC);
 
+CREATE INDEX ix_sec_recon_decision_run ON stonks.security_reconciliation_decision USING btree (run_id, applied_at DESC);
+
+CREATE INDEX ix_sec_recon_decision_security_history ON stonks.security_reconciliation_decision USING btree (security_id, applied_at DESC, decision_id);
+
+CREATE INDEX ix_sec_recon_eval_candidate_scan ON stonks.security_reconciliation_evaluation USING btree (decision_type, confidence_code, created_at DESC);
+
+CREATE INDEX ix_sec_recon_eval_ev_provider ON stonks.security_reconciliation_evaluation_evidence USING btree (provider_evidence_id);
+
+CREATE INDEX ix_sec_recon_eval_related_listing ON stonks.security_reconciliation_evaluation USING btree (related_listing_id) WHERE (related_listing_id IS NOT NULL);
+
+CREATE INDEX ix_sec_recon_eval_related_security ON stonks.security_reconciliation_evaluation USING btree (related_security_id) WHERE (related_security_id IS NOT NULL);
+
+CREATE INDEX ix_sec_recon_eval_run_report ON stonks.security_reconciliation_evaluation USING btree (run_id, decision_type, created_at DESC);
+
+CREATE INDEX ix_sec_recon_eval_security_history ON stonks.security_reconciliation_evaluation USING btree (security_id, created_at DESC, evaluation_id);
+
 CREATE INDEX ix_security_currency ON stonks.security USING btree (currency_code);
 
 CREATE INDEX ix_security_event_issuer ON stonks.security_event USING btree (issuer_id);
@@ -649,6 +729,10 @@ CREATE UNIQUE INDEX ux_listing_one_active_per_security_exchange ON stonks.listin
 CREATE UNIQUE INDEX ux_listing_symbol_one_active_per_listing ON stonks.listing_symbol_history USING btree (listing_id) WHERE (valid_to IS NULL);
 
 CREATE UNIQUE INDEX ux_provider_observation_raw_key ON stonks.provider_observation USING btree (provider_code, raw_key) WHERE (raw_key IS NOT NULL);
+
+CREATE UNIQUE INDEX ux_sec_recon_decision_promotion ON stonks.security_reconciliation_decision USING btree (security_id) WHERE ((decision_type)::text = 'PROMOTE_TO_CONFIRMED'::text);
+
+CREATE UNIQUE INDEX ux_sec_recon_eval_run_target_rule ON stonks.security_reconciliation_evaluation USING btree (run_id, security_id, COALESCE(listing_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(related_security_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(related_listing_id, '00000000-0000-0000-0000-000000000000'::uuid), decision_type, rule_id, rule_version);
 
 ALTER TABLE ONLY stonks.classification_code
     ADD CONSTRAINT fk_classification_code_system FOREIGN KEY (class_system) REFERENCES stonks.classification_system(class_system) ON UPDATE CASCADE;
@@ -760,6 +844,42 @@ ALTER TABLE ONLY stonks.provider_source_snapshot
 
 ALTER TABLE ONLY stonks.provider_source_snapshot_object
     ADD CONSTRAINT fk_provider_source_snapshot_object_object FOREIGN KEY (object_id) REFERENCES core.stored_object(object_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY stonks.security_reconciliation_decision
+    ADD CONSTRAINT fk_sec_recon_decision_eval FOREIGN KEY (evaluation_id) REFERENCES stonks.security_reconciliation_evaluation(evaluation_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_decision
+    ADD CONSTRAINT fk_sec_recon_decision_run FOREIGN KEY (run_id) REFERENCES core.core_run(run_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_decision
+    ADD CONSTRAINT fk_sec_recon_decision_security FOREIGN KEY (security_id) REFERENCES stonks.security(security_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation
+    ADD CONSTRAINT fk_sec_recon_eval_confidence FOREIGN KEY (confidence_code) REFERENCES stonks.confidence_level(confidence_code);
+
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation_evidence
+    ADD CONSTRAINT fk_sec_recon_eval_ev_eval FOREIGN KEY (evaluation_id) REFERENCES stonks.security_reconciliation_evaluation(evaluation_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation_evidence
+    ADD CONSTRAINT fk_sec_recon_eval_ev_provider FOREIGN KEY (provider_evidence_id) REFERENCES stonks.provider_evidence(provider_evidence_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation
+    ADD CONSTRAINT fk_sec_recon_eval_issuer FOREIGN KEY (issuer_id) REFERENCES stonks.issuer(issuer_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation
+    ADD CONSTRAINT fk_sec_recon_eval_listing FOREIGN KEY (listing_id) REFERENCES stonks.listing(listing_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation
+    ADD CONSTRAINT fk_sec_recon_eval_related_listing FOREIGN KEY (related_listing_id) REFERENCES stonks.listing(listing_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation
+    ADD CONSTRAINT fk_sec_recon_eval_related_security FOREIGN KEY (related_security_id) REFERENCES stonks.security(security_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation
+    ADD CONSTRAINT fk_sec_recon_eval_run FOREIGN KEY (run_id) REFERENCES core.core_run(run_id);
+
+ALTER TABLE ONLY stonks.security_reconciliation_evaluation
+    ADD CONSTRAINT fk_sec_recon_eval_security FOREIGN KEY (security_id) REFERENCES stonks.security(security_id);
 
 ALTER TABLE ONLY stonks.security
     ADD CONSTRAINT fk_security_currency FOREIGN KEY (currency_code) REFERENCES stonks.iso4217_currency(code);

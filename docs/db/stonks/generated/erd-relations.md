@@ -26,6 +26,9 @@ flowchart LR
   security["security"]
   security_event["security_event"]
   security_identifier["security_identifier"]
+  security_reconciliation_decision["security_reconciliation_decision"]
+  security_reconciliation_evaluation["security_reconciliation_evaluation"]
+  security_reconciliation_evaluation_evidence["security_reconciliation_evaluation_evidence"]
   stg_iso10383_mic["stg_iso10383_mic"]
   stg_iso3166_country["stg_iso3166_country"]
   stg_iso4217_currency["stg_iso4217_currency"]
@@ -80,4 +83,14 @@ flowchart LR
   provider -->|fk_security_identifier_provider| security_identifier
   security -->|fk_security_identifier_security| security_identifier
   identifier_type -->|fk_security_identifier_type| security_identifier
+  security_reconciliation_evaluation -->|fk_sec_recon_decision_eval| security_reconciliation_decision
+  security -->|fk_sec_recon_decision_security| security_reconciliation_decision
+  confidence_level -->|fk_sec_recon_eval_confidence| security_reconciliation_evaluation
+  issuer -->|fk_sec_recon_eval_issuer| security_reconciliation_evaluation
+  listing -->|fk_sec_recon_eval_listing| security_reconciliation_evaluation
+  listing -->|fk_sec_recon_eval_related_listing| security_reconciliation_evaluation
+  security -->|fk_sec_recon_eval_related_security| security_reconciliation_evaluation
+  security -->|fk_sec_recon_eval_security| security_reconciliation_evaluation
+  security_reconciliation_evaluation -->|fk_sec_recon_eval_ev_eval| security_reconciliation_evaluation_evidence
+  provider_evidence -->|fk_sec_recon_eval_ev_provider| security_reconciliation_evaluation_evidence
 ```

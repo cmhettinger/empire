@@ -38,6 +38,17 @@ def sanitize_sql(sql: str) -> str:
         "",
         sql,
     )
+    # pg_diagram renders PostgreSQL ``text[]`` declarations as an unescaped
+    # ``<TEXT>`` Graphviz HTML tag. Its SQL parser does not accept an alternate
+    # array spelling either, so its diagram-only input uses the base type. The
+    # canonical generated schema continues to show the actual array type.
+    # Limit this to column declarations; casts in defaults and CHECK
+    # expressions remain valid PostgreSQL syntax.
+    sql = re.sub(
+        r"(?m)^(\s*[A-Za-z_][A-Za-z0-9_]*\s+)([A-Za-z_][A-Za-z0-9_]*)(\[\])(?=\s)",
+        r"\1\2",
+        sql,
+    )
     sql = re.sub(r"\n{3,}", "\n\n", sql)
     return sql.strip() + "\n"
 

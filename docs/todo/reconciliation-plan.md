@@ -105,12 +105,16 @@ confidence and promotion decisions.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| E3.1 | [ ] | Define first evidence types | Document the first evidence types, such as issuer match, stable ticker/exchange observation, source snapshot continuity, and SEC series/class evidence placeholder. | S2.6 |
+| E3.1 | [x] | Define first evidence types | Document the first evidence types, such as issuer match, stable ticker/exchange observation, source snapshot continuity, and SEC series/class evidence placeholder. | S2.6 |
 | E3.2 | [ ] | Design evidence storage changes | Decide whether existing `provider_evidence` is enough or whether a new security-level reconciliation evidence table is needed. Document the chosen shape before implementing. | E3.1 |
 | E3.3 | [ ] | Implement evidence storage migration | Add the selected storage changes and validate schema. Preserve `provider_observation` and `provider_evidence` as the source trail. | E3.2 |
 | E3.4 | [ ] | Build evidence collector query layer | Add package queries that select provisional securities and their supporting SEC observations, source snapshots, issuer identifiers, security identifiers, and listings. Unit tests cover ordering and idempotent selection. | E3.3 |
 | E3.5 | [ ] | Build evidence collector writer | Write derived evidence idempotently with stable keys or conflict handling. Unit tests prove reruns do not duplicate evidence. | E3.4 |
 | E3.6 | [ ] | Add evidence collection summary | Return counts for scanned securities, evidence inserted/skipped, missing evidence, and warnings. Summary is JSON-ready for reports and CLI output. | E3.5 |
+
+Done: 2026-07-10 — documented the initial SEC reconciliation evidence contract
+in `docs/todo/stonks-securities-provisional-status.md`; verified with
+`git diff --check`.
 
 ## Phase 4: Confidence And Promotion Dry Run
 
