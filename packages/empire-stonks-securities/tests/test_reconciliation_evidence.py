@@ -7,8 +7,10 @@ import pytest
 
 from empire_stonks_securities.reconciliation_evidence import (
     EVIDENCE_TYPE_SEC_ISSUER_SECURITY_MATCH,
+    EVIDENCE_TYPE_SEC_SERIES_CLASS_IDENTIFIER,
     EVIDENCE_TYPE_SEC_SOURCE_SNAPSHOT_CONTINUITY,
     EVIDENCE_TYPE_SEC_TICKER_EXCHANGE_STABILITY,
+    collect_security_reconciliation_evidence,
     derive_security_reconciliation_evidence,
     select_provisional_security_evidence_inputs,
     write_derived_security_reconciliation_evidence,
@@ -124,6 +126,53 @@ def test_writer_reuses_existing_evidence_and_does_not_duplicate_lineage_bridges(
     assert "ON CONFLICT ON CONSTRAINT uq_sec_recon_evidence_identity DO NOTHING" in joined
     assert joined.count("security_reconciliation_evidence_provider_evidence") == 2
     assert joined.count("security_reconciliation_evidence_source_snapshot") == 2
+
+
+def test_collection_summary_reports_write_counts_missing_evidence_and_warnings():
+    row = _row()
+    row["supporting_observations"][0]["summary_json"]["exchange"] = "NASDAQ"
+    conn = CollectionConnection([row], fetchone_rows=[(uuid4(),), (uuid4(),), (uuid4(),)])
+
+    summary = collect_security_reconciliation_evidence(connection=conn)
+
+    assert summary.scanned_security_count == 1
+    assert summary.evidence_inserted_count == 3
+    assert summary.evidence_skipped_count == 0
+    assert summary.missing_evidence_by_type == {
+        EVIDENCE_TYPE_SEC_SERIES_CLASS_IDENTIFIER: 1,
+    }
+    assert summary.to_dict() == {
+        "scanned_security_count": 1,
+        "evidence_inserted_count": 3,
+        "evidence_skipped_count": 0,
+        "missing_evidence_count": 1,
+        "missing_evidence_by_type": {EVIDENCE_TYPE_SEC_SERIES_CLASS_IDENTIFIER: 1},
+        "warnings": [
+            "SEC series/class identifier evidence is unavailable until its source and parser are implemented"
+        ],
+    }
+    assert conn.commits == 3
+
+
+def test_collection_summary_counts_missing_evidence_without_writing():
+    row = _row()
+    row["supporting_observations"] = []
+    conn = CollectionConnection([row])
+
+    summary = collect_security_reconciliation_evidence(connection=conn)
+
+    assert summary.evidence_inserted_count == 0
+    assert summary.evidence_skipped_count == 0
+    assert summary.missing_evidence_by_type == {
+        EVIDENCE_TYPE_SEC_ISSUER_SECURITY_MATCH: 1,
+        EVIDENCE_TYPE_SEC_SERIES_CLASS_IDENTIFIER: 1,
+        EVIDENCE_TYPE_SEC_SOURCE_SNAPSHOT_CONTINUITY: 1,
+        EVIDENCE_TYPE_SEC_TICKER_EXCHANGE_STABILITY: 1,
+    }
+    assert summary.warnings == (
+        f"security {SECURITY_ID} has no supporting SEC observations",
+        "SEC series/class identifier evidence is unavailable until its source and parser are implemented",
+    )
 
 
 def _row() -> dict:
@@ -243,3 +292,26 @@ class WriterCursor:
 
     def fetchone(self):
         return self.connection.fetchone_rows.pop(0) if self.connection.fetchone_rows else None
+
+
+class CollectionConnection(WriterConnection):
+    def __init__(self, rows: list[dict], fetchone_rows=()) -> None:
+        super().__init__(fetchone_rows)
+        self.rows = rows
+        self.select_sql = ""
+        self.params = None
+
+    def cursor(self) -> "CollectionCursor":
+        return CollectionCursor(self)
+
+
+class CollectionCursor(WriterCursor):
+    def execute(self, sql: str, params=None) -> None:
+        normalized_sql = " ".join(sql.split())
+        self.connection.executed_sql.append(normalized_sql)
+        if "WITH provisional_security AS" in sql:
+            self.connection.select_sql = normalized_sql
+            self.connection.params = params
+
+    def fetchall(self) -> list[dict]:
+        return self.connection.rows

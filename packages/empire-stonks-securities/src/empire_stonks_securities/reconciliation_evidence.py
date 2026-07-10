@@ -19,6 +19,7 @@ RECONCILIATION_EVIDENCE_COLLECTOR_VERSION = "sec-v1"
 EVIDENCE_TYPE_SEC_ISSUER_SECURITY_MATCH = "SEC_ISSUER_SECURITY_MATCH"
 EVIDENCE_TYPE_SEC_TICKER_EXCHANGE_STABILITY = "SEC_TICKER_EXCHANGE_STABILITY"
 EVIDENCE_TYPE_SEC_SOURCE_SNAPSHOT_CONTINUITY = "SEC_SOURCE_SNAPSHOT_CONTINUITY"
+EVIDENCE_TYPE_SEC_SERIES_CLASS_IDENTIFIER = "SEC_SERIES_CLASS_IDENTIFIER"
 EVIDENCE_ROLE_SUPPORTS = "SUPPORTS"
 
 
@@ -110,6 +111,40 @@ class DerivedEvidenceWriteResult:
 
     reconciliation_evidence_id: UUID
     inserted: bool
+
+
+@dataclass(frozen=True)
+class EvidenceCollectionSummary:
+    """JSON-ready outcome of one SEC derived-evidence collection pass.
+
+    ``missing_evidence_by_type`` counts provisional securities for which the
+    current SEC collector could not emit that evidence type.  It is a coverage
+    signal, not a conflict or a promotion decision.
+    """
+
+    scanned_security_count: int
+    evidence_inserted_count: int
+    evidence_skipped_count: int
+    missing_evidence_by_type: Mapping[str, int]
+    warnings: tuple[str, ...] = ()
+
+    @property
+    def missing_evidence_count(self) -> int:
+        """Return the total missing-evidence classes across scanned securities."""
+
+        return sum(self.missing_evidence_by_type.values())
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a payload suitable for JSON reports and CLI output."""
+
+        return {
+            "scanned_security_count": self.scanned_security_count,
+            "evidence_inserted_count": self.evidence_inserted_count,
+            "evidence_skipped_count": self.evidence_skipped_count,
+            "missing_evidence_count": self.missing_evidence_count,
+            "missing_evidence_by_type": dict(self.missing_evidence_by_type),
+            "warnings": list(self.warnings),
+        }
 
 
 def select_provisional_security_evidence_inputs(
@@ -423,6 +458,76 @@ def write_derived_security_reconciliation_evidence(
             )
     connection.commit()
     return DerivedEvidenceWriteResult(reconciliation_evidence_id, inserted)
+
+
+def collect_security_reconciliation_evidence(
+    *,
+    connection: Any,
+    limit: int | None = None,
+    collector_version: str = RECONCILIATION_EVIDENCE_COLLECTOR_VERSION,
+) -> EvidenceCollectionSummary:
+    """Collect and persist SEC evidence for provisional securities.
+
+    The select, derivation, and writes remain independently reusable.  This
+    thin coordinator only aggregates their outcome for a future report or CLI;
+    it never evaluates confidence or changes canonical identity state.
+    """
+
+    inputs = select_provisional_security_evidence_inputs(connection=connection, limit=limit)
+    inserted_count = 0
+    skipped_count = 0
+    missing_by_type: dict[str, int] = {}
+    warnings: list[str] = []
+
+    for evidence_input in inputs:
+        evidence = derive_security_reconciliation_evidence(
+            evidence_input, collector_version=collector_version
+        )
+        present_types = {item.evidence_type for item in evidence}
+        for evidence_type in _missing_evidence_types(present_types):
+            missing_by_type[evidence_type] = missing_by_type.get(evidence_type, 0) + 1
+
+        if not evidence_input.supporting_observations:
+            warnings.append(
+                f"security {evidence_input.security_id} has no supporting SEC observations"
+            )
+        elif EVIDENCE_TYPE_SEC_TICKER_EXCHANGE_STABILITY not in present_types:
+            warnings.append(
+                f"security {evidence_input.security_id} has no matching SEC ticker/exchange evidence"
+            )
+
+        for item in evidence:
+            result = write_derived_security_reconciliation_evidence(
+                connection=connection, evidence=item
+            )
+            if result.inserted:
+                inserted_count += 1
+            else:
+                skipped_count += 1
+
+    if inputs:
+        warnings.append(
+            "SEC series/class identifier evidence is unavailable until its source and parser are implemented"
+        )
+    return EvidenceCollectionSummary(
+        scanned_security_count=len(inputs),
+        evidence_inserted_count=inserted_count,
+        evidence_skipped_count=skipped_count,
+        missing_evidence_by_type=dict(sorted(missing_by_type.items())),
+        warnings=tuple(warnings),
+    )
+
+
+def _missing_evidence_types(present_types: set[str]) -> tuple[str, ...]:
+    """Return known evidence classes absent from one provisional-security pass."""
+
+    known_types = (
+        EVIDENCE_TYPE_SEC_ISSUER_SECURITY_MATCH,
+        EVIDENCE_TYPE_SEC_TICKER_EXCHANGE_STABILITY,
+        EVIDENCE_TYPE_SEC_SOURCE_SNAPSHOT_CONTINUITY,
+        EVIDENCE_TYPE_SEC_SERIES_CLASS_IDENTIFIER,
+    )
+    return tuple(item for item in known_types if item not in present_types)
 
 
 def _derived_evidence(
