@@ -322,6 +322,36 @@ erDiagram
     TIMESTAMPTZ created_at
   }
 
+  security_reconciliation_evaluation_reconciliation_evidence {
+    UUID evaluation_id PK
+    UUID reconciliation_evidence_id PK
+    VARCHAR evidence_role PK
+    TIMESTAMPTZ created_at
+  }
+
+  security_reconciliation_evidence {
+    UUID reconciliation_evidence_id PK
+    UUID security_id FK
+    UUID issuer_id FK
+    UUID listing_id FK
+    VARCHAR evidence_type
+    VARCHAR evidence_role
+    CHAR evidence_key
+    JSONB summary_json
+    VARCHAR collector_version
+    TIMESTAMPTZ created_at
+  }
+
+  security_reconciliation_evidence_provider_evidence {
+    UUID reconciliation_evidence_id PK
+    UUID provider_evidence_id PK
+  }
+
+  security_reconciliation_evidence_source_snapshot {
+    UUID reconciliation_evidence_id PK
+    UUID source_snapshot_id PK
+  }
+
   stg_iso10383_mic {
     TEXT mic
     TEXT operating_mic
@@ -430,4 +460,13 @@ erDiagram
   security ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_security"
   security_reconciliation_evaluation ||--o{ security_reconciliation_evaluation_evidence : "fk_sec_recon_eval_ev_eval"
   provider_evidence ||--o{ security_reconciliation_evaluation_evidence : "fk_sec_recon_eval_ev_provider"
+  security_reconciliation_evaluation ||--o{ security_reconciliation_evaluation_reconciliation_evidence : "fk_sec_recon_eval_recon_evidence_evaluation"
+  security_reconciliation_evidence ||--o{ security_reconciliation_evaluation_reconciliation_evidence : "fk_sec_recon_eval_recon_evidence_evidence"
+  issuer ||--o{ security_reconciliation_evidence : "fk_sec_recon_evidence_issuer"
+  listing ||--o{ security_reconciliation_evidence : "fk_sec_recon_evidence_listing"
+  security ||--o{ security_reconciliation_evidence : "fk_sec_recon_evidence_security"
+  security_reconciliation_evidence ||--o{ security_reconciliation_evidence_provider_evidence : "fk_sec_recon_evidence_provider_evidence"
+  provider_evidence ||--o{ security_reconciliation_evidence_provider_evidence : "fk_sec_recon_evidence_provider_source"
+  security_reconciliation_evidence ||--o{ security_reconciliation_evidence_source_snapshot : "fk_sec_recon_evidence_snapshot_evidence"
+  provider_source_snapshot ||--o{ security_reconciliation_evidence_source_snapshot : "fk_sec_recon_evidence_snapshot_source"
 ```

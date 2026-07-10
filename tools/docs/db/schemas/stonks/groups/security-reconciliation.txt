@@ -1,0 +1,17 @@
+# Derived reconciliation evidence and reconciliation evaluation/audit history.
+
+confidence_level
+provider
+provider_source_snapshot
+provider_observation
+provider_evidence
+issuer
+security
+listing
+security_reconciliation_evidence
+security_reconciliation_evidence_provider_evidence
+security_reconciliation_evidence_source_snapshot
+security_reconciliation_evaluation
+security_reconciliation_evaluation_evidence
+security_reconciliation_evaluation_reconciliation_evidence
+security_reconciliation_decision

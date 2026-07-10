@@ -1,5 +1,12 @@
 ```mermaid
 erDiagram
+  confidence_level {
+    VARCHAR confidence_code PK
+    SMALLINT rank
+    TEXT description
+    BOOL is_active
+  }
+
   issuer {
     UUID issuer_id PK
     VARCHAR cik
@@ -46,7 +53,7 @@ erDiagram
     UUID issuer_id FK
     UUID security_id FK
     UUID listing_id FK
-    UUID event_id FK
+    UUID event_id
     VARCHAR evidence_role
     TEXT notes
     TIMESTAMPTZ created_at
@@ -81,13 +88,6 @@ erDiagram
     TIMESTAMPTZ updated_at
   }
 
-  provider_source_snapshot_object {
-    UUID source_snapshot_object_id PK
-    UUID source_snapshot_id FK
-    UUID object_id
-    TIMESTAMPTZ created_at
-  }
-
   security {
     UUID security_id PK
     UUID issuer_id FK
@@ -103,17 +103,52 @@ erDiagram
     VARCHAR identity_status
   }
 
-  security_event {
-    UUID event_id PK
-    UUID issuer_id FK
+  security_reconciliation_decision {
+    UUID decision_id PK
+    UUID evaluation_id FK
+    UUID run_id
     UUID security_id FK
-    UUID listing_id FK
-    VARCHAR event_type
-    DATE event_date
-    VARCHAR provider_code FK
-    VARCHAR confidence_code
-    TEXT description
+    VARCHAR decision_type
+    VARCHAR previous_identity_status
+    VARCHAR new_identity_status
+    TIMESTAMPTZ applied_at
+    TEXT applied_by
+    TEXT explanation
     JSONB details_json
+  }
+
+  security_reconciliation_evaluation {
+    UUID evaluation_id PK
+    UUID run_id
+    UUID security_id FK
+    UUID issuer_id FK
+    UUID listing_id FK
+    UUID related_security_id FK
+    UUID related_listing_id FK
+    VARCHAR decision_type
+    VARCHAR rule_id
+    VARCHAR rule_version
+    VARCHAR confidence_code FK
+    NUMERIC confidence_score
+    VARCHAR previous_identity_status
+    VARCHAR evaluated_identity_status
+    TEXT explanation
+    ARRAY reason_codes
+    JSONB details_json
+    TIMESTAMPTZ created_at
+  }
+
+  security_reconciliation_evaluation_evidence {
+    UUID evaluation_id PK
+    UUID provider_evidence_id PK
+    VARCHAR evidence_role PK
+    TIMESTAMPTZ created_at
+  }
+
+  security_reconciliation_evaluation_reconciliation_evidence {
+    UUID evaluation_id PK
+    UUID reconciliation_evidence_id PK
+    VARCHAR evidence_role PK
     TIMESTAMPTZ created_at
   }
 
@@ -141,7 +176,6 @@ erDiagram
   }
 
   security ||--o{ listing : "fk_listing_security"
-  security_event ||--o{ provider_evidence : "fk_provider_evidence_event"
   issuer ||--o{ provider_evidence : "fk_provider_evidence_issuer"
   listing ||--o{ provider_evidence : "fk_provider_evidence_listing"
   provider_observation ||--o{ provider_evidence : "fk_provider_evidence_observation"
@@ -149,12 +183,19 @@ erDiagram
   provider ||--o{ provider_observation : "fk_provider_observation_provider"
   provider_source_snapshot ||--o{ provider_observation : "provider_observation_source_snapshot_id_fkey"
   provider ||--o{ provider_source_snapshot : "provider_source_snapshot_provider_code_fkey"
-  provider_source_snapshot ||--o{ provider_source_snapshot_object : "provider_source_snapshot_object_source_snapshot_id_fkey"
   issuer ||--o{ security : "fk_security_issuer"
-  issuer ||--o{ security_event : "fk_security_event_issuer"
-  listing ||--o{ security_event : "fk_security_event_listing"
-  provider ||--o{ security_event : "fk_security_event_provider"
-  security ||--o{ security_event : "fk_security_event_security"
+  security_reconciliation_evaluation ||--|| security_reconciliation_decision : "fk_sec_recon_decision_eval"
+  security ||--o{ security_reconciliation_decision : "fk_sec_recon_decision_security"
+  confidence_level ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_confidence"
+  issuer ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_issuer"
+  listing ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_listing"
+  listing ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_related_listing"
+  security ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_related_security"
+  security ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_security"
+  security_reconciliation_evaluation ||--o{ security_reconciliation_evaluation_evidence : "fk_sec_recon_eval_ev_eval"
+  provider_evidence ||--o{ security_reconciliation_evaluation_evidence : "fk_sec_recon_eval_ev_provider"
+  security_reconciliation_evaluation ||--o{ security_reconciliation_evaluation_reconciliation_evidence : "fk_sec_recon_eval_recon_evidence_evaluation"
+  security_reconciliation_evidence ||--o{ security_reconciliation_evaluation_reconciliation_evidence : "fk_sec_recon_eval_recon_evidence_evidence"
   issuer ||--o{ security_reconciliation_evidence : "fk_sec_recon_evidence_issuer"
   listing ||--o{ security_reconciliation_evidence : "fk_sec_recon_evidence_listing"
   security ||--o{ security_reconciliation_evidence : "fk_sec_recon_evidence_security"

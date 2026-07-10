@@ -280,6 +280,78 @@ erDiagram
     TIMESTAMPTZ created_at
   }
 
+  security_reconciliation_decision {
+    UUID decision_id PK
+    UUID evaluation_id FK
+    UUID run_id
+    UUID security_id FK
+    VARCHAR decision_type
+    VARCHAR previous_identity_status
+    VARCHAR new_identity_status
+    TIMESTAMPTZ applied_at
+    TEXT applied_by
+    TEXT explanation
+    JSONB details_json
+  }
+
+  security_reconciliation_evaluation {
+    UUID evaluation_id PK
+    UUID run_id
+    UUID security_id FK
+    UUID issuer_id FK
+    UUID listing_id FK
+    UUID related_security_id FK
+    UUID related_listing_id FK
+    VARCHAR decision_type
+    VARCHAR rule_id
+    VARCHAR rule_version
+    VARCHAR confidence_code FK
+    NUMERIC confidence_score
+    VARCHAR previous_identity_status
+    VARCHAR evaluated_identity_status
+    TEXT explanation
+    ARRAY reason_codes
+    JSONB details_json
+    TIMESTAMPTZ created_at
+  }
+
+  security_reconciliation_evaluation_evidence {
+    UUID evaluation_id PK
+    UUID provider_evidence_id PK
+    VARCHAR evidence_role PK
+    TIMESTAMPTZ created_at
+  }
+
+  security_reconciliation_evaluation_reconciliation_evidence {
+    UUID evaluation_id PK
+    UUID reconciliation_evidence_id PK
+    VARCHAR evidence_role PK
+    TIMESTAMPTZ created_at
+  }
+
+  security_reconciliation_evidence {
+    UUID reconciliation_evidence_id PK
+    UUID security_id FK
+    UUID issuer_id FK
+    UUID listing_id FK
+    VARCHAR evidence_type
+    VARCHAR evidence_role
+    CHAR evidence_key
+    JSONB summary_json
+    VARCHAR collector_version
+    TIMESTAMPTZ created_at
+  }
+
+  security_reconciliation_evidence_provider_evidence {
+    UUID reconciliation_evidence_id PK
+    UUID provider_evidence_id PK
+  }
+
+  security_reconciliation_evidence_source_snapshot {
+    UUID reconciliation_evidence_id PK
+    UUID source_snapshot_id PK
+  }
+
   classification_system ||--o{ classification_code : "fk_classification_code_system"
   provider ||--o{ classification_system : "fk_classification_system_provider"
   iso3166_country ||--o{ exchange : "fk_exchange_country"
@@ -329,4 +401,23 @@ erDiagram
   provider ||--o{ security_identifier : "fk_security_identifier_provider"
   security ||--o{ security_identifier : "fk_security_identifier_security"
   identifier_type ||--o{ security_identifier : "fk_security_identifier_type"
+  security_reconciliation_evaluation ||--|| security_reconciliation_decision : "fk_sec_recon_decision_eval"
+  security ||--o{ security_reconciliation_decision : "fk_sec_recon_decision_security"
+  confidence_level ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_confidence"
+  issuer ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_issuer"
+  listing ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_listing"
+  listing ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_related_listing"
+  security ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_related_security"
+  security ||--o{ security_reconciliation_evaluation : "fk_sec_recon_eval_security"
+  security_reconciliation_evaluation ||--o{ security_reconciliation_evaluation_evidence : "fk_sec_recon_eval_ev_eval"
+  provider_evidence ||--o{ security_reconciliation_evaluation_evidence : "fk_sec_recon_eval_ev_provider"
+  security_reconciliation_evaluation ||--o{ security_reconciliation_evaluation_reconciliation_evidence : "fk_sec_recon_eval_recon_evidence_evaluation"
+  security_reconciliation_evidence ||--o{ security_reconciliation_evaluation_reconciliation_evidence : "fk_sec_recon_eval_recon_evidence_evidence"
+  issuer ||--o{ security_reconciliation_evidence : "fk_sec_recon_evidence_issuer"
+  listing ||--o{ security_reconciliation_evidence : "fk_sec_recon_evidence_listing"
+  security ||--o{ security_reconciliation_evidence : "fk_sec_recon_evidence_security"
+  security_reconciliation_evidence ||--o{ security_reconciliation_evidence_provider_evidence : "fk_sec_recon_evidence_provider_evidence"
+  provider_evidence ||--o{ security_reconciliation_evidence_provider_evidence : "fk_sec_recon_evidence_provider_source"
+  security_reconciliation_evidence ||--o{ security_reconciliation_evidence_source_snapshot : "fk_sec_recon_evidence_snapshot_evidence"
+  provider_source_snapshot ||--o{ security_reconciliation_evidence_source_snapshot : "fk_sec_recon_evidence_snapshot_source"
 ```

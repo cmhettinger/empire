@@ -124,7 +124,8 @@ verified with `git diff --check`.
 Done: 2026-07-10 — added the derived evidence, provider-evidence lineage,
 source-snapshot lineage, and evaluation-to-derived-evidence tables in
 `db/flyway/sql/V2026.07.10.0001__stonks_security_reconciliation_evidence.sql`;
-verified with `make db-validate` and `git diff --check`.
+verified with `make db-validate`,
+`make docs-db-erd-groups SCHEMA=stonks`, and `git diff --check`.
 
 ## Phase 4: Confidence And Promotion Dry Run
 

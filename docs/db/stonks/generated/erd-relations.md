@@ -29,6 +29,10 @@ flowchart LR
   security_reconciliation_decision["security_reconciliation_decision"]
   security_reconciliation_evaluation["security_reconciliation_evaluation"]
   security_reconciliation_evaluation_evidence["security_reconciliation_evaluation_evidence"]
+  security_reconciliation_evaluation_reconciliation_evidence["security_reconciliation_evaluation_reconciliation_evidence"]
+  security_reconciliation_evidence["security_reconciliation_evidence"]
+  security_reconciliation_evidence_provider_evidence["security_reconciliation_evidence_provider_evidence"]
+  security_reconciliation_evidence_source_snapshot["security_reconciliation_evidence_source_snapshot"]
   stg_iso10383_mic["stg_iso10383_mic"]
   stg_iso3166_country["stg_iso3166_country"]
   stg_iso4217_currency["stg_iso4217_currency"]
@@ -93,4 +97,13 @@ flowchart LR
   security -->|fk_sec_recon_eval_security| security_reconciliation_evaluation
   security_reconciliation_evaluation -->|fk_sec_recon_eval_ev_eval| security_reconciliation_evaluation_evidence
   provider_evidence -->|fk_sec_recon_eval_ev_provider| security_reconciliation_evaluation_evidence
+  security_reconciliation_evaluation -->|fk_sec_recon_eval_recon_evidence_evaluation| security_reconciliation_evaluation_reconciliation_evidence
+  security_reconciliation_evidence -->|fk_sec_recon_eval_recon_evidence_evidence| security_reconciliation_evaluation_reconciliation_evidence
+  issuer -->|fk_sec_recon_evidence_issuer| security_reconciliation_evidence
+  listing -->|fk_sec_recon_evidence_listing| security_reconciliation_evidence
+  security -->|fk_sec_recon_evidence_security| security_reconciliation_evidence
+  security_reconciliation_evidence -->|fk_sec_recon_evidence_provider_evidence| security_reconciliation_evidence_provider_evidence
+  provider_evidence -->|fk_sec_recon_evidence_provider_source| security_reconciliation_evidence_provider_evidence
+  security_reconciliation_evidence -->|fk_sec_recon_evidence_snapshot_evidence| security_reconciliation_evidence_source_snapshot
+  provider_source_snapshot -->|fk_sec_recon_evidence_snapshot_source| security_reconciliation_evidence_source_snapshot
 ```

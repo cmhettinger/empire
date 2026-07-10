@@ -9,3 +9,6 @@ issuer
 security
 listing
 security_event
+security_reconciliation_evidence
+security_reconciliation_evidence_provider_evidence
+security_reconciliation_evidence_source_snapshot
