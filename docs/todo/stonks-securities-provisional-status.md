@@ -253,9 +253,136 @@ trail. Do not store confidence scores, candidate decisions, or lifecycle
 transitions in `security_reconciliation_evidence`; those remain the exclusive
 responsibility of the evaluation and decision audit tables.
 
+Each evaluation must record the selected fixed confidence profile in
+`security_reconciliation_evaluation.rule_version` (initially
+`SEC_DAILY_CONTINUITY_V1` or `SEC_BACKFILL_PROMOTION_V1`). Its audit details
+must retain the profile result, distinct snapshot count, observed time span,
+and whether the result is continuity-ready or a promotion candidate. The
+existing audit shape therefore preserves which threshold was applied without a
+new generic profile table or a schema change.
+
 This selected shape preserves raw SEC lineage, gives derived evidence stable
 idempotent identity, retains the source-snapshot continuity unit, and leaves
 collection, confidence evaluation, and promotion independently rerunnable.
+
+---
+
+## First Confidence Rules
+
+The first confidence contract defines two small, explicit SEC-only profiles for
+dry-run evaluation of one `PROVISIONAL` `security_id`; it is not a generic
+rules engine. The evaluator receives one fixed profile name, records its policy
+ID, the individual rule IDs below, the selected derived-evidence IDs, and the
+resulting explanation with every evaluation. A later policy change receives a
+new policy ID (for example, `SEC_BACKFILL_PROMOTION_V2`) and does not reinterpret
+prior evaluation rows.
+
+- `SEC_DAILY_CONTINUITY_V1` provides a prompt operational signal that a current
+  SEC mapping persists. It can report continuity readiness, but can never make
+  a promotion candidate.
+- `SEC_BACKFILL_PROMOTION_V1` uses a materially longer and denser continuity
+  window. It is the only v1 profile that can make a **promotion candidate**.
+
+A candidate remains a high-confidence dry-run recommendation, not authority to
+change `security.identity_status`. Apply-mode guardrails, including whether any
+candidate is safe to promote automatically, are deliberately deferred to
+Phase 5.
+
+### Eligible Supporting Evidence
+
+The evaluator considers only stored SEC derived evidence for the evaluated
+security. A supporting summary is eligible when its `evidence_role` is
+`SUPPORTS`, its target IDs and normalized values are internally consistent
+with the candidate security, and its retained source lineage is present. It
+uses the evidence summary's distinct source-snapshot count; repeated delivery
+of the same snapshot never increases confidence.
+
+Both profiles use the same fixed score contributions and levels; their
+snapshot and time-span thresholds differ below.
+
+| Rule ID | Requirement | Score |
+|---|---|---:|
+| `SEC_V1_ISSUER_SECURITY_MATCH` | At least one eligible `SEC_ISSUER_SECURITY_MATCH` identifies the same non-null issuer and security. | 25 |
+| `SEC_V1_TICKER_EXCHANGE_STABILITY` | An eligible `SEC_TICKER_EXCHANGE_STABILITY` satisfies the selected profile's distinct-snapshot threshold for the same resolved listing, ticker, and exchange, with no `insufficient_repeat` marker. | 25 |
+| `SEC_V1_SOURCE_SNAPSHOT_CONTINUITY` | An eligible `SEC_SOURCE_SNAPSHOT_CONTINUITY` satisfies the selected profile's distinct-snapshot and observed-time-span thresholds for the same issuer/security/listing/ticker/exchange mapping. | 20 |
+| `SEC_V1_SERIES_CLASS_RESERVED` | No points in v1. `SEC_SERIES_CLASS_IDENTIFIER` remains unavailable until its source, parser, and mapping are implemented and validated. | 0 |
+
+The maximum v1 score is 70. A score is reported as `LOW` below 45, `MEDIUM`
+from 45 through 69, and `HIGH` at 70. These levels are evaluation labels only;
+they do not classify the instrument or alter lifecycle state.
+
+### Fixed Profile Thresholds
+
+| Profile | Stability and continuity threshold | Result at 70 points |
+|---|---|---|
+| `SEC_DAILY_CONTINUITY_V1` | At least two distinct semantic source snapshots. No minimum elapsed span is required. | `continuity_ready`; never a promotion candidate. |
+| `SEC_BACKFILL_PROMOTION_V1` | At least three distinct semantic source snapshots spanning at least 30 calendar days between the earliest and latest observed snapshot timestamps. | Eligible for the candidate rule below. |
+
+The elapsed span uses the observation or source-snapshot timestamps retained by
+the evidence, never a run ID, stored-object timestamp, or ingestion time.
+Snapshots must show the same issuer, security, listing, normalized ticker, and
+normalized exchange throughout the selected window. Repeated delivery of one
+snapshot cannot satisfy either profile.
+
+### Candidate Rule
+
+`SEC_BACKFILL_V1_PROMOTION_CANDIDATE` is satisfied only when all of the
+following are true:
+
+- the security is currently `PROVISIONAL`;
+- evaluation uses `SEC_BACKFILL_PROMOTION_V1`;
+- all three scored supporting rules above satisfy that profile's thresholds,
+  for a total score of 70 (`HIGH`);
+- the issuer, listing, normalized ticker, normalized exchange, and snapshot
+  mappings used by those summaries agree throughout the 30-day evaluation
+  window; and
+- none of the blocking rules below is satisfied.
+
+`SEC_DAILY_CONTINUITY_V1` reports `continuity_ready` only when its three scored
+rules total 70 and no blocking rule is satisfied. It reports
+`not_continuity_ready` otherwise. Its output always has
+`promotion_candidate = false` and the refusal reason
+`daily_profile_cannot_promote` when a caller asks for candidate status.
+
+Either profile must report a non-candidate result when evidence is missing or
+only partially satisfies its conditions. Missing evidence is a refusal reason
+(`missing_issuer_security_match`, `insufficient_ticker_exchange_repetition`,
+`insufficient_snapshot_continuity`, or `insufficient_backfill_time_span`), not
+a conflict and not negative score evidence.
+
+### Blocking Rules
+
+Any satisfied blocking rule makes the result `BLOCKED`, regardless of score;
+the evaluator must retain every applicable blocker rather than choosing one.
+
+| Rule ID | Blocking condition | Refusal reason |
+|---|---|---|
+| `SEC_V1_BLOCK_NON_PROVISIONAL` | The security is not currently `PROVISIONAL`. | `identity_status_not_provisional` |
+| `SEC_V1_BLOCK_EXPLICIT` | A relevant derived summary has `evidence_role = BLOCKS`. | `explicit_blocking_evidence` |
+| `SEC_V1_BLOCK_CONFLICT` | A relevant `SEC_ISSUER_SECURITY_MATCH`, `SEC_TICKER_EXCHANGE_STABILITY`, or `SEC_SOURCE_SNAPSHOT_CONTINUITY` summary has `evidence_role = CONFLICTS`. | `conflicting_sec_identity_evidence` |
+| `SEC_V1_BLOCK_INCONSISTENT_SUPPORT` | Eligible supporting summaries disagree on issuer, listing, normalized ticker, normalized exchange, or mapped security. | `inconsistent_supporting_evidence` |
+| `SEC_V1_BLOCK_INVALID_LINEAGE` | A summary selected as support lacks its required provider-evidence lineage, or a stability/continuity summary claiming snapshots lacks the corresponding snapshot lineage. | `incomplete_evidence_lineage` |
+
+`CONTEXT` summaries do not add points and do not block by themselves. They may
+be included in the explanation. The policy does not infer that ticker
+continuity means identical issuer or security, does not merge identities, and
+does not treat absence of the not-yet-implemented series/class evidence as a
+blocker.
+
+### Determinism And Scope
+
+For a fixed profile, set of stored evidence, and security lifecycle state, v1
+must return the same score, level, continuity/candidate/blocked status, rule
+IDs, refusal reasons, and evidence IDs. If multiple summaries satisfy one
+supporting rule, the evaluator may cite all of them but awards that rule's
+points once. Evidence selection and output ordering must be stable by rule ID
+and evidence ID.
+
+V1 intentionally excludes external identifiers, instrument-type enrichment,
+duplicate detection, successor/corporate-action handling, and cross-provider
+consensus. Validated strong identifiers may receive separate versioned
+promotion policies later; they are not exceptions to either SEC ticker-based
+profile.
 
 ---
 
@@ -322,5 +449,6 @@ Potential future classifications include:
   - object-store keys under
     `stonks/securities/runs/YYYY/MM/DD/run-reports/reconciliation/{dry-run,apply}`
 - CLI entrypoint `stonks-securities-reconcile`; dry-run is the default, and
-  apply requires `--apply`
+  apply requires `--apply`. The CLI exposes the fixed `daily` and `backfill`
+  profiles; `daily` is the default and cannot apply promotions.
 - Promotion Metrics Dashboard

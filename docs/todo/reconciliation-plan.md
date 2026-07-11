@@ -153,12 +153,17 @@ the safety rail before any automatic promotion exists.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| C4.1 | [ ] | Define first confidence rules | Document explicit versioned rules for what can make a security promotion candidate and what blocks promotion. Avoid a generic rules engine. | E3.6 |
-| C4.2 | [ ] | Implement confidence evaluator | Add package code that turns stored evidence into confidence results with rule id, score/level, explanation, evidence ids, and refusal reasons. Unit tests cover deterministic output. | C4.1 |
-| C4.3 | [ ] | Implement promotion candidate evaluator | Add dry-run evaluation for provisional securities without mutating identity state. Unit tests cover candidate and blocked cases. | C4.2 |
-| C4.4 | [ ] | Write evaluation audit rows in dry-run mode | Store evaluation results with run context while leaving `security.identity_status` unchanged. Tests prove dry-run does not promote. | C4.3 |
-| C4.5 | [ ] | Add dry-run JSON report builder | Produce a report payload with lifecycle counts, promotion candidates, blocked securities, missing evidence classes, warnings, and failures. Duplicate and successor sections are added later in Phase 6. | C4.4 |
-| C4.6 | [ ] | Store dry-run report artifact | Persist the dry-run JSON report under the agreed object-store run-report path with the agreed object kind/logical name. Tests cover report path and metadata. | C4.5 |
+| C4.1 | [x] | Define first confidence rules | Document explicit versioned rules for what can make a security promotion candidate and what blocks promotion. Avoid a generic rules engine. | E3.6 |
+| C4.2 | [ ] | Implement confidence evaluator | Add package code that evaluates stored evidence with an explicit fixed `daily` or `backfill` profile and returns its policy/rule IDs, score/level, explanation, evidence IDs, and refusal reasons. Unit tests cover deterministic output for both profiles. | C4.1 |
+| C4.3 | [ ] | Implement promotion candidate evaluator | Add dry-run evaluation for provisional securities without mutating identity state. The daily profile returns continuity readiness only; only the backfill profile can return a promotion candidate. Unit tests cover ready, candidate, and blocked cases. | C4.2 |
+| C4.4 | [ ] | Write evaluation audit rows in dry-run mode | Store the selected profile/policy version, result, snapshot count, observed span, and run context while leaving `security.identity_status` unchanged. Tests prove dry-run does not promote. | C4.3 |
+| C4.5 | [ ] | Add dry-run JSON report builder | Produce a profile-identified report payload with lifecycle counts, daily continuity-ready/not-ready counts or backfill promotion candidates, blocked securities, missing evidence classes, warnings, and failures. Duplicate and successor sections are added later in Phase 6. | C4.4 |
+| C4.6 | [ ] | Store dry-run report artifact | Persist each profile-identified dry-run JSON report under the agreed object-store run-report path with the agreed object kind/logical name. Tests cover report path and metadata. | C4.5 |
+
+Done: 2026-07-11 — defined versioned SEC daily-continuity and stricter
+backfill-promotion profiles, including candidate, scoring, refusal, and
+blocking rules, in `docs/todo/stonks-securities-provisional-status.md`;
+verified with `git diff --check`.
 
 ## Phase 5: Safe Apply Mode
 
@@ -167,10 +172,10 @@ Goal: allow explicit, high-confidence promotion from `PROVISIONAL` to
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| A5.1 | [ ] | Define apply-mode guardrails | Document which candidates can be auto-promoted, which must remain blocked, and which conditions require manual review or future provider evidence. | C4.6 |
+| A5.1 | [ ] | Define apply-mode guardrails | Document which backfill-profile candidates can be auto-promoted, which must remain blocked, and which conditions require manual review or future provider evidence. The daily profile is never eligible for apply mode. | C4.6 |
 | A5.2 | [ ] | Implement one-way promotion helper | Add package helper that changes `identity_status` from `PROVISIONAL` to `CONFIRMED`, writes audit rows, and rejects downgrades or unsupported transitions. Unit tests pass. | A5.1 |
-| A5.3 | [ ] | Implement apply-mode runner | Add explicit apply mode that promotes only safe candidates and returns applied/skipped/blocked counts. Dry-run remains the default path. | A5.2 |
-| A5.4 | [ ] | Add apply-mode report content | Include applied promotions, skipped candidates, blockers, and audit references in reconciliation reports. | A5.3 |
+| A5.3 | [ ] | Implement apply-mode runner | Add explicit apply mode that accepts only safe backfill-profile candidates and returns applied/skipped/blocked counts. Dry-run remains the default path. | A5.2 |
+| A5.4 | [ ] | Add apply-mode report content | Include the backfill policy ID, applied promotions, skipped candidates, blockers, and audit references in reconciliation reports. | A5.3 |
 | A5.5 | [ ] | Prove idempotent apply behavior | Tests prove applying the same safe candidate twice does not duplicate audit/evidence rows or change confirmed identities incorrectly. | A5.4 |
 
 ## Phase 6: Duplicate And Successor Candidate Detection
@@ -203,12 +208,12 @@ reconciliation DAG.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| O7.1 | [ ] | Add reconcile CLI skeleton | Add `stonks-securities-reconcile` with dry-run default, apply flag, source-run/report context options, and JSON output. CLI imports and help text work. | C4.6 |
-| O7.2 | [ ] | Wire CLI dry-run mode | CLI runs evidence collection, confidence evaluation, dry-run auditing, and report writing. Targeted CLI tests pass. | O7.1 |
-| O7.3 | [ ] | Wire CLI apply mode | CLI apply mode requires an explicit flag and runs safe promotions plus apply report content. Targeted CLI tests pass. | A5.5 |
+| O7.1 | [ ] | Add reconcile CLI skeleton | Add `stonks-securities-reconcile` with dry-run default, fixed `daily`/`backfill` profile selection (daily by default), apply flag, source-run/report context options, and JSON output. CLI imports and help text work. | C4.6 |
+| O7.2 | [ ] | Wire CLI dry-run mode | CLI runs evidence collection, the selected profile's confidence evaluation, dry-run auditing, and profile-identified report writing. Targeted CLI tests pass. | O7.1 |
+| O7.3 | [ ] | Wire CLI apply mode | CLI apply mode requires an explicit flag plus the backfill profile, then runs safe promotions and backfill apply-report content. Targeted CLI tests pass. | A5.5 |
 | O7.4 | [ ] | Add reconciliation DAG skeleton | Add one thin reconciliation DAG that can run after the consolidated SEC refresh DAG or manually. DAG import smoke test passes. | D1.8, O7.2 |
-| O7.5 | [ ] | Wire reconciliation DAG run context | DAG passes source run/report context explicitly and calls package-owned sequencing. Tests cover context handoff. | O7.4 |
-| O7.6 | [ ] | Update operator docs | Document consolidated SEC refresh, reconciliation dry-run/apply, report interpretation, and exact local verification/rebuild commands. | O7.5, O7.3 |
+| O7.5 | [ ] | Wire reconciliation DAG run context | DAG passes source run/report context and the explicit profile to package-owned sequencing. Its scheduled path uses the daily profile; manual backfill-profile runs remain explicit. Tests cover context handoff. | O7.4 |
+| O7.6 | [ ] | Update operator docs | Document consolidated SEC refresh, daily-continuity versus backfill-promotion dry runs, backfill-only apply, report interpretation, and exact local verification/rebuild commands. | O7.5, O7.3 |
 
 ## Phase 8: Final Verification And Cleanup
 
@@ -219,7 +224,7 @@ Goal: make the implementation reliable enough to become the normal workflow.
 | V8.1 | [ ] | Run full package test suite | `packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests` passes from the repo root. | O7.6 |
 | V8.2 | [ ] | Run DB validation | Repo-standard DB validation passes after all migrations. | O7.6 |
 | V8.3 | [ ] | Verify Airflow imports | Consolidated SEC refresh DAG and reconciliation DAG import cleanly in the Airflow environment or existing DAG smoke-test harness. | O7.6 |
-| V8.4 | [ ] | Verify local end-to-end dry run | Local/dev run proves SEC refresh then reconciliation dry-run produces expected reports without applying promotions. | V8.1, V8.2, V8.3 |
+| V8.4 | [ ] | Verify local end-to-end dry runs | Local/dev runs prove SEC refresh then both daily and backfill reconciliation profiles produce their expected reports without applying promotions. | V8.1, V8.2, V8.3 |
 | V8.5 | [ ] | Decide apply-mode rollout | Decide whether apply mode remains manual-only, becomes scheduled after dry-run, or needs more evidence/provider work before use. Record the decision here. | V8.4 |
 
 ---
