@@ -1,4 +1,4 @@
-.PHONY: db-up db-down db-ps db-logs db-migrate db-info db-validate db-clean db-psql
+.PHONY: db-up db-down db-ps db-logs db-migrate db-info db-validate db-clean db-psql db-data-remediation
 
 db-up: ## Start postgres and pgbouncer
 	$(COMPOSE) up -d postgres pgbouncer
@@ -29,3 +29,7 @@ db-repair: ## Repair Flyway
 
 db-psql: ## Open psql against Postgres
 	$(COMPOSE) exec postgres sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+db-data-remediation: ## Apply an opt-in data remediation (REMEDIATION=db/data-remediations/...sql)
+	@test -n "$(REMEDIATION)" || (echo "ERROR: Set REMEDIATION=db/data-remediations/...sql" >&2; exit 1)
+	bin/run-data-remediation --file "$(REMEDIATION)" --env-file deploy/env/$(DEPLOY_ENV).env --apply

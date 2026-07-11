@@ -208,6 +208,66 @@ def test_same_exchange_ticker_for_different_security_is_not_merged():
     }
 
 
+def test_verified_successor_retains_predecessor_observation_without_reopening_listing():
+    conn = FakeConnection()
+    predecessor_issuer, predecessor_security, exchange_id = seed_prereqs(
+        conn,
+        cik="0000034088",
+        ticker_norm="XOM",
+        raw_exchange="NYSE",
+        exchange_code="NYSE",
+    )
+    successor_issuer = conn.add_issuer("0002115436")
+    successor_security = conn.add_security(successor_issuer, "XOM")
+    predecessor_listing = conn.add_listing(
+        security_id=predecessor_security,
+        exchange_id=exchange_id,
+        ticker_norm="XOM",
+        status="MERGED",
+        valid_from=date(2026, 6, 18),
+        valid_to=date(2026, 7, 1),
+    )
+    successor_listing = conn.add_listing(
+        security_id=successor_security,
+        exchange_id=exchange_id,
+        ticker_norm="XOM",
+        status="ACTIVE",
+        valid_from=date(2026, 7, 2),
+    )
+    conn.add_successor_relationship(
+        predecessor_security_id=predecessor_security,
+        successor_security_id=successor_security,
+        predecessor_listing_id=predecessor_listing,
+        successor_listing_id=successor_listing,
+        effective_date=date(2026, 7, 1),
+    )
+    observation = listing_observation(
+        cik=34088,
+        cik_padded="0000034088",
+        ticker_norm="XOM",
+        exchange="NYSE",
+        provider_date=date(2026, 7, 11),
+    )
+    conn.add_issuer_evidence(observation.provider_observation_id, predecessor_issuer)
+    conn.add_security_evidence(
+        observation.provider_observation_id,
+        predecessor_issuer,
+        predecessor_security,
+    )
+
+    result = upsert_sec_listings(connection=conn, observations=[observation])
+
+    assert result.successor_observations_suppressed == 1
+    assert result.listings_created == 0
+    assert len(conn.listings) == 2
+    assert len(conn.symbol_history) == 0
+    assert any(
+        row["provider_observation_id"] == observation.provider_observation_id
+        and row["listing_id"] == predecessor_listing
+        for row in conn.provider_evidence
+    )
+
+
 def test_writes_evidence_link_from_observation_to_listing():
     conn = FakeConnection()
     issuer_id, security_id, _ = seed_prereqs(conn)
@@ -315,6 +375,7 @@ class FakeConnection:
         self.exchanges: dict[UUID, dict] = {}
         self.exchange_aliases: list[dict] = []
         self.listings: dict[UUID, dict] = {}
+        self.successor_relationships: list[dict] = []
         self.symbol_history: list[dict] = []
         self.provider_evidence: list[dict] = []
         self.issuer_writes = 0
@@ -355,6 +416,50 @@ class FakeConnection:
                 "provider_code": "SEC",
                 "raw_name": raw_name,
                 "is_active": True,
+            }
+        )
+
+    def add_listing(
+        self,
+        *,
+        security_id: UUID,
+        exchange_id: UUID,
+        ticker_norm: str,
+        status: str,
+        valid_from: date,
+        valid_to: date | None = None,
+    ) -> UUID:
+        listing_id = uuid4()
+        self.listings[listing_id] = {
+            "listing_id": listing_id,
+            "security_id": security_id,
+            "exchange_id": exchange_id,
+            "current_ticker": ticker_norm,
+            "ticker_norm": ticker_norm,
+            "status": status,
+            "valid_from": valid_from,
+            "valid_to": valid_to,
+            "first_seen": valid_from,
+            "last_seen": valid_from,
+        }
+        return listing_id
+
+    def add_successor_relationship(
+        self,
+        *,
+        predecessor_security_id: UUID,
+        successor_security_id: UUID,
+        predecessor_listing_id: UUID,
+        successor_listing_id: UUID,
+        effective_date: date,
+    ) -> None:
+        self.successor_relationships.append(
+            {
+                "predecessor_security_id": predecessor_security_id,
+                "successor_security_id": successor_security_id,
+                "predecessor_listing_id": predecessor_listing_id,
+                "successor_listing_id": successor_listing_id,
+                "effective_date": effective_date,
             }
         )
 
@@ -530,6 +635,26 @@ class FakeCursor:
                 None,
             )
             self.connection.last_result = (row["exchange_id"],) if row else None
+            return
+
+        if "FROM stonks.security_successor_relationship" in normalized:
+            security_id, exchange_id, ticker_norm, seen_date = params
+            relationship = next(
+                (
+                    row
+                    for row in self.connection.successor_relationships
+                    if row["predecessor_security_id"] == security_id
+                    and row["effective_date"] <= seen_date
+                    and self.connection.listings[row["predecessor_listing_id"]]["exchange_id"]
+                    == exchange_id
+                    and self.connection.listings[row["predecessor_listing_id"]]["ticker_norm"]
+                    == ticker_norm
+                ),
+                None,
+            )
+            self.connection.last_result = (
+                (relationship["predecessor_listing_id"],) if relationship is not None else None
+            )
             return
 
         if "FROM stonks.listing WHERE security_id" in normalized:

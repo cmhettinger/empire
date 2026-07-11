@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/run-data-remediation --file PATH --apply [--env-file PATH]
+
+Description:
+  Runs one opt-in SQL data remediation through Empire's Postgres container.
+  Data remediations are not Flyway migrations and must be applied explicitly
+  to an existing environment.
+
+Options:
+  --file PATH       SQL file under db/data-remediations/ (required).
+  --apply           Required acknowledgement before changing data.
+  --env-file PATH   Environment file to load. Defaults to deploy/env/local.env.
+  -h, --help        Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+REMEDIATION_FILE=""
+APPLY=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --file)
+      REMEDIATION_FILE="${2:-}"
+      [[ -n "${REMEDIATION_FILE}" ]] || { echo "ERROR: --file requires a path." >&2; exit 1; }
+      shift 2
+      ;;
+    --apply)
+      APPLY=true
+      shift
+      ;;
+    --env-file)
+      ENV_FILE="${2:-}"
+      [[ -n "${ENV_FILE}" ]] || { echo "ERROR: --env-file requires a path." >&2; exit 1; }
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+[[ -n "${REMEDIATION_FILE}" ]] || { echo "ERROR: --file is required." >&2; usage >&2; exit 1; }
+[[ "${APPLY}" == true ]] || { echo "ERROR: --apply is required to run a data remediation." >&2; exit 1; }
+[[ -f "${ENV_FILE}" ]] || { echo "ERROR: env file not found: ${ENV_FILE}" >&2; exit 1; }
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ "${REMEDIATION_FILE}" = /* ]]; then
+  REMEDIATION_CANDIDATE="${REMEDIATION_FILE}"
+else
+  REMEDIATION_CANDIDATE="${REPO_ROOT}/${REMEDIATION_FILE#./}"
+fi
+REMEDIATION_PATH="$(cd "$(dirname "${REMEDIATION_CANDIDATE}")" && pwd -P)/$(basename "${REMEDIATION_CANDIDATE}")"
+REMEDIATION_ROOT="${REPO_ROOT}/db/data-remediations/"
+
+case "${REMEDIATION_PATH}" in
+  "${REMEDIATION_ROOT}"*.sql) ;;
+  *)
+    echo "ERROR: remediation must be a .sql file under db/data-remediations/." >&2
+    exit 1
+    ;;
+esac
+
+[[ -f "${REMEDIATION_PATH}" ]] || { echo "ERROR: remediation file not found: ${REMEDIATION_FILE}" >&2; exit 1; }
+command -v docker >/dev/null 2>&1 || { echo "ERROR: docker was not found." >&2; exit 1; }
+
+set -a
+source "${ENV_FILE}"
+set +a
+
+: "${EMPIRE_POSTGRES_CONTAINER:?EMPIRE_POSTGRES_CONTAINER is required}"
+: "${POSTGRES_DB:?POSTGRES_DB is required}"
+: "${POSTGRES_USER:?POSTGRES_USER is required}"
+
+CHECKSUM="$(shasum -a 256 "${REMEDIATION_PATH}" | awk '{print $1}')"
+echo "==> Applying data remediation: ${REMEDIATION_FILE#./}"
+echo "==> Target: container=${EMPIRE_POSTGRES_CONTAINER} database=${POSTGRES_DB} user=${POSTGRES_USER}"
+echo "==> SHA-256: ${CHECKSUM}"
+
+docker exec -i "${EMPIRE_POSTGRES_CONTAINER}" psql \
+  --username "${POSTGRES_USER}" \
+  --dbname "${POSTGRES_DB}" \
+  --set ON_ERROR_STOP=on \
+  < "${REMEDIATION_PATH}"

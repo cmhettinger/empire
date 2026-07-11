@@ -52,6 +52,7 @@ class SecListingUpsertResult:
     symbol_history_skipped: int = 0
     evidence_inserted: int = 0
     evidence_skipped: int = 0
+    successor_observations_suppressed: int = 0
     warning_count: int = 0
 
     def to_dict(self) -> dict[str, int]:
@@ -70,6 +71,7 @@ class SecListingUpsertResult:
             "symbol_history_skipped": self.symbol_history_skipped,
             "evidence_inserted": self.evidence_inserted,
             "evidence_skipped": self.evidence_skipped,
+            "successor_observations_suppressed": self.successor_observations_suppressed,
             "warning_count": self.warning_count,
         }
 
@@ -98,8 +100,8 @@ def upsert_sec_listings_from_provider_observations(
         "Completed SEC listing upsert: observations_scanned=%s observations_skipped=%s "
         "issuers_resolved=%s issuers_missing=%s securities_resolved=%s securities_missing=%s "
         "exchanges_resolved=%s exchanges_unknown=%s listings_created=%s listings_updated=%s "
-        "symbol_history_inserted=%s symbol_history_skipped=%s evidence_inserted=%s "
-        "evidence_skipped=%s warning_count=%s",
+            "symbol_history_inserted=%s symbol_history_skipped=%s evidence_inserted=%s "
+            "evidence_skipped=%s successor_observations_suppressed=%s warning_count=%s",
         result.observations_scanned,
         result.observations_skipped,
         result.issuers_resolved,
@@ -112,9 +114,10 @@ def upsert_sec_listings_from_provider_observations(
         result.listings_updated,
         result.symbol_history_inserted,
         result.symbol_history_skipped,
-        result.evidence_inserted,
-        result.evidence_skipped,
-        result.warning_count,
+            result.evidence_inserted,
+            result.evidence_skipped,
+            result.successor_observations_suppressed,
+            result.warning_count,
     )
     return result
 
@@ -232,6 +235,38 @@ def upsert_sec_listings(
                 )
                 continue
             counts.exchanges_resolved += 1
+
+            predecessor_listing_id = _successor_predecessor_listing_id(
+                cursor=cursor,
+                security_id=security_id,
+                exchange_id=exchange_id,
+                ticker_norm=parsed["ticker_norm"],
+                seen_date=parsed["seen_date"],
+            )
+            if predecessor_listing_id is not None:
+                if _insert_provider_evidence(
+                    cursor=cursor,
+                    provider_observation_id=observation.provider_observation_id,
+                    issuer_id=issuer_id,
+                    security_id=security_id,
+                    listing_id=predecessor_listing_id,
+                    ticker_norm=parsed["ticker_norm"],
+                    exchange=parsed["exchange"],
+                ):
+                    counts.evidence_inserted += 1
+                else:
+                    counts.evidence_skipped += 1
+                counts.successor_observations_suppressed += 1
+                logger.info(
+                    "Retained SEC observation as predecessor listing evidence without "
+                    "reopening a successor-replaced listing: provider_observation_id=%s "
+                    "predecessor_listing_id=%s security_id=%s ticker_norm=%s",
+                    observation.provider_observation_id,
+                    predecessor_listing_id,
+                    security_id,
+                    parsed["ticker_norm"],
+                )
+                continue
 
             listing = _upsert_listing(
                 cursor=cursor,
@@ -375,6 +410,42 @@ def _resolve_exchange_id(*, cursor: Any, exchange: str) -> UUID | None:
         LIMIT 1
         """,
         (exchange, exchange),
+    )
+    row = cursor.fetchone()
+    return row[0] if row is not None else None
+
+
+def _successor_predecessor_listing_id(
+    *,
+    cursor: Any,
+    security_id: UUID,
+    exchange_id: UUID,
+    ticker_norm: str,
+    seen_date: date | None,
+) -> UUID | None:
+    """Return a closed predecessor listing for a verified successor transition.
+
+    A dated SEC observation after the verified effective date remains valuable
+    evidence, but must not reopen the predecessor's listing. Undated
+    observations remain unresolved and follow the normal safety path.
+    """
+
+    if seen_date is None:
+        return None
+    cursor.execute(
+        """
+        SELECT relation.predecessor_listing_id
+        FROM stonks.security_successor_relationship relation
+        JOIN stonks.listing predecessor_listing
+          ON predecessor_listing.listing_id = relation.predecessor_listing_id
+        WHERE relation.predecessor_security_id = %s
+          AND predecessor_listing.exchange_id = %s
+          AND predecessor_listing.ticker_norm = %s
+          AND relation.effective_date <= %s::date
+        ORDER BY relation.effective_date DESC, relation.relationship_id
+        LIMIT 1
+        """,
+        (security_id, exchange_id, ticker_norm, seen_date),
     )
     row = cursor.fetchone()
     return row[0] if row is not None else None
@@ -706,6 +777,7 @@ class _MutableListingCounts:
     symbol_history_skipped: int = 0
     evidence_inserted: int = 0
     evidence_skipped: int = 0
+    successor_observations_suppressed: int = 0
     warning_count: int = 0
 
     def to_result(self) -> SecListingUpsertResult:
@@ -724,5 +796,6 @@ class _MutableListingCounts:
             symbol_history_skipped=self.symbol_history_skipped,
             evidence_inserted=self.evidence_inserted,
             evidence_skipped=self.evidence_skipped,
+            successor_observations_suppressed=self.successor_observations_suppressed,
             warning_count=self.warning_count,
         )

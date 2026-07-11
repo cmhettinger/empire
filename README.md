@@ -52,6 +52,7 @@ Database assets:
 - Flyway migrations
 - schema definitions
 - curated seed reference data
+- opt-in historical data remediations under `db/data-remediations/`
 
 ### `deploy/`
 
