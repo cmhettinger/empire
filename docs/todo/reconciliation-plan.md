@@ -154,7 +154,7 @@ the safety rail before any automatic promotion exists.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | C4.1 | [x] | Define first confidence rules | Document explicit versioned rules for what can make a security promotion candidate and what blocks promotion. Avoid a generic rules engine. | E3.6 |
-| C4.2 | [ ] | Implement confidence evaluator | Add package code that evaluates stored evidence with an explicit fixed `daily` or `backfill` profile and returns its policy/rule IDs, score/level, explanation, evidence IDs, and refusal reasons. Unit tests cover deterministic output for both profiles. | C4.1 |
+| C4.2 | [x] | Implement confidence evaluator | Add package code that evaluates stored evidence with an explicit fixed `daily` or `backfill` profile and returns its policy/rule IDs, score/level, explanation, evidence IDs, and refusal reasons. Unit tests cover deterministic output for both profiles. | C4.1 |
 | C4.3 | [ ] | Implement promotion candidate evaluator | Add dry-run evaluation for provisional securities without mutating identity state. The daily profile returns continuity readiness only; only the backfill profile can return a promotion candidate. Unit tests cover ready, candidate, and blocked cases. | C4.2 |
 | C4.4 | [ ] | Write evaluation audit rows in dry-run mode | Store the selected profile/policy version, result, snapshot count, observed span, and run context while leaving `security.identity_status` unchanged. Tests prove dry-run does not promote. | C4.3 |
 | C4.5 | [ ] | Add dry-run JSON report builder | Produce a profile-identified report payload with lifecycle counts, daily continuity-ready/not-ready counts or backfill promotion candidates, blocked securities, missing evidence classes, warnings, and failures. Duplicate and successor sections are added later in Phase 6. | C4.4 |
@@ -164,6 +164,13 @@ Done: 2026-07-11 — defined versioned SEC daily-continuity and stricter
 backfill-promotion profiles, including candidate, scoring, refusal, and
 blocking rules, in `docs/todo/stonks-securities-provisional-status.md`;
 verified with `git diff --check`.
+
+Done: 2026-07-11 — added the pure, deterministic fixed-profile SEC confidence
+evaluator in `packages/empire-stonks-securities/src/empire_stonks_securities/reconciliation_confidence.py`,
+with daily and backfill profile coverage in
+`packages/empire-stonks-securities/tests/test_reconciliation_confidence.py`;
+verified with `packages/empire-stonks-securities/.venv/bin/python -m pytest packages/empire-stonks-securities/tests`
+(`176 passed`) and `git diff --check`.
 
 ## Phase 5: Safe Apply Mode
 
