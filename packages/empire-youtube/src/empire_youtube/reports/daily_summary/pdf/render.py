@@ -86,6 +86,25 @@ def _body_story(report: dict[str, Any], *, renderer: PdfRenderer) -> list[Any]:
         section_heading("Run Facts", styles=styles),
         simple_table(_run_fact_rows(report), theme=renderer.theme),
         PageBreak(),
+        section_heading("Video Download Outcomes", styles=styles),
+        paragraph(
+            "Each row is a planned download. Selection reason records the matching "
+            "rule from the YouTube configuration.",
+            styles=styles,
+        ),
+        spacer(8),
+        _video_outcomes_table(report, renderer=renderer),
+        PageBreak(),
+        section_heading("Download Access Diagnostics", styles=styles),
+        paragraph(
+            "PO token shows whether yt-dlp requested a token during this download. "
+            "Deno is reported as used only when yt-dlp logged its use; available means "
+            "the runtime was detected but no use was logged.",
+            styles=styles,
+        ),
+        spacer(8),
+        _access_diagnostics_table(report, renderer=renderer),
+        PageBreak(),
         section_heading("Download Exceptions", styles=styles),
         paragraph(
             "Entries below were not added to the Jellyfin media library. "
@@ -172,6 +191,91 @@ def _failed_downloads_table(report: dict[str, Any], *, renderer: PdfRenderer):
         )
     )
     return table
+
+
+def _video_outcomes_table(report: dict[str, Any], *, renderer: PdfRenderer):
+    outcomes = report.get("video_outcomes", [])
+    if not outcomes:
+        return simple_table(
+            [["Status", "Detail"], ["No downloads", "No planned video downloads were attempted."]],
+            theme=renderer.theme,
+        )
+    styles = renderer.styles
+    rows: list[list[Any]] = [["Title", "Length", "Status", "Why selected"]]
+    for outcome in outcomes:
+        rows.append(
+            [
+                Paragraph(escape(str(outcome.get("title") or "")), styles.body),
+                Paragraph(escape(str(outcome.get("length") or "Unknown")), styles.body),
+                Paragraph(_outcome_status_label(outcome), styles.body),
+                Paragraph(escape(str(outcome.get("selection_reason") or "")), styles.body),
+            ]
+        )
+    return _repeat_header_table(
+        rows,
+        col_widths=[176, 48, 72, 208],
+        renderer=renderer,
+    )
+
+
+def _access_diagnostics_table(report: dict[str, Any], *, renderer: PdfRenderer):
+    outcomes = report.get("video_outcomes", [])
+    if not outcomes:
+        return simple_table(
+            [["Status", "Detail"], ["No downloads", "No access diagnostics are available."]],
+            theme=renderer.theme,
+        )
+    styles = renderer.styles
+    rows: list[list[Any]] = [["Title", "Video ID", "Deno", "PO token"]]
+    for outcome in outcomes:
+        rows.append(
+            [
+                Paragraph(escape(str(outcome.get("title") or "")), styles.body),
+                Paragraph(escape(str(outcome.get("video_id") or "")), styles.body),
+                Paragraph(escape(str(outcome.get("deno") or "not observed").title()), styles.body),
+                Paragraph(escape(str(outcome.get("po_token") or "not observed").title()), styles.body),
+            ]
+        )
+    return _repeat_header_table(
+        rows,
+        col_widths=[250, 90, 82, 82],
+        renderer=renderer,
+    )
+
+
+def _repeat_header_table(
+    rows: list[list[Any]],
+    *,
+    col_widths: list[int],
+    renderer: PdfRenderer,
+):
+    table = Table(rows, colWidths=col_widths, repeatRows=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), renderer.theme.primary),
+                ("TEXTCOLOR", (0, 0), (-1, 0), renderer.theme.white),
+                ("FONTNAME", (0, 0), (-1, 0), renderer.theme.body_bold_font),
+                ("GRID", (0, 0), (-1, -1), 0.25, renderer.theme.light_grey),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    return table
+
+
+def _outcome_status_label(outcome: dict[str, Any]) -> str:
+    status = str(outcome.get("status") or "unknown")
+    labels = {
+        "downloaded": "Success",
+        "skipped": "Existing",
+        "failed": "Failed",
+    }
+    return escape(labels.get(status, status.title()))
 
 
 def _pdf_filename(generated_at: datetime) -> str:

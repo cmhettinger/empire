@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
+import subprocess
 from uuid import UUID, uuid4
 
 import pytest
@@ -46,12 +47,13 @@ def test_iter_and_find_download_entries():
 def test_ytdlp_command_uses_configured_pot_provider(monkeypatch, tmp_path):
     command: list[str] = []
 
-    def fake_run(args, *, check):
+    def fake_run(args, *, check, stdout, stderr, text):
         assert check is True
         command.extend(args)
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="[debug] JS runtimes: deno-2\n")
 
     monkeypatch.setattr("empire_youtube.downloader.subprocess.run", fake_run)
-    YtDlpCommand(pot_provider_url="http://youtube-pot-provider:4416/").download(
+    diagnostics = YtDlpCommand(pot_provider_url="http://youtube-pot-provider:4416/").download(
         url="https://www.youtube.com/watch?v=abc123",
         output_template=tmp_path / "movie.%(ext)s",
     )
@@ -59,6 +61,7 @@ def test_ytdlp_command_uses_configured_pot_provider(monkeypatch, tmp_path):
     assert command[command.index("--extractor-args") + 1] == (
         "youtubepot-bgutilhttp:base_url=http://youtube-pot-provider:4416"
     )
+    assert diagnostics == {"po_token": "not requested", "deno": "available"}
 
 
 def test_download_entry_to_object_store(tmp_path, monkeypatch):

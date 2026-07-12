@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -27,6 +28,9 @@ DEFAULT_LIBRARY_STORAGE_ROOT = "jellyfin"
 DEFAULT_PLAN_OBJECT_KIND = "jellyfin_library_plan"
 DEFAULT_TEMP_SUBDIR = "youtube/downloads"
 POT_PROVIDER_URL_ENV_VAR = "EMPIRE_YOUTUBE_POT_PROVIDER_URL"
+
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -57,23 +61,27 @@ class YouTubeDownloadResult:
 
     video_id: str
     status: str
+    title: str | None = None
     object_id: str | None = None
     object_key: str | None = None
     filename: str | None = None
     skipped: bool = False
     error_message: str | None = None
     cleanup_count: int = 0
+    access_diagnostics: dict[str, str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "video_id": self.video_id,
             "status": self.status,
+            "title": self.title,
             "object_id": self.object_id,
             "object_key": self.object_key,
             "filename": self.filename,
             "skipped": self.skipped,
             "error_message": self.error_message,
             "cleanup_count": self.cleanup_count,
+            "access_diagnostics": self.access_diagnostics,
         }
 
 
@@ -88,7 +96,7 @@ class YtDlpCommand:
         self.executable = executable
         self.pot_provider_url = pot_provider_url
 
-    def download(self, *, url: str, output_template: Path) -> None:
+    def download(self, *, url: str, output_template: Path) -> dict[str, str]:
         command = [
             self.executable,
             "--no-playlist",
@@ -114,12 +122,32 @@ class YtDlpCommand:
             "10",
             "--max-sleep-interval",
             "30",
+            "--verbose",
             *_pot_provider_args(self.pot_provider_url),
             "-o",
             str(output_template),
             url,
         ]
-        subprocess.run(command, check=True)
+        try:
+            completed = subprocess.run(
+                command,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            output = _command_output(exc.output)
+            if output:
+                log.error("yt-dlp output for failed download:\n%s", output)
+            raise
+        output = _command_output(completed.stdout)
+        if output:
+            log.info("yt-dlp output:\n%s", output)
+        return _access_diagnostics(
+            output=output,
+            pot_provider_configured=bool(_pot_provider_args(self.pot_provider_url)),
+        )
 
 
 def _pot_provider_args(pot_provider_url: str | None) -> list[str]:
@@ -134,6 +162,32 @@ def _pot_provider_args(pot_provider_url: str | None) -> list[str]:
         "--extractor-args",
         f"youtubepot-bgutilhttp:base_url={resolved_url.rstrip('/')}",
     ]
+
+
+def _command_output(value: object) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value if isinstance(value, str) else ""
+
+
+def _access_diagnostics(
+    *, output: str, pot_provider_configured: bool
+) -> dict[str, str]:
+    """Return only access facts yt-dlp actually exposed for this download."""
+
+    normalized = output.lower()
+    po_token_used = "po token" in normalized and (
+        "generating" in normalized or "retrieved" in normalized
+    )
+    deno_available = "js runtimes:" in normalized and "deno" in normalized
+    deno_used = " via deno" in normalized or "[jsc:deno]" in normalized
+    return {
+        "po_token": (
+            "used" if po_token_used else "not requested"
+            if pot_provider_configured else "not configured"
+        ),
+        "deno": "used" if deno_used else "available" if deno_available else "not observed",
+    }
 
 
 def load_library_plan_from_object_id(
@@ -204,6 +258,7 @@ def download_entry_to_object_store(
         return YouTubeDownloadResult(
             video_id=entry.video_id,
             status="skipped",
+            title=entry.title,
             object_key=entry.object_key,
             filename=entry.movie_filename,
             skipped=True,
@@ -217,7 +272,7 @@ def download_entry_to_object_store(
     expires_at = youtube_expires_at()
 
     try:
-        downloader.download(url=entry.source_url, output_template=output_template)
+        diagnostics = downloader.download(url=entry.source_url, output_template=output_template)
         if not movie_path.is_file() or movie_path.stat().st_size <= 0:
             raise RuntimeError(f"yt-dlp did not create a non-empty {MOVIE_FILENAME}")
         stored = object_store.put_file(
@@ -238,9 +293,13 @@ def download_entry_to_object_store(
         return YouTubeDownloadResult(
             video_id=entry.video_id,
             status="downloaded",
+            title=entry.title,
             object_id=str(stored.object_id),
             object_key=stored.object_key,
             filename=stored.filename,
+            access_diagnostics=(
+                diagnostics if isinstance(diagnostics, dict) else None
+            ),
         )
     except Exception as exc:
         cleanup_count = 0
@@ -254,15 +313,30 @@ def download_entry_to_object_store(
             result=YouTubeDownloadResult(
                 video_id=entry.video_id,
                 status="failed",
+                title=entry.title,
                 object_key=entry.object_key,
                 filename=entry.movie_filename,
                 error_message=str(exc),
                 cleanup_count=cleanup_count,
+                access_diagnostics=_failed_access_diagnostics(exc, downloader),
             )
         ) from exc
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
         _remove_empty_temp_parents(work_dir)
+
+
+def _failed_access_diagnostics(
+    exc: Exception,
+    downloader: object,
+) -> dict[str, str] | None:
+    if not isinstance(downloader, YtDlpCommand):
+        return None
+    output = _command_output(getattr(exc, "output", ""))
+    return _access_diagnostics(
+        output=output,
+        pot_provider_configured=bool(_pot_provider_args(downloader.pot_provider_url)),
+    )
 
 
 class YouTubeDownloadError(RuntimeError):

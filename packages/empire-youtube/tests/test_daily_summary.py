@@ -34,6 +34,53 @@ def test_daily_summary_includes_download_outcomes_and_threshold():
         {"video_id": "four", "status": "failed", "error_message": "HTTP Error 403"},
         {"video_id": "five", "status": "failed", "error_message": "HTTP Error 403"},
     ]
+    assert report["video_outcomes"] == [
+        {
+            "video_id": "one",
+            "title": "Channel video",
+            "length": "1:30",
+            "status": "downloaded",
+            "selection_reason": "Followed channel: Empire Channel",
+            "deno": "available",
+            "po_token": "used",
+        },
+        {
+            "video_id": "two",
+            "title": "Topic video",
+            "length": "1:05:02",
+            "status": "downloaded",
+            "selection_reason": "Topic section: Markets",
+            "deno": "not observed",
+            "po_token": "not observed",
+        },
+        {
+            "video_id": "three",
+            "title": "Both sources video",
+            "length": "Unknown",
+            "status": "skipped",
+            "selection_reason": "Followed channel: Empire Channel; Topic section: Markets",
+            "deno": "not observed",
+            "po_token": "not observed",
+        },
+        {
+            "video_id": "four",
+            "title": "four",
+            "length": "Unknown",
+            "status": "failed",
+            "selection_reason": "Scraper discovery",
+            "deno": "not observed",
+            "po_token": "not observed",
+        },
+        {
+            "video_id": "five",
+            "title": "five",
+            "length": "Unknown",
+            "status": "failed",
+            "selection_reason": "Scraper discovery",
+            "deno": "not observed",
+            "po_token": "not observed",
+        },
+    ]
 
 
 def test_daily_summary_fails_below_threshold():
@@ -81,7 +128,7 @@ def _report():
             "skipped_sidecar_count": 3,
         },
         download_results=[
-            {"video_id": "one", "status": "downloaded"},
+            {"video_id": "one", "status": "downloaded", "access_diagnostics": {"deno": "available", "po_token": "used"}},
             {"video_id": "two", "status": "downloaded"},
             {"video_id": "three", "status": "skipped"},
             {"video_id": "four", "status": "failed", "error_message": "HTTP Error 403"},
@@ -90,5 +137,31 @@ def _report():
         dag_id="youtube_daily_scrape",
         dag_run_id="manual__test",
         minimum_success_rate=0.6,
+        scrape_payload={
+            "config": {"topic_section_names": {"markets": "Markets"}},
+            "videos": [
+                {
+                    "video_id": "one",
+                    "title": "Channel video",
+                    "content": {"duration_seconds": 90},
+                    "discovery_sources": ["channel_watch"],
+                    "matched_channels": [{"channel_name": "Empire Channel"}],
+                },
+                {
+                    "video_id": "two",
+                    "title": "Topic video",
+                    "content": {"duration_seconds": 3902},
+                    "discovery_sources": ["topic_search"],
+                    "matched_sections": ["markets"],
+                },
+                {
+                    "video_id": "three",
+                    "title": "Both sources video",
+                    "discovery_sources": ["channel_watch", "topic_search"],
+                    "matched_channels": [{"channel_name": "Empire Channel"}],
+                    "matched_sections": ["markets"],
+                },
+            ],
+        },
         generated_at=GENERATED_AT,
     )

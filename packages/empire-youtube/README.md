@@ -264,11 +264,12 @@ dags/youtube/youtube_daily_scrape.py
 
 `youtube_daily_scrape` runs the complete pipeline in one Airflow DAG:
 `scrape_youtube_metadata` -> `process_youtube_library_plan` ->
-`list_download_video_ids` -> mapped `download_one_video` -> `finalize_downloads`.
-The scrape and plan
-tasks use their persisted Empire run records as inputs to the following stage;
-each mapped download retains its own persisted run record and uses the
-`youtube_download` pool. The final task permits individual download failures
+`list_download_video_ids` -> mapped `download_one_video` -> `generate_daily_summary`
+-> `finalize_downloads`. The complete workflow uses one Empire run context:
+the scrape payload, library plan, mapped-download reports, and PDF summary are
+stored under the scrape run id. Per-video download reports are kept in that
+run's `reports/<video-id>/` folder. Mapped downloads use the `youtube_download`
+pool. The final task permits individual download failures
 while at least 60% of planned videos download or are already present; adjust
 `MINIMUM_DOWNLOAD_SUCCESS_RATE` in the DAG to change that threshold.
 
@@ -276,7 +277,7 @@ Before the threshold is applied, `generate_daily_summary` creates an Empire-
 branded PDF cover sheet and run-status report. It records scraped/planned
 counts, completed and failed downloads, the success-rate gate, and per-video
 exceptions. The PDF is stored in the global YouTube object-store area under
-the summary report run's `reports/` folder.
+the workflow run's `reports/` folder.
 
 The local Compose stack includes an internal-only `youtube-pot-provider`
 service for YouTube Proof of Origin tokens. Airflow passes

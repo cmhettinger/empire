@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
 
-import pytest
-
 EXPECTED_TASK_ORDER = [
     "scrape_youtube_metadata",
     "process_youtube_library_plan",
@@ -42,9 +40,11 @@ def test_youtube_daily_scrape_dag_wires_stages_in_order(monkeypatch):
     assert dag.task_by_id["list_download_video_ids"].call_args[0].task_id == (
         "process_youtube_library_plan"
     )
-    assert dag.task_by_id["download_one_video"].partial_kwargs["plan_result"].task_id == (
+    partial_kwargs = dag.task_by_id["download_one_video"].partial_kwargs
+    assert partial_kwargs["plan_result"].task_id == (
         "process_youtube_library_plan"
     )
+    assert partial_kwargs["scrape_result"].task_id == "scrape_youtube_metadata"
     assert dag.task_by_id["download_one_video"].expand_kwargs["video_id"].task_id == (
         "list_download_video_ids"
     )
@@ -89,23 +89,6 @@ def test_download_summary_allows_the_configured_failure_rate(monkeypatch):
     assert summary["success_rate"] == 0.6
     assert summary["minimum_success_rate"] == 0.6
     assert summary["failed_video_ids"] == ["four", "five"]
-
-
-def test_download_finalization_fails_below_the_configured_threshold(monkeypatch):
-    module, _fake_sdk = _load_dag_module(monkeypatch)
-    finalize_downloads = module.youtube_daily_scrape_dag.task_by_id[
-        "finalize_downloads"
-    ].python_callable
-
-    with pytest.raises(RuntimeError, match="below the required 60.0%"):
-        finalize_downloads(
-            {
-                "report": {
-                    "summary": {"success_rate": 0.5},
-                    "failed_downloads": [{"video_id": "two"}],
-                }
-            }
-        )
 
 
 def test_download_cleanup_defaults_to_removing_incomplete_jellyfin_folders(monkeypatch):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -12,12 +13,11 @@ from empire_core import ObjectStore, RunContext, RunService, StoredObject
 
 from empire_youtube.reports.daily_summary.pdf.render import render_youtube_daily_summary_pdf
 from empire_youtube.retention import youtube_expires_at
-from empire_youtube.runner import DEFAULT_DOMAIN, DEFAULT_STORAGE_KEY, youtube_run_object_key
+from empire_youtube.runner import DEFAULT_STORAGE_KEY, youtube_run_object_key
 
 
 YOUTUBE_DAILY_SUMMARY_PDF_LOGICAL_NAME = "youtube_daily_summary_pdf"
 YOUTUBE_DAILY_SUMMARY_PDF_OBJECT_KIND = "youtube_daily_summary_pdf"
-YOUTUBE_DAILY_SUMMARY_JOB_NAME = "youtube_daily_summary"
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,7 @@ def build_youtube_daily_summary_report(
     dag_id: str,
     dag_run_id: str,
     minimum_success_rate: float,
+    scrape_payload: dict[str, object] | None = None,
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Build the stable, JSON-ready data model used by the PDF report."""
@@ -94,6 +95,10 @@ def build_youtube_daily_summary_report(
             "minimum_success_rate": minimum_success_rate,
         },
         "failed_downloads": failed,
+        "video_outcomes": _video_outcomes(
+            scrape_payload=scrape_payload or {},
+            download_results=download_results,
+        ),
     }
 
 
@@ -107,13 +112,17 @@ def generate_youtube_daily_summary_pdf_stage(
     minimum_success_rate: float,
     object_store: ObjectStore,
     run_service: RunService,
-    runner_ref: dict[str, object],
+    run_context: RunContext,
     generated_at: datetime | None = None,
     output_dir: str | Path | None = None,
 ) -> YouTubeDailySummaryResult:
     """Render, store, and track a branded daily YouTube summary PDF."""
 
     generated_at = generated_at or datetime.now(UTC)
+    scrape_payload = _load_scrape_payload(
+        object_store=object_store,
+        stored_object_id=scrape_result.get("stored_object_id"),
+    )
     report = build_youtube_daily_summary_report(
         scrape_result=scrape_result,
         plan_result=plan_result,
@@ -121,22 +130,8 @@ def generate_youtube_daily_summary_pdf_stage(
         dag_id=dag_id,
         dag_run_id=dag_run_id,
         minimum_success_rate=minimum_success_rate,
+        scrape_payload=scrape_payload,
         generated_at=generated_at,
-    )
-    run_context = run_service.start_run(
-        domain=DEFAULT_DOMAIN,
-        job_name=YOUTUBE_DAILY_SUMMARY_JOB_NAME,
-        subject_key="daily",
-        effective_date=generated_at.date(),
-        run_type="airflow",
-        runner="airflow",
-        runner_ref=runner_ref,
-        params={
-            "dag_id": dag_id,
-            "dag_run_id": dag_run_id,
-            "success_rate": report["summary"]["success_rate"],
-            "minimum_success_rate": minimum_success_rate,
-        },
     )
     try:
         render_dir = Path(output_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp")) / "youtube" / "reports" / str(run_context.run_id)
@@ -170,14 +165,6 @@ def generate_youtube_daily_summary_pdf_stage(
                 "success_rate": report["summary"]["success_rate"],
             },
         )
-        run_service.complete_run(
-            run_context.run_id,
-            summary={
-                **report["summary"],
-                "report_status": report["status"],
-                "report_object_id": str(stored.object_id),
-            },
-        )
         return YouTubeDailySummaryResult(report=report, run_context=run_context, stored_object=stored)
     except Exception as exc:
         run_service.fail_run(
@@ -186,3 +173,90 @@ def generate_youtube_daily_summary_pdf_stage(
             summary={"failed_step": "youtube_daily_summary_pdf"},
         )
         raise
+
+
+def _load_scrape_payload(
+    *, object_store: ObjectStore,
+    stored_object_id: object,
+) -> dict[str, object]:
+    if not stored_object_id:
+        return {}
+    payload = json.loads(object_store.get_bytes(UUID(str(stored_object_id))).decode("utf-8"))
+    return payload if isinstance(payload, dict) else {}
+
+
+def _video_outcomes(
+    *,
+    scrape_payload: dict[str, object],
+    download_results: list[dict[str, object]],
+) -> list[dict[str, str]]:
+    """Join download results to scraper provenance for the human report."""
+
+    videos = scrape_payload.get("videos")
+    video_list = videos if isinstance(videos, list) else []
+    videos_by_id = {
+        str(video.get("video_id")): video
+        for video in video_list
+        if isinstance(video, dict)
+    }
+    config = scrape_payload.get("config")
+    section_names = (
+        config.get("topic_section_names", {}) if isinstance(config, dict) else {}
+    )
+    outcomes: list[dict[str, str]] = []
+    for result in download_results:
+        video_id = str(result.get("video_id") or "")
+        video = videos_by_id.get(video_id, {})
+        title = str(result.get("title") or video.get("title") or video_id)
+        diagnostics = result.get("access_diagnostics")
+        diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+        outcomes.append(
+            {
+                "video_id": video_id,
+                "title": title,
+                "length": _format_duration(video),
+                "status": str(result.get("status") or "unknown"),
+                "selection_reason": _selection_reason(video, section_names),
+                "deno": str(diagnostics.get("deno") or "not observed"),
+                "po_token": str(diagnostics.get("po_token") or "not observed"),
+            }
+        )
+    return outcomes
+
+
+def _format_duration(video: dict[str, object]) -> str:
+    content = video.get("content")
+    seconds = content.get("duration_seconds") if isinstance(content, dict) else None
+    if not isinstance(seconds, int) or seconds < 0:
+        return "Unknown"
+    hours, remaining = divmod(seconds, 3600)
+    minutes, seconds = divmod(remaining, 60)
+    return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
+
+
+def _selection_reason(video: dict[str, object], section_names: object) -> str:
+    sources = {str(source) for source in video.get("discovery_sources", [])}
+    reasons: list[str] = []
+    if "channel_watch" in sources:
+        channels = video.get("matched_channels")
+        channel_list = channels if isinstance(channels, list) else []
+        names = [
+            str(channel.get("channel_name"))
+            for channel in channel_list
+            if isinstance(channel, dict)
+            if channel.get("channel_name")
+        ]
+        reasons.append(
+            "Followed channel: " + (", ".join(names) if names else "matched channel")
+        )
+    if "topic_search" in sources:
+        sections = video.get("matched_sections")
+        section_list = sections if isinstance(sections, list) else []
+        names = [
+            str(section_names.get(str(section), section))
+            for section in section_list
+        ] if isinstance(section_names, dict) else [str(section) for section in section_list]
+        reasons.append(
+            "Topic section: " + (", ".join(names) if names else "matched metadata")
+        )
+    return "; ".join(reasons) or "Scraper discovery"

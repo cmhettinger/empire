@@ -4,6 +4,7 @@ import logging
 import os
 import time
 from datetime import UTC, datetime
+from uuid import UUID
 
 from airflow.sdk import dag, get_current_context, task
 from empire_core import EmpireDatabase, ObjectStore, RunService
@@ -59,6 +60,7 @@ def youtube_daily_scrape():
                 run_type="airflow",
                 runner="airflow",
                 runner_ref={"dag_id": YOUTUBE_DAILY_SCRAPE_DAG_ID},
+                complete_run=False,
             )
 
         log.info(
@@ -85,6 +87,7 @@ def youtube_daily_scrape():
             object_store = ObjectStore.from_connection(conn)
             run_service = RunService.from_connection(conn)
             scrape_payload = load_scrape_payload(args, object_store)
+            run_context = run_service.get_run_context(UUID(scrape_run_id))
             result = run_youtube_processor_to_object_store(
                 scrape_payload=scrape_payload,
                 processor=YouTubeScrapeProcessor(),
@@ -93,6 +96,8 @@ def youtube_daily_scrape():
                 run_type="airflow",
                 runner="airflow",
                 runner_ref={"dag_id": YOUTUBE_DAILY_SCRAPE_DAG_ID},
+                run_context=run_context,
+                complete_run=False,
                 source=args.input_source,
             )
 
@@ -141,7 +146,9 @@ def youtube_daily_scrape():
 
     @task(task_id="download_one_video", pool="youtube_download")
     def download_one_video(
-        video_id: str, plan_result: dict[str, str | int | list[str]]
+        video_id: str,
+        plan_result: dict[str, str | int | list[str]],
+        scrape_result: dict[str, str | int],
     ) -> dict[str, str | bool | int | None]:
         context = get_current_context()
         conf = context["dag_run"].conf or {}
@@ -160,24 +167,7 @@ def youtube_daily_scrape():
                 object_store, str(plan_result["stored_object_id"])
             )
             entry = find_download_entry(plan, video_id=video_id)
-            run_context = run_service.start_run(
-                domain="youtube",
-                job_name="youtube_download",
-                subject_key=entry.video_id,
-                effective_date=datetime.now(UTC).date(),
-                run_type="airflow",
-                runner="airflow",
-                runner_ref={
-                    "dag_id": YOUTUBE_DAILY_SCRAPE_DAG_ID,
-                    "task_id": "download_one_video",
-                },
-                params={
-                    "video_id": entry.video_id,
-                    "source_url": entry.source_url,
-                    "object_key": entry.object_key,
-                    "cleanup_on_failure": cleanup_on_failure,
-                },
-            )
+            run_context = run_service.get_run_context(UUID(str(scrape_result["run_id"])))
             try:
                 result = download_entry_to_object_store(
                     entry=entry,
@@ -186,18 +176,9 @@ def youtube_daily_scrape():
                     cleanup_on_failure=cleanup_on_failure,
                 )
                 report = _write_report(object_store, run_context, result.to_dict())
-                run_service.complete_run(
-                    run_context.run_id,
-                    summary={**result.to_dict(), "report_object_id": str(report.object_id)},
-                )
             except YouTubeDownloadError as exc:
                 result = exc.result
                 report = _write_report(object_store, run_context, result.to_dict())
-                run_service.fail_run(
-                    run_context.run_id,
-                    error_message=result.error_message or str(exc),
-                    summary={**result.to_dict(), "report_object_id": str(report.object_id)},
-                )
                 log.exception("Failed YouTube download for %s", video_id)
                 return {
                     **result.to_dict(),
@@ -221,6 +202,8 @@ def youtube_daily_scrape():
         context = get_current_context()
         dag_run = context["dag_run"]
         with EmpireDatabase.connect_from_env() as conn:
+            object_store = ObjectStore.from_connection(conn)
+            run_service = RunService.from_connection(conn)
             result = generate_youtube_daily_summary_pdf_stage(
                 scrape_result=scrape_result,
                 plan_result=plan_result,
@@ -228,12 +211,9 @@ def youtube_daily_scrape():
                 dag_id=dag_run.dag_id,
                 dag_run_id=dag_run.run_id,
                 minimum_success_rate=MINIMUM_DOWNLOAD_SUCCESS_RATE,
-                object_store=ObjectStore.from_connection(conn),
-                run_service=RunService.from_connection(conn),
-                runner_ref={
-                    "dag_id": YOUTUBE_DAILY_SCRAPE_DAG_ID,
-                    "task_id": "generate_daily_summary",
-                },
+                object_store=object_store,
+                run_service=run_service,
+                run_context=run_service.get_run_context(UUID(str(scrape_result["run_id"]))),
                 generated_at=datetime.now(UTC),
             )
         report = result.to_dict()
@@ -252,19 +232,41 @@ def youtube_daily_scrape():
     def finalize_downloads(summary_report: dict[str, object]) -> dict[str, object]:
         report = summary_report["report"]
         summary = report["summary"]
-        if summary["success_rate"] < MINIMUM_DOWNLOAD_SUCCESS_RATE:
-            raise RuntimeError(
-                "YouTube download success rate "
-                f"{summary['success_rate']:.1%} is below the required "
-                f"{MINIMUM_DOWNLOAD_SUCCESS_RATE:.1%}. Failed videos: "
-                f"{[item['video_id'] for item in report['failed_downloads']]}"
+        with EmpireDatabase.connect_from_env() as conn:
+            run_service = RunService.from_connection(conn)
+            run_id = UUID(str(summary_report["run_id"]))
+            completion_summary = {
+                **summary,
+                "report_status": report["status"],
+                "report_object_id": summary_report["stored_object_id"],
+                "failed_video_ids": [item["video_id"] for item in report["failed_downloads"]],
+            }
+            if summary["success_rate"] >= MINIMUM_DOWNLOAD_SUCCESS_RATE:
+                run_service.complete_run(run_id, summary=completion_summary)
+                return summary_report
+            run_service.fail_run(
+                run_id,
+                error_message=(
+                    "YouTube download success rate "
+                    f"{summary['success_rate']:.1%} is below the required "
+                    f"{MINIMUM_DOWNLOAD_SUCCESS_RATE:.1%}."
+                ),
+                summary=completion_summary,
             )
-        return summary_report
+        raise RuntimeError(
+            "YouTube download success rate "
+            f"{summary['success_rate']:.1%} is below the required "
+            f"{MINIMUM_DOWNLOAD_SUCCESS_RATE:.1%}. Failed videos: "
+            f"{[item['video_id'] for item in report['failed_downloads']]}"
+        )
 
     scrape_result = scrape_youtube_metadata()
     plan_result = process_youtube_library_plan(scrape_result)
     video_ids = list_download_video_ids(plan_result)
-    download_results = download_one_video.partial(plan_result=plan_result).expand(
+    download_results = download_one_video.partial(
+        plan_result=plan_result,
+        scrape_result=scrape_result,
+    ).expand(
         video_id=video_ids
     )
     summary_report = generate_daily_summary(
@@ -317,6 +319,7 @@ def _write_report(object_store: ObjectStore, run_context, result: dict):
             storage_key_prefix=os.environ.get("EMPIRE_STORAGE_KEY_YOUTUBE", DEFAULT_STORAGE_KEY),
             effective_date=run_context.effective_date,
             run_id=str(run_context.run_id),
+            suffix=f"reports/{result['video_id']}",
         ),
         filename=DOWNLOAD_REPORT_FILENAME,
         data=data,

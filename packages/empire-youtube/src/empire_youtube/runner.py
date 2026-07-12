@@ -61,6 +61,8 @@ def run_youtube_scraper_to_object_store(
     run_type: str,
     runner: str,
     runner_ref: dict | None = None,
+    run_context: RunContext | None = None,
+    complete_run: bool = True,
     effective_date: date | None = None,
     generated_at: datetime | None = None,
     storage_root: str | None = None,
@@ -79,7 +81,7 @@ def run_youtube_scraper_to_object_store(
         DEFAULT_STORAGE_KEY,
     )
 
-    ctx = run_service.start_run(
+    ctx = run_context or run_service.start_run(
         domain=DEFAULT_DOMAIN,
         job_name=config.name,
         subject_key=DEFAULT_SUBJECT_KEY,
@@ -124,15 +126,16 @@ def run_youtube_scraper_to_object_store(
                 "window_hours": scrape_result.window_hours,
             },
         )
-        run_service.complete_run(
-            ctx.run_id,
-            summary={
-                "stored_object_id": str(stored.object_id),
-                "video_count": len(scrape_result.videos),
-                "object_key": object_key,
-                "filename": DEFAULT_OUTPUT_FILENAME,
-            },
-        )
+        if complete_run:
+            run_service.complete_run(
+                ctx.run_id,
+                summary={
+                    "stored_object_id": str(stored.object_id),
+                    "video_count": len(scrape_result.videos),
+                    "object_key": object_key,
+                    "filename": DEFAULT_OUTPUT_FILENAME,
+                },
+            )
         return YouTubeScrapeRunResult(
             run_context=ctx,
             scrape_result=scrape_result,
@@ -189,6 +192,8 @@ def run_youtube_processor_to_object_store(
     run_type: str,
     runner: str,
     runner_ref: dict | None = None,
+    run_context: RunContext | None = None,
+    complete_run: bool = True,
     source: dict | None = None,
     effective_date: date | None = None,
     generated_at: datetime | None = None,
@@ -217,7 +222,7 @@ def run_youtube_processor_to_object_store(
 
     videos = scrape_payload.get("videos")
     video_count = len(videos) if isinstance(videos, list) else 0
-    ctx = run_service.start_run(
+    ctx = run_context or run_service.start_run(
         domain=DEFAULT_DOMAIN,
         job_name=DEFAULT_PROCESSOR_JOB_NAME,
         subject_key=DEFAULT_SUBJECT_KEY,
@@ -286,18 +291,19 @@ def run_youtube_processor_to_object_store(
                 "skipped_sidecar_count": skipped_sidecar_count,
             },
         )
-        run_service.complete_run(
-            ctx.run_id,
-            summary={
-                "stored_object_id": str(stored.object_id),
-                "source_video_count": library_plan.source_video_count,
-                "plan_entry_count": len(library_plan.entries),
-                "sidecar_object_count": len(stored_sidecars),
-                "skipped_sidecar_count": skipped_sidecar_count,
-                "object_key": object_key,
-                "filename": DEFAULT_LIBRARY_PLAN_FILENAME,
-            },
-        )
+        if complete_run:
+            run_service.complete_run(
+                ctx.run_id,
+                summary={
+                    "stored_object_id": str(stored.object_id),
+                    "source_video_count": library_plan.source_video_count,
+                    "plan_entry_count": len(library_plan.entries),
+                    "sidecar_object_count": len(stored_sidecars),
+                    "skipped_sidecar_count": skipped_sidecar_count,
+                    "object_key": object_key,
+                    "filename": DEFAULT_LIBRARY_PLAN_FILENAME,
+                },
+            )
         return YouTubeProcessRunResult(
             run_context=ctx,
             library_plan=library_plan,

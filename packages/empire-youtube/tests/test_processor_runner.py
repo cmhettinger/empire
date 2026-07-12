@@ -102,6 +102,44 @@ def test_run_youtube_processor_to_object_store(tmp_path, monkeypatch):
     }
 
 
+def test_processor_reuses_the_supplied_workflow_run_context(tmp_path, monkeypatch):
+    monkeypatch.setenv("EMPIRE_STORAGE_KEY_YOUTUBE", "youtube")
+    run_repo = InMemoryRunRepository()
+    object_repo = InMemoryObjectRepository(str(tmp_path))
+    object_repo.roots["jellyfin"] = object_repo.roots["global"]
+    run_service = RunService(run_repo)
+    workflow_context = run_service.start_run(
+        domain="youtube",
+        job_name="daily_youtube_scraper",
+        subject_key="daily",
+        effective_date=datetime(2026, 5, 23, tzinfo=UTC).date(),
+        run_type="manual",
+        runner="pytest",
+    )
+
+    result = run_youtube_processor_to_object_store(
+        scrape_payload={
+            "source": "youtube",
+            "schema_version": 1,
+            "run_id": str(workflow_context.run_id),
+            "videos": [],
+        },
+        processor=YouTubeScrapeProcessor(thumbnail_fetcher=FakeThumbnailFetcher()),
+        run_service=run_service,
+        object_store=ObjectStore(object_repo),
+        run_type="manual",
+        runner="pytest",
+        run_context=workflow_context,
+        complete_run=False,
+        generated_at=datetime(2026, 5, 23, 22, 0, tzinfo=UTC),
+    )
+
+    assert result.run_context.run_id == workflow_context.run_id
+    assert list(run_repo.runs) == [workflow_context.run_id]
+    assert result.stored_object.object_key == f"youtube/2026/05/23/{workflow_context.run_id}"
+    assert run_repo.runs[workflow_context.run_id].status == "started"
+
+
 def test_run_youtube_processor_skips_existing_sidecars(tmp_path, monkeypatch):
     monkeypatch.setenv("EMPIRE_STORAGE_KEY_YOUTUBE", "/youtube/")
     monkeypatch.delenv("EMPIRE_STORAGE_KEY_YOUTUBE_LIBRARY", raising=False)
