@@ -10,6 +10,7 @@ from empire_core import EmpireDatabase, ObjectStore, RunService
 from empire_youtube import (
     YouTubeScrapeProcessor,
     YouTubeScraper,
+    generate_youtube_daily_summary_pdf_stage,
     load_config_by_logical_name,
     run_youtube_processor_to_object_store,
     run_youtube_scraper_to_object_store,
@@ -147,7 +148,7 @@ def youtube_daily_scrape():
         delay_seconds = int(
             os.environ.get("EMPIRE_YOUTUBE_DOWNLOAD_TASK_DELAY_SECONDS", "0")
         )
-        cleanup_on_failure = bool(conf.get("cleanup_on_failure", False))
+        cleanup_on_failure = _cleanup_on_failure_from_conf(conf)
         if delay_seconds > 0:
             log.info("Sleeping %s seconds before downloading %s", delay_seconds, video_id)
             time.sleep(delay_seconds)
@@ -211,26 +212,54 @@ def youtube_daily_scrape():
             "report_object_id": str(report.object_id),
         }
 
-    @task(task_id="finalize_downloads", trigger_rule="all_done")
-    def finalize_downloads(
+    @task(task_id="generate_daily_summary")
+    def generate_daily_summary(
+        scrape_result: dict[str, str | int],
+        plan_result: dict[str, str | int | list[str]],
         download_results: list[dict[str, str | bool | int | None]],
     ) -> dict[str, object]:
-        summary = _summarize_download_results(download_results)
+        context = get_current_context()
+        dag_run = context["dag_run"]
+        with EmpireDatabase.connect_from_env() as conn:
+            result = generate_youtube_daily_summary_pdf_stage(
+                scrape_result=scrape_result,
+                plan_result=plan_result,
+                download_results=download_results,
+                dag_id=dag_run.dag_id,
+                dag_run_id=dag_run.run_id,
+                minimum_success_rate=MINIMUM_DOWNLOAD_SUCCESS_RATE,
+                object_store=ObjectStore.from_connection(conn),
+                run_service=RunService.from_connection(conn),
+                runner_ref={
+                    "dag_id": YOUTUBE_DAILY_SCRAPE_DAG_ID,
+                    "task_id": "generate_daily_summary",
+                },
+                generated_at=datetime.now(UTC),
+            )
+        report = result.to_dict()
+        summary = report["report"]["summary"]
         log.info(
-            "YouTube download summary: %s/%s successful (%.1f%%), %s failed",
-            summary["successful_count"],
-            summary["total_count"],
+            "Generated YouTube daily summary PDF %s: %s/%s successful (%.1f%%), %s failed",
+            report["stored_object_id"],
+            summary["successful_download_count"],
+            summary["download_total_count"],
             summary["success_rate"] * 100,
-            summary["failed_count"],
+            summary["failed_download_count"],
         )
+        return report
+
+    @task(task_id="finalize_downloads", trigger_rule="all_done")
+    def finalize_downloads(summary_report: dict[str, object]) -> dict[str, object]:
+        report = summary_report["report"]
+        summary = report["summary"]
         if summary["success_rate"] < MINIMUM_DOWNLOAD_SUCCESS_RATE:
             raise RuntimeError(
                 "YouTube download success rate "
                 f"{summary['success_rate']:.1%} is below the required "
                 f"{MINIMUM_DOWNLOAD_SUCCESS_RATE:.1%}. Failed videos: "
-                f"{summary['failed_video_ids']}"
+                f"{[item['video_id'] for item in report['failed_downloads']]}"
             )
-        return summary
+        return summary_report
 
     scrape_result = scrape_youtube_metadata()
     plan_result = process_youtube_library_plan(scrape_result)
@@ -238,7 +267,12 @@ def youtube_daily_scrape():
     download_results = download_one_video.partial(plan_result=plan_result).expand(
         video_id=video_ids
     )
-    finalize_downloads(download_results)
+    summary_report = generate_daily_summary(
+        scrape_result,
+        plan_result,
+        download_results,
+    )
+    finalize_downloads(summary_report)
 
 
 def _summarize_download_results(
@@ -264,6 +298,12 @@ def _summarize_download_results(
         "minimum_success_rate": MINIMUM_DOWNLOAD_SUCCESS_RATE,
         "failed_video_ids": failed_video_ids,
     }
+
+
+def _cleanup_on_failure_from_conf(conf: dict[str, object]) -> bool:
+    """Keep the Jellyfin library free of incomplete video folders by default."""
+
+    return bool(conf.get("cleanup_on_failure", True))
 
 
 def _write_report(object_store: ObjectStore, run_context, result: dict):

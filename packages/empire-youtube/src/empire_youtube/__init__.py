@@ -12,6 +12,7 @@ from empire_youtube.downloader import (
     load_library_plan_from_object_id,
     load_library_plan_from_run_id,
 )
+from empire_youtube.daily_summary import generate_youtube_daily_summary_pdf_stage
 from empire_youtube.exceptions import (
     EmpireYouTubeError,
     YouTubeAPIError,
@@ -86,6 +87,7 @@ __all__ = [
     "build_video_from_ytdlp_metadata",
     "download_entry_to_object_store",
     "find_download_entry",
+    "generate_youtube_daily_summary_pdf_stage",
     "iter_download_entries",
     "load_config_by_logical_name",
     "load_config_from_object_id",

@@ -37,6 +37,10 @@ COPY packages/empire-core /opt/empire/packages/empire-core
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-core
 
+COPY packages/empire-reports /opt/empire/packages/empire-reports
+
+RUN pip install --no-cache-dir /opt/empire/packages/empire-reports
+
 COPY packages/empire-youtube /opt/empire/packages/empire-youtube
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-youtube
@@ -44,10 +48,6 @@ RUN pip install --no-cache-dir /opt/empire/packages/empire-youtube
 COPY packages/empire-weather /opt/empire/packages/empire-weather
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-weather
-
-COPY packages/empire-reports /opt/empire/packages/empire-reports
-
-RUN pip install --no-cache-dir /opt/empire/packages/empire-reports
 
 COPY packages/empire-stonks-securities /opt/empire/packages/empire-stonks-securities
 

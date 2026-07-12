@@ -13,6 +13,7 @@ EXPECTED_TASK_ORDER = [
     "process_youtube_library_plan",
     "list_download_video_ids",
     "download_one_video",
+    "generate_daily_summary",
     "finalize_downloads",
 ]
 
@@ -47,8 +48,19 @@ def test_youtube_daily_scrape_dag_wires_stages_in_order(monkeypatch):
     assert dag.task_by_id["download_one_video"].expand_kwargs["video_id"].task_id == (
         "list_download_video_ids"
     )
+    assert [
+        task.task_id for task in dag.task_by_id["generate_daily_summary"].call_args
+    ] == [
+        "scrape_youtube_metadata",
+        "process_youtube_library_plan",
+        "download_one_video",
+    ]
+    assert dag.task_by_id["generate_daily_summary"].decorator_kwargs == {}
+    assert dag.task_by_id["finalize_downloads"].decorator_kwargs == {
+        "trigger_rule": "all_done"
+    }
     assert dag.task_by_id["finalize_downloads"].call_args[0].task_id == (
-        "download_one_video"
+        "generate_daily_summary"
     )
 
 
@@ -59,9 +71,6 @@ def test_youtube_daily_scrape_dag_preserves_download_task_configuration(monkeypa
 
     assert download_task.decorator_kwargs == {"pool": "youtube_download"}
     assert "retries" not in download_task.decorator_kwargs
-    assert module.youtube_daily_scrape_dag.task_by_id["finalize_downloads"].decorator_kwargs == {
-        "trigger_rule": "all_done"
-    }
 
 
 def test_download_summary_allows_the_configured_failure_rate(monkeypatch):
@@ -90,11 +99,20 @@ def test_download_finalization_fails_below_the_configured_threshold(monkeypatch)
 
     with pytest.raises(RuntimeError, match="below the required 60.0%"):
         finalize_downloads(
-            [
-                {"video_id": "one", "status": "downloaded"},
-                {"video_id": "two", "status": "failed"},
-            ]
+            {
+                "report": {
+                    "summary": {"success_rate": 0.5},
+                    "failed_downloads": [{"video_id": "two"}],
+                }
+            }
         )
+
+
+def test_download_cleanup_defaults_to_removing_incomplete_jellyfin_folders(monkeypatch):
+    module, _fake_sdk = _load_dag_module(monkeypatch)
+
+    assert module._cleanup_on_failure_from_conf({}) is True
+    assert module._cleanup_on_failure_from_conf({"cleanup_on_failure": False}) is False
 
 
 def test_old_youtube_dag_definitions_are_retired():

@@ -272,6 +272,12 @@ each mapped download retains its own persisted run record and uses the
 while at least 60% of planned videos download or are already present; adjust
 `MINIMUM_DOWNLOAD_SUCCESS_RATE` in the DAG to change that threshold.
 
+Before the threshold is applied, `generate_daily_summary` creates an Empire-
+branded PDF cover sheet and run-status report. It records scraped/planned
+counts, completed and failed downloads, the success-rate gate, and per-video
+exceptions. The PDF is stored in the global YouTube object-store area under
+the summary report run's `reports/` folder.
+
 The local Compose stack includes an internal-only `youtube-pot-provider`
 service for YouTube Proof of Origin tokens. Airflow passes
 `EMPIRE_YOUTUBE_POT_PROVIDER_URL` to yt-dlp; the default local value is
@@ -286,12 +292,13 @@ To download only selected videos in a manual DAG run, provide:
 }
 ```
 
-To remove planned video-folder sidecars when a mapped download fails, also
-provide:
+Mapped downloads remove their planned Jellyfin folder by default when the media
+download fails, so the library contains complete videos only. During debugging,
+retain a failed video's sidecars by providing:
 
 ```json
 {
-  "cleanup_on_failure": true
+  "cleanup_on_failure": false
 }
 ```
 
