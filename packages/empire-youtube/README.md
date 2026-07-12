@@ -255,49 +255,43 @@ inspection and retry.
 
 ## Airflow DAGs
 
-The YouTube Airflow DAGs are manual-only while the pipeline is being hardened:
+The consolidated YouTube/Jellyfin Airflow DAG is manual-only while the pipeline
+is being hardened:
 
 ```text
 dags/youtube/youtube_daily_scrape.py
-dags/youtube/youtube_daily_plan.py
-dags/youtube/youtube_daily_download.py
 ```
 
-`youtube_daily_scrape` is the manual entry point for the full pipeline. When it
-completes, it triggers `youtube_daily_plan` with the scraper run id. When the
-processor completes, it triggers `youtube_daily_download` with the library plan
-run id.
+`youtube_daily_scrape` runs the complete pipeline in one Airflow DAG:
+`scrape_youtube_metadata` -> `process_youtube_library_plan` ->
+`list_download_video_ids` -> mapped `download_one_video` -> `finalize_downloads`.
+The scrape and plan
+tasks use their persisted Empire run records as inputs to the following stage;
+each mapped download retains its own persisted run record and uses the
+`youtube_download` pool. The final task permits individual download failures
+while at least 60% of planned videos download or are already present; adjust
+`MINIMUM_DOWNLOAD_SUCCESS_RATE` in the DAG to change that threshold.
 
-Trigger the processor DAG with one scraper input:
+The local Compose stack includes an internal-only `youtube-pot-provider`
+service for YouTube Proof of Origin tokens. Airflow passes
+`EMPIRE_YOUTUBE_POT_PROVIDER_URL` to yt-dlp; the default local value is
+`http://youtube-pot-provider:4416`. Set it to an empty value to disable the
+provider for a deployment.
+
+To download only selected videos in a manual DAG run, provide:
 
 ```json
 {
-  "scraper_object_id": "00000000-0000-0000-0000-000000000000"
-}
-```
-
-or:
-
-```json
-{
-  "scraper_run_id": "00000000-0000-0000-0000-000000000000"
-}
-```
-
-Trigger the downloader DAG with one plan input:
-
-```json
-{
-  "plan_object_id": "00000000-0000-0000-0000-000000000000"
-}
-```
-
-To download only selected videos:
-
-```json
-{
-  "plan_object_id": "00000000-0000-0000-0000-000000000000",
   "video_ids": ["4oq91rzQcO8", "3aA4NBWiNrA"]
+}
+```
+
+To remove planned video-folder sidecars when a mapped download fails, also
+provide:
+
+```json
+{
+  "cleanup_on_failure": true
 }
 ```
 

@@ -9,4 +9,5 @@ include:
   - pgbouncer.yml
   - flyway.yml
   - airflow.yml
+  - youtube-pot-provider.yml
   - jellyfin.yml

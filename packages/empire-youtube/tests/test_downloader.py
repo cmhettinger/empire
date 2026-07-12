@@ -10,6 +10,7 @@ from empire_core.object_store.models import StorageRoot, StoredObject
 
 from empire_youtube.downloader import (
     MOVIE_FILENAME,
+    YtDlpCommand,
     YouTubeDownloadEntry,
     YouTubeDownloadError,
     cleanup_entry_sidecars,
@@ -40,6 +41,24 @@ def test_iter_and_find_download_entries():
     assert find_download_entry(plan, video_id="abc123") == entries[0]
     with pytest.raises(RuntimeError, match="not found"):
         find_download_entry(plan, video_id="missing")
+
+
+def test_ytdlp_command_uses_configured_pot_provider(monkeypatch, tmp_path):
+    command: list[str] = []
+
+    def fake_run(args, *, check):
+        assert check is True
+        command.extend(args)
+
+    monkeypatch.setattr("empire_youtube.downloader.subprocess.run", fake_run)
+    YtDlpCommand(pot_provider_url="http://youtube-pot-provider:4416/").download(
+        url="https://www.youtube.com/watch?v=abc123",
+        output_template=tmp_path / "movie.%(ext)s",
+    )
+
+    assert command[command.index("--extractor-args") + 1] == (
+        "youtubepot-bgutilhttp:base_url=http://youtube-pot-provider:4416"
+    )
 
 
 def test_download_entry_to_object_store(tmp_path, monkeypatch):

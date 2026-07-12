@@ -26,6 +26,7 @@ MEDIA_ASSET_OBJECT_KIND = "youtube_media_asset"
 DEFAULT_LIBRARY_STORAGE_ROOT = "jellyfin"
 DEFAULT_PLAN_OBJECT_KIND = "jellyfin_library_plan"
 DEFAULT_TEMP_SUBDIR = "youtube/downloads"
+POT_PROVIDER_URL_ENV_VAR = "EMPIRE_YOUTUBE_POT_PROVIDER_URL"
 
 
 @dataclass(frozen=True)
@@ -79,8 +80,13 @@ class YouTubeDownloadResult:
 class YtDlpCommand:
     """Shell out to yt-dlp for one video."""
 
-    def __init__(self, executable: str = "yt-dlp") -> None:
+    def __init__(
+        self,
+        executable: str = "yt-dlp",
+        pot_provider_url: str | None = None,
+    ) -> None:
         self.executable = executable
+        self.pot_provider_url = pot_provider_url
 
     def download(self, *, url: str, output_template: Path) -> None:
         command = [
@@ -108,11 +114,26 @@ class YtDlpCommand:
             "10",
             "--max-sleep-interval",
             "30",
+            *_pot_provider_args(self.pot_provider_url),
             "-o",
             str(output_template),
             url,
         ]
         subprocess.run(command, check=True)
+
+
+def _pot_provider_args(pot_provider_url: str | None) -> list[str]:
+    resolved_url = (
+        pot_provider_url
+        if pot_provider_url is not None
+        else os.environ.get(POT_PROVIDER_URL_ENV_VAR, "")
+    ).strip()
+    if not resolved_url:
+        return []
+    return [
+        "--extractor-args",
+        f"youtubepot-bgutilhttp:base_url={resolved_url.rstrip('/')}",
+    ]
 
 
 def load_library_plan_from_object_id(

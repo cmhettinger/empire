@@ -6,3 +6,4 @@ requests
 curl-cffi
 pandas
 yt-dlp[default]
+bgutil-ytdlp-pot-provider==1.3.1

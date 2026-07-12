@@ -46,6 +46,7 @@ x-airflow-common: &airflow-common
 
     EMPIRE_YOUTUBE_GOOGLE_API_KEY: ${EMPIRE_YOUTUBE_GOOGLE_API_KEY}
     EMPIRE_YOUTUBE_DAYS_TO_KEEP: ${EMPIRE_YOUTUBE_DAYS_TO_KEEP}
+    EMPIRE_YOUTUBE_POT_PROVIDER_URL: ${EMPIRE_YOUTUBE_POT_PROVIDER_URL:-}
 
     EMPIRE_WEATHER_OPENWEATHER_API_KEY: ${EMPIRE_WEATHER_OPENWEATHER_API_KEY}
 
@@ -75,6 +76,8 @@ x-airflow-common: &airflow-common
       condition: service_started
     redis:
       condition: service_healthy
+    youtube-pot-provider:
+      condition: service_started
 
   networks:
     - empire-net
