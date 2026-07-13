@@ -1,875 +1,486 @@
 # OHLCV Architecture Plan
 
-## Overview
+## Status
 
-This document defines the initial architecture for adding daily and historical backfill OHLCV market data to the Empire Stonks platform.
+This document defines the approved initial architecture for provider-native
+daily OHLCV ingestion in Empire Stonks.
 
-The design intentionally separates canonical financial identity from provider-native market data. This allows OHLCV ingestion and daily update work to proceed independently while security-master reconciliation continues.
+The active implementation target is `empire-stonks-ohlcv`. The future
+`empire-stonks-ohlcv-bridge` package is explicitly deferred until:
 
-The architecture is divided into three modules:
+- Provider-native OHLCV ingestion is stable.
+- The security master and reconciliation contracts are further along.
+- A concrete consumer requires provider-to-canonical listing mappings.
 
-1. `empire-stonks-securities` (already under construction)
-2. `empire-stonks-ohlcv`
-3. `empire-stonks-ohlcv-bridge`
+The implementation checklist is maintained in
+`docs/todo/ohlcv-task-plan.md`.
 
-Supporting artifacts for run tracking, provenance, and source-object retention are provided by `empire-core` and its object-store services rather than duplicated inside the OHLCV package.
+## Initial Goal
 
-The initial market-data providers are expected to include:
+Build a simple reusable package that:
 
-- Stooq
-- EODData
-- Yahoo Finance
+- Downloads daily or historical source data from EODData, Stooq, and Yahoo.
+- Stores raw provider objects briefly through Empire Core.
+- Parses provider-native market/symbol series and daily bars.
+- Stores current provider-native OHLCV values in PostgreSQL.
+- Runs idempotently through CLIs and thin Airflow DAGs.
+- Reports import health, freshness, coverage, stale series, and gap warnings.
+- Preserves enough provider identity and source lineage for a future bridge.
 
-Each provider may represent the same real-world listing differently. Provider-native identities are therefore retained independently and reconciled to canonical listings later through the bridge module.
+The package does not need canonical issuer, security, listing, or exchange
+resolution before importing data.
 
----
+## Active Package Boundary
 
-# Architectural Principles
+### `empire-stonks-ohlcv` owns
 
-## Keep canonical identity separate from provider data
+- Provider-specific OHLCV source acquisition and parsing.
+- Shared provider-listing and daily-bar dataclasses.
+- Provider-native listing-series persistence.
+- Provider-native daily OHLCV persistence.
+- Current-state idempotent upserts.
+- Core run tracking and short-lived raw-object integration.
+- Durable source-content identity through existing Stonks source snapshots.
+- Provider-specific daily and historical-import runners.
+- Provider-scoped validation and operational reports.
+- Thin CLI entrypoints called by operators and Airflow.
 
-The security master answers:
+### `empire-stonks-ohlcv` does not own
 
-> What is the canonical issuer, security, and listing?
+- Canonical issuer, security, listing, exchange, or symbol-history mutation.
+- Provider-to-canonical listing mappings.
+- Ticker-reuse detection or real-world identity reconstruction.
+- Cross-provider price or adjustment normalization.
+- Corporate-action normalization.
+- A canonical or authoritative OHLCV series.
+- Sector, industry, fundamentals, descriptive enrichment, or other non-OHLCV
+  metadata exposed by a provider.
+- Intraday or extended-hours data in the first implementation.
+- Append-only provider bar revision history.
 
-The OHLCV module answers:
+Airflow orchestrates package-owned functions. Provider acquisition, parsing,
+persistence, validation, reporting, and sequencing do not belong in DAG files.
 
-> What listing did a provider publish, and what OHLCV values did it provide?
+## Dependency Direction
 
-The bridge answers:
-
-> Which provider listing corresponds to which canonical listing?
-
-These are different facts and should not be forced into the same model.
-
-## Allow OHLCV ingestion before reconciliation
-
-A provider listing does not need a resolved `listing_id` before data can be imported.
-
-For example:
-
-```text
-STOOQ   / US   / XOM
-EODDATA / NYSE / XOM
-YAHOO   / NYQ  / XOM
-```
-
-Each provider representation receives its own durable UUID and may accumulate OHLCV history immediately.
-
-Later, the bridge may resolve all three provider instruments to the same canonical listing.
-
-## Provider listings are permanent identities
-
-A `provider_listing` record is not a temporary placeholder that is replaced after reconciliation.
-
-It permanently identifies a provider-native object and preserves:
-
-- Provider namespace
-- Provider market
-- Provider ticker
-- Provider metadata
-- Source-specific adjustment semantics
-- Source-specific OHLCV history
-- Provenance for later authoritative-series construction
-
-## Do not let OHLCV ingestion mutate the security master
-
-The OHLCV module may create and update provider-native listings and OHLCV rows.
-
-It must not create, promote, merge, or modify canonical:
-
-- Issuers
-- Securities
-- Listings
-- Canonical symbol history
-- Canonical identity decisions
-
-## Make mappings temporal
-
-Provider listings may change meaning over time because of:
-
-- Ticker reuse
-- Exchange transfers
-- Corporate reorganizations
-- Provider symbology changes
-- Incorrect historical mappings
-- Listing replacements
-
-Mappings between provider listings and listings should therefore support `valid_from` and `valid_to`.
-
-## Preserve provider-native markets
-
-Provider markets should attempt to map to canonical exchange codes.
-
-Examples:
+The initial Python dependency shape is:
 
 ```text
-Provider   Provider market   Canonical exchange
----------  ---------------  ------------------
-EODDATA    NYSE              NYSE
-YAHOO      NYQ               NYSE
-STOOQ      US                unresolved or broad market
-```
-
-The provider-native market metadata should be retained even if a canonical `exchange_id` is later assigned.
-
-## Reuse shared Empire reference data
-
-The OHLCV module should reuse existing stonks shared reference tables where appropriate, including examples:
-
-- `provider`
-- `exchange`
-- `instrument_class`
-- `instrument_type`
-- `currency`
-- `confidence_level`
-
-The OHLCV module should not introduce a duplicate provider table or a parallel instrument taxonomy.
-
-## Reuse Empire Core provenance
-
-Package-specific import-run and source-artifact tables should be unnecessary.
-
-The OHLCV module should reuse:
-
-- Empire Core run tracking
-- Empire Core run contexts
-- Empire object store
-- Existing object-store references
-- Existing execution provenance conventions
-
----
-
-# Module Architecture
-
-## Full Module Relationship
-
-```text
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                 empire-stonks-securities                                      │
-│                                                                               │
-│  Owns canonical identity and shared reference data.                           │
-│                                                                               │
-│  ┌──────────┐      ┌───────────┐      ┌───────────┐                           │
-│  │ issuer   │ 1:N  │ security  │ 1:N  │ listing   │                           │
-│  │----------├─────►│-----------├─────►│-----------│                           │
-│  │issuer_id │      │security_id│      │listing_id │                           │
-│  └──────────┘      │issuer_id  │      │security_id|                           │
-│                    └───────────┘      │exchange_id|                           │
-│                                       └──────┬────┘                           │
-│                                              │ N:1                            │
-│                                              ▼                                │
-│                                       ┌──────────┐                            │
-│                                       │ exchange │                            │
-│                                       └──────────┘                            │
-│                                                                               │
-│  Shared reference tables:                                                     │
-│                                                                               │
-│  ┌──────────┐  ┌─────────────────┐  ┌──────────┐  ┌─────────────────┐         │
-│  │ provider │  │ instrument_type │  │ currency │  │ confidence_level│         │
-│  └──────────┘  └─────────────────┘  └──────────┘  └─────────────────┘         │
-│                                                                               │
-│  Does not know about provider listings or OHLCV rows.                         │
-└───────────────────────────────▲───────────────────────────────────────────────┘
-                                │
-                                │ References canonical listing_id
-                                │
-┌───────────────────────────────┴──────────────────────────────────────────────┐
-│                  empire-stonks-ohlcv-bridge                                  │
-│                                                                              │
-│  Owns the relationship between provider-native instruments and canonical     │
-│  security-master listings.                                                   │
-│                                                                              │
-│  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │ provider_listing_mapping                                               │  │
-│  │------------------------------------------------------------------------│  │
-│  │ provider_listing_mapping_id                                 UUID PK    │  │
-│  │ provider_listing_id                                         UUID FK    │  │
-│  │ listing_id                                                  FK         │  │
-│  │ valid_from                                                  DATE NULL  │  │
-│  │ valid_to                                                    DATE NULL  │  │
-│  │ mapping_status                                                         │  │
-│  │ confidence_level_code                                       FK NULL    │  │
-│  │ mapping_method                                              NULL       │  │
-│  │ evidence                                                    JSONB NULL │  │
-│  │ created_by_run_id                                           UUID NULL  │  │
-│  │ created_at                                                             │  │
-│  │ updated_at                                                             │  │
-│  └────────────────────────────────────────────────────────────────────────┘  │
-│                                                                              │
-│  Depends on both adjacent modules.                                           │
-│  Neither adjacent module depends on this module.                             │
-└───────────────────────────────▲──────────────────────────────────────────────┘
-                                │
-                                │ References provider_instrument_id
-                                │
-┌───────────────────────────────┴──────────────────────────────────────────────┐
-│                       empire-stonks-ohlcv                                    │
-│                                                                              │
-│  Owns provider-native listings and daily OHLCV data.                         │
-│                                                                              │
-│  Reuses shared provider, exchange, currency, and instrument-type references. │
-│  Reuses Empire Core for run tracking and source-object provenance.           │
-│                                                                              │
-│  ┌──────────────┐                                                            │
-│  │ provider     │                                                            │
-│  │ shared ref   │                                                            │
-│  └──────┬───────┘                                                            │
-│         │                                                                    │
-│         │                                                                    │
-│         │                                                                    │
-│         │                                                                    │
-│         │                 ┌────────────────────────────────────────────┐     │
-│         └────────────────►│ provider_listing                           │     │
-│                           │--------------------------------------------│     │
-│                           │ provider_listing_id             UUID PK    │     │
-│                           │ provider_code                   FK         │     │
-│                           │ provider_market                 VARCHAR    │     │
-│                           │ ticker                          VARCHAR    │     │
-│                           │ provider_listing_name           VARCHAR    │     │
-│                           │ instrument_type_code            FK NULL    │     │
-│                           │ currency_code                   FK NULL    │     │
-│                           │ price_adjustment_code           NULL       │     │
-│                           │ volume_adjustment_code          NULL       │     │
-│                           │ first_seen                      DATE       │     │
-│                           │ last_seen                       DATE       │     │
-│                           │ status                                     │     │
-│                           │ raw_metadata                    JSONB NULL │     │
-│                           │ created_at                      TIMESTAMPTZ│     │
-│                           │ updated_at                      TIMESTAMPTZ│     │
-│                           │                                            │     │
-│                           │ UNIQUE(provider_code,                      │     │
-│                           │        provider_market,                    │     │
-│                           │        ticker)                             │     │
-│                           └───────────────────┬────────────────────────┘     │
-│                                               │ 1:N                          │
-│                                               ▼                              │
-│                           ┌────────────────────────────────────────────┐     │
-│                           │ ohlcv                                      │     │
-│                           │--------------------------------------------│     │
-│                           │ provider_listing_id             PK/FK      │     │
-│                           │ trading_date                    PK         │     │
-│                           │ open                                       │     │
-│                           │ high                                       │     │
-│                           │ low                                        │     │
-│                           │ close                                      │     │
-│                           │ volume                                     |     │
-│                           │ adjusted_close                 NULL        │     │
-│                           │ created_by_run_id              FK NULL     │     │
-│                           │ updated_by_run_id              FK NULL     │     │
-│                           │ source_object_id               FK NULL     │     │
-│                           │ quality_status                  NULL       │     │
-│                           │ created_at                                 │     │
-│                           │ updated_at                                 │     │
-│                           └────────────────────────────────────────────┘     │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-## Package Dependency Shape
-
-```text
-empire-stonks-securities             empire-stonks-ohlcv
-               ▲                                ▲
-               │                                │
-               └── empire-stonks-ohlcv-bridge ──┘
-```
-
-The arrows above represent package dependencies.
-
-```text
-empire-stonks-ohlcv-bridge
-    depends on empire-stonks-securities
-    depends on empire-stonks-ohlcv
-
-empire-stonks-securities
-    does not depend on empire-stonks-ohlcv
-    does not depend on empire-stonks-ohlcv-bridge
-
 empire-stonks-ohlcv
-    does not depend on canonical issuer, security, or listing identity
-    does not depend on empire-stonks-ohlcv-bridge
+        |
+        v
+   empire-core
 ```
 
-All three modules may depend on `empire-core` for run tracking, object-store access, and shared infrastructure.
-
----
-
-# Module Responsibilities
-
-## `empire-stonks-securities`
-
-The security-master module owns canonical financial identity and shared reference data.
-
-### Primary responsibilities
-
-- Canonical issuer identity
-- Canonical security identity
-- Canonical listing identity
-- Exchange reference data
-- Canonical symbol history
-- Instrument classification
-- Currency references
-- Provider references
-- Confidence-level references
-- Security identity reconciliation
-- Promotion, merge, split, and conflict handling
-
-### Core identity chain
+`empire-stonks-ohlcv` does not import `empire-stonks-securities`. It may use
+existing shared tables in the `stonks` schema, including:
 
 ```text
-issuer
-   │
-   ▼
-security
-   │
-   ▼
-listing
-   │
-   ▼
-exchange
+stonks.provider
+stonks.instrument_type
+stonks.iso4217_currency
+stonks.provider_source_snapshot
+stonks.provider_source_snapshot_object
 ```
 
-### Existing shared taxonomy
+The security-master package does not depend on OHLCV. Neither package depends
+on the future bridge.
+
+## Provider-Series Identity
+
+A `provider_listing` identifies a provider-native market/symbol series. It does
+not assert that the series represents one real-world listing for its entire
+history.
+
+The initial provider-series lookup is based on:
 
 ```text
-instrument_class
-      │
-      │ 1:N
-      ▼
-instrument_type
-      │
-      ├────────────► security.instrument_type_code
-      │
-      └────────────► provider_listing.instrument_type_code
+provider_code
+provider_market
+provider_ticker
 ```
 
-The same instrument taxonomy should be used by both the security master and the OHLCV module.
+The exact raw-value preservation, case handling, database constraints, and
+indexes are finalized in the schema-design tasks before migration work.
 
-The provider-native classification should still be retained in raw metadata when available.
+Ticker reuse cannot be reliably detected from raw OHLCV inputs and is not an
+initial ingestion responsibility. If a provider reuses a market/ticker tuple
+without exposing an identity break, the same provider series may contain both
+date ranges. A future bridge can map non-overlapping periods of one provider
+series to different canonical listings.
 
----
+Similarly, if a provider changes its ticker representation, multiple provider
+series may later map to different periods of one canonical listing. OHLCV
+ingestion does not infer that relationship.
 
-## `empire-stonks-ohlcv`
+`first_seen` and `last_seen`, if included in the final table design, are
+observational metadata only. They do not prove listing validity dates.
 
-The OHLCV module owns provider-native market listings and historical or daily OHLCV rows.
+## Provider-Native Value Policy
 
-It does not require canonical listing reconciliation before ingestion.
+Daily values are stored as supplied by each provider.
 
-### Primary responsibilities
+The initial package does not:
 
-- Provider-market discovery
-- Provider-listing discovery
-- Provider-native listing identity
-- Historical OHLCV backfill
-- Daily incremental OHLCV imports
-- Idempotent upserts
-- Source-object provenance through Empire Core
-- Data-quality validation
-- Gap detection
-- Stale-series detection
-- Provider coverage reporting
+- Convert one provider's raw prices to another provider's adjustment basis.
+- Reconstruct splits or dividends.
+- Reconcile price or volume disagreements.
+- Merge provider rows into a consensus value.
 
-### Initial providers
+Shared daily-bar dataclasses provide a common shape, but they do not imply that
+values from different providers are directly comparable.
+
+Where a provider exposes the information, the parsed record or provider-series
+metadata should retain:
+
+- The provider-native market and ticker.
+- Whether OHLC fields are documented as raw or adjusted.
+- Whether adjusted close is separately supplied.
+- Whether volume is adjusted, unadjusted, absent, or unspecified.
+- The provider source/feed code.
+- The parser version.
+- Other small provider-native metadata needed to interpret the bar.
+
+Sector, industry, fundamentals, and unrelated provider metadata are outside the
+OHLCV package even when the same provider exposes them.
+
+## Initial Database Shape
+
+The first implementation adds only:
 
 ```text
-STOOQ
+stonks.provider_listing
+stonks.ohlcv_daily
+```
+
+It also registers these rows in the existing `stonks.provider` table:
+
+```text
 EODDATA
+STOOQ
 YAHOO
 ```
 
-Each provider has its own provider-native instruments.
+### `provider_listing`
+
+`provider_listing` stores the durable UUID used by Empire to own one
+provider-native market/symbol series.
+
+The schema-design phase must finalize:
+
+- Provider FK and provider-native market/ticker fields.
+- Raw-value preservation and deterministic lookup behavior.
+- Optional name, instrument type, currency, and adjustment metadata.
+- First/last-seen and status semantics, if needed.
+- JSON metadata boundaries.
+- Timestamps, constraints, and indexes.
+
+It must not contain `listing_id` or another canonical-identity FK.
+
+### `ohlcv_daily`
+
+`ohlcv_daily` stores one current provider-native daily bar for a
+`provider_listing` and trading date.
+
+The intended natural primary key is:
 
 ```text
-STOOQ   / US   / XOM  ─┐
-EODDATA / NYSE / XOM ──┼─ later resolved to one canonical listing
-YAHOO   / NYQ  / XOM ──┘
+(provider_listing_id, trading_date)
 ```
 
-The provider-specific UUIDs remain permanent even after reconciliation.
+The schema-design phase must finalize:
 
-### Core OHLCV relationship
+- Exact price and volume types.
+- OHLC and optional adjusted-close nullability.
+- Structural OHLC/volume checks.
+- Provider-native adjustment metadata placement.
+- Durable source-snapshot lineage.
+- Cleanup-safe Core run references.
+- Inserted/updated/unchanged upsert behavior.
+- Timestamps and reporting indexes.
+
+A separate `provider_market`, `market_data_series`, canonical bar, or bar
+revision table is not part of the initial schema.
+
+## Current-State Upsert Policy
+
+The initial package stores the current provider value for each provider series
+and trading date.
+
+- A first import inserts the bar.
+- An identical rerun is unchanged and does not duplicate it.
+- A later provider correction may update the existing row.
+- The package returns inserted, updated, unchanged, rejected, and warning counts
+  where applicable.
+- No append-only bar revision history is created initially.
+- Exceptional manual database corrections remain an operator responsibility.
+
+This is an intentional early-stage tradeoff. A future requirement for provider
+revision history must be designed separately rather than inferred from Core run
+records.
+
+## Core Run And Source Provenance
+
+Empire Core owns execution and physical object metadata:
 
 ```text
-provider
-   │
-   ▼
-provider_listing
-   │
-   ▼
-ohlcv
+core.core_run
+core.stored_object
 ```
 
----
-
-## `empire-stonks-ohlcv-bridge`
-
-The bridge module connects provider-native OHLCV listings to canonical listings.
-
-It depends on both the securities and OHLCV modules.
-
-Neither core module depends on the bridge.
-
-### Primary responsibilities
-
-- Candidate listing mappings
-- Confirmed listing mappings
-- Mapping confidence
-- Mapping evidence
-- Temporal mapping validity
-- Ambiguity handling
-- Conflict handling
-- Rejected mappings
-- Superseded mappings
-- Manual and automated review outcomes
-
-### Core bridge relationship
+Existing Stonks tables own durable provider-source content identity:
 
 ```text
-provider_listing
-        │
-        ▼
-listing
-        │
-        ▼
-security
-        │
-        ▼
-issuer
+stonks.provider_source_snapshot
+stonks.provider_source_snapshot_object
 ```
 
-### Recommended mapping states
+The ingestion flow is:
 
 ```text
-UNRESOLVED
-CANDIDATE
-CONFIRMED
-AMBIGUOUS
-CONFLICTED
-REJECTED
+provider source
+    -> core.core_run
+    -> core.stored_object with short expiration
+    -> stonks.provider_source_snapshot
+    -> provider_listing
+    -> ohlcv_daily
+    -> provider health report
 ```
 
----
+Raw objects normally expire after approximately seven days. When Core cleanup
+and purge remove a raw object, its `provider_source_snapshot_object` membership
+row may be removed while the durable source snapshot and parsed database rows
+remain.
 
-# Table Plan
+OHLCV rows should use the durable source snapshot for source-content lineage.
+They must not rely on a retained raw `source_object_id` as their only long-lived
+provenance.
 
-## Security Master Tables Reused by OHLCV
+Core run references on mutable OHLCV facts must use cleanup-safe nullability and
+delete behavior. Credentials must never be written into run parameters,
+summaries, object metadata, logs, reports, or Airflow task payloads.
 
-The OHLCV and bridge modules should reuse existing reference tables rather than duplicate them.
+## Package And Runtime Conventions
 
-### `provider`
-
-Existing generic provider table.
+### Package names
 
 ```text
-provider
---------
-provider_code       PK
-provider_name
-provider_type
-website
-description
-is_active
+Poetry distribution: empire-stonks-ohlcv
+Python import:       empire_stonks_ohlcv
+Initial version:     0.1.0
 ```
 
-Expected OHLCV provider rows include:
+### Database names
 
 ```text
-STOOQ
-EODDATA
-YAHOO
+stonks.provider_listing
+stonks.ohlcv_daily
 ```
 
-### `exchange`
+Flyway migrations remain in the monorepo-level `db/flyway/sql` directory and
+must run after the existing Core and Stonks reference/source-snapshot
+migrations. No package-local migration runner is introduced.
 
-Existing canonical exchange reference.
+### Core run names
 
-
-### `instrument_class`
-
-Existing high-level classification reference.
-
-### `instrument_type`
-
-Both canonical securities and provider-native listings should reference this table.
-
----
-
-## OHLCV Module Tables
-
-## `provider_listing`
-
-Represents a durable provider-native listing.
-
-### Classification rule
-
-`instrument_type_code` should contain Empire's normalized interpretation of the provider instrument.
-
-The original vendor classification should remain available through provider-native fields or `raw_metadata` when possible.
-
----
-
-## `ohlcv`
-
-Stores provider-native daily OHLCV rows.
-
-### Initial scope
-
-The first version assumes:
-
-- Daily bars
-- One stored interpretation per provider instrument
-- No intraday data
-- No parallel regular-session and extended-session streams
-- No multiple adjustment variants stored side by side
-
-Because of that, a separate `market_data_series` table is not required.
-
----
-
-# Bridge Module Tables
-
-## `provider_listing_mapping`
-
-Maps a provider-native instrument to a canonical security-master listing.
-
-### Purpose
-
-This table owns the claim:
-
-> This provider listing corresponds to this canonical listing for this effective period.
-
-### Temporal requirement
-
-Mappings should not be treated as permanently timeless.
+All OHLCV runs use:
 
 ```text
-provider_listing_id
-    -> listing_id
-    -> valid_from
-    -> valid_to
+domain = stonks
 ```
 
-### Expected cardinality
-
-A provider listing may have:
-
-- No confirmed listing
-- One current listing
-- Different listings over different time periods
-- Multiple candidates during reconciliation
-- Rejected mappings
-
----
-
-# Data Flow
-
-## OHLCV Ingestion
+Initial job names are:
 
 ```text
-Provider source
-      │
-      ▼
-Empire object store
-      │
-      ▼
-RunContext / Empire Core run
-      │
-      ▼
-provider_listing
-      │
-      ▼
-ohlcv
+stonks_ohlcv_eoddata_daily
+stonks_ohlcv_stooq_daily
+stonks_ohlcv_yahoo_daily
+stonks_ohlcv_stooq_backfill
 ```
 
-The import process may create provider listings and OHLCV rows.
+The default `subject_key` is `all_series`. Explicitly scoped imports may use a
+stable provider-native scope such as `market:<market>` or `symbol:<symbol>`.
+Secrets are never part of a subject key or run parameter.
 
-It must not create canonical issuer, security, or listing records.
+### Airflow DAG names
 
-## Identity Reconciliation
+Initial DAG IDs follow the package job names:
 
 ```text
-provider_listing
-        │
-        ▼
-candidate matching
-        │
-        ▼
-canonical listing
-        │
-        ▼
-security
-        │
-        ▼
-issuer
+stonks_ohlcv_eoddata_daily
+stonks_ohlcv_stooq_daily
+stonks_ohlcv_yahoo_daily
 ```
 
-## Multi-Provider Example
+Yahoo scheduling may remain manual or symbol-limited if its implemented source
+contract does not justify a full nightly schedule. Historical Stooq import is an
+operator CLI, not a scheduled backfill DAG in the initial scope.
+
+### Object-store names
+
+The object-store key prefix is configured by:
 
 ```text
-STOOQ instrument UUID
-    provider key: US / XOM
-          │
-          ├── Stooq OHLCV rows
-          │
-          └── bridge mapping ──────────┐
-                                       │
-EODDATA instrument UUID                │
-    provider key: NYSE / XOM           │
-          │                            │
-          ├── EODData OHLCV rows       ├──► canonical NYSE XOM listing
-          │                            │
-          └── bridge mapping ──────────┤
-                                       │
-YAHOO instrument UUID                  │
-    provider key: NYQ / XOM            │
-          │                            │
-          ├── Yahoo OHLCV rows         │
-          │                            │
-          └── bridge mapping ──────────┘
+EMPIRE_STORAGE_KEY_STONKS_OHLCV
 ```
 
----
-
-# Authoritative OHLCV Strategy
-
-The long-term goal is one authoritative OHLCV history per canonical tradable instrument.
-
-The first phase stores provider-native histories separately.
+with default:
 
 ```text
-provider_listing
-        │
-        ▼
-provider-native ohlcv
+stonks/ohlcv
 ```
 
-Later, confirmed bridge mappings allow provider histories to be evaluated for canonical use.
+Raw objects use a deterministic shape equivalent to:
 
 ```text
-provider OHLCV
-    STOOQ
-    EODDATA
-    YAHOO
-        │
-        ▼
-selection and validation policy
-        │
-        ▼
-authoritative Empire OHLCV
+stonks/ohlcv/<provider>/runs/YYYY/MM/DD/<run_id>/<source_code>/
 ```
 
-The authoritative series should not silently merge provider rows without provenance.
-
-Examples of acceptable future behavior include:
-
-- Stooq as primary
-- EODData as fallback
-- Yahoo for selected global indices
-- Second-provider validation for suspicious bars
-- Explicit, auditable gap filling
-- Manual overrides with retained evidence
-
-The initial schema does not need to finalize the authoritative-series storage model, but it must preserve enough provider identity and provenance to build one later.
-
----
-
-# Risks and Required Safeguards
-
-## Ticker reuse
-
-`provider listing + market + ticker` cannot always be assumed to represent the same real-world instrument forever.
-
-When reuse is detected:
-
-- Preserve the old provider instrument
-- Create a new provider-instrument UUID
-- Use temporal bridge mappings
-- Do not rewrite old OHLCV ownership
-
-## Provider disagreement
-
-Different providers may disagree on:
-
-- Trading dates
-- Prices
-- Volume
-- Adjustments
-- Exchange assignment
-- Instrument type
-- Symbol history
-
-Provider-native histories must remain separate until an explicit canonical selection process is applied.
-
-## Adjustment mismatch
-
-Do not compare or merge unlike histories without normalization.
-
-Possible differences include:
-
-- Raw prices
-- Split-adjusted prices
-- Dividend-adjusted prices
-- Total-return-adjusted prices
-- Adjusted or unadjusted volume
-- Regular-session or extended-session values
-
-## Unresolved identity
-
-Unresolved provider instruments remain valid OHLCV records.
-
-However, downstream applications should distinguish between:
-
-- Provider-native data
-- Candidate mappings
-- Confirmed canonical mappings
-
-A provider-native chart may work without a listing.
-
-Issuer-level analytics, portfolio reporting, and canonical security aggregation should normally require a confirmed bridge.
-
-## Index and benchmark handling
-
-The initial bridge is centered on:
+Provider reports use:
 
 ```text
-provider_listingt -> listing
+stonks/ohlcv/<provider>/runs/YYYY/MM/DD/<run_id>/run-reports/health/
 ```
 
-Some provider instruments may instead represent:
+Initial object kinds are:
 
 ```text
-provider_listing -> index
-provider_listing -> benchmark
-provider_listing -> currency pair
-provider_listing -> commodity
+stonks_ohlcv_raw_source
+stonks_ohlcv_health_report
+stonks_ohlcv_backfill_report
 ```
 
-The first implementation may focus on listing mappings.
-
-Future canonical models can add sibling bridge tables without changing the OHLCV module.
-
----
-
-# Initial Build Scope
-
-## Security Master (empire-stonks-securities)
-
-Continue the existing reconciliation and promotion work independently.
-
-No OHLCV dependency is required.
-
-## OHLCV Module (empire-stonks-ohlcv)
-
-Initial tables:
+Health-report logical names use:
 
 ```text
-provider_listing
-ohlcv
+stonks-ohlcv-<provider>-health
 ```
 
-Initial capabilities:
+Source codes are stable lowercase feed identifiers prefixed by provider, for
+example `eoddata_<feed>`, `stooq_<feed>`, and `yahoo_<feed>`. Exact feed suffixes
+and parser versions are fixed in each provider's source-contract task.
 
-1. Register Stooq, EODData, and Yahoo in the shared `provider` table.
-2. Discover provider-native markets
-3. Create durable provider-listing UUIDs.
-4. Import historical daily OHLCV.
-5. Run daily incremental updates.
-6. Use idempotent upserts.
-7. Retain raw source objects through Empire Core.
-8. Link changes to Empire Core run records.
-9. Validate OHLCV invariants.
-10. Report missing bars, stale series, and coverage gaps.
+## Environment And Secret Conventions
 
-## OHLCV Bridge
+Reusable package code reads configuration from `os.environ`. It must not:
 
-Initial table:
+- Load `.env` files.
+- Import `python-dotenv`.
+- Assume the repository location of `deploy/env/local.env`.
+- Read configuration directly from repository files.
+
+Local shells and `bin` wrappers use the existing `bin/env-load` mechanism to
+load:
+
+```text
+deploy/env/local.env
+```
+
+Docker Compose and Airflow receive the same values from the runtime environment.
+Non-secret names/defaults are documented in `deploy/env/local.example.env`.
+Real credentials remain in the active local environment and are not committed.
+
+Common OHLCV variables are:
+
+```text
+EMPIRE_STORAGE_KEY_STONKS_OHLCV=stonks/ohlcv
+EMPIRE_STONKS_OHLCV_RAW_RETENTION_DAYS=7
+EMPIRE_STONKS_OHLCV_HTTP_TIMEOUT_SECONDS=<seconds>
+EMPIRE_STONKS_OHLCV_MAX_RETRIES=<count>
+```
+
+Provider-specific variables use these prefixes:
+
+```text
+EMPIRE_STONKS_OHLCV_EODDATA_*
+EMPIRE_STONKS_OHLCV_STOOQ_*
+EMPIRE_STONKS_OHLCV_YAHOO_*
+```
+
+The initial reserved EODData credential names are:
+
+```text
+EMPIRE_STONKS_OHLCV_EODDATA_USERNAME
+EMPIRE_STONKS_OHLCV_EODDATA_PASSWORD
+```
+
+Stooq and Yahoo do not have a required secret in the approved architecture.
+If the selected source contract later requires one, it must follow the provider
+prefix, be documented in the provider task, and receive the same redaction
+tests. Source URLs, request bounds, and other provider-specific non-secret
+suffixes are finalized with the provider source contracts rather than guessed
+here.
+
+## Provider Adapter Boundary
+
+EODData, Stooq, and Yahoo share package-owned dataclasses for provider listings,
+daily bars, source metadata, and import results.
+
+Their remote APIs and file layouts do not need a forced common downloader
+interface. Provider-specific modules may acquire and parse differently as long
+as they return the shared package records and use the same persistence, Core,
+validation, and report contracts.
+
+The first EODData vertical slice defines the smallest useful common contract.
+Stooq and Yahoo reuse it without adding provider-specific database columns.
+Avoid a registry, plugin system, generic provider factory, or unrelated metadata
+framework unless later requirements justify one.
+
+## Validation And Reporting Scope
+
+Each provider vertical slice includes its own validation, stored health report,
+runner, and Airflow DAG before work begins on the next provider.
+
+The shared report contract should cover:
+
+- Acquisition and parse status.
+- Accepted, rejected, inserted, updated, and unchanged counts.
+- Per-provider market/series coverage.
+- Minimum and maximum trading dates.
+- Latest-bar age and stale-series candidates.
+- Weekday-shaped gap warnings.
+- Bounded samples of failures and warnings.
+- Provider-native adjustment/interpretation notes.
+
+The initial schema has no authoritative exchange calendar. Reports must not
+claim that a missing exchange holiday is definitively a missing bar.
+
+## Deferred Bridge And Authoritative History
+
+The future bridge will answer:
+
+> Which canonical listing, if any, corresponds to this provider series for a
+> particular effective period?
+
+That work is deferred. The current package does not create:
 
 ```text
 provider_listing_mapping
+canonical_ohlcv
+authoritative_ohlcv
 ```
 
-Initial capabilities:
+Future temporal mappings must be able to:
 
-1. Create unresolved and candidate mappings.
-2. Confirm provider-instrument-to-listing mappings.
-3. Store confidence and evidence.
-4. Support effective dates.
-5. Flag ambiguous and conflicting mappings.
-6. Keep bridge writes isolated from both core modules.
+- Map multiple provider series to one canonical listing.
+- Map different date ranges of one provider series to different listings.
+- Preserve unresolved and ambiguous provider series.
+- Retain evidence and decision provenance.
 
----
+Any future authoritative series must select provider rows explicitly and retain
+their provider-listing, trading-date, and source-snapshot lineage. It must not
+silently coalesce unlike provider values.
 
-# Final Ownership Summary
+## Known Initial Limitations
 
-```text
-┌──────────────────────────────────┐
-│ empire-stonks-securities         │
-│----------------------------------│
-│ Canonical financial identity     │
-│                                  │
-│ issuer                           │
-│ security                         │
-│ listing                          │
-│ exchange                         │
-│ provider                         │
-│ instrument_class                 │
-│ instrument_type                  │
-│ currency                         │
-│ confidence levels                │
-└────────────────▲─────────────────┘
-                 │
-                 │ canonical listing reference
-                 │
-┌────────────────┴─────────────────┐
-│ empire-stonks-ohlcv-bridge       │
-│----------------------------------│
-│ Identity relationship            │
-│                                  │
-│ provider_listing_mapping.        │
-│ mapping status                   │
-│ confidence                       │
-│ evidence                         │
-│ temporal validity                │
-└────────────────▲─────────────────┘
-                 │
-                 │ provider instrument reference
-                 │
-┌────────────────┴─────────────────┐
-│ empire-stonks-ohlcv              │
-│----------------------------------│
-│ Provider-native market data      │
-│                                  │
-│ provider_market                  │
-│ provider_instrument              │
-│ ohlcv                            │
-└──────────────────────────────────┘
+- Provider market text is not mapped to canonical exchange records.
+- Provider ticker reuse may be undetected.
+- Provider values are not normalized across adjustment bases.
+- Provider corrections overwrite current rows without stored revision history.
+- Raw files expire after the operational inspection window.
+- Gap reports are not exchange-calendar aware.
+- No canonical listing relationship exists until bridge work begins.
+- No sector, industry, fundamentals, or descriptive enrichment is collected.
 
-All modules reuse empire-core for:
-- Run tracking
-- RunContext
-- Object-store persistence
-- Source-object provenance
-- Shared infrastructure
-```
-
-This architecture allows OHLCV ingestion and daily processing to proceed immediately while canonical security-master reconciliation continues independently.
-
-## First Priority Build: OHLCV Package (empire-stonks-ohlcv)
-
-Initial design/build elements:
-
-Generate ohlcv-tasks.md with steps for package buildout (similar to docs/todo/reconciliation-plan.md) which should
-include at minimum:
-
-0. Generate new empire-stonks-ohlcv package and integrate into empire airflow stack
-1. Register Stooq, EODData, and Yahoo in the shared `provider` table.
-2. Design empire-stonks-ohlcv tables and flyway scripts in the stonks schema of empire postgres
-3. Create dag for importing nightly eoddata records.
-3. Create dag for importing nightly stooq records.
-4. Create one-time use utility to import historical daily OHLCV from stooq.
-5. Run daily incremental updates.
-6. Use idempotent upserts.
-7. Generate daily reports include status missing bars, stale series, and coverage gaps.
-
-Note that we will save the empire-stonks-ohlcv-bridge tasks until after ohlcv is built and securities including
-reconciliation is completed.
+These are accepted scope limits, not blockers for importing useful
+provider-native daily and historical OHLCV data.
