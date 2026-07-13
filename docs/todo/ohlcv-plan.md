@@ -8,7 +8,7 @@ The design intentionally separates canonical financial identity from provider-na
 
 The architecture is divided into three modules:
 
-1. `empire-stonks-security-master`
+1. `empire-stonks-securities` (already under construction)
 2. `empire-stonks-ohlcv`
 3. `empire-stonks-ohlcv-bridge`
 
@@ -803,7 +803,7 @@ Initial capabilities:
 
 ```text
 ┌──────────────────────────────────┐
-│ empire-stonks-securities.        │
+│ empire-stonks-securities         │
 │----------------------------------│
 │ Canonical financial identity     │
 │                                  │
@@ -854,11 +854,11 @@ All modules reuse empire-core for:
 
 This architecture allows OHLCV ingestion and daily processing to proceed immediately while canonical security-master reconciliation continues independently.
 
-## First Priority Build: OHLCV Module (empire-stonks-ohlcv)
+## First Priority Build: OHLCV Package (empire-stonks-ohlcv)
 
 Initial design/build elements:
 
-Generate stonks-ohlcv-plan.md with steps for module buildout (similar to docs/todo/reconciliation-plan.md) which should
+Generate ohlcv-tasks.md with steps for package buildout (similar to docs/todo/reconciliation-plan.md) which should
 include at minimum:
 
 0. Generate new empire-stonks-ohlcv package and integrate into empire airflow stack
@@ -870,3 +870,6 @@ include at minimum:
 5. Run daily incremental updates.
 6. Use idempotent upserts.
 7. Generate daily reports include status missing bars, stale series, and coverage gaps.
+
+Note that we will save the empire-stonks-ohlcv-bridge tasks until after ohlcv is built and securities including
+reconciliation is completed.
