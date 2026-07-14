@@ -208,7 +208,7 @@ before provider or database logic is added.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| B1.1 | [ ] | Scaffold Poetry package | Create `packages/empire-stonks-ohlcv` with version `0.1.0`, `src/empire_stonks_ohlcv`, tests, README, and the minimum initial dependency on `empire-core`. Package import works. | P0.5 |
+| B1.1 | [x] | Scaffold Poetry package | Create `packages/empire-stonks-ohlcv` with version `0.1.0`, `src/empire_stonks_ohlcv`, tests, README, and the minimum initial dependency on `empire-core`. Package import works. | P0.5 |
 | B1.2 | [ ] | Add package exceptions and exports | Add a small exception hierarchy and stable top-level exports without exposing provider internals or creating a generic framework. Import tests pass. | B1.1 |
 | B1.3 | [ ] | Add environment-driven config skeleton | Add typed configuration that reads only `os.environ`. Local runtimes load `deploy/env/local.env`; the package does not load `.env` files or assume repository paths. Unit tests cover defaults, required values, and provider-specific credentials. | B1.1 |
 | B1.4 | [ ] | Add secret-safe config behavior | Prove config representations, errors, logs, Core run parameters, object metadata, reports, and serialized results do not expose provider credentials or tokens. Targeted tests pass. | B1.3 |
@@ -216,6 +216,13 @@ before provider or database logic is added.
 | B1.6 | [ ] | Add local environment settings | Add documented non-secret defaults/placeholders to `deploy/env/local.example.env` and the active local values to `deploy/env/local.env` as appropriate. Provider secrets stay local and are not committed. | B1.3-B1.4 |
 | B1.7 | [ ] | Pass OHLCV settings to Airflow | Pass the required `EMPIRE_STONKS_OHLCV_*` values from `deploy/env/local.env` through Airflow Compose without embedding credentials in DAG files or images. | B1.5-B1.6 |
 | B1.8 | [ ] | Add package CLI wrapper convention | Add the first `bin/stonks-ohlcv-*` wrapper and package script skeleton using the existing `bin/env-load` pattern so local commands receive `deploy/env/local.env`. Help/import smoke tests pass. | B1.1-B1.4, B1.6 |
+
+Done: 2026-07-14 — added `packages/empire-stonks-ohlcv/{pyproject.toml,
+poetry.lock,README.md,src/empire_stonks_ohlcv/__init__.py,tests/test_package.py}`;
+`poetry check --lock` passed (deprecation warnings only), `poetry run pytest -q`
+passed (1 test), isolated package/Core imports and `compileall` passed,
+`poetry run python -m pip check` found no broken requirements, and
+`poetry build` built the sdist/wheel.
 
 ## Phase 2: Database Design And Migration
 
