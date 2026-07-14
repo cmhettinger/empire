@@ -212,7 +212,7 @@ before provider or database logic is added.
 | B1.2 | [x] | Add package exceptions and exports | Add a small exception hierarchy and stable top-level exports without exposing provider internals or creating a generic framework. Import tests pass. | B1.1 |
 | B1.3 | [x] | Add environment-driven config skeleton | Add typed configuration that reads only `os.environ`. Local runtimes load `deploy/env/local.env`; the package does not load `.env` files or assume repository paths. Unit tests cover defaults, required values, and provider-specific credentials. | B1.1 |
 | B1.4 | [x] | Add secret-safe config behavior | Prove config representations, errors, logs, Core run parameters, object metadata, reports, and serialized results do not expose provider credentials or tokens. Targeted tests pass. | B1.3 |
-| B1.5 | [ ] | Install package in Airflow image | Add the package to `deploy/docker/airflow/Dockerfile` in dependency-safe order. The Airflow image build reaches package installation successfully. | B1.1 |
+| B1.5 | [x] | Install package in Airflow image | Add the package to `deploy/docker/airflow/Dockerfile` in dependency-safe order. The Airflow image build reaches package installation successfully. | B1.1 |
 | B1.6 | [ ] | Add local environment settings | Add documented non-secret defaults/placeholders to `deploy/env/local.example.env` and the active local values to `deploy/env/local.env` as appropriate. Provider secrets stay local and are not committed. | B1.3-B1.4 |
 | B1.7 | [ ] | Pass OHLCV settings to Airflow | Pass the required `EMPIRE_STONKS_OHLCV_*` values from `deploy/env/local.env` through Airflow Compose without embedding credentials in DAG files or images. | B1.5-B1.6 |
 | B1.8 | [ ] | Add package CLI wrapper convention | Add the first `bin/stonks-ohlcv-*` wrapper and package script skeleton using the existing `bin/env-load` pattern so local commands receive `deploy/env/local.env`. Help/import smoke tests pass. | B1.1-B1.4, B1.6 |
@@ -243,6 +243,12 @@ README guidance, and `tests/test_secret_safety.py`; `poetry run pytest -q`
 passed (22 tests), isolated safe-config import, `compileall`,
 `poetry check --lock` (deprecation warnings only),
 `poetry run python -m pip check`, and `git diff --check` passed.
+
+Done: 2026-07-14 — installed `packages/empire-stonks-ohlcv` immediately after
+`empire-core` in `deploy/docker/airflow/Dockerfile`; `make airflow-build`
+completed all 19 image steps and installed `empire-stonks-ohlcv==0.1.0`, and a
+one-off `empire-airflow:3.2.1` container imported both OHLCV and Core
+successfully (`0.1.0 empire_stonks_ohlcv empire_core`).
 
 ## Phase 2: Database Design And Migration
 
