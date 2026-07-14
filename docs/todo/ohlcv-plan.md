@@ -397,11 +397,10 @@ EMPIRE_STONKS_OHLCV_STOOQ_*
 EMPIRE_STONKS_OHLCV_YAHOO_*
 ```
 
-The initial reserved EODData credential names are:
+The initial EODData credential name is:
 
 ```text
-EMPIRE_STONKS_OHLCV_EODDATA_USERNAME
-EMPIRE_STONKS_OHLCV_EODDATA_PASSWORD
+EMPIRE_STONKS_OHLCV_EODDATA_API_KEY
 ```
 
 Stooq and Yahoo do not have a required secret in the approved architecture.

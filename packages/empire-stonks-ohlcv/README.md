@@ -26,11 +26,10 @@ EMPIRE_STONKS_OHLCV_HTTP_TIMEOUT_SECONDS=30
 EMPIRE_STONKS_OHLCV_MAX_RETRIES=3
 ```
 
-EODData acquisition requires both of these runtime credentials:
+EODData acquisition uses this runtime credential:
 
 ```text
-EMPIRE_STONKS_OHLCV_EODDATA_USERNAME
-EMPIRE_STONKS_OHLCV_EODDATA_PASSWORD
+EMPIRE_STONKS_OHLCV_EODDATA_API_KEY
 ```
 
 Stooq and Yahoo do not require credentials in the current package contract.

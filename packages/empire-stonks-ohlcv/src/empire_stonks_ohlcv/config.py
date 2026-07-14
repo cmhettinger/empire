@@ -19,8 +19,7 @@ STORAGE_KEY_ENV = "EMPIRE_STORAGE_KEY_STONKS_OHLCV"
 RAW_RETENTION_DAYS_ENV = "EMPIRE_STONKS_OHLCV_RAW_RETENTION_DAYS"
 HTTP_TIMEOUT_SECONDS_ENV = "EMPIRE_STONKS_OHLCV_HTTP_TIMEOUT_SECONDS"
 MAX_RETRIES_ENV = "EMPIRE_STONKS_OHLCV_MAX_RETRIES"
-EODDATA_USERNAME_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_USERNAME"
-EODDATA_PASSWORD_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_PASSWORD"
+EODDATA_API_KEY_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_API_KEY"
 
 
 def _environment_int(name: str, default: int) -> int:
@@ -48,27 +47,18 @@ def _environment_float(name: str, default: float) -> float:
 class EODDataCredentials:
     """Immutable EODData credentials with redacted representations."""
 
-    __slots__ = ("_username", "_password")
+    __slots__ = ("_api_key",)
 
-    def __init__(self, *, username: str, password: str) -> None:
-        if not username.strip():
-            raise OHLCVConfigError(f"{EODDATA_USERNAME_ENV} is required.")
-        if not password:
-            raise OHLCVConfigError(f"{EODDATA_PASSWORD_ENV} is required.")
-        object.__setattr__(self, "_username", username)
-        object.__setattr__(self, "_password", password)
+    def __init__(self, *, api_key: str) -> None:
+        if not api_key:
+            raise OHLCVConfigError(f"{EODDATA_API_KEY_ENV} is required.")
+        object.__setattr__(self, "_api_key", api_key)
 
     @property
-    def username(self) -> str:
-        """Return the username for provider authentication only."""
+    def api_key(self) -> str:
+        """Return the API key for provider authentication only."""
 
-        return self._username
-
-    @property
-    def password(self) -> str:
-        """Return the password for provider authentication only."""
-
-        return self._password
+        return self._api_key
 
     def __setattr__(self, name: str, _value: object) -> None:
         raise AttributeError(
@@ -76,14 +66,14 @@ class EODDataCredentials:
         )
 
     def __repr__(self) -> str:
-        return "EODDataCredentials(username=<redacted>, password=<redacted>)"
+        return "EODDataCredentials(api_key=<redacted>)"
 
     __str__ = __repr__
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, EODDataCredentials):
             return NotImplemented
-        return self.username == other.username and self.password == other.password
+        return self.api_key == other.api_key
 
     def __copy__(self) -> Self:
         return self
@@ -127,15 +117,11 @@ class OHLCVConfig:
         """Load configuration from the process environment."""
 
         storage_key = os.environ.get(STORAGE_KEY_ENV, DEFAULT_STORAGE_KEY).strip()
-        username = os.environ.get(EODDATA_USERNAME_ENV)
-        password = os.environ.get(EODDATA_PASSWORD_ENV)
+        api_key = os.environ.get(EODDATA_API_KEY_ENV)
 
         credentials: EODDataCredentials | None = None
-        if username or password:
-            credentials = EODDataCredentials(
-                username=username or "",
-                password=password or "",
-            )
+        if api_key:
+            credentials = EODDataCredentials(api_key=api_key)
 
         return cls(
             storage_key=storage_key,
@@ -156,8 +142,7 @@ class OHLCVConfig:
 
         if self.eoddata_credentials is None:
             raise OHLCVConfigError(
-                f"{EODDATA_USERNAME_ENV} and {EODDATA_PASSWORD_ENV} are required "
-                "for EODData acquisition."
+                f"{EODDATA_API_KEY_ENV} is required for EODData acquisition."
             )
         return self.eoddata_credentials
 

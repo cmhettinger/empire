@@ -6,8 +6,7 @@ import pytest
 
 from empire_stonks_ohlcv import EODDataCredentials, OHLCVConfig, OHLCVConfigError
 from empire_stonks_ohlcv.config import (
-    EODDATA_PASSWORD_ENV,
-    EODDATA_USERNAME_ENV,
+    EODDATA_API_KEY_ENV,
     HTTP_TIMEOUT_SECONDS_ENV,
     MAX_RETRIES_ENV,
     RAW_RETENTION_DAYS_ENV,
@@ -20,8 +19,7 @@ OHLCV_ENV_VARS = (
     RAW_RETENTION_DAYS_ENV,
     HTTP_TIMEOUT_SECONDS_ENV,
     MAX_RETRIES_ENV,
-    EODDATA_USERNAME_ENV,
-    EODDATA_PASSWORD_ENV,
+    EODDATA_API_KEY_ENV,
 )
 
 
@@ -60,39 +58,18 @@ def test_config_loads_common_environment_values(
 def test_config_loads_eoddata_credentials(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv(EODDATA_USERNAME_ENV, "market-user")
-    monkeypatch.setenv(EODDATA_PASSWORD_ENV, "market-password")
+    monkeypatch.setenv(EODDATA_API_KEY_ENV, "market-api-key")
 
     config = OHLCVConfig.from_env()
 
     assert config.eoddata_credentials == EODDataCredentials(
-        username="market-user",
-        password="market-password",
+        api_key="market-api-key",
     )
     assert config.require_eoddata_credentials() == config.eoddata_credentials
 
 
-@pytest.mark.parametrize(
-    ("present_name", "present_value", "missing_name"),
-    [
-        (EODDATA_USERNAME_ENV, "market-user", EODDATA_PASSWORD_ENV),
-        (EODDATA_PASSWORD_ENV, "market-password", EODDATA_USERNAME_ENV),
-    ],
-)
-def test_config_rejects_incomplete_eoddata_credentials(
-    monkeypatch: pytest.MonkeyPatch,
-    present_name: str,
-    present_value: str,
-    missing_name: str,
-) -> None:
-    monkeypatch.setenv(present_name, present_value)
-
-    with pytest.raises(OHLCVConfigError, match=missing_name):
-        OHLCVConfig.from_env()
-
-
 def test_eoddata_credentials_can_be_required() -> None:
-    with pytest.raises(OHLCVConfigError, match=EODDATA_USERNAME_ENV):
+    with pytest.raises(OHLCVConfigError, match=EODDATA_API_KEY_ENV):
         OHLCVConfig.from_env().require_eoddata_credentials()
 
 
@@ -125,8 +102,7 @@ def test_config_does_not_load_dotenv(
     tmp_path: Path,
 ) -> None:
     (tmp_path / ".env").write_text(
-        f"{EODDATA_USERNAME_ENV}=file-user\n"
-        f"{EODDATA_PASSWORD_ENV}=file-password\n",
+        f"{EODDATA_API_KEY_ENV}=file-api-key\n",
         encoding="utf-8",
     )
     monkeypatch.chdir(tmp_path)

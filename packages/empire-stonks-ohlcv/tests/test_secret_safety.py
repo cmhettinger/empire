@@ -9,29 +9,25 @@ import pytest
 
 from empire_stonks_ohlcv import EODDataCredentials, OHLCVConfig, OHLCVConfigError
 from empire_stonks_ohlcv.config import (
-    EODDATA_PASSWORD_ENV,
-    EODDATA_USERNAME_ENV,
+    EODDATA_API_KEY_ENV,
     MAX_RETRIES_ENV,
 )
 
 
-SECRET_USERNAME = "private-eoddata-user"
-SECRET_PASSWORD = "private-eoddata-password"
+SECRET_API_KEY = "private-eoddata-api-key"
 SECRET_TOKEN = "private-provider-token"
 
 
 def _configured() -> OHLCVConfig:
     return OHLCVConfig(
         eoddata_credentials=EODDataCredentials(
-            username=SECRET_USERNAME,
-            password=SECRET_PASSWORD,
+            api_key=SECRET_API_KEY,
         )
     )
 
 
 def _assert_secret_values_absent(text: str) -> None:
-    assert SECRET_USERNAME not in text
-    assert SECRET_PASSWORD not in text
+    assert SECRET_API_KEY not in text
     assert SECRET_TOKEN not in text
 
 
@@ -51,7 +47,7 @@ def test_credentials_are_immutable_and_not_implicitly_json_serializable() -> Non
     credentials = config.require_eoddata_credentials()
 
     with pytest.raises(AttributeError, match="immutable"):
-        credentials.password = "replacement"  # type: ignore[misc]
+        credentials.api_key = "replacement"  # type: ignore[misc]
 
     implicit_payload = asdict(config)
     _assert_secret_values_absent(repr(implicit_payload))
@@ -62,15 +58,7 @@ def test_credentials_are_immutable_and_not_implicitly_json_serializable() -> Non
 def test_validation_errors_do_not_echo_credentials_or_tokens(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv(EODDATA_USERNAME_ENV, SECRET_USERNAME)
-    monkeypatch.delenv(EODDATA_PASSWORD_ENV, raising=False)
-
-    with pytest.raises(OHLCVConfigError) as credential_error:
-        OHLCVConfig.from_env()
-
-    _assert_secret_values_absent(str(credential_error.value))
-
-    monkeypatch.delenv(EODDATA_USERNAME_ENV, raising=False)
+    monkeypatch.setenv(EODDATA_API_KEY_ENV, SECRET_API_KEY)
     monkeypatch.setenv(MAX_RETRIES_ENV, SECRET_TOKEN)
 
     with pytest.raises(OHLCVConfigError) as token_error:
