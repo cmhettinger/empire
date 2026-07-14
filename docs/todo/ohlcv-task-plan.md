@@ -210,7 +210,7 @@ before provider or database logic is added.
 |----|--------|------|---------------|------------|
 | B1.1 | [x] | Scaffold Poetry package | Create `packages/empire-stonks-ohlcv` with version `0.1.0`, `src/empire_stonks_ohlcv`, tests, README, and the minimum initial dependency on `empire-core`. Package import works. | P0.5 |
 | B1.2 | [x] | Add package exceptions and exports | Add a small exception hierarchy and stable top-level exports without exposing provider internals or creating a generic framework. Import tests pass. | B1.1 |
-| B1.3 | [ ] | Add environment-driven config skeleton | Add typed configuration that reads only `os.environ`. Local runtimes load `deploy/env/local.env`; the package does not load `.env` files or assume repository paths. Unit tests cover defaults, required values, and provider-specific credentials. | B1.1 |
+| B1.3 | [x] | Add environment-driven config skeleton | Add typed configuration that reads only `os.environ`. Local runtimes load `deploy/env/local.env`; the package does not load `.env` files or assume repository paths. Unit tests cover defaults, required values, and provider-specific credentials. | B1.1 |
 | B1.4 | [ ] | Add secret-safe config behavior | Prove config representations, errors, logs, Core run parameters, object metadata, reports, and serialized results do not expose provider credentials or tokens. Targeted tests pass. | B1.3 |
 | B1.5 | [ ] | Install package in Airflow image | Add the package to `deploy/docker/airflow/Dockerfile` in dependency-safe order. The Airflow image build reaches package installation successfully. | B1.1 |
 | B1.6 | [ ] | Add local environment settings | Add documented non-secret defaults/placeholders to `deploy/env/local.example.env` and the active local values to `deploy/env/local.env` as appropriate. Provider secrets stay local and are not committed. | B1.3-B1.4 |
@@ -230,6 +230,12 @@ inheritance coverage in `tests/test_exceptions.py`; `poetry run pytest -q`
 passed (3 tests), isolated public imports, `compileall`, `poetry check --lock`
 (deprecation warnings only), `poetry run python -m pip check`, and
 `git diff --check` passed.
+
+Done: 2026-07-14 — added immutable common/EODData environment config in
+`src/empire_stonks_ohlcv/config.py`, public exports, README defaults, and
+`tests/test_config.py`; `poetry run pytest -q` passed (17 tests), isolated
+config imports, `compileall`, `poetry check --lock` (deprecation warnings only),
+`poetry run python -m pip check`, and `git diff --check` passed.
 
 ## Phase 2: Database Design And Migration
 

@@ -25,8 +25,10 @@ def test_public_exports_are_explicit() -> None:
     import empire_stonks_ohlcv
 
     assert empire_stonks_ohlcv.__all__ == [
+        "EODDataCredentials",
         "EmpireStonksOHLCVError",
         "OHLCVAcquisitionError",
+        "OHLCVConfig",
         "OHLCVConfigError",
         "OHLCVParseError",
         "OHLCVPersistenceError",
