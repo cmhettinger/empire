@@ -39,6 +39,20 @@ Credentials are excluded from config and credential representations. Use
 parameters, object metadata, reports, logs, or serialized results. Pass the
 credential object itself only to provider authentication code.
 
+## CLI
+
+Local commands use `bin/env-load` to load `deploy/env/local.env` before calling
+package-owned command modules. The initial configuration check prints only the
+secret-safe configuration summary:
+
+```bash
+bin/stonks-ohlcv-config
+bin/stonks-ohlcv-config --env-file deploy/env/local.example.env
+```
+
+The same command is exposed as the package script `stonks-ohlcv-config` for
+installed runtimes; environment loading remains the caller's responsibility.
+
 ## Development
 
 Install the package environment and run its tests from this directory:
@@ -50,6 +64,6 @@ poetry run pytest
 
 ## Status
 
-This is the initial package scaffold. Provider contracts, configuration,
-database persistence, Core integration, CLIs, and Airflow entrypoints are added
-in later implementation tasks.
+This is the initial package scaffold. Provider contracts, database persistence,
+Core integration, provider import CLIs, and Airflow entrypoints are added in
+later implementation tasks.

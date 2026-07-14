@@ -13,6 +13,9 @@ empire-core = { path = "../empire-core" }
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
 
+[tool.poetry.scripts]
+stonks-ohlcv-config = "empire_stonks_ohlcv.scripts.config:main"
+
 [build-system]
 requires = ["poetry-core>=1.8.0"]
 build-backend = "poetry.core.masonry.api"

@@ -214,8 +214,8 @@ before provider or database logic is added.
 | B1.4 | [x] | Add secret-safe config behavior | Prove config representations, errors, logs, Core run parameters, object metadata, reports, and serialized results do not expose provider credentials or tokens. Targeted tests pass. | B1.3 |
 | B1.5 | [x] | Install package in Airflow image | Add the package to `deploy/docker/airflow/Dockerfile` in dependency-safe order. The Airflow image build reaches package installation successfully. | B1.1 |
 | B1.6 | [x] | Add local environment settings | Add documented non-secret defaults/placeholders to `deploy/env/local.example.env` and the active local values to `deploy/env/local.env` as appropriate. Provider secrets stay local and are not committed. | B1.3-B1.4 |
-| B1.7 | [ ] | Pass OHLCV settings to Airflow | Pass the required `EMPIRE_STONKS_OHLCV_*` values from `deploy/env/local.env` through Airflow Compose without embedding credentials in DAG files or images. | B1.5-B1.6 |
-| B1.8 | [ ] | Add package CLI wrapper convention | Add the first `bin/stonks-ohlcv-*` wrapper and package script skeleton using the existing `bin/env-load` pattern so local commands receive `deploy/env/local.env`. Help/import smoke tests pass. | B1.1-B1.4, B1.6 |
+| B1.7 | [x] | Pass OHLCV settings to Airflow | Pass the required `EMPIRE_STONKS_OHLCV_*` values from `deploy/env/local.env` through Airflow Compose without embedding credentials in DAG files or images. | B1.5-B1.6 |
+| B1.8 | [x] | Add package CLI wrapper convention | Add the first `bin/stonks-ohlcv-*` wrapper and package script skeleton using the existing `bin/env-load` pattern so local commands receive `deploy/env/local.env`. Help/import smoke tests pass. | B1.1-B1.4, B1.6 |
 
 Done: 2026-07-14 — added `packages/empire-stonks-ohlcv/{pyproject.toml,
 poetry.lock,README.md,src/empire_stonks_ohlcv/__init__.py,tests/test_package.py}`;
@@ -256,6 +256,19 @@ preserving the API-key-only EODData credential; both files loaded through
 `bin/env-load` and `OHLCVConfig.from_env()`, Compose config validation passed,
 `poetry run pytest -q` passed (20 tests), and local ignore/tracking checks plus
 `git diff --check` passed.
+
+Done: 2026-07-14 — passed the storage key, common OHLCV settings, and EODData
+API key/source settings through the shared Airflow environment in
+`deploy/compose/airflow.yml`; Compose config validation and `make airflow-build`
+passed, rendered config verified 7 variables across all 6 Airflow services, and
+a one-off container loaded the API-key config with a secret-safe summary; image
+metadata inspection confirmed no OHLCV settings were embedded in the image.
+
+Done: 2026-07-14 — added `bin/stonks-ohlcv-config`, the package
+`scripts.config` module/Poetry entrypoint, README usage, and secret-safe CLI
+coverage; Bash syntax, wrapper/module help and example-env smoke tests passed,
+`poetry run pytest -q` passed (21 tests), and Poetry check/install/build,
+`pip check`, `compileall`, import, and `git diff --check` passed.
 
 ## Phase 2: Database Design And Migration
 
