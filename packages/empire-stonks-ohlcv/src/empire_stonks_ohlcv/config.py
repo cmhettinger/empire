@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from math import isfinite
+from typing import Self
 
 from empire_stonks_ohlcv.exceptions import OHLCVConfigError
 
@@ -28,8 +29,9 @@ def _environment_int(name: str, default: int) -> int:
         return default
     try:
         return int(raw_value)
-    except ValueError as exc:
-        raise OHLCVConfigError(f"{name} must be an integer.") from exc
+    except ValueError:
+        pass
+    raise OHLCVConfigError(f"{name} must be an integer.")
 
 
 def _environment_float(name: str, default: float) -> float:
@@ -38,22 +40,56 @@ def _environment_float(name: str, default: float) -> float:
         return default
     try:
         return float(raw_value)
-    except ValueError as exc:
-        raise OHLCVConfigError(f"{name} must be a number.") from exc
+    except ValueError:
+        pass
+    raise OHLCVConfigError(f"{name} must be a number.")
 
 
-@dataclass(frozen=True)
 class EODDataCredentials:
-    """Credentials required by EODData acquisition."""
+    """Immutable EODData credentials with redacted representations."""
 
-    username: str = field(repr=False)
-    password: str = field(repr=False)
+    __slots__ = ("_username", "_password")
 
-    def __post_init__(self) -> None:
-        if not self.username.strip():
+    def __init__(self, *, username: str, password: str) -> None:
+        if not username.strip():
             raise OHLCVConfigError(f"{EODDATA_USERNAME_ENV} is required.")
-        if not self.password:
+        if not password:
             raise OHLCVConfigError(f"{EODDATA_PASSWORD_ENV} is required.")
+        object.__setattr__(self, "_username", username)
+        object.__setattr__(self, "_password", password)
+
+    @property
+    def username(self) -> str:
+        """Return the username for provider authentication only."""
+
+        return self._username
+
+    @property
+    def password(self) -> str:
+        """Return the password for provider authentication only."""
+
+        return self._password
+
+    def __setattr__(self, name: str, _value: object) -> None:
+        raise AttributeError(
+            f"{type(self).__name__} is immutable; cannot set {name}"
+        )
+
+    def __repr__(self) -> str:
+        return "EODDataCredentials(username=<redacted>, password=<redacted>)"
+
+    __str__ = __repr__
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, EODDataCredentials):
+            return NotImplemented
+        return self.username == other.username and self.password == other.password
+
+    def __copy__(self) -> Self:
+        return self
+
+    def __deepcopy__(self, _memo: dict[int, object]) -> Self:
+        return self
 
 
 @dataclass(frozen=True)
@@ -64,7 +100,10 @@ class OHLCVConfig:
     raw_retention_days: int = DEFAULT_RAW_RETENTION_DAYS
     http_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS
     max_retries: int = DEFAULT_MAX_RETRIES
-    eoddata_credentials: EODDataCredentials | None = None
+    eoddata_credentials: EODDataCredentials | None = field(
+        default=None,
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         if not self.storage_key.strip():
@@ -121,3 +160,14 @@ class OHLCVConfig:
                 "for EODData acquisition."
             )
         return self.eoddata_credentials
+
+    def to_safe_dict(self) -> dict[str, str | int | float | bool]:
+        """Return non-secret settings safe for operational payloads and logs."""
+
+        return {
+            "storage_key": self.storage_key,
+            "raw_retention_days": self.raw_retention_days,
+            "http_timeout_seconds": self.http_timeout_seconds,
+            "max_retries": self.max_retries,
+            "eoddata_configured": self.eoddata_credentials is not None,
+        }

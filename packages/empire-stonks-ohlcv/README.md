@@ -35,6 +35,11 @@ EMPIRE_STONKS_OHLCV_EODDATA_PASSWORD
 
 Stooq and Yahoo do not require credentials in the current package contract.
 
+Credentials are excluded from config and credential representations. Use
+`OHLCVConfig.to_safe_dict()` when placing configuration details in Core run
+parameters, object metadata, reports, logs, or serialized results. Pass the
+credential object itself only to provider authentication code.
+
 ## Development
 
 Install the package environment and run its tests from this directory:
