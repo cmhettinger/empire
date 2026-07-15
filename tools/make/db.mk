@@ -1,4 +1,4 @@
-.PHONY: db-up db-down db-ps db-logs db-migrate db-info db-validate db-clean db-psql db-data-remediation
+.PHONY: db-up db-down db-ps db-logs db-migrate db-info db-validate db-clean db-psql db-test-ohlcv-schema db-data-remediation
 
 db-up: ## Start postgres and pgbouncer
 	$(COMPOSE) up -d postgres pgbouncer
@@ -29,6 +29,9 @@ db-repair: ## Repair Flyway
 
 db-psql: ## Open psql against Postgres
 	$(COMPOSE) exec postgres sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+db-test-ohlcv-schema: ## Run transactional Stonks OHLCV schema contract tests
+	$(COMPOSE) exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < db/tests/stonks/ohlcv_schema_contract.sql
 
 db-data-remediation: ## Apply an opt-in data remediation (REMEDIATION=db/data-remediations/...sql)
 	@test -n "$(REMEDIATION)" || (echo "ERROR: Set REMEDIATION=db/data-remediations/...sql" >&2; exit 1)
