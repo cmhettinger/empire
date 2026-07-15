@@ -181,7 +181,7 @@ series and daily bars.
 | S2.2 | [x] | Design `ohlcv_daily` columns | Document exact price/volume and persisted derived-value types, nullability, composite key, OHLC and derived-value invariants, deliberate adjusted-value and per-row provenance omissions, timestamps, and indexes for listing/date and freshness queries. | P0.3-P0.4, S2.1 |
 | S2.3 | [x] | Define idempotent write behavior | Specify insert, unchanged-row skip, provider-correction update, first/last-seen update, prior-close-derived recalculation for the immediately following bar, transaction, and returned-count behavior before repository code is written. | S2.1-S2.2 |
 | S2.4 | [x] | Add provider seed migration | Add idempotent `stonks.provider` rows for `EODDATA`, `STOOQ`, and `YAHOO` using the existing provider-table conventions. DB validation passes. | P0.5 |
-| S2.5 | [ ] | Add OHLCV table migration | Create `stonks.provider_listing` and `stonks.ohlcv_daily` in one ordered Flyway migration or clearly ordered migrations, with the designed provider, instrument-type, and owning-series FKs and no per-row Core/source-snapshot FKs. | S2.1-S2.4 |
+| S2.5 | [x] | Add OHLCV table migration | Create `stonks.provider_listing` and `stonks.ohlcv_daily` in one ordered Flyway migration or clearly ordered migrations, with the designed provider, instrument-type, and owning-series FKs and no per-row Core/source-snapshot FKs. | S2.1-S2.4 |
 | S2.6 | [ ] | Validate schema and regenerate DB docs | Run repo DB validation and regenerate the Stonks ERD/docs. Generated relations show the intended provider, instrument-type, listing-series, and daily-bar relationships with no canonical `listing_id`, Core run, or source-snapshot FK. | S2.5 |
 | S2.7 | [ ] | Add schema contract tests | Add focused tests or validation SQL proving primary keys, exact case-sensitive unique lookup behavior, reference FKs, OHLC and row-local derived-value checks, and update/delete semantics behave as designed. | S2.5 |
 
@@ -216,6 +216,16 @@ idempotent active `DATA_SOURCE` upserts for `EODDATA`, `STOOQ`, and `YAHOO`;
 `make db-migrate` applied migration 2026.07.15.0001, `make db-validate`
 successfully validated all 30 migrations, and a PostgreSQL query returned the
 three intended active provider rows.
+
+Done: 2026-07-15 — added
+`db/flyway/sql/V2026.07.15.0002__stonks_create_ohlcv_tables.sql` with the
+designed provider-listing identity, coverage/default checks, current daily
+OHLCV and persisted derived columns, numeric/formula checks, focused indexes,
+provider/instrument FKs, and cascading bar ownership FK; `make db-migrate`
+applied migration 2026.07.15.0002 and `make db-validate` validated all 31
+migrations. PostgreSQL catalog inspection confirmed 24 columns, 12 checks, the
+three intended FKs/delete actions, five PK/unique/reporting indexes, and no
+canonical listing, Core run, source-snapshot, or source-object columns.
 
 ## Phase 3: Shared Models And Persistence
 

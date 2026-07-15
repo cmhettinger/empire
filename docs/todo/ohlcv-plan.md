@@ -257,9 +257,9 @@ supports cross-series freshness and coverage queries.
 
 All four OHLC values are required. Checks require `high >= low`, `high` to be
 at least `open` and `close`, `low` to be at most `open` and `close`, and volume
-to be null or non-negative. Prices are not constrained to be non-negative so
-the database does not silently impose a market-domain rule on provider-native
-values.
+to be null or non-negative. All numeric values reject PostgreSQL `NaN`. Prices
+are not otherwise constrained to be non-negative so the database does not
+silently impose a market-domain rule on provider-native values.
 
 The five derived columns are persisted and rounded to their declared scale:
 
