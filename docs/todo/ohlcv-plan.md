@@ -25,7 +25,7 @@ Build a simple reusable package that:
 - Stores current provider-native OHLCV values in PostgreSQL.
 - Runs idempotently through CLIs and thin Airflow DAGs.
 - Reports import health, freshness, coverage, stale series, and gap warnings.
-- Preserves enough provider identity and source lineage for a future bridge.
+- Preserves provider-native series identity for a future bridge.
 
 The package does not need canonical issuer, security, listing, or exchange
 resolution before importing data.
@@ -78,7 +78,6 @@ existing shared tables in the `stonks` schema, including:
 ```text
 stonks.provider
 stonks.instrument_type
-stonks.iso4217_currency
 stonks.provider_source_snapshot
 stonks.provider_source_snapshot_object
 ```
@@ -96,12 +95,15 @@ The initial provider-series lookup is based on:
 
 ```text
 provider_code
-provider_market
-provider_ticker
+market
+ticker
 ```
 
-The exact raw-value preservation, case handling, database constraints, and
-indexes are finalized in the schema-design tasks before migration work.
+`market` and `ticker` preserve the provider values exactly, including case.
+Lookup and uniqueness are case-sensitive. Leading or trailing whitespace and
+empty values are invalid; provider adapters must reject them rather than
+silently normalizing them. A provider changing only the case of either value
+therefore creates a different provider series.
 
 Ticker reuse cannot be reliably detected from raw OHLCV inputs and is not an
 initial ingestion responsibility. If a provider reuses a market/ticker tuple
@@ -113,8 +115,10 @@ Similarly, if a provider changes its ticker representation, multiple provider
 series may later map to different periods of one canonical listing. OHLCV
 ingestion does not infer that relationship.
 
-`first_seen` and `last_seen`, if included in the final table design, are
-observational metadata only. They do not prove listing validity dates.
+`first_seen` and `last_seen` are the minimum and maximum accepted trading dates
+observed for the provider series. They are coverage metadata only and do not
+prove listing validity dates or current activity. The initial table has no
+status column.
 
 ## Provider-Native Value Policy
 
@@ -130,8 +134,8 @@ The initial package does not:
 Shared daily-bar dataclasses provide a common shape, but they do not imply that
 values from different providers are directly comparable.
 
-Where a provider exposes the information, the parsed record or provider-series
-metadata should retain:
+Where a provider exposes the information, its source contract and operational
+report should document:
 
 - The provider-native market and ticker.
 - Whether OHLC fields are documented as raw or adjusted.
@@ -139,7 +143,12 @@ metadata should retain:
 - Whether volume is adjusted, unadjusted, absent, or unspecified.
 - The provider source/feed code.
 - The parser version.
-- Other small provider-native metadata needed to interpret the bar.
+
+The initial database deliberately stores one OHLC series, optional volume, and
+five derived values used by downstream analysis. It has no adjusted-close,
+adjustment, currency, or arbitrary metadata columns. Consumers must use the
+provider source contract when interpreting values; the database does not claim
+that different providers use comparable adjustment bases.
 
 Sector, industry, fundamentals, and unrelated provider metadata are outside the
 OHLCV package even when the same provider exposes them.
@@ -166,14 +175,46 @@ YAHOO
 `provider_listing` stores the durable UUID used by Empire to own one
 provider-native market/symbol series.
 
-The schema-design phase must finalize:
+The exact columns are:
 
-- Provider FK and provider-native market/ticker fields.
-- Raw-value preservation and deterministic lookup behavior.
-- Optional name, instrument type, currency, and adjustment metadata.
-- First/last-seen and status semantics, if needed.
-- JSON metadata boundaries.
-- Timestamps, constraints, and indexes.
+```text
+provider_listing_id  UUID         NOT NULL  PK, default gen_random_uuid()
+provider_code        VARCHAR(32)  NOT NULL  FK -> stonks.provider
+market               TEXT         NOT NULL
+ticker               TEXT         NOT NULL
+name                 TEXT         NULL
+instrument_type_code VARCHAR(32)  NOT NULL  FK -> stonks.instrument_type,
+                                             default 'UNKNOWN'
+first_seen           DATE         NULL
+last_seen            DATE         NULL
+created_at           TIMESTAMPTZ  NOT NULL  default now()
+updated_at           TIMESTAMPTZ  NOT NULL  default now()
+```
+
+The provider-series lookup key and unique constraint are:
+
+```text
+(provider_code, market, ticker)
+```
+
+The key uses exact case-sensitive `TEXT` equality. `market` and `ticker` must
+both be non-empty and equal to their `btrim` result. `first_seen` and
+`last_seen` must either both be null or both be non-null with
+`last_seen >= first_seen`. The provider and instrument-type FKs use the default
+`NO ACTION` delete behavior so referenced rows cannot be removed while provider
+series use them. `name` is descriptive only and has no uniqueness or non-blank
+constraint. `updated_at` is maintained by the writer when stored values change;
+the initial migration does not add a general timestamp trigger.
+
+The unique lookup index also supports provider-scoped series scans because
+`provider_code` is its leading column. A separate partial index on
+`(provider_code, last_seen DESC)` where `last_seen IS NOT NULL` supports
+provider-scoped freshness and stale-series reporting. No indexes are added for
+the optional name or instrument type without a demonstrated query.
+
+The table intentionally omits status, currency, adjustment, and JSON metadata
+columns. `UNKNOWN` already exists in `stonks.instrument_type`, so providers can
+be imported without inferring a type.
 
 It must not contain `listing_id` or another canonical-identity FK.
 
@@ -188,16 +229,77 @@ The intended natural primary key is:
 (provider_listing_id, trading_date)
 ```
 
-The schema-design phase must finalize:
+The exact columns are:
 
-- Exact price and volume types.
-- OHLC and optional adjusted-close nullability.
-- Structural OHLC/volume checks.
-- Provider-native adjustment metadata placement.
-- Durable source-snapshot lineage.
-- Cleanup-safe Core run references.
-- Inserted/updated/unchanged upsert behavior.
-- Timestamps and reporting indexes.
+```text
+provider_listing_id UUID           NOT NULL  PK, FK -> provider_listing
+trading_date        DATE           NOT NULL  PK
+open                NUMERIC(30,10) NOT NULL
+high                NUMERIC(30,10) NOT NULL
+low                 NUMERIC(30,10) NOT NULL
+close               NUMERIC(30,10) NOT NULL
+volume              NUMERIC(30,8)  NULL
+change              NUMERIC(30,8)  NULL
+changepct           NUMERIC(30,8)  NULL
+typ                 NUMERIC(30,8)  NOT NULL
+hl_range            NUMERIC(30,8)  NOT NULL
+oc_range            NUMERIC(30,8)  NOT NULL
+created_at           TIMESTAMPTZ    NOT NULL  default now()
+updated_at           TIMESTAMPTZ    NOT NULL  default now()
+```
+
+The provider-listing FK uses `ON DELETE CASCADE` because a daily bar has no
+meaning without its owning provider series. The composite primary key supports
+listing/date range scans and per-listing latest-date lookups in either scan
+direction, so a duplicate `(provider_listing_id, trading_date DESC)` index is
+not added. An additional `(trading_date DESC, provider_listing_id)` index
+supports cross-series freshness and coverage queries.
+
+All four OHLC values are required. Checks require `high >= low`, `high` to be
+at least `open` and `close`, `low` to be at most `open` and `close`, and volume
+to be null or non-negative. Prices are not constrained to be non-negative so
+the database does not silently impose a market-domain rule on provider-native
+values.
+
+The five derived columns are persisted and rounded to their declared scale:
+
+```text
+change    = close - previous_close
+changepct = change / previous_close
+typ       = (high + low + close) / 3
+hl_range  = high - low
+oc_range  = close - open
+```
+
+`previous_close` is the close from the greatest stored `trading_date` less than
+the current date for the same provider listing; it need not be the previous
+calendar or weekday date. `change` and `changepct` are null when no previous bar
+exists. `changepct` is also null when `previous_close` is zero, and it stores the
+ratio rather than percentage points. A check requires `changepct` to be null
+whenever `change` is null. Checks also require the stored `typ`, `hl_range`, and
+`oc_range` values to equal their formulas after rounding to eight decimal
+places. Cross-row `change` and `changepct` correctness remains the writer's
+responsibility because a row check cannot inspect the preceding bar.
+
+Inserting or correcting a historical bar recalculates its derived values and
+the `change` and `changepct` of the immediately following stored bar. Exact
+transaction and returned-count behavior is finalized in S2.3. `updated_at` is
+maintained by the writer only when a stored bar or its persisted derived values
+change.
+
+These five values remain on `ohlcv_daily` as frequently queried daily-bar
+conveniences. A future technical-indicator table is not created or reserved in
+the initial schema. If provider-native or canonical technicals are later
+implemented, rolling, cross-series, parameterized, or calculation-versioned
+indicators belong in a separately designed table at their actual grain; that
+does not require moving these foundational daily values.
+
+The table intentionally omits adjusted close, source snapshot, Core run, and
+arbitrary metadata columns. Core runs, raw objects, and source snapshots remain
+available for import operations and reports, but an individual bar is not
+traceable to the run or source snapshot that supplied its current value. This
+accepts less auditing and lower row/index storage overhead for the initial
+current-state dataset.
 
 A separate `provider_market`, `market_data_series`, canonical bar, or bar
 revision table is not part of the initial schema.
@@ -210,6 +312,8 @@ and trading date.
 - A first import inserts the bar.
 - An identical rerun is unchanged and does not duplicate it.
 - A later provider correction may update the existing row.
+- A historical insert or correction also refreshes prior-close-derived values
+  on the immediately following stored bar when necessary.
 - The package returns inserted, updated, unchanged, rejected, and warning counts
   where applicable.
 - No append-only bar revision history is created initially.
@@ -242,22 +346,23 @@ provider source
     -> core.core_run
     -> core.stored_object with short expiration
     -> stonks.provider_source_snapshot
+
+provider source
     -> provider_listing
     -> ohlcv_daily
+
+core.core_run
     -> provider health report
 ```
 
 Raw objects normally expire after approximately seven days. When Core cleanup
 and purge remove a raw object, its `provider_source_snapshot_object` membership
 row may be removed while the durable source snapshot and parsed database rows
-remain.
+remain. Source snapshots identify acquired provider content for operations and
+reports but are intentionally not foreign-keyed from individual OHLCV rows.
 
-OHLCV rows should use the durable source snapshot for source-content lineage.
-They must not rely on a retained raw `source_object_id` as their only long-lived
-provenance.
-
-Core run references on mutable OHLCV facts must use cleanup-safe nullability and
-delete behavior. Credentials must never be written into run parameters,
+Core runs likewise describe import execution but are not referenced from the
+mutable OHLCV facts. Credentials must never be written into run parameters,
 summaries, object metadata, logs, reports, or Airflow task payloads.
 
 ## Package And Runtime Conventions
@@ -467,8 +572,10 @@ Future temporal mappings must be able to:
 - Retain evidence and decision provenance.
 
 Any future authoritative series must select provider rows explicitly and retain
-their provider-listing, trading-date, and source-snapshot lineage. It must not
-silently coalesce unlike provider values.
+their provider-listing and trading-date identity. If source-level lineage is a
+requirement, that future design must add it explicitly because the initial bar
+table does not retain a source-snapshot FK. It must not silently coalesce unlike
+provider values.
 
 ## Known Initial Limitations
 
@@ -476,6 +583,7 @@ silently coalesce unlike provider values.
 - Provider ticker reuse may be undetected.
 - Provider values are not normalized across adjustment bases.
 - Provider corrections overwrite current rows without stored revision history.
+- Individual bars do not retain source-snapshot or import-run provenance.
 - Raw files expire after the operational inspection window.
 - Gap reports are not exchange-calendar aware.
 - No canonical listing relationship exists until bridge work begins.

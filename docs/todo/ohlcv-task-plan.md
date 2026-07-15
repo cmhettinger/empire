@@ -93,9 +93,9 @@ different canonical listings.
 
 `ohlcv_daily` stores values as supplied by each provider. The package does not
 normalize price adjustment bases or reconcile disagreements across providers.
-Provider-native adjustment semantics must be documented and retained where the
-source makes them available so consumers do not assume unlike series are
-comparable.
+Provider-native adjustment semantics must be documented in provider source
+contracts and operational reports so consumers do not assume unlike series are
+comparable. They are not stored as columns on each listing or bar.
 
 The initial database shape is deliberately limited to:
 
@@ -109,7 +109,6 @@ The package reuses these existing tables rather than creating equivalents:
 ```text
 stonks.provider
 stonks.instrument_type
-stonks.iso4217_currency
 stonks.provider_source_snapshot
 stonks.provider_source_snapshot_object
 core.core_run
@@ -178,13 +177,30 @@ series and daily bars.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| S2.1 | [ ] | Design `provider_listing` columns | Document exact columns, types, provider-native market and ticker preservation/case handling, provider-series lookup key, optional name/type/currency/adjustment metadata, first/last-seen semantics, timestamps, constraints, and indexes. The design does not claim canonical identity. | P0.2-P0.4 |
-| S2.2 | [ ] | Design `ohlcv_daily` columns | Document exact price/volume types, nullability, composite key, OHLC invariants, provider-native adjustment fields, source-snapshot lineage, run references, timestamps, and indexes for listing/date and freshness queries. | P0.3-P0.4, S2.1 |
-| S2.3 | [ ] | Define idempotent write behavior | Specify insert, unchanged-row skip, provider-correction update, first/last-seen update, transaction, and returned-count behavior before repository code is written. | S2.1-S2.2 |
+| S2.1 | [x] | Design `provider_listing` columns | Document exact columns, types, exact case-sensitive provider-native market and ticker handling, provider-series lookup key, optional name and default-`UNKNOWN` instrument type, first/last-seen semantics, deliberate metadata omissions, timestamps, constraints, and indexes. The design does not claim canonical identity. | P0.2-P0.4 |
+| S2.2 | [x] | Design `ohlcv_daily` columns | Document exact price/volume and persisted derived-value types, nullability, composite key, OHLC and derived-value invariants, deliberate adjusted-value and per-row provenance omissions, timestamps, and indexes for listing/date and freshness queries. | P0.3-P0.4, S2.1 |
+| S2.3 | [ ] | Define idempotent write behavior | Specify insert, unchanged-row skip, provider-correction update, first/last-seen update, prior-close-derived recalculation for the immediately following bar, transaction, and returned-count behavior before repository code is written. | S2.1-S2.2 |
 | S2.4 | [ ] | Add provider seed migration | Add idempotent `stonks.provider` rows for `EODDATA`, `STOOQ`, and `YAHOO` using the existing provider-table conventions. DB validation passes. | P0.5 |
-| S2.5 | [ ] | Add OHLCV table migration | Create `stonks.provider_listing` and `stonks.ohlcv_daily` in one ordered Flyway migration or clearly ordered migrations, with explicit FKs to existing Core/Stonks tables and cleanup-safe run/object semantics. | S2.1-S2.4 |
-| S2.6 | [ ] | Validate schema and regenerate DB docs | Run repo DB validation and regenerate the Stonks ERD/docs. Generated relations show the intended provider, source-snapshot, run, listing-series, and daily-bar relationships with no canonical `listing_id` FK. | S2.5 |
-| S2.7 | [ ] | Add schema contract tests | Add focused tests or validation SQL proving primary keys, unique lookup behavior, OHLC checks, source-snapshot FKs, and update/delete semantics behave as designed. | S2.5 |
+| S2.5 | [ ] | Add OHLCV table migration | Create `stonks.provider_listing` and `stonks.ohlcv_daily` in one ordered Flyway migration or clearly ordered migrations, with the designed provider, instrument-type, and owning-series FKs and no per-row Core/source-snapshot FKs. | S2.1-S2.4 |
+| S2.6 | [ ] | Validate schema and regenerate DB docs | Run repo DB validation and regenerate the Stonks ERD/docs. Generated relations show the intended provider, instrument-type, listing-series, and daily-bar relationships with no canonical `listing_id`, Core run, or source-snapshot FK. | S2.5 |
+| S2.7 | [ ] | Add schema contract tests | Add focused tests or validation SQL proving primary keys, exact case-sensitive unique lookup behavior, reference FKs, OHLC and row-local derived-value checks, and update/delete semantics behave as designed. | S2.5 |
+
+Done: 2026-07-15 — finalized the minimal `stonks.provider_listing` contract in
+`docs/todo/ohlcv-plan.md` and revised `docs/todo/ohlcv-db-roughcut.txt`: exact
+case-sensitive `(provider_code, market, ticker)` identity, default `UNKNOWN`
+instrument type, coverage-date semantics, constraints, timestamps, and focused
+indexes, with status/currency/adjustment/JSON metadata deliberately omitted;
+verified with `git diff --check` and focused documentation consistency searches.
+
+Done: 2026-07-15 — finalized the minimal `stonks.ohlcv_daily` contract in
+`docs/todo/ohlcv-plan.md` and revised `docs/todo/ohlcv-db-roughcut.txt`:
+`NUMERIC` OHLCV and persisted derived-value types, composite key, structural
+and row-local formula checks, prior-close semantics, timestamps, and one
+cross-series freshness index, with adjusted values and per-row snapshot/run
+provenance deliberately omitted; retained the five daily conveniences on the
+bar while deferring rolling/cross-series/versioned technical indicators to a
+future design; verified with `git diff --check` and focused documentation
+consistency searches.
 
 ## Phase 3: Shared Models And Persistence
 
@@ -193,11 +209,11 @@ writes without introducing provider-specific schema branches.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| M3.1 | [ ] | Add provider-listing dataclass | Add a typed immutable record for provider code, native market, native ticker, optional display/name/type/currency fields, known adjustment metadata, and raw metadata. Validation tests cover required identity fields. | B1.2, S2.1 |
-| M3.2 | [ ] | Add daily-bar dataclass | Add a typed immutable daily-bar record using `date` and `Decimal`, with optional provider-supported fields and validation matching database invariants. Unit tests cover valid and invalid bars. | B1.2, S2.2 |
+| M3.1 | [ ] | Add provider-listing dataclass | Add a typed immutable record for provider code, native market, native ticker, optional name, and instrument type defaulting to `UNKNOWN`. Validation tests cover required identity fields. | B1.2, S2.1 |
+| M3.2 | [ ] | Add daily-bar dataclass | Add a typed immutable daily-bar record using `date` and `Decimal`, with optional volume and validation matching the source-field database invariants. Persisted derived values are writer-calculated rather than provider inputs. Unit tests cover valid and invalid bars. | B1.2, S2.2 |
 | M3.3 | [ ] | Add provider batch/result models | Add small JSON-ready result dataclasses for acquired objects, parsed listing/bar batches, inserted/updated/unchanged counts, failures, and warnings. | M3.1-M3.2 |
 | M3.4 | [ ] | Implement provider-listing writer | Add focused transactional SQL that resolves or inserts provider series idempotently and updates observational metadata without mutating canonical tables. Unit tests cover reruns and different providers/markets. | S2.3, M3.1 |
-| M3.5 | [ ] | Implement daily-bar writer | Add batched transactional current-state upserts returning inserted, updated, and unchanged counts. Tests cover reruns, provider corrections, null optional fields, and constraint failures. | S2.3, M3.2-M3.4 |
+| M3.5 | [ ] | Implement daily-bar writer | Add batched transactional current-state upserts returning inserted, updated, and unchanged counts. Tests cover reruns, provider corrections, following-bar derived-value recalculation, null optional fields, and constraint failures. | S2.3, M3.2-M3.4 |
 | M3.6 | [ ] | Add daily-bar query helpers | Add only the read queries needed for incremental cutoffs, per-series date ranges, freshness, coverage, and reporting. Ordering and empty-state tests pass. | M3.5 |
 | M3.7 | [ ] | Prove provider isolation | Tests prove identical market/ticker/date values from EODData, Stooq, and Yahoo remain distinct through their provider-listing IDs and cannot overwrite one another. | M3.4-M3.6 |
 
@@ -225,7 +241,7 @@ allowing their acquisition and parsing details to differ.
 | A5.1 | [ ] | Define provider output contract | Define the minimal provider interface or callable contract that yields shared listing and daily-bar batches plus source metadata. Do not require unrelated metadata or identical remote APIs. | M3.1-M3.3, C4.6 |
 | A5.2 | [ ] | Define source-code conventions | Assign stable provider/source/parser-version identifiers for listing discovery, nightly daily data, and historical files so source snapshots remain interpretable. | C4.3, A5.1 |
 | A5.3 | [ ] | Add provider fixture policy | Add small committed fixtures derived from documented provider formats, sanitized of credentials and limited to records needed for parser and edge-case tests. | A5.1-A5.2 |
-| A5.4 | [ ] | Add shared parser contract tests | Add reusable assertions for provider code, market/ticker preservation, date/Decimal parsing, optional volume/adjusted values, rejected invalid rows, and deterministic output. | A5.3 |
+| A5.4 | [ ] | Add shared parser contract tests | Add reusable assertions for provider code, exact market/ticker preservation, date/Decimal parsing, optional volume, rejected invalid rows, and deterministic output. | A5.3 |
 | A5.5 | [ ] | Add provider runner seam | Make package runners accept provider acquisition/parser collaborators so tests do not require network access and Airflow remains a thin caller. | C4.5-C4.6, A5.1 |
 
 ## Phase 6: EODData End-To-End Vertical Slice
@@ -247,7 +263,7 @@ DAG before starting the next provider.
 | E6.9 | [ ] | Add EODData daily runner | Add package-owned sequencing for nightly EODData acquisition, snapshot registration, validation, persistence, reporting, and Core run completion/failure. Tests cover success, failure, and rerun behavior. | E6.7-E6.8 |
 | E6.10 | [ ] | Add EODData nightly DAG | Add one thin scheduled DAG that obtains Airflow context/config from the Compose environment, calls the package runner, and returns only small secret-safe summaries/object IDs. DAG tests cover schedule, catchup, overlap, context, and imports. | E6.9, B1.5-B1.7 |
 | E6.11 | [ ] | Verify EODData Airflow discovery | Rebuild/restart the Airflow image as required and verify the EODData DAG appears with its intended schedule/tags and imports without credentials in the DAG source. | E6.10 |
-| E6.12 | [ ] | Run EODData fixture vertical test | Run the full EODData fixture path through the DAG-callable package runner and report. Confirm run, raw object, snapshot, provider listing, bars, and report are linked and a rerun is unchanged. | E6.10-E6.11, S2.6 |
+| E6.12 | [ ] | Run EODData fixture vertical test | Run the full EODData fixture path through the DAG-callable package runner and report. Confirm the operational run/object/snapshot/report chain and the separately persisted provider listing/bars, then prove a rerun is unchanged. | E6.10-E6.11, S2.6 |
 
 ## Phase 7: Stooq Daily End-To-End Vertical Slice
 
@@ -291,7 +307,7 @@ selected scheduling mode while keeping non-OHLCV Yahoo data out of the package.
 |----|--------|------|---------------|------------|
 | Y9.1 | [ ] | Document Yahoo source and config contract | Record the chosen OHLCV endpoint/source, `EMPIRE_STONKS_OHLCV_YAHOO_*` settings, request inputs, market/ticker fields, native daily/adjusted semantics, rate/error behavior, and explicit exclusion of enrichment. Runtime values come from `deploy/env/local.env`. | T7.9, A5.1-A5.2 |
 | Y9.2 | [ ] | Implement Yahoo acquisition | Acquire Yahoo OHLCV responses with injected HTTP dependencies, timeouts, bounded retries, provider-appropriate request pacing, Core raw storage, and secret-safe errors/metadata. | Y9.1, C4.2, A5.5 |
-| Y9.3 | [ ] | Implement Yahoo parser | Parse Yahoo fixtures into shared listing/bar records, including optional adjusted-close data where supplied, without changing shared tables. | Y9.1-Y9.2, A5.3-A5.4 |
+| Y9.3 | [ ] | Implement Yahoo parser | Parse Yahoo fixtures into the selected provider-native OHLCV series without adding adjusted-close or provider-specific columns to the shared tables. | Y9.1-Y9.2, A5.3-A5.4 |
 | Y9.4 | [ ] | Implement Yahoo import service | Compose validation, snapshot registration, provider-series resolution, bar writes, and import summaries. Rerun tests pass. | Y9.2-Y9.3, E6.4-E6.5 |
 | Y9.5 | [ ] | Build and store Yahoo report | Reuse the shared report contract for Yahoo-scoped import health, freshness, coverage, stale series, gap warnings, failures, and native adjustment notes. | Y9.4, E6.6-E6.7 |
 | Y9.6 | [ ] | Add Yahoo CLI | Add an operator CLI and `bin` wrapper using `bin/env-load`; it runs controlled Yahoo import plus reporting and emits a secret-safe summary. | Y9.5, B1.8 |
@@ -351,16 +367,16 @@ When phases 0-10 are complete, Empire should have a reusable
 - Thin nightly Airflow DAGs for the providers that are operationally enabled.
 - JSON health reports for ingestion counts, freshness, stale series, coverage,
   and non-calendar-aware gap warnings.
-- Tests proving provider isolation, rerun safety, Core integration, cleanup-safe
-  lineage, and runtime imports.
+- Tests proving provider isolation, rerun safety, cleanup-safe Core object and
+  snapshot integration, and runtime imports.
 
 What should be considered done and authoritative:
 
 - Each stored row is the current value imported for one provider-native series
   and trading date.
-- The provider, native market text, native ticker, known native adjustment
-  semantics, source-content identity, and import run are traceable to the level
-  retained by the initial design.
+- The provider, exact native market text, and exact native ticker are traceable
+  from each row. Adjustment semantics remain in provider source contracts and
+  reports; source snapshots and import runs are not linked per row.
 - Reprocessing the same input does not duplicate provider listings or bars.
 - Providers can disagree without overwriting one another.
 

@@ -1,0 +1,66 @@
+                                ▲
+                                │ eventually referenced by bridge mappings
+                                │
+┌───────────────────────────────┴──────────────────────────────────────────────┐
+│                        empire-stonks-ohlcv                                   │
+│                                                                              │
+│  Owns provider-native listing series and current daily OHLCV values.         │
+│  It does not claim canonical listing identity or retain per-row provenance.  │
+│                                                                              │
+│  ┌────────────────┐          ┌──────────────────────────────────────────┐    │
+│  │ provider       │          │ provider_listing                         │    │
+│  │----------------│          │------------------------------------------│    │
+│  │ provider_code  │─────────►│ provider_listing_id  UUID PK             │    │
+│  └────────────────┘          │ provider_code        VARCHAR(32) FK      │    │
+│                              │ market               TEXT                │    │
+│  ┌─────────────────┐         │ ticker               TEXT                │    │
+│  │ instrument_type │         │ name                 TEXT NULL           │    │
+│  │-----------------│         │ instrument_type_code VARCHAR(32) FK      │    │
+│  │ type_code       │────────►│   default UNKNOWN                        │    │
+│  └─────────────────┘         │ first_seen           DATE NULL           │    │
+│                              │ last_seen            DATE NULL           │    │
+│                              │ created_at           TIMESTAMPTZ         │    │
+│                              │ updated_at           TIMESTAMPTZ         │    │
+│                              │                                          │    │
+│                              │ UNIQUE (provider_code, market, ticker)    │    │
+│                              └────────────────────┬─────────────────────┘    │
+│                                                   │ 1:N                      │
+│                                                   ▼                          │
+│                              ┌──────────────────────────────────────────┐    │
+│                              │ ohlcv_daily                              │    │
+│                              │------------------------------------------│    │
+│                              │ provider_listing_id UUID PK/FK           │    │
+│                              │ trading_date        DATE PK              │    │
+│                              │ open                NUMERIC(30,10)       │    │
+│                              │ high                NUMERIC(30,10)       │    │
+│                              │ low                 NUMERIC(30,10)       │    │
+│                              │ close               NUMERIC(30,10)       │    │
+│                              │ volume              NUMERIC(30,8) NULL  │    │
+│                              │ change              NUMERIC(30,8) NULL  │    │
+│                              │ changepct           NUMERIC(30,8) NULL  │    │
+│                              │ typ                 NUMERIC(30,8)        │    │
+│                              │ hl_range            NUMERIC(30,8)        │    │
+│                              │ oc_range            NUMERIC(30,8)        │    │
+│                              │ created_at          TIMESTAMPTZ          │    │
+│                              │ updated_at          TIMESTAMPTZ          │    │
+│                              └──────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Design notes
+
+- `market` and `ticker` are exact, case-sensitive provider values. Empty values
+  and surrounding whitespace are rejected; no normalized shadow columns exist.
+- `first_seen` and `last_seen` are the minimum and maximum accepted trading
+  dates observed for the series, not listing validity or active-status dates;
+  they are either both null or both populated.
+- No status, currency, adjustment, adjusted-close, arbitrary metadata,
+  source-snapshot, or Core-run columns are stored.
+- Core runs, raw objects, and source snapshots remain operational import records
+  but are intentionally not linked from individual provider listings or bars.
+- `change` is close minus the previous stored bar's close; `changepct` is that
+  change divided by the previous close. Both are null for the first stored bar,
+  and `changepct` is null when the previous close is zero.
+- `typ`, `hl_range`, and `oc_range` persist `(high + low + close) / 3`,
+  `high - low`, and `close - open`. All derived values use scale 8.
+- Historical inserts and corrections recalculate prior-close-derived values on
+  the immediately following stored bar.
