@@ -232,6 +232,32 @@ CREATE TABLE stonks.listing_symbol_history (
     CONSTRAINT ck_listing_symbol_provider_upper CHECK (((provider_code IS NULL) OR ((provider_code)::text = upper((provider_code)::text))))
 );
 
+CREATE TABLE stonks.ohlcv_daily (
+    provider_listing_id uuid NOT NULL,
+    trading_date date NOT NULL,
+    open numeric(30,10) NOT NULL,
+    high numeric(30,10) NOT NULL,
+    low numeric(30,10) NOT NULL,
+    close numeric(30,10) NOT NULL,
+    volume numeric(30,8),
+    change numeric(30,8),
+    changepct numeric(30,8),
+    typ numeric(30,8) NOT NULL,
+    hl_range numeric(30,8) NOT NULL,
+    oc_range numeric(30,8) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_ohlcv_daily_changepct_requires_change CHECK (((change IS NOT NULL) OR (changepct IS NULL))),
+    CONSTRAINT ck_ohlcv_daily_high_bounds CHECK (((high >= open) AND (high >= close))),
+    CONSTRAINT ck_ohlcv_daily_high_low CHECK ((high >= low)),
+    CONSTRAINT ck_ohlcv_daily_hl_range CHECK ((hl_range = round((high - low), 8))),
+    CONSTRAINT ck_ohlcv_daily_low_bounds CHECK (((low <= open) AND (low <= close))),
+    CONSTRAINT ck_ohlcv_daily_numeric_not_nan CHECK (((open <> 'NaN'::numeric) AND (high <> 'NaN'::numeric) AND (low <> 'NaN'::numeric) AND (close <> 'NaN'::numeric) AND ((volume IS NULL) OR (volume <> 'NaN'::numeric)) AND ((change IS NULL) OR (change <> 'NaN'::numeric)) AND ((changepct IS NULL) OR (changepct <> 'NaN'::numeric)) AND (typ <> 'NaN'::numeric) AND (hl_range <> 'NaN'::numeric) AND (oc_range <> 'NaN'::numeric))),
+    CONSTRAINT ck_ohlcv_daily_oc_range CHECK ((oc_range = round((close - open), 8))),
+    CONSTRAINT ck_ohlcv_daily_typ CHECK ((typ = round((((high + low) + close) / (3)::numeric), 8))),
+    CONSTRAINT ck_ohlcv_daily_volume_nonnegative CHECK (((volume IS NULL) OR (volume >= (0)::numeric)))
+);
+
 CREATE TABLE stonks.provider (
     provider_code character varying(32) NOT NULL,
     provider_name text NOT NULL,
@@ -255,6 +281,22 @@ CREATE TABLE stonks.provider_evidence (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ck_provider_evidence_role CHECK (((evidence_role)::text = ANY ((ARRAY['SUPPORTS'::character varying, 'CONFLICTS'::character varying, 'CREATED_FROM'::character varying, 'UPDATED_FROM'::character varying, 'MANUAL_REVIEW'::character varying])::text[]))),
     CONSTRAINT ck_provider_evidence_target CHECK (((issuer_id IS NOT NULL) OR (security_id IS NOT NULL) OR (listing_id IS NOT NULL) OR (event_id IS NOT NULL)))
+);
+
+CREATE TABLE stonks.provider_listing (
+    provider_listing_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    provider_code character varying(32) NOT NULL,
+    market text NOT NULL,
+    ticker text NOT NULL,
+    name text,
+    instrument_type_code character varying(32) DEFAULT 'UNKNOWN'::character varying NOT NULL,
+    first_seen date,
+    last_seen date,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_provider_listing_market CHECK (((market <> ''::text) AND (market = btrim(market)))),
+    CONSTRAINT ck_provider_listing_seen_dates CHECK ((((first_seen IS NULL) AND (last_seen IS NULL)) OR ((first_seen IS NOT NULL) AND (last_seen IS NOT NULL) AND (last_seen >= first_seen)))),
+    CONSTRAINT ck_provider_listing_ticker CHECK (((ticker <> ''::text) AND (ticker = btrim(ticker))))
 );
 
 CREATE TABLE stonks.provider_observation (
@@ -431,6 +473,25 @@ CREATE TABLE stonks.security_reconciliation_evidence_source_snapshot (
     source_snapshot_id uuid CONSTRAINT security_reconciliation_evidence_so_source_snapshot_id_not_null NOT NULL
 );
 
+CREATE TABLE stonks.security_successor_relationship (
+    relationship_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    predecessor_issuer_id uuid NOT NULL,
+    successor_issuer_id uuid NOT NULL,
+    predecessor_security_id uuid CONSTRAINT security_successor_relationshi_predecessor_security_id_not_null NOT NULL,
+    successor_security_id uuid NOT NULL,
+    predecessor_listing_id uuid NOT NULL,
+    successor_listing_id uuid NOT NULL,
+    relationship_type character varying(40) NOT NULL,
+    effective_date date NOT NULL,
+    exchange_ratio numeric(18,8) DEFAULT 1 NOT NULL,
+    source_url text NOT NULL,
+    details_json jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ck_security_successor_relationship_distinct_security CHECK ((predecessor_security_id <> successor_security_id)),
+    CONSTRAINT ck_security_successor_relationship_exchange_ratio CHECK ((exchange_ratio > (0)::numeric)),
+    CONSTRAINT ck_security_successor_relationship_type CHECK (((relationship_type)::text = ANY ((ARRAY['REDOMICILIATION_SUCCESSOR'::character varying, 'MERGER_SUCCESSOR'::character varying, 'SHARE_EXCHANGE_SUCCESSOR'::character varying])::text[])))
+);
+
 CREATE UNLOGGED TABLE stonks.stg_iso10383_mic (
     mic text,
     operating_mic text,
@@ -543,6 +604,9 @@ ALTER TABLE ONLY stonks.listing
 ALTER TABLE ONLY stonks.listing_symbol_history
     ADD CONSTRAINT listing_symbol_history_pkey PRIMARY KEY (listing_symbol_id);
 
+ALTER TABLE ONLY stonks.ohlcv_daily
+    ADD CONSTRAINT pk_ohlcv_daily PRIMARY KEY (provider_listing_id, trading_date);
+
 ALTER TABLE ONLY stonks.security_reconciliation_evaluation_evidence
     ADD CONSTRAINT pk_sec_recon_eval_evidence PRIMARY KEY (evaluation_id, provider_evidence_id, evidence_role);
 
@@ -557,6 +621,9 @@ ALTER TABLE ONLY stonks.security_reconciliation_evidence_source_snapshot
 
 ALTER TABLE ONLY stonks.provider_evidence
     ADD CONSTRAINT provider_evidence_pkey PRIMARY KEY (provider_evidence_id);
+
+ALTER TABLE ONLY stonks.provider_listing
+    ADD CONSTRAINT provider_listing_pkey PRIMARY KEY (provider_listing_id);
 
 ALTER TABLE ONLY stonks.provider_observation
     ADD CONSTRAINT provider_observation_pkey PRIMARY KEY (provider_observation_id);
@@ -588,6 +655,9 @@ ALTER TABLE ONLY stonks.security_reconciliation_evaluation
 ALTER TABLE ONLY stonks.security_reconciliation_evidence
     ADD CONSTRAINT security_reconciliation_evidence_pkey PRIMARY KEY (reconciliation_evidence_id);
 
+ALTER TABLE ONLY stonks.security_successor_relationship
+    ADD CONSTRAINT security_successor_relationship_pkey PRIMARY KEY (relationship_id);
+
 ALTER TABLE ONLY stonks.classification_code
     ADD CONSTRAINT uq_classification_code UNIQUE (class_system, code);
 
@@ -608,6 +678,9 @@ ALTER TABLE ONLY stonks.issuer_name_history
 
 ALTER TABLE ONLY stonks.listing_symbol_history
     ADD CONSTRAINT uq_listing_symbol_history UNIQUE (listing_id, ticker_norm, valid_from);
+
+ALTER TABLE ONLY stonks.provider_listing
+    ADD CONSTRAINT uq_provider_listing_identity UNIQUE (provider_code, market, ticker);
 
 ALTER TABLE ONLY stonks.provider_source_snapshot
     ADD CONSTRAINT uq_provider_source_snapshot_identity UNIQUE (provider_code, source_code, content_sha256);
@@ -703,6 +776,8 @@ CREATE INDEX ix_listing_symbol_ticker ON stonks.listing_symbol_history USING btr
 
 CREATE INDEX ix_listing_ticker_norm ON stonks.listing USING btree (ticker_norm);
 
+CREATE INDEX ix_ohlcv_daily_trading_date ON stonks.ohlcv_daily USING btree (trading_date DESC, provider_listing_id);
+
 CREATE INDEX ix_provider_evidence_event ON stonks.provider_evidence USING btree (event_id);
 
 CREATE INDEX ix_provider_evidence_issuer ON stonks.provider_evidence USING btree (issuer_id);
@@ -712,6 +787,8 @@ CREATE INDEX ix_provider_evidence_listing ON stonks.provider_evidence USING btre
 CREATE INDEX ix_provider_evidence_observation ON stonks.provider_evidence USING btree (provider_observation_id);
 
 CREATE INDEX ix_provider_evidence_security ON stonks.provider_evidence USING btree (security_id);
+
+CREATE INDEX ix_provider_listing_provider_last_seen ON stonks.provider_listing USING btree (provider_code, last_seen DESC) WHERE (last_seen IS NOT NULL);
 
 CREATE INDEX ix_provider_observation_accession ON stonks.provider_observation USING btree (accession_no);
 
@@ -781,6 +858,10 @@ CREATE INDEX ix_security_provisional_issuer ON stonks.security USING btree (issu
 
 CREATE INDEX ix_security_status ON stonks.security USING btree (status);
 
+CREATE INDEX ix_security_successor_predecessor_lookup ON stonks.security_successor_relationship USING btree (predecessor_security_id, effective_date, predecessor_listing_id);
+
+CREATE INDEX ix_security_successor_successor_lookup ON stonks.security_successor_relationship USING btree (successor_security_id, effective_date, successor_listing_id);
+
 CREATE INDEX ix_security_title ON stonks.security USING btree (security_title);
 
 CREATE INDEX ix_security_type ON stonks.security USING btree (instrument_type_code);
@@ -796,6 +877,8 @@ CREATE UNIQUE INDEX ux_provider_observation_raw_key ON stonks.provider_observati
 CREATE UNIQUE INDEX ux_sec_recon_decision_promotion ON stonks.security_reconciliation_decision USING btree (security_id) WHERE ((decision_type)::text = 'PROMOTE_TO_CONFIRMED'::text);
 
 CREATE UNIQUE INDEX ux_sec_recon_eval_run_target_rule ON stonks.security_reconciliation_evaluation USING btree (run_id, security_id, COALESCE(listing_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(related_security_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(related_listing_id, '00000000-0000-0000-0000-000000000000'::uuid), decision_type, rule_id, rule_version);
+
+CREATE UNIQUE INDEX ux_security_successor_relationship ON stonks.security_successor_relationship USING btree (predecessor_listing_id, successor_listing_id, relationship_type, effective_date);
 
 ALTER TABLE ONLY stonks.classification_code
     ADD CONSTRAINT fk_classification_code_system FOREIGN KEY (class_system) REFERENCES stonks.classification_system(class_system) ON UPDATE CASCADE;
@@ -881,6 +964,9 @@ ALTER TABLE ONLY stonks.listing_symbol_history
 ALTER TABLE ONLY stonks.listing_symbol_history
     ADD CONSTRAINT fk_listing_symbol_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
 
+ALTER TABLE ONLY stonks.ohlcv_daily
+    ADD CONSTRAINT fk_ohlcv_daily_provider_listing FOREIGN KEY (provider_listing_id) REFERENCES stonks.provider_listing(provider_listing_id) ON DELETE CASCADE;
+
 ALTER TABLE ONLY stonks.provider_evidence
     ADD CONSTRAINT fk_provider_evidence_event FOREIGN KEY (event_id) REFERENCES stonks.security_event(event_id) ON DELETE CASCADE;
 
@@ -895,6 +981,12 @@ ALTER TABLE ONLY stonks.provider_evidence
 
 ALTER TABLE ONLY stonks.provider_evidence
     ADD CONSTRAINT fk_provider_evidence_security FOREIGN KEY (security_id) REFERENCES stonks.security(security_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY stonks.provider_listing
+    ADD CONSTRAINT fk_provider_listing_instrument_type FOREIGN KEY (instrument_type_code) REFERENCES stonks.instrument_type(type_code);
+
+ALTER TABLE ONLY stonks.provider_listing
+    ADD CONSTRAINT fk_provider_listing_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code);
 
 ALTER TABLE ONLY stonks.provider_observation
     ADD CONSTRAINT fk_provider_observation_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;
@@ -1003,6 +1095,24 @@ ALTER TABLE ONLY stonks.security_identifier
 
 ALTER TABLE ONLY stonks.security
     ADD CONSTRAINT fk_security_issuer FOREIGN KEY (issuer_id) REFERENCES stonks.issuer(issuer_id);
+
+ALTER TABLE ONLY stonks.security_successor_relationship
+    ADD CONSTRAINT fk_security_successor_predecessor_issuer FOREIGN KEY (predecessor_issuer_id) REFERENCES stonks.issuer(issuer_id);
+
+ALTER TABLE ONLY stonks.security_successor_relationship
+    ADD CONSTRAINT fk_security_successor_predecessor_listing FOREIGN KEY (predecessor_listing_id) REFERENCES stonks.listing(listing_id);
+
+ALTER TABLE ONLY stonks.security_successor_relationship
+    ADD CONSTRAINT fk_security_successor_predecessor_security FOREIGN KEY (predecessor_security_id) REFERENCES stonks.security(security_id);
+
+ALTER TABLE ONLY stonks.security_successor_relationship
+    ADD CONSTRAINT fk_security_successor_successor_issuer FOREIGN KEY (successor_issuer_id) REFERENCES stonks.issuer(issuer_id);
+
+ALTER TABLE ONLY stonks.security_successor_relationship
+    ADD CONSTRAINT fk_security_successor_successor_listing FOREIGN KEY (successor_listing_id) REFERENCES stonks.listing(listing_id);
+
+ALTER TABLE ONLY stonks.security_successor_relationship
+    ADD CONSTRAINT fk_security_successor_successor_security FOREIGN KEY (successor_security_id) REFERENCES stonks.security(security_id);
 
 ALTER TABLE ONLY stonks.security
     ADD CONSTRAINT fk_security_type FOREIGN KEY (instrument_type_code) REFERENCES stonks.instrument_type(type_code);

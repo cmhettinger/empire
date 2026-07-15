@@ -182,6 +182,23 @@ erDiagram
     TIMESTAMPTZ created_at
   }
 
+  ohlcv_daily {
+    UUID provider_listing_id PK
+    DATE trading_date PK
+    NUMERIC open
+    NUMERIC high
+    NUMERIC low
+    NUMERIC close
+    NUMERIC volume
+    NUMERIC change
+    NUMERIC changepct
+    NUMERIC typ
+    NUMERIC hl_range
+    NUMERIC oc_range
+    TIMESTAMPTZ created_at
+    TIMESTAMPTZ updated_at
+  }
+
   provider {
     VARCHAR provider_code PK
     TEXT provider_name
@@ -201,6 +218,19 @@ erDiagram
     VARCHAR evidence_role
     TEXT notes
     TIMESTAMPTZ created_at
+  }
+
+  provider_listing {
+    UUID provider_listing_id PK
+    VARCHAR provider_code FK
+    TEXT market
+    TEXT ticker
+    TEXT name
+    VARCHAR instrument_type_code FK
+    DATE first_seen
+    DATE last_seen
+    TIMESTAMPTZ created_at
+    TIMESTAMPTZ updated_at
   }
 
   provider_observation {
@@ -352,6 +382,22 @@ erDiagram
     UUID source_snapshot_id PK
   }
 
+  security_successor_relationship {
+    UUID relationship_id PK
+    UUID predecessor_issuer_id FK
+    UUID successor_issuer_id FK
+    UUID predecessor_security_id FK
+    UUID successor_security_id FK
+    UUID predecessor_listing_id FK
+    UUID successor_listing_id FK
+    VARCHAR relationship_type
+    DATE effective_date
+    NUMERIC exchange_ratio
+    TEXT source_url
+    JSONB details_json
+    TIMESTAMPTZ created_at
+  }
+
   stg_iso10383_mic {
     TEXT mic
     TEXT operating_mic
@@ -429,11 +475,14 @@ erDiagram
   confidence_level ||--o{ listing_symbol_history : "fk_listing_symbol_confidence"
   listing ||--o{ listing_symbol_history : "fk_listing_symbol_listing"
   provider ||--o{ listing_symbol_history : "fk_listing_symbol_provider"
+  provider_listing ||--o{ ohlcv_daily : "fk_ohlcv_daily_provider_listing"
   security_event ||--o{ provider_evidence : "fk_provider_evidence_event"
   issuer ||--o{ provider_evidence : "fk_provider_evidence_issuer"
   listing ||--o{ provider_evidence : "fk_provider_evidence_listing"
   provider_observation ||--o{ provider_evidence : "fk_provider_evidence_observation"
   security ||--o{ provider_evidence : "fk_provider_evidence_security"
+  instrument_type ||--o{ provider_listing : "fk_provider_listing_instrument_type"
+  provider ||--o{ provider_listing : "fk_provider_listing_provider"
   provider ||--o{ provider_observation : "fk_provider_observation_provider"
   provider_source_snapshot ||--o{ provider_observation : "provider_observation_source_snapshot_id_fkey"
   provider ||--o{ provider_source_snapshot : "provider_source_snapshot_provider_code_fkey"
@@ -469,4 +518,10 @@ erDiagram
   provider_evidence ||--o{ security_reconciliation_evidence_provider_evidence : "fk_sec_recon_evidence_provider_source"
   security_reconciliation_evidence ||--o{ security_reconciliation_evidence_source_snapshot : "fk_sec_recon_evidence_snapshot_evidence"
   provider_source_snapshot ||--o{ security_reconciliation_evidence_source_snapshot : "fk_sec_recon_evidence_snapshot_source"
+  issuer ||--o{ security_successor_relationship : "fk_security_successor_predecessor_issuer"
+  listing ||--o{ security_successor_relationship : "fk_security_successor_predecessor_listing"
+  security ||--o{ security_successor_relationship : "fk_security_successor_predecessor_security"
+  issuer ||--o{ security_successor_relationship : "fk_security_successor_successor_issuer"
+  listing ||--o{ security_successor_relationship : "fk_security_successor_successor_listing"
+  security ||--o{ security_successor_relationship : "fk_security_successor_successor_security"
 ```

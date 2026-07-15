@@ -18,8 +18,10 @@ flowchart LR
   issuer_name_history["issuer_name_history"]
   listing["listing"]
   listing_symbol_history["listing_symbol_history"]
+  ohlcv_daily["ohlcv_daily"]
   provider["provider"]
   provider_evidence["provider_evidence"]
+  provider_listing["provider_listing"]
   provider_observation["provider_observation"]
   provider_source_snapshot["provider_source_snapshot"]
   provider_source_snapshot_object["provider_source_snapshot_object"]
@@ -33,6 +35,7 @@ flowchart LR
   security_reconciliation_evidence["security_reconciliation_evidence"]
   security_reconciliation_evidence_provider_evidence["security_reconciliation_evidence_provider_evidence"]
   security_reconciliation_evidence_source_snapshot["security_reconciliation_evidence_source_snapshot"]
+  security_successor_relationship["security_successor_relationship"]
   stg_iso10383_mic["stg_iso10383_mic"]
   stg_iso3166_country["stg_iso3166_country"]
   stg_iso4217_currency["stg_iso4217_currency"]
@@ -66,11 +69,14 @@ flowchart LR
   confidence_level -->|fk_listing_symbol_confidence| listing_symbol_history
   listing -->|fk_listing_symbol_listing| listing_symbol_history
   provider -->|fk_listing_symbol_provider| listing_symbol_history
+  provider_listing -->|fk_ohlcv_daily_provider_listing| ohlcv_daily
   security_event -->|fk_provider_evidence_event| provider_evidence
   issuer -->|fk_provider_evidence_issuer| provider_evidence
   listing -->|fk_provider_evidence_listing| provider_evidence
   provider_observation -->|fk_provider_evidence_observation| provider_evidence
   security -->|fk_provider_evidence_security| provider_evidence
+  instrument_type -->|fk_provider_listing_instrument_type| provider_listing
+  provider -->|fk_provider_listing_provider| provider_listing
   provider -->|fk_provider_observation_provider| provider_observation
   provider_source_snapshot -->|provider_observation_source_snapshot_id_fkey| provider_observation
   provider -->|provider_source_snapshot_provider_code_fkey| provider_source_snapshot
@@ -106,4 +112,10 @@ flowchart LR
   provider_evidence -->|fk_sec_recon_evidence_provider_source| security_reconciliation_evidence_provider_evidence
   security_reconciliation_evidence -->|fk_sec_recon_evidence_snapshot_evidence| security_reconciliation_evidence_source_snapshot
   provider_source_snapshot -->|fk_sec_recon_evidence_snapshot_source| security_reconciliation_evidence_source_snapshot
+  issuer -->|fk_security_successor_predecessor_issuer| security_successor_relationship
+  listing -->|fk_security_successor_predecessor_listing| security_successor_relationship
+  security -->|fk_security_successor_predecessor_security| security_successor_relationship
+  issuer -->|fk_security_successor_successor_issuer| security_successor_relationship
+  listing -->|fk_security_successor_successor_listing| security_successor_relationship
+  security -->|fk_security_successor_successor_security| security_successor_relationship
 ```
