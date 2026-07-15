@@ -182,7 +182,7 @@ series and daily bars.
 | S2.3 | [x] | Define idempotent write behavior | Specify insert, unchanged-row skip, provider-correction update, first/last-seen update, prior-close-derived recalculation for the immediately following bar, transaction, and returned-count behavior before repository code is written. | S2.1-S2.2 |
 | S2.4 | [x] | Add provider seed migration | Add idempotent `stonks.provider` rows for `EODDATA`, `STOOQ`, and `YAHOO` using the existing provider-table conventions. DB validation passes. | P0.5 |
 | S2.5 | [x] | Add OHLCV table migration | Create `stonks.provider_listing` and `stonks.ohlcv_daily` in one ordered Flyway migration or clearly ordered migrations, with the designed provider, instrument-type, and owning-series FKs and no per-row Core/source-snapshot FKs. | S2.1-S2.4 |
-| S2.6 | [ ] | Validate schema and regenerate DB docs | Run repo DB validation and regenerate the Stonks ERD/docs. Generated relations show the intended provider, instrument-type, listing-series, and daily-bar relationships with no canonical `listing_id`, Core run, or source-snapshot FK. | S2.5 |
+| S2.6 | [x] | Validate schema and regenerate DB docs | Run repo DB validation and regenerate the Stonks ERD/docs. Generated relations show the intended provider, instrument-type, listing-series, and daily-bar relationships with no canonical `listing_id`, Core run, or source-snapshot FK. | S2.5 |
 | S2.7 | [ ] | Add schema contract tests | Add focused tests or validation SQL proving primary keys, exact case-sensitive unique lookup behavior, reference FKs, OHLC and row-local derived-value checks, and update/delete semantics behave as designed. | S2.5 |
 
 Done: 2026-07-15 — finalized the minimal `stonks.provider_listing` contract in
@@ -226,6 +226,15 @@ applied migration 2026.07.15.0002 and `make db-validate` validated all 31
 migrations. PostgreSQL catalog inspection confirmed 24 columns, 12 checks, the
 three intended FKs/delete actions, five PK/unique/reporting indexes, and no
 canonical listing, Core run, source-snapshot, or source-object columns.
+
+Done: 2026-07-15 — added the `ohlcv` Stonks documentation group in
+`tools/docs/db/schemas/stonks/groups/ohlcv.txt`, documented it in
+`docs/db/tools-docs.md`, and generated focused Mermaid and pg-diagram outputs
+under `docs/db/stonks/generated`; `make db-validate` validated all 31
+migrations, and the Stonks schema, full/grouped Mermaid, and full/grouped
+pg-diagram generators completed. Visual inspection confirmed the provider and
+instrument-type references into `provider_listing` and its one-to-many
+`ohlcv_daily` relation, with no canonical/Core/source-snapshot relationship.
 
 ## Phase 3: Shared Models And Persistence
 

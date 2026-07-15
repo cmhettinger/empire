@@ -1,0 +1,6 @@
+# Provider-native OHLCV listing series and daily bars.
+
+provider
+instrument_type
+provider_listing
+ohlcv_daily

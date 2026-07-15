@@ -154,6 +154,7 @@ instrument-types
 issuer-classifications
 issuer-identity
 market-reference
+ohlcv
 provider-evidence
 security-events
 security-identity
