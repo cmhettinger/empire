@@ -179,7 +179,7 @@ series and daily bars.
 |----|--------|------|---------------|------------|
 | S2.1 | [x] | Design `provider_listing` columns | Document exact columns, types, exact case-sensitive provider-native market and ticker handling, provider-series lookup key, optional name and default-`UNKNOWN` instrument type, first/last-seen semantics, deliberate metadata omissions, timestamps, constraints, and indexes. The design does not claim canonical identity. | P0.2-P0.4 |
 | S2.2 | [x] | Design `ohlcv_daily` columns | Document exact price/volume and persisted derived-value types, nullability, composite key, OHLC and derived-value invariants, deliberate adjusted-value and per-row provenance omissions, timestamps, and indexes for listing/date and freshness queries. | P0.3-P0.4, S2.1 |
-| S2.3 | [ ] | Define idempotent write behavior | Specify insert, unchanged-row skip, provider-correction update, first/last-seen update, prior-close-derived recalculation for the immediately following bar, transaction, and returned-count behavior before repository code is written. | S2.1-S2.2 |
+| S2.3 | [x] | Define idempotent write behavior | Specify insert, unchanged-row skip, provider-correction update, first/last-seen update, prior-close-derived recalculation for the immediately following bar, transaction, and returned-count behavior before repository code is written. | S2.1-S2.2 |
 | S2.4 | [ ] | Add provider seed migration | Add idempotent `stonks.provider` rows for `EODDATA`, `STOOQ`, and `YAHOO` using the existing provider-table conventions. DB validation passes. | P0.5 |
 | S2.5 | [ ] | Add OHLCV table migration | Create `stonks.provider_listing` and `stonks.ohlcv_daily` in one ordered Flyway migration or clearly ordered migrations, with the designed provider, instrument-type, and owning-series FKs and no per-row Core/source-snapshot FKs. | S2.1-S2.4 |
 | S2.6 | [ ] | Validate schema and regenerate DB docs | Run repo DB validation and regenerate the Stonks ERD/docs. Generated relations show the intended provider, instrument-type, listing-series, and daily-bar relationships with no canonical `listing_id`, Core run, or source-snapshot FK. | S2.5 |
@@ -202,6 +202,14 @@ bar while deferring rolling/cross-series/versioned technical indicators to a
 future design; verified with `git diff --check` and focused documentation
 consistency searches.
 
+Done: 2026-07-15 — defined the idempotent persistence contract in
+`docs/todo/ohlcv-plan.md`: unique validated inputs, stored-scale comparisons,
+one transaction per batch/chunk, deterministic per-series locking, conservative
+listing metadata updates, update-only-when-distinct bars, final-state derived
+recalculation, timestamp rules, and disjoint input versus derived-maintenance
+counts; verified with `git diff --check`, balanced Markdown fences, and focused
+contract consistency searches.
+
 ## Phase 3: Shared Models And Persistence
 
 Goal: build provider-neutral package primitives for parsed records and database
@@ -211,9 +219,9 @@ writes without introducing provider-specific schema branches.
 |----|--------|------|---------------|------------|
 | M3.1 | [ ] | Add provider-listing dataclass | Add a typed immutable record for provider code, native market, native ticker, optional name, and instrument type defaulting to `UNKNOWN`. Validation tests cover required identity fields. | B1.2, S2.1 |
 | M3.2 | [ ] | Add daily-bar dataclass | Add a typed immutable daily-bar record using `date` and `Decimal`, with optional volume and validation matching the source-field database invariants. Persisted derived values are writer-calculated rather than provider inputs. Unit tests cover valid and invalid bars. | B1.2, S2.2 |
-| M3.3 | [ ] | Add provider batch/result models | Add small JSON-ready result dataclasses for acquired objects, parsed listing/bar batches, inserted/updated/unchanged counts, failures, and warnings. | M3.1-M3.2 |
+| M3.3 | [ ] | Add provider batch/result models | Add small JSON-ready result dataclasses for acquired objects, parsed listing/bar batches, inserted/updated/unchanged and derived-maintenance counts, failures, and warnings. | M3.1-M3.2 |
 | M3.4 | [ ] | Implement provider-listing writer | Add focused transactional SQL that resolves or inserts provider series idempotently and updates observational metadata without mutating canonical tables. Unit tests cover reruns and different providers/markets. | S2.3, M3.1 |
-| M3.5 | [ ] | Implement daily-bar writer | Add batched transactional current-state upserts returning inserted, updated, and unchanged counts. Tests cover reruns, provider corrections, following-bar derived-value recalculation, null optional fields, and constraint failures. | S2.3, M3.2-M3.4 |
+| M3.5 | [ ] | Implement daily-bar writer | Add batched transactional current-state upserts returning inserted, updated, unchanged, and derived-updated counts. Tests cover reruns, provider corrections, following-bar derived-value recalculation, null optional fields, and constraint failures. | S2.3, M3.2-M3.4 |
 | M3.6 | [ ] | Add daily-bar query helpers | Add only the read queries needed for incremental cutoffs, per-series date ranges, freshness, coverage, and reporting. Ordering and empty-state tests pass. | M3.5 |
 | M3.7 | [ ] | Prove provider isolation | Tests prove identical market/ticker/date values from EODData, Stooq, and Yahoo remain distinct through their provider-listing IDs and cannot overwrite one another. | M3.4-M3.6 |
 
@@ -256,7 +264,7 @@ DAG before starting the next provider.
 | E6.2 | [ ] | Implement EODData acquisition | Download or receive the chosen nightly source with timeouts, bounded retries, clear errors, injected HTTP/file dependencies, and Core raw-object storage. Unit tests cover success, common failures, and secret-safe errors/metadata. | E6.1, C4.2, A5.5 |
 | E6.3 | [ ] | Implement EODData parser | Parse fixtures into shared provider-listing and daily-bar records while preserving provider-native market, ticker, and value semantics. Shared parser-contract tests pass. | E6.1-E6.2, A5.3-A5.4 |
 | E6.4 | [ ] | Define shared validation and report contract | Define structural OHLC checks, null/volume handling, hard failures versus warnings, provider/run import counts, freshness, coverage, stale-series, and weekday-shaped gap metrics. State that gaps are not exchange-calendar authoritative. | P0.3, S2.2, M3.6 |
-| E6.5 | [ ] | Implement EODData import service | Validate parsed records, register the source snapshot, resolve provider listings, upsert daily bars, and return accepted/rejected/inserted/updated/unchanged counts. Idempotent rerun tests pass. | E6.2-E6.4, M3.4-M3.5, C4.3-C4.6 |
+| E6.5 | [ ] | Implement EODData import service | Validate parsed records, register the source snapshot, resolve provider listings, upsert daily bars, and return accepted/rejected/inserted/updated/unchanged plus derived-maintenance counts. Idempotent rerun tests pass. | E6.2-E6.4, M3.4-M3.5, C4.3-C4.6 |
 | E6.6 | [ ] | Implement EODData health queries | Add the first deterministic health queries for the shared report contract, scoped to EODData provider series. Validate indexes against representative fixture volume. | E6.4-E6.5 |
 | E6.7 | [ ] | Build and store EODData report | Produce a common Empire-style JSON report with EODData run/import counts, freshness, coverage, stale series, gap warnings, failures, and native-semantics notes; store it under the active Core run. Tests cover paths and metadata. | E6.5-E6.6, C4.2, C4.5 |
 | E6.8 | [ ] | Add EODData CLI | Add an operator CLI and `bin` wrapper that receives `deploy/env/local.env` through `bin/env-load`, supports an explicit effective date, runs import plus reporting, and emits a secret-safe JSON summary. | E6.7, B1.8 |
@@ -291,7 +299,7 @@ coverage reporting, without adding canonical identity assumptions.
 |----|--------|------|---------------|------------|
 | H8.1 | [ ] | Define historical import inputs and bounds | Document supported Stooq historical source files, environment settings, date bounds, symbol/market filters, expected volume, restart behavior, and explicit exclusions. | T7.9 |
 | H8.2 | [ ] | Add streaming/chunked historical parser | Parse historical input without loading the entire dataset into memory. Tests prove stable chunk boundaries and equivalent results across chunk sizes. | H8.1, T7.3 |
-| H8.3 | [ ] | Add chunked database writer | Write provider listings and bars in bounded transactions with cumulative inserted/updated/unchanged/failure counts. A failed chunk can be rerun safely. | H8.2, M3.4-M3.5 |
+| H8.3 | [ ] | Add chunked database writer | Write provider listings and bars in bounded transactions with cumulative inserted/updated/unchanged/derived-updated/failure counts. A failed chunk can be rerun safely. | H8.2, M3.4-M3.5 |
 | H8.4 | [ ] | Add historical import run tracking | Start one Core run with explicit non-secret parameters and progress summaries; retain source snapshots and raw input according to the same retention policy. Failure leaves enough context for an operator rerun. | H8.3, C4.3-C4.6 |
 | H8.5 | [ ] | Add historical import report | Build and store a Stooq backfill report with input bounds, chunk progress, write counts, resulting coverage, failures, and warnings. Tests cover partial and successful runs. | H8.4, T7.5 |
 | H8.6 | [ ] | Add historical Stooq CLI | Add `stonks-ohlcv-stooq-backfill` using `bin/env-load`, with explicit input/date/filter/chunk options and a secret-safe JSON summary. It does not mutate canonical tables. | H8.5, B1.8 |

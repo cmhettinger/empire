@@ -307,21 +307,132 @@ revision table is not part of the initial schema.
 ## Current-State Upsert Policy
 
 The initial package stores the current provider value for each provider series
-and trading date.
+and trading date. Persistence operates on validated provider-listing and bar
+records; validation must reject invalid records before they reach the writer.
 
-- A first import inserts the bar.
-- An identical rerun is unchanged and does not duplicate it.
-- A later provider correction may update the existing row.
-- A historical insert or correction also refreshes prior-close-derived values
-  on the immediately following stored bar when necessary.
-- The package returns inserted, updated, unchanged, rejected, and warning counts
-  where applicable.
-- No append-only bar revision history is created initially.
-- Exceptional manual database corrections remain an operator responsibility.
+### Input identity and ordering
 
-This is an intentional early-stage tradeoff. A future requirement for provider
-revision history must be designed separately rather than inferred from Core run
-records.
+Each writer call must contain at most one provider-listing record for an exact
+`(provider_code, market, ticker)` identity and at most one bar for an exact
+`(provider_listing_id, trading_date)` identity. The caller may supply records in
+any order. Duplicate keys reaching persistence are an error and roll back the
+writer call; the writer never uses first-wins or last-wins behavior.
+
+Values are converted to their database scales before comparison. Derived values
+are calculated from those stored-scale OHLC values, not from higher-precision
+temporary inputs. This makes rerun comparisons and database formula checks
+deterministic.
+
+### Transaction and concurrency boundary
+
+One accepted import batch or bounded historical chunk writes its provider
+listings, bars, derived values, and listing coverage dates in one database
+transaction. Repository helpers share the caller's cursor and do not commit
+independently. Any SQL, constraint, or duplicate-key error rolls back the whole
+writer call and is raised to the import service; persistence errors are not
+converted into rejected-row counts.
+
+After resolving provider-listing IDs, the writer locks affected
+`provider_listing` rows in deterministic ID order. This serializes bar and
+derived-value changes for the same provider series while allowing different
+series to be written concurrently. The implementation must not depend on input
+order for lock order or derived calculations. Listing identities are also
+resolved or inserted in deterministic `(provider_code, market, ticker)` order
+so concurrent batches do not acquire uniqueness conflicts in caller order.
+
+### Provider-listing resolution and updates
+
+A missing provider series is inserted with its exact provider, market, and
+ticker values. A uniqueness conflict resolves the existing row; it does not
+create an alternate case or normalized identity.
+
+For an existing series:
+
+- A non-null incoming `name` replaces a distinct stored name; null does not
+  erase a stored name.
+- A non-`UNKNOWN` incoming `instrument_type_code` replaces a distinct stored
+  value. `UNKNOWN` never downgrades a known type.
+- `first_seen` becomes the least accepted trading date ever written for the
+  series and `last_seen` becomes the greatest. They are initialized together
+  by the first accepted bar and change only when accepted coverage expands.
+- `updated_at` changes only when name, instrument type, or coverage actually
+  changes. Resolving an identical series does not touch the row.
+
+The listing writer reports one mutually exclusive result for each unique series
+processed: `inserted`, `updated`, or `unchanged`. A newly inserted listing is
+counted only as inserted even when its initial coverage dates are populated in
+the same transaction.
+
+### Daily-bar insert, correction, and unchanged behavior
+
+The provider payload of a daily bar is `open`, `high`, `low`, `close`, and
+nullable `volume`. The five derived columns are writer-owned and are never
+accepted as provider inputs.
+
+- If the `(provider_listing_id, trading_date)` key is absent, the writer inserts
+  the stored-scale provider values and calculated derived values.
+- If all five stored provider values compare equal with `IS NOT DISTINCT FROM`,
+  the input bar is unchanged. It is not rewritten and its timestamps are not
+  touched merely because it was seen again.
+- If any stored provider value differs, the row is a provider correction. The
+  writer replaces the current provider values, recalculates its derived values,
+  and changes `updated_at`.
+
+The write is therefore an update-only-when-distinct upsert, not an unconditional
+`ON CONFLICT DO UPDATE`. No append-only bar revision row is created. Exceptional
+manual database corrections remain an operator responsibility.
+
+### Derived-value recalculation
+
+The writer stages the full batch and calculates against the logical final series
+that results when staged provider values overlay stored values. This avoids
+input-order-dependent calculations while still supplying required derived
+values when a new row is inserted. The recalculation set contains every accepted
+input bar plus the immediately following stored bar for each inserted or
+corrected date, if one exists in the logical final series. The set is
+de-duplicated, so adjacent or overlapping inputs recalculate each affected row
+once.
+
+Calculations use the greatest stored trading date less than the target date as
+the predecessor. They follow the formulas and eight-decimal rounding contract
+defined for `ohlcv_daily`. This handles, without special ordering assumptions:
+
+- Appending a newest bar.
+- Inserting a new earliest bar.
+- Filling a historical gap between two stored bars.
+- Correcting one bar or several adjacent bars in the same batch.
+
+An existing row is updated for derived maintenance only when at least one
+derived value is distinct. Such an update changes `updated_at`. A no-op
+recalculation does not touch the row.
+
+### Returned counts
+
+Daily-bar persistence returns these disjoint counts:
+
+```text
+inserted
+updated
+unchanged
+derived_updated
+```
+
+`inserted`, `updated`, and `unchanged` classify accepted unique provider-input
+bars and therefore sum to the accepted input count. `derived_updated` counts
+existing rows changed only to repair or refresh derived values, including a
+following bar not present in the input. An inserted or provider-corrected input
+bar is never also counted as `derived_updated`. If an unchanged input row needs
+a derived-only repair, it remains `unchanged` for input classification and also
+increments `derived_updated` once.
+
+Provider-listing counts are reported separately and are not added to bar
+counts. The import/validation layer adds `rejected` and `warning` counts to the
+combined result; persistence does not guess those outcomes. A failed writer
+call returns no success counts because its transaction is rolled back.
+
+This is an intentional early-stage current-state tradeoff. A future requirement
+for provider revision history must be designed separately rather than inferred
+from Core run records.
 
 ## Core Run And Source Provenance
 
@@ -538,7 +649,8 @@ runner, and Airflow DAG before work begins on the next provider.
 The shared report contract should cover:
 
 - Acquisition and parse status.
-- Accepted, rejected, inserted, updated, and unchanged counts.
+- Accepted, rejected, inserted, updated, unchanged, and derived-maintenance
+  counts.
 - Per-provider market/series coverage.
 - Minimum and maximum trading dates.
 - Latest-bar age and stale-series candidates.
