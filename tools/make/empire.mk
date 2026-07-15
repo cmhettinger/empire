@@ -4,7 +4,7 @@ empire-up: ## Start the full Empire local stack
 	$(COMPOSE) up -d postgres pgbouncer redis airflow-api airflow-scheduler airflow-dag-processor airflow-triggerer airflow-worker
 
 empire-down: ## Stop the full Empire local stack
-	$(COMPOSE) stop jellyfin airflow-api airflow-scheduler airflow-dag-processor airflow-triggerer airflow-worker redis pgbouncer postgres
+	$(COMPOSE) stop jellyfin airflow-api airflow-scheduler airflow-dag-processor airflow-triggerer airflow-worker youtube-pot-provider redis pgbouncer postgres
 
 empire-ps: ## Show full Empire stack status
 	$(COMPOSE) ps postgres pgbouncer redis airflow-api airflow-scheduler airflow-dag-processor airflow-triggerer airflow-worker
