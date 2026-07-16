@@ -13,8 +13,10 @@ from empire_stonks_ohlcv import (
     DailyBar,
     OHLCVWorkflowError,
     ParsedListingBatch,
+    ParsedProviderOutput,
     PersistenceCounts,
     ProviderListing,
+    ProviderSourceMetadata,
     execute_import_boundary,
 )
 from empire_stonks_ohlcv import import_boundary
@@ -94,6 +96,18 @@ def parsed_batch() -> ParsedListingBatch:
     )
 
 
+def parsed_output(*batches: ParsedListingBatch) -> ParsedProviderOutput:
+    return ParsedProviderOutput(
+        sources=(
+            ProviderSourceMetadata(
+                source_code="eoddata_daily",
+                parser_version="2026.07",
+            ),
+        ),
+        batches=tuple(batches),
+    )
+
+
 def test_success_persists_all_ohlcv_records_in_one_commit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -135,8 +149,7 @@ def test_success_persists_all_ohlcv_records_in_one_commit(
         run_context=run_context(),
         provider_code="EODDATA",
         acquire=lambda _context: (acquired,),
-        parse=lambda _objects: (batch,),
-        parser_versions={"eoddata_daily": "2026.07"},
+        parse=lambda _objects: parsed_output(batch),
     )
 
     assert events == ["snapshot", "listings", "bars"]
@@ -171,10 +184,10 @@ def test_failure_is_stage_safe_and_never_partially_commits(
             raise RuntimeError("secret acquisition detail")
         return (acquired,)
 
-    def parse(_objects: tuple[AcquiredObject, ...]) -> tuple[ParsedListingBatch, ...]:
+    def parse(_objects: tuple[AcquiredObject, ...]) -> ParsedProviderOutput:
         if failure_stage == "parsing":
             raise RuntimeError("secret parser detail")
-        return (batch,)
+        return parsed_output(batch)
 
     def register(**_values: object) -> None:
         if failure_stage == "persistence":
@@ -204,6 +217,45 @@ def test_failure_is_stage_safe_and_never_partially_commits(
     assert connection.cursor_calls == expected_cursor_calls
     assert connection.commit_calls == 0
     assert connection.rollback_calls == expected_rollbacks
+
+
+@pytest.mark.parametrize("mismatch", ["source", "provider", "return_type"])
+def test_parser_output_contract_mismatches_fail_before_persistence(
+    mismatch: str,
+) -> None:
+    connection = FakeConnection()
+
+    def parse(_objects: tuple[AcquiredObject, ...]) -> object:
+        if mismatch == "return_type":
+            return (parsed_batch(),)
+        if mismatch == "source":
+            return ParsedProviderOutput(
+                sources=(ProviderSourceMetadata("eoddata_other", "v1"),),
+                batches=(parsed_batch(),),
+            )
+        wrong_provider_batch = ParsedListingBatch(
+            listing=ProviderListing(
+                provider_code="STOOQ",
+                market="NYSE",
+                ticker="ABC",
+            ),
+            bars=(),
+        )
+        return parsed_output(wrong_provider_batch)
+
+    with pytest.raises(OHLCVWorkflowError) as error:
+        execute_import_boundary(
+            connection=connection,
+            run_context=run_context(),
+            provider_code="EODDATA",
+            acquire=lambda _context: (acquired_object(),),
+            parse=parse,  # type: ignore[arg-type]
+        )
+
+    assert error.value.stage == "parsing"
+    assert connection.cursor_calls == 0
+    assert connection.commit_calls == 0
+    assert connection.rollback_calls == 0
 
 
 def test_commit_failure_is_reported_as_persistence_and_rolls_back(
@@ -238,7 +290,7 @@ def test_commit_failure_is_reported_as_persistence_and_rolls_back(
             run_context=run_context(),
             provider_code="EODDATA",
             acquire=lambda _context: (acquired_object(),),
-            parse=lambda _objects: (),
+            parse=lambda _objects: parsed_output(),
         )
 
     assert error.value.stage == "persistence"

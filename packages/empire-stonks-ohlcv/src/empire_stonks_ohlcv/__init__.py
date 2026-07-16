@@ -32,12 +32,18 @@ from empire_stonks_ohlcv.queries import (
     select_provider_latest_trading_date,
     select_provider_listing_coverage,
 )
+from empire_stonks_ohlcv.provider_contract import (
+    AcquireProviderObjects,
+    ParseProviderObjects,
+)
 from empire_stonks_ohlcv.results import (
     AcquiredObject,
     ImportIssue,
     ParsedListingBatch,
+    ParsedProviderOutput,
     PersistenceCounts,
     ProviderImportResult,
+    ProviderSourceMetadata,
 )
 from empire_stonks_ohlcv.runner import (
     JOB_PROVIDER_CODES,
@@ -53,6 +59,7 @@ from empire_stonks_ohlcv.source_snapshots import (
 
 __all__ = [
     "AcquiredObject",
+    "AcquireProviderObjects",
     "DailyBarDateRange",
     "DailyBarWriteInput",
     "EODDataCredentials",
@@ -68,11 +75,14 @@ __all__ = [
     "OHLCVWorkflowError",
     "OHLCVRunResult",
     "ParsedListingBatch",
+    "ParsedProviderOutput",
+    "ParseProviderObjects",
     "PersistenceCounts",
     "ProviderListing",
     "ProviderListingCoverage",
     "ProviderListingWriteResult",
     "ProviderImportResult",
+    "ProviderSourceMetadata",
     "RAW_SOURCE_OBJECT_KIND",
     "ResolvedProviderListing",
     "SAFE_FAILURE_MESSAGE",

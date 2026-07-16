@@ -16,7 +16,9 @@ from empire_stonks_ohlcv import (
     DailyBar,
     OHLCVWorkflowError,
     ParsedListingBatch,
+    ParsedProviderOutput,
     ProviderListing,
+    ProviderSourceMetadata,
     RAW_SOURCE_OBJECT_KIND,
     execute_import_boundary,
 )
@@ -170,22 +172,31 @@ def test_raw_objects_survive_failures_and_database_writes_rerun_atomically(
             ),
         )
 
+        def output_for(*batches: ParsedListingBatch) -> ParsedProviderOutput:
+            return ParsedProviderOutput(
+                sources=(
+                    ProviderSourceMetadata(
+                        source_code=SOURCE_CODE,
+                        parser_version="test.v1",
+                    ),
+                ),
+                batches=tuple(batches),
+            )
+
         success_object = store_raw("success")
         first = execute_import_boundary(
             connection=connection,
             run_context=run_context,
             provider_code="EODDATA",
             acquire=lambda _context: (success_object,),
-            parse=lambda _objects: (valid_batch,),
-            parser_versions={SOURCE_CODE: "test.v1"},
+            parse=lambda _objects: output_for(valid_batch),
         )
         rerun = execute_import_boundary(
             connection=connection,
             run_context=run_context,
             provider_code="EODDATA",
             acquire=lambda _context: (success_object,),
-            parse=lambda _objects: (valid_batch,),
-            parser_versions={SOURCE_CODE: "test.v1"},
+            parse=lambda _objects: output_for(valid_batch),
         )
         assert first.listing_counts.inserted == 1
         assert first.bar_counts.inserted == 1
@@ -206,7 +217,7 @@ def test_raw_objects_survive_failures_and_database_writes_rerun_atomically(
                 run_context=run_context,
                 provider_code="EODDATA",
                 acquire=fail_after_acquisition,
-                parse=lambda _objects: (),
+                parse=lambda _objects: output_for(),
             )
         assert acquisition_error.value.stage == "acquisition"
 
@@ -239,7 +250,7 @@ def test_raw_objects_survive_failures_and_database_writes_rerun_atomically(
                 run_context=run_context,
                 provider_code="EODDATA",
                 acquire=lambda _context: (persistence_object,),
-                parse=lambda _objects: (invalid_batch,),
+                parse=lambda _objects: output_for(invalid_batch),
             )
         assert persistence_error.value.stage == "persistence"
 

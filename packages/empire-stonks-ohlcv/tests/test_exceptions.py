@@ -35,6 +35,7 @@ def test_public_exports_are_explicit() -> None:
 
     assert empire_stonks_ohlcv.__all__ == [
         "AcquiredObject",
+        "AcquireProviderObjects",
         "DailyBarDateRange",
         "DailyBarWriteInput",
         "EODDataCredentials",
@@ -50,11 +51,14 @@ def test_public_exports_are_explicit() -> None:
         "OHLCVWorkflowError",
         "OHLCVRunResult",
         "ParsedListingBatch",
+        "ParsedProviderOutput",
+        "ParseProviderObjects",
         "PersistenceCounts",
         "ProviderListing",
         "ProviderListingCoverage",
         "ProviderListingWriteResult",
         "ProviderImportResult",
+        "ProviderSourceMetadata",
         "RAW_SOURCE_OBJECT_KIND",
         "ResolvedProviderListing",
         "SAFE_FAILURE_MESSAGE",

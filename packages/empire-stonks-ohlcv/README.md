@@ -97,7 +97,16 @@ identical retry safe after parsing, persistence, or later Core completion
 failure.
 
 The boundary accepts injected acquisition and parsing callables. Provider
-interface definitions and concrete provider runners remain later tasks.
+acquisition returns stored `AcquiredObject` references; parsing returns a
+`ParsedProviderOutput` containing only shared listing/bar batches and the
+`ProviderSourceMetadata` source-code/parser-version pairs needed for snapshot
+registration. Source metadata must exactly cover the acquired source codes,
+and parsed listings must match the active provider. Provider adapters may use
+functions or bound methods and do not share a downloader base class, registry,
+remote request model, or arbitrary metadata contract.
+
+Concrete source identifiers, provider implementations, and provider runners
+remain later tasks.
 
 ## CLI
 

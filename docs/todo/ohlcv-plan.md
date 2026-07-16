@@ -748,6 +748,42 @@ here.
 EODData, Stooq, and Yahoo share package-owned dataclasses for provider listings,
 daily bars, source metadata, and import results.
 
+The minimal adapter boundary is two callables:
+
+```python
+AcquireProviderObjects = Callable[
+    [RunContext],
+    tuple[AcquiredObject, ...],
+]
+
+ParseProviderObjects = Callable[
+    [tuple[AcquiredObject, ...]],
+    ParsedProviderOutput,
+]
+```
+
+`AcquireProviderObjects` completes provider-specific retrieval and Core raw
+storage, then returns a non-empty tuple of durable `AcquiredObject` references.
+`ParseProviderObjects` reads those references using provider-owned mechanisms
+and returns one immutable `ParsedProviderOutput` containing:
+
+- A non-empty tuple of `ProviderSourceMetadata(source_code, parser_version)`.
+- A tuple of shared `ParsedListingBatch` records, which may be empty for a
+  structurally valid source containing no accepted series.
+
+Each source code appears once in the metadata and the metadata source-code set
+must exactly match the acquired objects' source-code set. Every parsed listing
+must use the provider code of the active import. The boundary carries no URLs,
+credentials, headers, retry policy, remote request model, arbitrary metadata,
+or provider-specific records. Exact source-code and parser-version values are
+assigned by the provider source-code convention and source-contract tasks.
+
+Adapters may satisfy these aliases with functions, bound methods, or other
+callables. They do not inherit a shared base class and are not registered in a
+provider factory. The transactional import boundary consumes the source
+metadata to register each source snapshot and consumes only shared listing/bar
+batches for persistence.
+
 Their remote APIs and file layouts do not need a forced common downloader
 interface. Provider-specific modules may acquire and parse differently as long
 as they return the shared package records and use the same persistence, Core,

@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
 from empire_stonks_ohlcv.models import DailyBar, ProviderListing
+
+
+_SOURCE_CODE_PATTERN = re.compile(r"^[a-z0-9]+(?:[_-][a-z0-9]+)*$")
+_PARSER_VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 def _validate_required_text(field_name: str, value: object) -> None:
@@ -82,6 +87,79 @@ class ParsedListingBatch:
             "listing": self.listing.to_dict(),
             "bar_count": self.bar_count,
             "bars": [bar.to_dict() for bar in self.bars],
+        }
+
+
+@dataclass(frozen=True)
+class ProviderSourceMetadata:
+    """Stable source identity needed to interpret and persist parsed output."""
+
+    source_code: str
+    parser_version: str
+
+    def __post_init__(self) -> None:
+        _validate_required_text("source_code", self.source_code)
+        _validate_required_text("parser_version", self.parser_version)
+        if len(self.source_code) > 64 or not _SOURCE_CODE_PATTERN.fullmatch(
+            self.source_code
+        ):
+            raise ValueError("source_code must be a lowercase path-safe identifier.")
+        if len(self.parser_version) > 64 or not _PARSER_VERSION_PATTERN.fullmatch(
+            self.parser_version
+        ):
+            raise ValueError("parser_version must be a path-safe identifier.")
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "source_code": self.source_code,
+            "parser_version": self.parser_version,
+        }
+
+
+@dataclass(frozen=True)
+class ParsedProviderOutput:
+    """Minimal provider parser output shared by every provider adapter."""
+
+    sources: tuple[ProviderSourceMetadata, ...]
+    batches: tuple[ParsedListingBatch, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.sources, tuple) or any(
+            not isinstance(item, ProviderSourceMetadata) for item in self.sources
+        ):
+            raise TypeError(
+                "sources must contain only ProviderSourceMetadata records."
+            )
+        if not self.sources:
+            raise ValueError("sources must not be empty.")
+        source_codes = [source.source_code for source in self.sources]
+        if len(set(source_codes)) != len(source_codes):
+            raise ValueError("sources must contain unique source_code values.")
+        if not isinstance(self.batches, tuple) or any(
+            not isinstance(item, ParsedListingBatch) for item in self.batches
+        ):
+            raise TypeError("batches must contain only ParsedListingBatch records.")
+
+    @property
+    def listing_count(self) -> int:
+        return len(self.batches)
+
+    @property
+    def bar_count(self) -> int:
+        return sum(batch.bar_count for batch in self.batches)
+
+    def parser_version_for(self, source_code: str) -> str:
+        for source in self.sources:
+            if source.source_code == source_code:
+                return source.parser_version
+        raise KeyError(source_code)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sources": [source.to_dict() for source in self.sources],
+            "listing_count": self.listing_count,
+            "bar_count": self.bar_count,
+            "batches": [batch.to_dict() for batch in self.batches],
         }
 
 

@@ -13,9 +13,11 @@ from empire_stonks_ohlcv import (
     DailyBar,
     ImportIssue,
     ParsedListingBatch,
+    ParsedProviderOutput,
     PersistenceCounts,
     ProviderImportResult,
     ProviderListing,
+    ProviderSourceMetadata,
 )
 
 
@@ -127,6 +129,83 @@ def test_parsed_listing_batch_rejects_invalid_members(
 ) -> None:
     with pytest.raises(TypeError, match=message):
         ParsedListingBatch(listing=listing, bars=bars)  # type: ignore[arg-type]
+
+
+def test_parsed_provider_output_contains_only_shared_records_and_source_identity(
+) -> None:
+    source = ProviderSourceMetadata(
+        source_code="eoddata_daily",
+        parser_version="csv.v1",
+    )
+    output = ParsedProviderOutput(
+        sources=(source,),
+        batches=(ParsedListingBatch(listing=_listing(), bars=(_bar(),)),),
+    )
+
+    assert output.listing_count == 1
+    assert output.bar_count == 1
+    assert output.parser_version_for("eoddata_daily") == "csv.v1"
+    assert json.loads(json.dumps(output.to_dict()))["sources"] == [
+        {
+            "source_code": "eoddata_daily",
+            "parser_version": "csv.v1",
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    ("sources", "batches", "message"),
+    [
+        ([], (), "sources"),
+        ((), (), "sources must not be empty"),
+        ((object(),), (), "sources"),
+        (
+            (
+                ProviderSourceMetadata("eoddata_daily", "v1"),
+                ProviderSourceMetadata("eoddata_daily", "v2"),
+            ),
+            (),
+            "unique source_code",
+        ),
+        ((ProviderSourceMetadata("eoddata_daily", "v1"),), [], "batches"),
+        (
+            (ProviderSourceMetadata("eoddata_daily", "v1"),),
+            (object(),),
+            "batches",
+        ),
+    ],
+)
+def test_parsed_provider_output_rejects_invalid_members(
+    sources: object,
+    batches: object,
+    message: str,
+) -> None:
+    with pytest.raises((TypeError, ValueError), match=message):
+        ParsedProviderOutput(  # type: ignore[arg-type]
+            sources=sources,
+            batches=batches,
+        )
+
+
+@pytest.mark.parametrize(
+    ("source_code", "parser_version", "message"),
+    [
+        ("EODDATA_DAILY", "v1", "source_code"),
+        ("eoddata/daily", "v1", "source_code"),
+        ("eoddata_daily", "bad version", "parser_version"),
+        ("eoddata_daily", "", "parser_version"),
+    ],
+)
+def test_provider_source_metadata_rejects_invalid_identifiers(
+    source_code: str,
+    parser_version: str,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        ProviderSourceMetadata(
+            source_code=source_code,
+            parser_version=parser_version,
+        )
 
 
 def test_persistence_counts_are_disjoint_and_json_ready() -> None:
