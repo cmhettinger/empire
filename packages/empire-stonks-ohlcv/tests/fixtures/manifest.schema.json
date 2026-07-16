@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://empire.local/schemas/stonks-ohlcv-fixture-manifest.json",
+  "title": "Empire Stonks OHLCV provider fixture manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "provider_code",
+    "source_code",
+    "parser_version",
+    "format_reference",
+    "provenance",
+    "payload_file",
+    "payload_size_bytes",
+    "payload_sha256",
+    "sanitization",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider_code": {
+      "enum": ["EODDATA", "STOOQ", "YAHOO"]
+    },
+    "source_code": {
+      "enum": [
+        "eoddata_symbol_list",
+        "eoddata_daily",
+        "stooq_daily",
+        "stooq_history",
+        "yahoo_daily"
+      ]
+    },
+    "parser_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "format_reference": {
+      "type": "string",
+      "pattern": "^docs/[A-Za-z0-9_./-]+\\.md#[a-z0-9-]+$"
+    },
+    "provenance": {
+      "enum": ["sanitized_excerpt", "constructed_from_documented_format"]
+    },
+    "payload_file": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "payload_size_bytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65536
+    },
+    "payload_sha256": {
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sanitization": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

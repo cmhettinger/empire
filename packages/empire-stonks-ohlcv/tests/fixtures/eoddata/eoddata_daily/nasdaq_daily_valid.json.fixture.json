@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "provider_code": "EODDATA",
+  "source_code": "eoddata_daily",
+  "parser_version": "1.0.0",
+  "format_reference": "docs/stonks/ohlcv-eoddata-daily-format.md#observed-json-format",
+  "provenance": "constructed_from_documented_format",
+  "payload_file": "nasdaq_daily_valid.json",
+  "payload_size_bytes": 443,
+  "payload_sha256": "4f1a717fd2301bea086b783c2521d2b45b329e8ab9bf435df3674e55c8c3f8c2",
+  "sanitization": [
+    "Replaced real provider symbols with fixed fictional symbols.",
+    "Replaced prices and volumes with small representative values.",
+    "Excluded all request, authentication, account, and URL data."
+  ],
+  "cases": [
+    "valid NASDAQ daily OHLCV rows",
+    "exact symbol case and punctuation",
+    "four-decimal JSON numeric text",
+    "equal open and high",
+    "zero volume"
+  ]
+}

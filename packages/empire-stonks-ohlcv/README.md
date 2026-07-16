@@ -125,6 +125,17 @@ historical records discover their own series; Yahoo has no initial broad symbol
 discovery or historical-file source. Concrete endpoints and formats remain
 owned by the later provider source-contract tasks.
 
+## Provider fixtures
+
+Parser fixtures follow [the package fixture policy](tests/fixtures/README.md).
+Each small raw payload is paired with a manifest that records its documented
+format reference, production source/parser identity, provenance, sanitization,
+size, checksum, and intended cases. Policy tests reject unmanifested,
+oversized, drifted, unsafe, or unknown-source payloads.
+
+Provider payloads are added only after repository evidence or a source-contract
+task documents the real format. Tests never acquire live fixture data.
+
 ## CLI
 
 Local commands use `bin/env-load` to load `deploy/env/local.env` before calling

@@ -1,0 +1,24 @@
+[
+  {
+    "exchangeCode": "NASDAQ",
+    "symbolCode": "EMPA",
+    "interval": "d",
+    "dateStamp": "2026-07-15",
+    "open": 10.2500,
+    "high": 10.8750,
+    "low": 10.1250,
+    "close": 10.7500,
+    "volume": 125000
+  },
+  {
+    "exchangeCode": "NASDAQ",
+    "symbolCode": "emp.B",
+    "interval": "d",
+    "dateStamp": "2026-07-15",
+    "open": 27.7900,
+    "high": 27.7900,
+    "low": 27.5900,
+    "close": 27.7096,
+    "volume": 0
+  }
+]

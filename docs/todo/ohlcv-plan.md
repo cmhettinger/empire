@@ -825,6 +825,36 @@ Yahoo likewise imports an explicitly controlled symbol set and has no broad
 listing-discovery or historical-file workflow in the initial plan. Adding
 identifiers for those unimplemented workflows would not authorize them.
 
+### Provider fixture policy
+
+Provider parser fixtures live under
+`packages/empire-stonks-ohlcv/tests/fixtures/<provider>/<source_code>/` and are
+governed by the package fixture README and manifest schema. A raw fixture is
+committed only after repository format evidence or its provider source contract
+documents the endpoint or file, syntax, native identity fields, and observed
+OHLCV fields. This prevents a synthetic guess from silently becoming the parser
+contract.
+
+Every payload has a `<payload_file>.fixture.json` sidecar recording its
+production provider/source/parser identity, repository format reference, provenance,
+sanitization, exact byte size and SHA-256, and the minimal parser cases it
+covers. Payloads are at most 64 KiB, contain only fields and records required by
+those cases, and preserve provider syntax that affects parsing. Credentials,
+authentication material, cookies, signed or query-bearing URLs, account data,
+request headers, and local paths are prohibited.
+
+Committed parser tests never call live providers. Acquisition uses injected
+transport collaborators, while parsers read fixed fixture bytes. Compressed
+payloads are allowed only when compression belongs to the documented source
+contract. Full provider downloads and large historical samples are not test
+fixtures; volume and chunk-boundary tests generate deterministic local data.
+
+No raw provider fixture is committed before its source format is evidenced. The
+initial EODData NASDAQ daily fixture is constructed from the bounded live-format
+evidence in `docs/stonks/ohlcv-eoddata-daily-format.md`; it does not finalize
+the broader E6.1 production source contract. Stooq and Yahoo fixtures remain
+deferred until T7.1/H8.1 and Y9.1 provide equivalent format evidence.
+
 Their remote APIs and file layouts do not need a forced common downloader
 interface. Provider-specific modules may acquire and parse differently as long
 as they return the shared package records and use the same persistence, Core,
