@@ -32,4 +32,5 @@ def test_public_exports_are_explicit() -> None:
         "OHLCVConfigError",
         "OHLCVParseError",
         "OHLCVPersistenceError",
+        "ProviderListing",
     ]
