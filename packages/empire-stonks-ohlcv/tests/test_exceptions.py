@@ -25,13 +25,18 @@ def test_public_exports_are_explicit() -> None:
     import empire_stonks_ohlcv
 
     assert empire_stonks_ohlcv.__all__ == [
+        "AcquiredObject",
         "EODDataCredentials",
         "DailyBar",
         "EmpireStonksOHLCVError",
+        "ImportIssue",
         "OHLCVAcquisitionError",
         "OHLCVConfig",
         "OHLCVConfigError",
         "OHLCVParseError",
         "OHLCVPersistenceError",
+        "ParsedListingBatch",
+        "PersistenceCounts",
         "ProviderListing",
+        "ProviderImportResult",
     ]

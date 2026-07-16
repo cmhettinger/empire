@@ -179,7 +179,7 @@ writes without introducing provider-specific schema branches.
 |----|--------|------|---------------|------------|
 | M3.1 | [x] | Add provider-listing dataclass | Add a typed immutable record for provider code, native market, native ticker, optional name, and instrument type defaulting to `UNKNOWN`. Validation tests cover required identity fields. | B1.2, S2.1 |
 | M3.2 | [x] | Add daily-bar dataclass | Add a typed immutable daily-bar record using `date` and `Decimal`, with optional volume and validation matching the source-field database invariants. Persisted derived values are writer-calculated rather than provider inputs. Unit tests cover valid and invalid bars. | B1.2, S2.2 |
-| M3.3 | [ ] | Add provider batch/result models | Add small JSON-ready result dataclasses for acquired objects, parsed listing/bar batches, inserted/updated/unchanged and derived-maintenance counts, failures, and warnings. | M3.1-M3.2 |
+| M3.3 | [x] | Add provider batch/result models | Add small JSON-ready result dataclasses for acquired objects, parsed listing/bar batches, inserted/updated/unchanged and derived-maintenance counts, failures, and warnings. | M3.1-M3.2 |
 | M3.4 | [ ] | Implement provider-listing writer | Add focused transactional SQL that resolves or inserts provider series idempotently and updates observational metadata without mutating canonical tables. Unit tests cover reruns and different providers/markets. | S2.3, M3.1 |
 | M3.5 | [ ] | Implement daily-bar writer | Add batched transactional current-state upserts returning inserted, updated, unchanged, and derived-updated counts. Tests cover reruns, provider corrections, following-bar derived-value recalculation, null optional fields, and constraint failures. | S2.3, M3.2-M3.4 |
 | M3.6 | [ ] | Add daily-bar query helpers | Add only the read queries needed for incremental cutoffs, per-series date ranges, freshness, coverage, and reporting. Ordering and empty-state tests pass. | M3.5 |
@@ -200,6 +200,15 @@ with source-only fields and date/Decimal/OHLCV invariant coverage in
 package tests passed (94), and Poetry lock check, `compileall`, isolated import
 smoke test, `pip check`, package sdist/wheel build, 88-column scan, and
 `git diff --check` passed (no project formatter/linter is configured).
+
+Done: 2026-07-16 — added public JSON-ready acquisition, parsed-batch,
+persistence-count, issue, and provider-import records in
+`packages/empire-stonks-ohlcv/src/empire_stonks_ohlcv/{results.py,models.py,
+__init__.py}` with coverage in `tests/{test_results.py,test_exceptions.py}`;
+focused tests passed (26), full package tests passed (120), and Poetry lock
+check, `compileall`, isolated import/JSON smoke test, `pip check`, package
+sdist/wheel build, 88-column scan, and `git diff --check` passed (no project
+formatter/linter is configured).
 
 ## Phase 4: Core Run, Object-Store, And Source-Snapshot Integration
 

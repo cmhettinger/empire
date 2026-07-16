@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 
 UNKNOWN_INSTRUMENT_TYPE_CODE = "UNKNOWN"
@@ -67,6 +68,17 @@ class ProviderListing:
         _validate_native_identity("ticker", self.ticker)
         _validate_code("instrument_type_code", self.instrument_type_code)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-ready representation without normalizing identity."""
+
+        return {
+            "provider_code": self.provider_code,
+            "market": self.market,
+            "ticker": self.ticker,
+            "name": self.name,
+            "instrument_type_code": self.instrument_type_code,
+        }
+
 
 @dataclass(frozen=True)
 class DailyBar:
@@ -102,3 +114,15 @@ class DailyBar:
             raise ValueError("low must be less than or equal to open and close.")
         if self.volume is not None and self.volume < Decimal(0):
             raise ValueError("volume must be non-negative.")
+
+    def to_dict(self) -> dict[str, str | None]:
+        """Return JSON-ready strings without losing Decimal precision."""
+
+        return {
+            "trading_date": self.trading_date.isoformat(),
+            "open": str(self.open),
+            "high": str(self.high),
+            "low": str(self.low),
+            "close": str(self.close),
+            "volume": None if self.volume is None else str(self.volume),
+        }
