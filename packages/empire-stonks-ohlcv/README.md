@@ -39,6 +39,19 @@ Credentials are excluded from config and credential representations. Use
 parameters, object metadata, reports, logs, or serialized results. Pass the
 credential object itself only to provider authentication code.
 
+## Raw object storage
+
+`store_raw_bytes()` and `store_raw_file()` persist acquired provider payloads
+through Empire Core under the active `stonks` `RunContext`. They build the
+provider/effective-date/run/source key and stable raw filename, apply the
+configured raw retention window, attach only allowlisted provider metadata, and
+return an `AcquiredObject` containing Core's computed size and SHA-256.
+
+The file helper moves its staged source by default, matching the existing
+`empire-stonks-securities` acquisition convention; callers can request a copy
+when they still own the staged file. Source-snapshot registration is a separate
+persistence step and is not performed by these storage helpers.
+
 ## CLI
 
 Local commands use `bin/env-load` to load `deploy/env/local.env` before calling
@@ -64,6 +77,6 @@ poetry run pytest
 
 ## Status
 
-This is the initial package scaffold. Provider contracts, database persistence,
-Core integration, provider import CLIs, and Airflow entrypoints are added in
-later implementation tasks.
+Shared models, provider-native persistence/query helpers, and Core raw-object
+storage are implemented. Provider contracts, source-snapshot registration,
+provider import CLIs, and Airflow entrypoints are added in later tasks.
