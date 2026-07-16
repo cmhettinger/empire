@@ -183,7 +183,7 @@ writes without introducing provider-specific schema branches.
 | M3.4 | [x] | Implement provider-listing writer | Add focused transactional SQL that resolves or inserts provider series idempotently and updates observational metadata without mutating canonical tables. Unit tests cover reruns and different providers/markets. | S2.3, M3.1 |
 | M3.5 | [x] | Implement daily-bar writer | Add batched transactional current-state upserts returning inserted, updated, unchanged, and derived-updated counts. Tests cover reruns, provider corrections, following-bar derived-value recalculation, null optional fields, and constraint failures. | S2.3, M3.2-M3.4 |
 | M3.6 | [x] | Add daily-bar query helpers | Add only the read queries needed for incremental cutoffs, per-series date ranges, freshness, coverage, and reporting. Ordering and empty-state tests pass. | M3.5 |
-| M3.7 | [ ] | Prove provider isolation | Tests prove identical market/ticker/date values from EODData, Stooq, and Yahoo remain distinct through their provider-listing IDs and cannot overwrite one another. | M3.4-M3.6 |
+| M3.7 | [x] | Prove provider isolation | Tests prove identical market/ticker/date values from EODData, Stooq, and Yahoo remain distinct through their provider-listing IDs and cannot overwrite one another. | M3.4-M3.6 |
 
 Done: 2026-07-16 — added and publicly exported immutable `ProviderListing` in
 `packages/empire-stonks-ohlcv/src/empire_stonks_ohlcv/{models.py,__init__.py}`
@@ -241,6 +241,16 @@ focused unit tests passed (5), PostgreSQL integration passed (1), full package
 tests passed (137), Flyway validated 31 migrations, and the OHLCV schema
 contract passed. `poetry check`, `compileall`, import smoke test, and `git diff
 --check` passed (no project formatter/linter is configured).
+
+Done: 2026-07-16 — added rollback-only PostgreSQL provider-isolation coverage
+in `packages/empire-stonks-ohlcv/tests/test_provider_isolation_integration.py`;
+identical EODData, Stooq, and Yahoo native market/ticker/date inputs resolved
+to distinct IDs, and an EODData correction left the Stooq/Yahoo bars and
+provider-scoped coverage unchanged. Focused PostgreSQL integration passed (1),
+full package tests passed (138), Flyway validated 31 migrations, and the OHLCV
+schema contract passed. `poetry check`, `compileall`, import smoke test,
+test-file 88-column scan, and `git diff --check` passed (no project
+formatter/linter is configured).
 
 ## Phase 4: Core Run, Object-Store, And Source-Snapshot Integration
 
