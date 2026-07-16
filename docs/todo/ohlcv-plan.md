@@ -784,6 +784,47 @@ provider factory. The transactional import boundary consumes the source
 metadata to register each source snapshot and consumes only shared listing/bar
 batches for persistence.
 
+### Source and parser identifiers
+
+Production adapters use these exact initial identities:
+
+| Provider | Purpose | `source_code` | `parser_version` |
+|----------|---------|---------------|------------------|
+| `EODDATA` | Provider symbol-list discovery | `eoddata_symbol_list` | `1.0.0` |
+| `EODDATA` | Nightly daily OHLCV | `eoddata_daily` | `1.0.0` |
+| `STOOQ` | Nightly daily OHLCV, including native series discovery | `stooq_daily` | `1.0.0` |
+| `STOOQ` | Operator-supplied historical files | `stooq_history` | `1.0.0` |
+| `YAHOO` | Controlled-symbol daily OHLCV | `yahoo_daily` | `1.0.0` |
+
+Provider codes are the existing uppercase database identifiers. Source codes
+are lowercase, provider-prefixed logical feed identifiers. They do not contain
+an exchange, ticker, effective date, schedule, endpoint version, filename, or
+file partition. For example, every supported Stooq historical partition uses
+`stooq_history`; its stable part key and raw filename distinguish the concrete
+file inside a run.
+
+A source code remains stable when a URL, host, authentication mechanism, or
+delivery filename changes without changing the logical provider feed. A
+genuinely different provider dataset receives a new source code rather than
+reusing an existing identity. Provider source-contract tasks select the remote
+endpoint and format but must use these identifiers unless the implemented feed
+is demonstrably a different logical dataset.
+
+Parser versions use numeric `MAJOR.MINOR.PATCH` text and are versioned
+independently for each source constant. A parser version changes whenever code
+can change accepted or rejected records, provider-native field interpretation,
+or shared listing/bar output for the same bytes. Package releases, run dates,
+and fixture revisions do not by themselves change it. The current source
+snapshot upsert preserves the parser version from the first registration of a
+provider/source/checksum identity; a later reparse does not rewrite that
+first-seen fact.
+
+Stooq does not need a separate listing-discovery identity because its supported
+daily and historical OHLCV records introduce their own provider-native series.
+Yahoo likewise imports an explicitly controlled symbol set and has no broad
+listing-discovery or historical-file workflow in the initial plan. Adding
+identifiers for those unimplemented workflows would not authorize them.
+
 Their remote APIs and file layouts do not need a forced common downloader
 interface. Provider-specific modules may acquire and parse differently as long
 as they return the shared package records and use the same persistence, Core,

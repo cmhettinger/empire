@@ -105,8 +105,25 @@ and parsed listings must match the active provider. Provider adapters may use
 functions or bound methods and do not share a downloader base class, registry,
 remote request model, or arbitrary metadata contract.
 
-Concrete source identifiers, provider implementations, and provider runners
-remain later tasks.
+Concrete provider endpoints, formats, implementations, and runners remain
+later tasks.
+
+Production source metadata is exposed as immutable constants:
+
+| Provider workflow | Source code | Parser version |
+|-------------------|-------------|----------------|
+| EODData symbol discovery | `eoddata_symbol_list` | `1.0.0` |
+| EODData nightly daily | `eoddata_daily` | `1.0.0` |
+| Stooq nightly daily | `stooq_daily` | `1.0.0` |
+| Stooq historical files | `stooq_history` | `1.0.0` |
+| Yahoo controlled-symbol daily | `yahoo_daily` | `1.0.0` |
+
+Source codes identify logical feeds, not endpoints, dates, symbols, or file
+partitions. Parser versions use source-specific `MAJOR.MINOR.PATCH` values and
+change when parsing or interpretation can change shared output. Stooq daily and
+historical records discover their own series; Yahoo has no initial broad symbol
+discovery or historical-file source. Concrete endpoints and formats remain
+owned by the later provider source-contract tasks.
 
 ## CLI
 

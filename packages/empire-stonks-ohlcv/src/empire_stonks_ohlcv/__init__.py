@@ -56,12 +56,21 @@ from empire_stonks_ohlcv.source_snapshots import (
     SourceSnapshotRegistration,
     upsert_provider_source_snapshot,
 )
+from empire_stonks_ohlcv.source_conventions import (
+    EODDATA_DAILY_SOURCE,
+    EODDATA_SYMBOL_LIST_SOURCE,
+    STOOQ_DAILY_SOURCE,
+    STOOQ_HISTORY_SOURCE,
+    YAHOO_DAILY_SOURCE,
+)
 
 __all__ = [
     "AcquiredObject",
     "AcquireProviderObjects",
     "DailyBarDateRange",
     "DailyBarWriteInput",
+    "EODDATA_DAILY_SOURCE",
+    "EODDATA_SYMBOL_LIST_SOURCE",
     "EODDataCredentials",
     "DailyBar",
     "EmpireStonksOHLCVError",
@@ -87,6 +96,9 @@ __all__ = [
     "ResolvedProviderListing",
     "SAFE_FAILURE_MESSAGE",
     "SourceSnapshotRegistration",
+    "STOOQ_DAILY_SOURCE",
+    "STOOQ_HISTORY_SOURCE",
+    "YAHOO_DAILY_SOURCE",
     "build_raw_filename",
     "build_raw_object_key",
     "build_run_summary",
