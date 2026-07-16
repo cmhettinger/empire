@@ -60,6 +60,12 @@ content. It reuses `stonks.provider_source_snapshot` and
 `stonks.provider_source_snapshot_object`; it does not create package-specific
 lineage tables or commit independently.
 
+Core metadata purge is lineage-safe: deleting an expired raw
+`core.stored_object` cascades only its
+`provider_source_snapshot_object` membership and clears the snapshot's nullable
+first-seen object reference. The durable source snapshot, provider listing, and
+OHLCV bars remain independent and queryable.
+
 ## CLI
 
 Local commands use `bin/env-load` to load `deploy/env/local.env` before calling

@@ -180,7 +180,7 @@ run-level operational provenance.
 | C4.1 | [x] | Define OHLCV object paths and kinds | Document deterministic storage keys for provider/date/run/source, raw filenames, object kinds, logical names, metadata, and approximately seven-day expiration. | P0.4-P0.5, B1.3 |
 | C4.2 | [x] | Add raw-object storage helper | Add package-owned helpers that store downloaded bytes/files through `ObjectStore` with the active `RunContext`, checksum, provider metadata, and expiration. Tests use an in-memory/fake object repository. | C4.1 |
 | C4.3 | [x] | Add source-snapshot persistence | Add focused Stonks persistence that upserts `provider_source_snapshot` by provider/source/checksum and links each current stored object through `provider_source_snapshot_object`. Do not duplicate these tables. | C4.2, S2.5 |
-| C4.4 | [ ] | Prove cleanup-safe lineage | Tests or database verification prove raw object purge removes snapshot-object membership while the source snapshot and OHLCV rows remain valid. | C4.3 |
+| C4.4 | [x] | Prove cleanup-safe lineage | Tests or database verification prove raw object purge removes snapshot-object membership while the source snapshot and OHLCV rows remain valid. | C4.3 |
 | C4.5 | [ ] | Add package run wrapper | Add a reusable runner that starts, completes, fails, and summarizes `core.core_run` records around provider acquisition/import work. Tests cover success and failure paths. | B1.3, M3.3, C4.2 |
 | C4.6 | [ ] | Add acquisition-to-import transaction boundary | Define and implement failure behavior between completed raw download, snapshot registration, parsing, and database writes so partial failures are reportable and safely rerunnable. | C4.3-C4.5, M3.5 |
 
@@ -206,6 +206,13 @@ focused fake-cursor/PostgreSQL tests; unit tests passed (8), PostgreSQL
 integration passed (1), the DB-backed full suite passed (157), Flyway validated
 31 migrations, and Poetry lock check, compileall, pip check, import smoke test,
 88-column scan, and `git diff --check` passed (no formatter/linter is configured).
+
+Done: 2026-07-16 — added rollback-only PostgreSQL purge-lifecycle coverage in
+`packages/empire-stonks-ohlcv/tests/test_cleanup_safe_lineage_integration.py`;
+documented the verified behavior in the package README; the focused lifecycle
+test passed (1), the DB-backed full suite passed (158), Flyway validated 31
+migrations, and Poetry lock check, compileall, pip check, 88-column scan, and
+`git diff --check` passed (no formatter/linter is configured).
 
 ## Phase 5: Provider Contract And Fixtures
 
