@@ -476,6 +476,36 @@ Core runs likewise describe import execution but are not referenced from the
 mutable OHLCV facts. Credentials must never be written into run parameters,
 summaries, object metadata, logs, reports, or Airflow task payloads.
 
+### Acquisition-to-import failure boundary
+
+Provider work uses this ordered durability boundary:
+
+1. `run_provider_import()` starts and commits the Core run.
+2. The acquisition collaborator downloads and stores each raw source through
+   Core. Core object writes are independently durable before acquisition
+   returns.
+3. The parsing collaborator fully parses the acquired objects in memory. No
+   source snapshot, provider listing, or daily bar is written while parsing.
+4. One database transaction registers every acquired source snapshot, resolves
+   every provider listing, and writes every daily bar. The boundary commits
+   once only after all writes succeed and otherwise rolls the transaction back.
+5. The run wrapper records the compact success summary after that commit.
+
+The failure contract is deliberately forward-only:
+
+| Failed stage | Durable state after failure | Retry behavior |
+|--------------|-----------------------------|----------------|
+| Acquisition | The Core run and any raw objects already stored by the collaborator remain; no OHLCV transaction has begun. | Retry may reacquire or reuse retained content. |
+| Parsing | All acquired Core raw objects remain; no source snapshot, listing, or bar from the attempt exists. | Retry may parse the retained content again. |
+| Persistence or commit | Core raw objects remain; source-snapshot, membership, listing, and bar changes from the transaction are rolled back together. | Retry repeats the same content-identity and current-state upserts. |
+| Core completion after database commit | Raw objects and all database writes remain even if the run cannot be marked successful. | Retry is safe because snapshot, listing, and bar writes are idempotent. |
+
+No failure path deletes raw evidence or attempts compensating database writes.
+`OHLCVWorkflowError` exposes only the allowlisted stage names `acquisition`,
+`parsing`, and `persistence`; the original exception remains its in-process
+cause. Core receives the fixed run error message and the safe stage only, never
+provider, parser, database, credential, URL, or payload details.
+
 ## Package And Runtime Conventions
 
 ### Package names

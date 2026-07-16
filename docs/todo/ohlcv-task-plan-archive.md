@@ -266,3 +266,66 @@ full package tests passed (138), Flyway validated 31 migrations, and the OHLCV
 schema contract passed. `poetry check`, `compileall`, import smoke test,
 test-file 88-column scan, and `git diff --check` passed (no project
 formatter/linter is configured).
+
+## Phase 4: Core Run, Object-Store, And Source-Snapshot Integration
+
+Goal: retain raw inputs briefly while preserving durable content identity and
+run-level operational provenance.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| C4.1 | [x] | Define OHLCV object paths and kinds | Document deterministic storage keys for provider/date/run/source, raw filenames, object kinds, logical names, metadata, and approximately seven-day expiration. | P0.4-P0.5, B1.3 |
+| C4.2 | [x] | Add raw-object storage helper | Add package-owned helpers that store downloaded bytes/files through `ObjectStore` with the active `RunContext`, checksum, provider metadata, and expiration. Tests use an in-memory/fake object repository. | C4.1 |
+| C4.3 | [x] | Add source-snapshot persistence | Add focused Stonks persistence that upserts `provider_source_snapshot` by provider/source/checksum and links each current stored object through `provider_source_snapshot_object`. Do not duplicate these tables. | C4.2, S2.5 |
+| C4.4 | [x] | Prove cleanup-safe lineage | Tests or database verification prove raw object purge removes snapshot-object membership while the source snapshot and OHLCV rows remain valid. | C4.3 |
+| C4.5 | [x] | Add package run wrapper | Add a reusable runner that starts, completes, fails, and summarizes `core.core_run` records around provider acquisition/import work. Tests cover success and failure paths. | B1.3, M3.3, C4.2 |
+| C4.6 | [x] | Add acquisition-to-import transaction boundary | Define and implement failure behavior between completed raw download, snapshot registration, parsing, and database writes so partial failures are reportable and safely rerunnable. | C4.3-C4.5, M3.5 |
+
+Done: 2026-07-16 — defined the Core-compatible OHLCV raw/report key,
+filename, kind, logical-name, metadata, secret-safety, and expiration contract
+in `docs/todo/ohlcv-plan.md`; focused config/secret tests passed (17), Poetry
+lock check and config import passed, the full package suite passed (133 passed,
+5 skipped), the contract/fence scans found 8 required markers and 60 balanced
+fences, and `git diff --check` passed.
+
+Done: 2026-07-16 — added public Core-backed raw byte/file storage, deterministic
+key/filename builders, metadata and run validation, retention, and fake-repository
+coverage in `packages/empire-stonks-ohlcv/{src/empire_stonks_ohlcv/object_store.py,
+tests/test_object_store.py,README.md}` plus exports; focused tests passed (10),
+the full suite passed (143 passed, 5 skipped), and Poetry lock check, compileall,
+pip check, import smoke test, sdist/wheel build, 88-column scan, and
+`git diff --check` passed (no formatter/linter is configured).
+
+Done: 2026-07-16 — added caller-transaction-owned source identity and object
+membership persistence in `packages/empire-stonks-ohlcv/src/
+empire_stonks_ohlcv/source_snapshots.py`, public exports/README guidance, and
+focused fake-cursor/PostgreSQL tests; unit tests passed (8), PostgreSQL
+integration passed (1), the DB-backed full suite passed (157), Flyway validated
+31 migrations, and Poetry lock check, compileall, pip check, import smoke test,
+88-column scan, and `git diff --check` passed (no formatter/linter is configured).
+
+Done: 2026-07-16 — added rollback-only PostgreSQL purge-lifecycle coverage in
+`packages/empire-stonks-ohlcv/tests/test_cleanup_safe_lineage_integration.py`;
+documented the verified behavior in the package README; the focused lifecycle
+test passed (1), the DB-backed full suite passed (158), Flyway validated 31
+migrations, and Poetry lock check, compileall, pip check, 88-column scan, and
+`git diff --check` passed (no formatter/linter is configured).
+
+Done: 2026-07-16 — added the injected, secret-safe Core lifecycle wrapper and
+compact run result/summary contract in
+`packages/empire-stonks-ohlcv/src/empire_stonks_ohlcv/runner.py`, public
+exports/README guidance, and success, failure, validation, and PostgreSQL
+coverage; focused unit tests passed (5), PostgreSQL integration passed (1), the
+DB-backed full suite passed (164), Flyway validated 31 migrations, and Poetry
+lock check, compileall, pip check, import smoke test, 88-column scan, and
+`git diff --check` passed (no formatter/linter is configured).
+
+Done: 2026-07-16 — added the public acquisition/parse/transaction boundary,
+allowlisted stage-safe workflow failures, and Core failure-stage summaries in
+`packages/empire-stonks-ohlcv/{src/empire_stonks_ohlcv/{import_boundary.py,
+exceptions.py,runner.py},tests/test_import_boundary*.py,README.md}` and updated
+`docs/todo/ohlcv-plan.md`; focused unit tests passed (14), focused PostgreSQL
+integration passed (1), the DB-backed full suite passed (172), Flyway validated
+31 migrations, and the OHLCV schema contract, Poetry lock check, compileall,
+pip check, import smoke test, package build, 88-column scan, and
+`git diff --check` passed (no formatter/linter is configured).

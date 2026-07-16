@@ -76,10 +76,28 @@ fixed secret-safe message and compact failure summary before re-raising the
 original exception to the caller.
 
 The wrapper accepts injected work and `RunService` collaborators for reusable
-CLI, Airflow, and test use. It owns run lifecycle only; provider acquisition,
-parsing, source-snapshot registration, and database transaction sequencing
-remain separate package operations until their provider runner tasks compose
-them.
+CLI, Airflow, and test use. It owns run lifecycle only.
+
+## Acquisition-to-import boundary
+
+`execute_import_boundary()` composes injected acquisition and parsing work with
+the shared persistence helpers. Acquisition finishes first, and Core raw-object
+writes remain independently committed. Parsing then completes in memory before
+the boundary opens one caller connection transaction for every source-snapshot,
+provider-listing, and daily-bar write. That transaction commits once on success
+and rolls back in full on any persistence or commit error.
+
+Failures raise `OHLCVWorkflowError` with only one allowlisted stage:
+`acquisition`, `parsing`, or `persistence`. `run_provider_import()` records that
+stage in its otherwise detail-free failure summary and re-raises the exception;
+provider exception text is retained only as the Python cause and is never sent
+to Core. The boundary does not delete already stored raw inputs or compensate
+successful database commits. Content-identity and current-state upserts make an
+identical retry safe after parsing, persistence, or later Core completion
+failure.
+
+The boundary accepts injected acquisition and parsing callables. Provider
+interface definitions and concrete provider runners remain later tasks.
 
 ## CLI
 
@@ -107,5 +125,6 @@ poetry run pytest
 ## Status
 
 Shared models, provider-native persistence/query helpers, Core raw-object
-storage, and source-snapshot registration are implemented. Provider contracts,
-provider import CLIs, and Airflow entrypoints are added in later tasks.
+storage, source-snapshot registration, run lifecycle, and the transactional
+import boundary are implemented. Provider contracts, provider import CLIs, and
+Airflow entrypoints are added in later tasks.

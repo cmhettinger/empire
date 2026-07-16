@@ -1,9 +1,12 @@
+import pytest
+
 from empire_stonks_ohlcv import (
     EmpireStonksOHLCVError,
     OHLCVAcquisitionError,
     OHLCVConfigError,
     OHLCVParseError,
     OHLCVPersistenceError,
+    OHLCVWorkflowError,
 )
 
 
@@ -13,12 +16,18 @@ def test_public_exception_hierarchy() -> None:
         OHLCVConfigError,
         OHLCVParseError,
         OHLCVPersistenceError,
+        OHLCVWorkflowError,
     )
 
     assert all(
         issubclass(error_type, EmpireStonksOHLCVError)
         for error_type in exception_types
     )
+
+
+def test_workflow_error_rejects_unknown_stage_text() -> None:
+    with pytest.raises(ValueError, match="acquisition, parsing, or persistence"):
+        OHLCVWorkflowError("secret provider detail")
 
 
 def test_public_exports_are_explicit() -> None:
@@ -38,6 +47,7 @@ def test_public_exports_are_explicit() -> None:
         "OHLCVConfigError",
         "OHLCVParseError",
         "OHLCVPersistenceError",
+        "OHLCVWorkflowError",
         "OHLCVRunResult",
         "ParsedListingBatch",
         "PersistenceCounts",
@@ -52,6 +62,7 @@ def test_public_exports_are_explicit() -> None:
         "build_raw_filename",
         "build_raw_object_key",
         "build_run_summary",
+        "execute_import_boundary",
         "upsert_provider_listings",
         "upsert_daily_bars",
         "upsert_provider_source_snapshot",

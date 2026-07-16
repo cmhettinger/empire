@@ -11,7 +11,7 @@ from typing import Any, TypeAlias
 from empire_core import RunContext, RunService
 
 from empire_stonks_ohlcv.config import OHLCVConfig
-from empire_stonks_ohlcv.exceptions import OHLCVConfigError
+from empire_stonks_ohlcv.exceptions import OHLCVConfigError, OHLCVWorkflowError
 from empire_stonks_ohlcv.results import ProviderImportResult
 
 
@@ -101,11 +101,15 @@ def run_provider_import(
             run_context=completed_context,
             import_result=import_result,
         )
-    except Exception:
+    except Exception as exc:
+        failed_stage = exc.stage if isinstance(exc, OHLCVWorkflowError) else None
         run_service.fail_run(
             run_context.run_id,
             SAFE_FAILURE_MESSAGE,
-            summary=build_failure_summary(provider_code),
+            summary=build_failure_summary(
+                provider_code,
+                failed_stage=failed_stage,
+            ),
         )
         raise
 
@@ -127,13 +131,20 @@ def build_run_summary(import_result: ProviderImportResult) -> dict[str, Any]:
     }
 
 
-def build_failure_summary(provider_code: str) -> dict[str, str]:
+def build_failure_summary(
+    provider_code: str,
+    *,
+    failed_stage: str | None = None,
+) -> dict[str, str]:
     """Build a detail-free Core summary for a failed provider run."""
 
-    return {
+    summary = {
         "provider_code": provider_code,
         "outcome": "failed",
     }
+    if failed_stage is not None:
+        summary["failed_stage"] = failed_stage
+    return summary
 
 
 def _validate_run_inputs(

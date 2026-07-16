@@ -13,6 +13,7 @@ from empire_stonks_ohlcv import (
     ImportIssue,
     OHLCVConfig,
     OHLCVConfigError,
+    OHLCVWorkflowError,
     PersistenceCounts,
     ProviderImportResult,
     SAFE_FAILURE_MESSAGE,
@@ -202,6 +203,33 @@ def test_failure_marks_run_with_safe_details_and_reraises() -> None:
     assert repository.failure_messages[failed.run_id] == SAFE_FAILURE_MESSAGE
     assert SECRET not in repr(failed)
     assert SECRET not in repository.failure_messages[failed.run_id]
+
+
+def test_workflow_failure_records_only_the_safe_failed_stage() -> None:
+    repository = FakeRunRepository()
+
+    def work(_run_context: RunContext) -> ProviderImportResult:
+        raise OHLCVWorkflowError("parsing") from RuntimeError(SECRET)
+
+    with pytest.raises(OHLCVWorkflowError, match="parsing"):
+        run_provider_import(
+            run_service=RunService(repository),
+            config=configured(),
+            provider_code="EODDATA",
+            job_name="stonks_ohlcv_eoddata_daily",
+            effective_date=EFFECTIVE_DATE,
+            run_type="cli",
+            runner="pytest",
+            work=work,
+        )
+
+    failed = next(iter(repository.runs.values()))
+    assert failed.summary == {
+        "provider_code": "EODDATA",
+        "outcome": "failed",
+        "failed_stage": "parsing",
+    }
+    assert SECRET not in repr(failed.summary)
 
 
 @pytest.mark.parametrize(
