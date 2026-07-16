@@ -37,6 +37,10 @@ from empire_stonks_ohlcv.results import (
     PersistenceCounts,
     ProviderImportResult,
 )
+from empire_stonks_ohlcv.source_snapshots import (
+    SourceSnapshotRegistration,
+    upsert_provider_source_snapshot,
+)
 
 __all__ = [
     "AcquiredObject",
@@ -59,10 +63,12 @@ __all__ = [
     "ProviderImportResult",
     "RAW_SOURCE_OBJECT_KIND",
     "ResolvedProviderListing",
+    "SourceSnapshotRegistration",
     "build_raw_filename",
     "build_raw_object_key",
     "upsert_provider_listings",
     "upsert_daily_bars",
+    "upsert_provider_source_snapshot",
     "select_daily_bar_date_range",
     "select_latest_trading_date",
     "select_provider_latest_trading_date",

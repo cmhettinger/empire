@@ -52,6 +52,14 @@ The file helper moves its staged source by default, matching the existing
 when they still own the staged file. Source-snapshot registration is a separate
 persistence step and is not performed by these storage helpers.
 
+`upsert_provider_source_snapshot()` performs that caller-transaction-owned
+step. It verifies the `AcquiredObject` against the current Core raw-object row,
+upserts the existing Stonks source identity by provider, source code, and Core
+checksum, and idempotently links every concrete stored object carrying that
+content. It reuses `stonks.provider_source_snapshot` and
+`stonks.provider_source_snapshot_object`; it does not create package-specific
+lineage tables or commit independently.
+
 ## CLI
 
 Local commands use `bin/env-load` to load `deploy/env/local.env` before calling
@@ -77,6 +85,6 @@ poetry run pytest
 
 ## Status
 
-Shared models, provider-native persistence/query helpers, and Core raw-object
-storage are implemented. Provider contracts, source-snapshot registration,
+Shared models, provider-native persistence/query helpers, Core raw-object
+storage, and source-snapshot registration are implemented. Provider contracts,
 provider import CLIs, and Airflow entrypoints are added in later tasks.
