@@ -8,10 +8,11 @@ from empire_stonks_ohlcv.exceptions import (
     OHLCVParseError,
     OHLCVPersistenceError,
 )
-from empire_stonks_ohlcv.models import ProviderListing
+from empire_stonks_ohlcv.models import DailyBar, ProviderListing
 
 __all__ = [
     "EODDataCredentials",
+    "DailyBar",
     "EmpireStonksOHLCVError",
     "OHLCVAcquisitionError",
     "OHLCVConfig",

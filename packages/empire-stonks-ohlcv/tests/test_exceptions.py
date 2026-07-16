@@ -26,6 +26,7 @@ def test_public_exports_are_explicit() -> None:
 
     assert empire_stonks_ohlcv.__all__ == [
         "EODDataCredentials",
+        "DailyBar",
         "EmpireStonksOHLCVError",
         "OHLCVAcquisitionError",
         "OHLCVConfig",
