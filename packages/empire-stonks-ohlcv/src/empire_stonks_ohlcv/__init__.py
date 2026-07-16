@@ -14,6 +14,7 @@ from empire_stonks_ohlcv.listings import (
     ResolvedProviderListing,
     upsert_provider_listings,
 )
+from empire_stonks_ohlcv.daily_bars import DailyBarWriteInput, upsert_daily_bars
 from empire_stonks_ohlcv.results import (
     AcquiredObject,
     ImportIssue,
@@ -24,6 +25,7 @@ from empire_stonks_ohlcv.results import (
 
 __all__ = [
     "AcquiredObject",
+    "DailyBarWriteInput",
     "EODDataCredentials",
     "DailyBar",
     "EmpireStonksOHLCVError",
@@ -40,4 +42,5 @@ __all__ = [
     "ProviderImportResult",
     "ResolvedProviderListing",
     "upsert_provider_listings",
+    "upsert_daily_bars",
 ]

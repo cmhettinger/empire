@@ -26,6 +26,7 @@ def test_public_exports_are_explicit() -> None:
 
     assert empire_stonks_ohlcv.__all__ == [
         "AcquiredObject",
+        "DailyBarWriteInput",
         "EODDataCredentials",
         "DailyBar",
         "EmpireStonksOHLCVError",
@@ -42,4 +43,5 @@ def test_public_exports_are_explicit() -> None:
         "ProviderImportResult",
         "ResolvedProviderListing",
         "upsert_provider_listings",
+        "upsert_daily_bars",
     ]

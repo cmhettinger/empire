@@ -181,7 +181,7 @@ writes without introducing provider-specific schema branches.
 | M3.2 | [x] | Add daily-bar dataclass | Add a typed immutable daily-bar record using `date` and `Decimal`, with optional volume and validation matching the source-field database invariants. Persisted derived values are writer-calculated rather than provider inputs. Unit tests cover valid and invalid bars. | B1.2, S2.2 |
 | M3.3 | [x] | Add provider batch/result models | Add small JSON-ready result dataclasses for acquired objects, parsed listing/bar batches, inserted/updated/unchanged and derived-maintenance counts, failures, and warnings. | M3.1-M3.2 |
 | M3.4 | [x] | Implement provider-listing writer | Add focused transactional SQL that resolves or inserts provider series idempotently and updates observational metadata without mutating canonical tables. Unit tests cover reruns and different providers/markets. | S2.3, M3.1 |
-| M3.5 | [ ] | Implement daily-bar writer | Add batched transactional current-state upserts returning inserted, updated, unchanged, and derived-updated counts. Tests cover reruns, provider corrections, following-bar derived-value recalculation, null optional fields, and constraint failures. | S2.3, M3.2-M3.4 |
+| M3.5 | [x] | Implement daily-bar writer | Add batched transactional current-state upserts returning inserted, updated, unchanged, and derived-updated counts. Tests cover reruns, provider corrections, following-bar derived-value recalculation, null optional fields, and constraint failures. | S2.3, M3.2-M3.4 |
 | M3.6 | [ ] | Add daily-bar query helpers | Add only the read queries needed for incremental cutoffs, per-series date ranges, freshness, coverage, and reporting. Ordering and empty-state tests pass. | M3.5 |
 | M3.7 | [ ] | Prove provider isolation | Tests prove identical market/ticker/date values from EODData, Stooq, and Yahoo remain distinct through their provider-listing IDs and cannot overwrite one another. | M3.4-M3.6 |
 
@@ -220,6 +220,17 @@ passed (1), full package tests passed (127), Flyway validated 31 migrations,
 and the OHLCV schema contract passed. Poetry lock check, `compileall`, import
 smoke test, `pip check`, package sdist/wheel build, 88-column scan, and
 `git diff --check` passed (no project formatter/linter is configured).
+
+Done: 2026-07-16 — added the caller-transaction-owned daily-bar writer and
+resolved-listing input record in
+`packages/empire-stonks-ohlcv/src/empire_stonks_ohlcv/{daily_bars.py,__init__.py}`
+with scale, duplicate-input, and rollback-only PostgreSQL coverage in
+`tests/{test_daily_bars.py,test_daily_bars_integration.py,test_exceptions.py}`;
+focused unit tests passed (4), PostgreSQL integration passed (2), full package
+tests passed (131), Flyway validated 31 migrations, and the OHLCV schema
+contract passed. Poetry lock check, `compileall`, import smoke test, `pip
+check`, package sdist/wheel build, 88-column scan, and `git diff --check`
+passed (no project formatter/linter is configured).
 
 ## Phase 4: Core Run, Object-Store, And Source-Snapshot Integration
 
