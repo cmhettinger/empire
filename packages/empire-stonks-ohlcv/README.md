@@ -66,6 +66,21 @@ Core metadata purge is lineage-safe: deleting an expired raw
 first-seen object reference. The durable source snapshot, provider listing, and
 OHLCV bars remain independent and queryable.
 
+## Core run lifecycle
+
+`run_provider_import()` starts the approved provider job through Core, passes
+the active `RunContext` to package-owned work, and completes or fails the run.
+Successful Core summaries contain only provider and import counts; acquired
+object details and issue text remain outside the run record. Failures store a
+fixed secret-safe message and compact failure summary before re-raising the
+original exception to the caller.
+
+The wrapper accepts injected work and `RunService` collaborators for reusable
+CLI, Airflow, and test use. It owns run lifecycle only; provider acquisition,
+parsing, source-snapshot registration, and database transaction sequencing
+remain separate package operations until their provider runner tasks compose
+them.
+
 ## CLI
 
 Local commands use `bin/env-load` to load `deploy/env/local.env` before calling
