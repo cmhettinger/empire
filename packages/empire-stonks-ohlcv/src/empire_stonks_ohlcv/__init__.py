@@ -9,6 +9,11 @@ from empire_stonks_ohlcv.exceptions import (
     OHLCVPersistenceError,
 )
 from empire_stonks_ohlcv.models import DailyBar, ProviderListing
+from empire_stonks_ohlcv.listings import (
+    ProviderListingWriteResult,
+    ResolvedProviderListing,
+    upsert_provider_listings,
+)
 from empire_stonks_ohlcv.results import (
     AcquiredObject,
     ImportIssue,
@@ -31,5 +36,8 @@ __all__ = [
     "ParsedListingBatch",
     "PersistenceCounts",
     "ProviderListing",
+    "ProviderListingWriteResult",
     "ProviderImportResult",
+    "ResolvedProviderListing",
+    "upsert_provider_listings",
 ]

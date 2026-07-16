@@ -38,5 +38,8 @@ def test_public_exports_are_explicit() -> None:
         "ParsedListingBatch",
         "PersistenceCounts",
         "ProviderListing",
+        "ProviderListingWriteResult",
         "ProviderImportResult",
+        "ResolvedProviderListing",
+        "upsert_provider_listings",
     ]
