@@ -15,6 +15,14 @@ from empire_stonks_ohlcv.listings import (
     upsert_provider_listings,
 )
 from empire_stonks_ohlcv.daily_bars import DailyBarWriteInput, upsert_daily_bars
+from empire_stonks_ohlcv.queries import (
+    DailyBarDateRange,
+    ProviderListingCoverage,
+    select_daily_bar_date_range,
+    select_latest_trading_date,
+    select_provider_latest_trading_date,
+    select_provider_listing_coverage,
+)
 from empire_stonks_ohlcv.results import (
     AcquiredObject,
     ImportIssue,
@@ -25,6 +33,7 @@ from empire_stonks_ohlcv.results import (
 
 __all__ = [
     "AcquiredObject",
+    "DailyBarDateRange",
     "DailyBarWriteInput",
     "EODDataCredentials",
     "DailyBar",
@@ -38,9 +47,14 @@ __all__ = [
     "ParsedListingBatch",
     "PersistenceCounts",
     "ProviderListing",
+    "ProviderListingCoverage",
     "ProviderListingWriteResult",
     "ProviderImportResult",
     "ResolvedProviderListing",
     "upsert_provider_listings",
     "upsert_daily_bars",
+    "select_daily_bar_date_range",
+    "select_latest_trading_date",
+    "select_provider_latest_trading_date",
+    "select_provider_listing_coverage",
 ]

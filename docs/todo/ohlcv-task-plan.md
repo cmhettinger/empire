@@ -182,7 +182,7 @@ writes without introducing provider-specific schema branches.
 | M3.3 | [x] | Add provider batch/result models | Add small JSON-ready result dataclasses for acquired objects, parsed listing/bar batches, inserted/updated/unchanged and derived-maintenance counts, failures, and warnings. | M3.1-M3.2 |
 | M3.4 | [x] | Implement provider-listing writer | Add focused transactional SQL that resolves or inserts provider series idempotently and updates observational metadata without mutating canonical tables. Unit tests cover reruns and different providers/markets. | S2.3, M3.1 |
 | M3.5 | [x] | Implement daily-bar writer | Add batched transactional current-state upserts returning inserted, updated, unchanged, and derived-updated counts. Tests cover reruns, provider corrections, following-bar derived-value recalculation, null optional fields, and constraint failures. | S2.3, M3.2-M3.4 |
-| M3.6 | [ ] | Add daily-bar query helpers | Add only the read queries needed for incremental cutoffs, per-series date ranges, freshness, coverage, and reporting. Ordering and empty-state tests pass. | M3.5 |
+| M3.6 | [x] | Add daily-bar query helpers | Add only the read queries needed for incremental cutoffs, per-series date ranges, freshness, coverage, and reporting. Ordering and empty-state tests pass. | M3.5 |
 | M3.7 | [ ] | Prove provider isolation | Tests prove identical market/ticker/date values from EODData, Stooq, and Yahoo remain distinct through their provider-listing IDs and cannot overwrite one another. | M3.4-M3.6 |
 
 Done: 2026-07-16 — added and publicly exported immutable `ProviderListing` in
@@ -231,6 +231,16 @@ tests passed (131), Flyway validated 31 migrations, and the OHLCV schema
 contract passed. Poetry lock check, `compileall`, import smoke test, `pip
 check`, package sdist/wheel build, 88-column scan, and `git diff --check`
 passed (no project formatter/linter is configured).
+
+Done: 2026-07-16 — added public read-only incremental-cutoff, per-series
+date-range, provider-freshness, and ordered provider-coverage helpers in
+`packages/empire-stonks-ohlcv/src/empire_stonks_ohlcv/{queries.py,__init__.py}`
+with JSON/export, ordering, and empty-state coverage in
+`tests/{test_queries.py,test_queries_integration.py,test_exceptions.py}`;
+focused unit tests passed (5), PostgreSQL integration passed (1), full package
+tests passed (137), Flyway validated 31 migrations, and the OHLCV schema
+contract passed. `poetry check`, `compileall`, import smoke test, and `git diff
+--check` passed (no project formatter/linter is configured).
 
 ## Phase 4: Core Run, Object-Store, And Source-Snapshot Integration
 
