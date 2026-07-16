@@ -532,7 +532,7 @@ Yahoo scheduling may remain manual or symbol-limited if its implemented source
 contract does not justify a full nightly schedule. Historical Stooq import is an
 operator CLI, not a scheduled backfill DAG in the initial scope.
 
-### Object-store names
+### Object-store contract
 
 The object-store key prefix is configured by:
 
@@ -546,35 +546,122 @@ with default:
 stonks/ohlcv
 ```
 
-Raw objects use a deterministic shape equivalent to:
+The runtime normalizes the prefix by removing surrounding `/` characters. The
+result must be a non-empty relative key; empty path segments and `.` or `..`
+segments are invalid. OHLCV uses the existing Core `global` storage root, a
+required active `RunContext`, `object_scope = run`, and `domain = stonks`.
+Package code does not import `empire-stonks-securities`, but follows its
+Core-owned object fields and run/date partitioning conventions.
+
+#### Run object keys
+
+Raw objects use this exact key shape:
 
 ```text
-stonks/ohlcv/<provider>/runs/YYYY/MM/DD/<run_id>/<source_code>/
+<storage_key>/<provider>/runs/YYYY/MM/DD/<run_id>/<source_code>
 ```
 
-Provider reports use:
+The path components have these meanings:
+
+- `<storage_key>` is the normalized configured prefix.
+- `<provider>` is the lowercase form of the uppercase database provider code.
+- `YYYY/MM/DD` comes from the run's explicit effective date, not wall-clock
+  storage time. Provider runners must always supply that date.
+- `<run_id>` is the canonical lowercase UUID text from the active Core run.
+- `<source_code>` is the stable lowercase provider-prefixed feed identifier.
+
+Provider and source path values must match
+`[a-z0-9]+(?:[_-][a-z0-9]+)*`; path separators, whitespace, and dot segments
+are rejected. Exact source codes and parser versions remain owned by the
+provider source-contract tasks. Including the run ID makes every attempt
+distinct, while all objects from one run remain predictable from its effective
+date and provider.
+
+Health and historical-backfill reports use these keys and filenames:
 
 ```text
-stonks/ohlcv/<provider>/runs/YYYY/MM/DD/<run_id>/run-reports/health/
+<storage_key>/<provider>/runs/YYYY/MM/DD/<run_id>/run-reports/health
+    health.json
+<storage_key>/<provider>/runs/YYYY/MM/DD/<run_id>/run-reports/backfill
+    backfill.json
 ```
 
-Initial object kinds are:
+#### Raw filenames
+
+A source adapter declares a fixed lowercase format suffix as part of its source
+contract. One-payload sources use `raw.<format_suffix>`. A multipart source uses
+`raw-<part_key>.<format_suffix>`, where `<part_key>` is a stable, path-safe
+provider file or request-part identity. Examples include `raw.json`,
+`raw.csv.gz`, and `raw-2026-q1.zip`.
+
+`<part_key>` uses the same safe-token rule as provider and source path values.
+`<format_suffix>` must match `[a-z0-9]+(?:\.[a-z0-9]+)*` and is fixed by the
+source contract rather than inferred from untrusted response data.
+
+The suffix and optional part key must be derived from the source contract and
+request scope. Response timestamps, random values, URL query strings,
+`Content-Disposition`, and unsanitized provider basenames must not determine the
+stored filename. A run may contain only one object for an exact
+`(source_code, filename)` pair; adapters split distinct payloads with distinct
+stable part keys. Metadata stays in `core.stored_object.metadata`; OHLCV does
+not create a metadata sidecar object.
+
+#### Core object fields
+
+The initial object fields are:
+
+| Artifact | `object_kind` | `logical_name` | `content_type` |
+|----------|---------------|----------------|----------------|
+| Raw provider payload | `stonks_ohlcv_raw_source` | `<source_code>` | Actual allowlisted media type |
+| Provider health report | `stonks_ohlcv_health_report` | `stonks-ohlcv-<provider>-health` | `application/json` |
+| Historical backfill report | `stonks_ohlcv_backfill_report` | `stonks-ohlcv-<provider>-backfill` | `application/json` |
+
+The raw object's required metadata is a small secret-safe allowlist:
+
+```json
+{
+  "schema_version": 1,
+  "provider_code": "EODDATA",
+  "source_code": "eoddata_example",
+  "effective_date": "YYYY-MM-DD",
+  "acquired_at": "UTC RFC 3339 timestamp",
+  "retention_days": 7
+}
+```
+
+Once assigned by the provider source contract, `parser_version` is also stored.
+Safe scalar provider facts such as a provider file date, ETag, or last-modified
+value may be added only when the provider adapter explicitly defines them.
+Core's first-class `filename`, `content_type`, `size_bytes`, and
+`checksum_sha256` columns remain authoritative and are not duplicated in
+metadata.
+
+Report metadata uses the same `schema_version`, `provider_code`, and
+`effective_date`, plus `report_name` and a UTC RFC 3339 `generated_at`. Counts,
+failures, warnings, source semantics, and backfill bounds belong in the report
+payload rather than object metadata.
+
+Credentials, authentication headers, cookies, signed or query-bearing URLs,
+raw request headers, full configuration dictionaries, and local temporary paths
+are forbidden from object keys, filenames, logical names, metadata, and report
+payloads. A provider may record a source endpoint only after reducing it to an
+explicitly safe, credential-free identifier.
+
+#### Expiration
+
+Immediately before storing a raw object, the helper captures one UTC storage
+timestamp and sets:
 
 ```text
-stonks_ohlcv_raw_source
-stonks_ohlcv_health_report
-stonks_ohlcv_backfill_report
+expires_at = storage_timestamp
+             + EMPIRE_STONKS_OHLCV_RAW_RETENTION_DAYS
 ```
 
-Health-report logical names use:
-
-```text
-stonks-ohlcv-<provider>-health
-```
-
-Source codes are stable lowercase feed identifiers prefixed by provider, for
-example `eoddata_<feed>`, `stooq_<feed>`, and `yahoo_<feed>`. Exact feed suffixes
-and parser versions are fixed in each provider's source-contract task.
+The configured default is seven days. Expiration is based on storage time, not
+the effective date, so an old historical import still receives the full
+inspection window. Core cleanup and purge own physical deletion. Health and
+backfill reports have `expires_at = NULL` by default because they are run-level
+operational records; only raw provider payloads use the short retention setting.
 
 ## Environment And Secret Conventions
 
