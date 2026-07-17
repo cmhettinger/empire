@@ -183,6 +183,22 @@ bin/stonks-ohlcv-config --env-file deploy/env/local.example.env
 The same command is exposed as the package script `stonks-ohlcv-config` for
 installed runtimes; environment loading remains the caller's responsibility.
 
+Run the EODData daily workflow with an explicit provider date:
+
+```bash
+bin/stonks-ohlcv-eoddata-daily --effective-date 2026-07-15
+bin/stonks-ohlcv-eoddata-daily \
+  --effective-date 2026-07-15 \
+  --env-file deploy/env/local.example.env
+```
+
+The wrapper sources `bin/env-load`, defaults to `deploy/env/local.env`, and
+suppresses environment-loader status output so successful stdout is exactly one
+compact JSON object. The installed `stonks-ohlcv-eoddata-daily` package command
+expects its runtime environment to be loaded already. Invalid dates are rejected
+before opening a database connection; runtime failures print only a fixed safe
+message and return nonzero.
+
 ## EODData acquisition
 
 `acquire_eoddata_objects()` performs the package-owned EODData acquisition
@@ -333,4 +349,4 @@ storage, source-snapshot registration, run lifecycle, the transactional import
 boundary, EODData six-request acquisition, and EODData Symbol List parsing are
 implemented along with EODData Quote List parsing/reconciliation, atomic import,
 shared provider health queries, and the stored EODData report. Later provider
-parsers, the EODData CLI, and Airflow entrypoints are added in later tasks.
+parsers and Airflow entrypoints are added in later tasks.

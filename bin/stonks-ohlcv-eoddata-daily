@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/stonks-ohlcv-eoddata-daily --effective-date YYYY-MM-DD [--env-file PATH]
+
+Description:
+  Loads the Empire environment and runs the package-owned EODData daily OHLCV
+  workflow. Successful output is one compact secret-safe JSON object.
+
+Options:
+  --effective-date DATE  Required provider Quote List date in YYYY-MM-DD form.
+  --env-file PATH        Load an environment file before running.
+                         Defaults to deploy/env/local.env.
+  -h, --help             Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      ARGS+=("$@")
+      break
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# shellcheck source=bin/env-load
+source "${REPO_ROOT}/bin/env-load" "${ENV_FILE}" >/dev/null
+
+PYTHON_BIN="${REPO_ROOT}/packages/empire-stonks-ohlcv/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-stonks-ohlcv/src:${REPO_ROOT}/packages/empire-core/src${PYTHONPATH:+:${PYTHONPATH}}"
+
+if ! "${PYTHON_BIN}" -c 'import empire_core, empire_stonks_ohlcv' >/dev/null 2>&1; then
+  echo "ERROR: empire-stonks-ohlcv dependencies are not installed for ${PYTHON_BIN}." >&2
+  echo "       Run: cd packages/empire-stonks-ohlcv && poetry install" >&2
+  exit 1
+fi
+
+exec "${PYTHON_BIN}" -m empire_stonks_ohlcv.scripts.eoddata_daily "${ARGS[@]}"

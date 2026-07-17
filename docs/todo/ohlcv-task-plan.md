@@ -189,7 +189,7 @@ values provider-native.
 | E6.7 | [x] | Implement EODData health queries | Add the first deterministic health queries for the shared report contract, parameterized by provider and exercised for EODData across NYSE, NASDAQ, and AMEX. Include active/inactive handling and validate existing indexes against representative fixture volume before adding any new index. | E6.5-E6.6 |
 | E6.8 | [x] | Build and store EODData report | Produce a common Empire-style JSON report with per-source and per-market acquisition, parse, validation, listing-write, and bar-write counts; duplicate and cross-feed mismatch outcomes; freshness, coverage, stale series, gap warnings, bounded failures/warnings, and native-semantics notes. Store it under the active Core run; tests cover provider/market scoping, paths, metadata, and secret safety. | E6.6-E6.7, C4.2, C4.5 |
 | E6.9 | [x] | Add EODData daily runner | Add package-owned sequencing for the ordered Symbol List and Quote List acquisition, parsing/reconciliation, atomic snapshot/listing/bar persistence, reporting, and Core run completion/failure. Support an explicit effective date and return only a compact secret-safe result. Tests cover success, acquisition/parse/persistence/report failures, partial raw evidence, and rerun behavior. | E6.8, B1.8 |
-| E6.10 | [ ] | Add EODData CLI | Add an operator CLI and `bin` wrapper that receives `deploy/env/local.env` through `bin/env-load`, supports an explicit effective date, calls the package daily runner, and emits its secret-safe JSON summary without duplicating sequencing. | E6.9, B1.8 |
+| E6.10 | [x] | Add EODData CLI | Add an operator CLI and `bin` wrapper that receives `deploy/env/local.env` through `bin/env-load`, supports an explicit effective date, calls the package daily runner, and emits its secret-safe JSON summary without duplicating sequencing. | E6.9, B1.8 |
 | E6.11 | [ ] | Add EODData nightly DAG | Add one thin scheduled DAG that obtains Airflow context/config from the Compose environment, derives or receives the intended effective date, calls the package daily runner, and returns only small secret-safe summaries/object IDs. DAG tests cover schedule relative to documented delivery timing, catchup, overlap, context, effective date, and imports. | E6.9-E6.10, B1.5-B1.7 |
 | E6.12 | [ ] | Verify EODData Airflow discovery | Rebuild/restart the Airflow image as required and verify the EODData DAG appears with its intended schedule/tags and imports without credentials in the DAG source. | E6.11 |
 | E6.13 | [ ] | Run EODData six-object fixture vertical test | Run the full three-exchange Symbol List plus Quote List fixture path through the DAG-callable package runner and stored report. Confirm one Core run, six raw objects and snapshot memberships, atomic listing-before-bar persistence, separate listing/bar counts, duplicate and mismatch reporting, market isolation, and the durable run/object/snapshot/report chain; then prove a rerun is unchanged. | E6.11-E6.12, S2.6 |
@@ -295,6 +295,20 @@ composition, secret safety, and same-date reruns with distinct Core run IDs and
 unchanged counts. The full configured suite passed (314) with no skips.
 Poetry check/build, compileall, pip check, public import, 88-column scan,
 secret-key scan, and `git diff --check` passed.
+
+Done: 2026-07-17 — added the `stonks-ohlcv-eoddata-daily` package command and
+executable `bin/stonks-ohlcv-eoddata-daily` wrapper. The wrapper extracts only
+`--env-file`, sources `bin/env-load` with `deploy/env/local.env` by default, and
+delegates an explicit `--effective-date YYYY-MM-DD` to the command module. The
+module loads environment-only configuration, constructs Core database/run/
+object services, calls `run_eoddata_daily()` once, and prints one sorted compact
+JSON result; it contains no provider sequencing. Invalid dates stop before the
+database opens, and runtime failures emit only a fixed non-secret message with a
+nonzero exit. CLI, wrapper syntax/help/executable-mode, entrypoint, delegation,
+failure, and secret-safety tests passed; the full configured suite passed (321)
+with no skips.
+Poetry install/check/build, installed command help, compileall, pip check,
+88-column scan, shell syntax, secret-key scan, and `git diff --check` passed.
 
 ## Phase 7: Stooq Daily End-To-End Vertical Slice
 
