@@ -1,0 +1,34 @@
+[
+  {
+    "code": "COMP",
+    "name": "Compatible Systems",
+    "type": "Equity",
+    "currency": "USD",
+    "close": 20.00
+  },
+  {
+    "code": "COMP",
+    "name": null,
+    "type": "Equity",
+    "currency": "USD",
+    "close": 99.00
+  },
+  {
+    "code": "MIN.I",
+    "name": "",
+    "type": 7,
+    "currency": " "
+  },
+  {
+    "code": "CLASH",
+    "name": "Conflict One",
+    "type": "Equity",
+    "currency": "CAD"
+  },
+  {
+    "code": "CLASH",
+    "name": "Conflict Two",
+    "type": "Equity",
+    "currency": "USD"
+  }
+]

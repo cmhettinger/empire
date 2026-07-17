@@ -150,8 +150,8 @@ task documents the real format. Tests never acquire live fixture data.
 
 Provider parser tests reuse `tests/parser_contract.py`. They adapt their parser
 to a bytes-in callable and provide exact valid and invalid cases, declaring
-whether their documented source permits absent volume. The assertions verify
-provider and native identity, optional/required volume behavior,
+whether a bar source permits absent volume or is listing-only. The assertions
+verify provider and native identity, optional/required volume behavior,
 `date`/`Decimal` types, deterministic ordered output, and deterministic
 `OHLCVParseError` rejection. This test seam does not impose one production
 parser signature.
@@ -205,6 +205,20 @@ partitions remain durable when a later request fails, while response bodies,
 query-bearing URLs, and transport exception details are excluded from surfaced
 errors and Core metadata.
 
+## EODData Symbol List parsing
+
+`parse_eoddata_symbol_list()` parses one trusted NYSE, NASDAQ, or AMEX Symbol
+List payload. It preserves the exact provider code as the ticker, always emits
+the shared `UNKNOWN` instrument type, retains usable `name`, `type`, and
+`currency` values, and ignores all quote-like fields in this discovery feed.
+
+Compatible duplicate codes collapse without choosing an input row. Conflicting
+descriptive values reject the whole exchange/code identity, and the provider-
+specific result returns deterministic duplicate counts plus a bounded safe
+issue sample. `to_parsed_provider_output()` adapts accepted listings to the
+shared listing-batch boundary with no bars; Quote List reconciliation owns bars
+in the next stage.
+
 ## Development
 
 Install the package environment and run its tests from this directory:
@@ -218,6 +232,6 @@ poetry run pytest
 
 Shared models, provider-native persistence/query helpers, Core raw-object
 storage, source-snapshot registration, run lifecycle, the transactional import
-boundary, and EODData six-request acquisition are implemented. Provider
-parsers, validation/reporting, provider import CLIs, and Airflow entrypoints are
-added in later tasks.
+boundary, EODData six-request acquisition, and EODData Symbol List parsing are
+implemented. Quote List and later provider parsers, validation/reporting,
+provider import CLIs, and Airflow entrypoints are added in later tasks.

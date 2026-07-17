@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "provider_code": "EODDATA",
+  "source_code": "eoddata_symbol_list",
+  "parser_version": "1.0.0",
+  "format_reference": "docs/stonks/ohlcv-eoddata-source-contract.md#symbol-list-contract",
+  "provenance": "constructed_from_documented_format",
+  "payload_file": "nyse_symbols_valid.json",
+  "payload_size_bytes": 263,
+  "payload_sha256": "4122ff513aa6493ace6a45bf0f40209bb4f443ef35eb1e81f0718e9ef8d719d9",
+  "sanitization": [
+    "Used a fixed fictional symbol and company name.",
+    "Used small representative quote-like values that the parser must ignore.",
+    "Excluded all request, authentication, account, and URL data."
+  ],
+  "cases": [
+    "valid NYSE symbol identity and descriptive metadata",
+    "quote-like Symbol List fields are ignored"
+  ]
+}

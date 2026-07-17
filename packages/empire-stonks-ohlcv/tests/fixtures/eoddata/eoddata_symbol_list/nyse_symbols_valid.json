@@ -1,0 +1,15 @@
+[
+  {
+    "code": "EMP.A",
+    "name": "Empire Alpha",
+    "type": "Equity",
+    "currency": "USD",
+    "dateStamp": "2026-07-16T00:00:00",
+    "open": 10.25,
+    "high": 10.75,
+    "low": 10.00,
+    "close": 10.50,
+    "volume": 125000,
+    "change": 0.25
+  }
+]

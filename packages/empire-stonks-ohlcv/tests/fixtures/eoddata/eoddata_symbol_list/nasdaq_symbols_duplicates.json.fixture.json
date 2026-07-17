@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "provider_code": "EODDATA",
+  "source_code": "eoddata_symbol_list",
+  "parser_version": "1.0.0",
+  "format_reference": "docs/stonks/ohlcv-eoddata-source-contract.md#symbol-list-contract",
+  "provenance": "constructed_from_documented_format",
+  "payload_file": "nasdaq_symbols_duplicates.json",
+  "payload_size_bytes": 526,
+  "payload_sha256": "dfdb24f6498f558552bff577908c98c213a883c8a8dd212b6059595d97ef12ae",
+  "sanitization": [
+    "Used fixed fictional symbols and company names.",
+    "Used small representative values for ignored and optional fields.",
+    "Excluded all request, authentication, account, and URL data."
+  ],
+  "cases": [
+    "compatible duplicate symbol rows collapse deterministically",
+    "conflicting duplicate symbol rows are rejected",
+    "missing, blank, and unexpectedly typed optional fields are omitted"
+  ]
+}

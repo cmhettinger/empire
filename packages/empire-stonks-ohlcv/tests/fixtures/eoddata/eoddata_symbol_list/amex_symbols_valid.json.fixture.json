@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "provider_code": "EODDATA",
+  "source_code": "eoddata_symbol_list",
+  "parser_version": "1.0.0",
+  "format_reference": "docs/stonks/ohlcv-eoddata-source-contract.md#symbol-list-contract",
+  "provenance": "constructed_from_documented_format",
+  "payload_file": "amex_symbols_valid.json",
+  "payload_size_bytes": 140,
+  "payload_sha256": "b210503cb9bdd55096e6c4b3fde35d750af5980c9c308628f1bf4bcd158db7de",
+  "sanitization": [
+    "Used a fixed fictional mixed-case symbol.",
+    "Used small representative values for ignored fields.",
+    "Excluded all request, authentication, account, and URL data."
+  ],
+  "cases": [
+    "valid AMEX symbol preserves exact case and punctuation",
+    "missing optional name and currency are omitted"
+  ]
+}

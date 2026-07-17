@@ -43,13 +43,18 @@ def assert_parser_contract(
     *,
     parse: ParseFixture,
     provider_code: str,
-    volume_is_optional: bool,
+    volume_is_optional: bool | None,
     valid_cases: tuple[ValidParserCase, ...],
     invalid_cases: tuple[InvalidParserCase, ...],
+    has_bars: bool = True,
 ) -> None:
     """Assert the shared provider parser behavior for supplied cases."""
 
-    assert type(volume_is_optional) is bool
+    assert type(has_bars) is bool
+    if has_bars:
+        assert type(volume_is_optional) is bool
+    else:
+        assert volume_is_optional is None
     assert valid_cases, "parser contract requires at least one valid case"
     assert invalid_cases, "parser contract requires at least one invalid case"
 
@@ -72,14 +77,19 @@ def assert_parser_contract(
             for bar in batch.bars
         )
 
-    assert any(volume is not None for volume in volumes), (
-        "parser contract requires a populated-volume case"
-    )
-    if volume_is_optional:
+    if not has_bars:
+        assert not volumes, "listing-only parser unexpectedly returned bars"
+    elif volume_is_optional:
+        assert any(volume is not None for volume in volumes), (
+            "parser contract requires a populated-volume case"
+        )
         assert any(volume is None for volume in volumes), (
             "optional-volume source requires a volume=None case"
         )
     else:
+        assert any(volume is not None for volume in volumes), (
+            "parser contract requires a populated-volume case"
+        )
         assert all(volume is not None for volume in volumes), (
             "required-volume source returned volume=None"
         )
