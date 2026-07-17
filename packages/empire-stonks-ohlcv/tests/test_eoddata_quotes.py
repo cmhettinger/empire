@@ -345,6 +345,54 @@ def test_same_ticker_is_isolated_across_all_exchange_partitions() -> None:
     assert all(result.bar_count == 1 for result in results)
 
 
+def test_reconciled_result_builds_shared_validation_counts_and_issues() -> None:
+    symbol_list = _symbols(
+        "NYSE",
+        {"code": "DUP", "name": "Compatible"},
+        {"code": "DUP", "name": "Compatible"},
+        {"code": "BAD", "name": "First"},
+        {"code": "BAD", "name": "Second"},
+    )
+    quote_result = parse_eoddata_quote_list(
+        b"[]",
+        exchange="NYSE",
+        effective_date=EFFECTIVE_DATE,
+        symbol_list=symbol_list,
+    )
+
+    result = quote_result.to_validation_result(symbol_list=symbol_list)
+
+    assert tuple(item.to_dict() for item in result.feed_counts) == (
+        {
+            "source_code": "eoddata_symbol_list",
+            "market": "NYSE",
+            "input_rows": 4,
+            "accepted_records": 1,
+            "rejected_records": 1,
+            "duplicate_rows_collapsed": 1,
+            "warning_count": 1,
+        },
+        {
+            "source_code": "eoddata_daily",
+            "market": "NYSE",
+            "input_rows": 0,
+            "accepted_records": 0,
+            "rejected_records": 0,
+            "duplicate_rows_collapsed": 0,
+            "warning_count": 1,
+        },
+    )
+    assert result.output.listing_count == 1
+    assert result.output.bar_count == 0
+    assert result.failures.total_count == 1
+    assert result.failures.samples[0].record_reference == "NYSE:BAD"
+    assert result.warnings.total_count == 2
+    assert tuple(issue.code for issue in result.warnings.samples) == (
+        "eoddata_symbol_duplicates_collapsed",
+        "eoddata_quote_list_empty",
+    )
+
+
 def test_quote_parser_passes_shared_contract_for_all_exchanges() -> None:
     nasdaq_symbols = _symbols(
         "NASDAQ",

@@ -1018,6 +1018,10 @@ framework unless later requirements justify one.
 Each provider vertical slice includes its own validation, stored health report,
 runner, and Airflow DAG before work begins on the next provider.
 
+The production severity, scoped-count, bounded-issue, freshness, stale-series,
+weekday-gap, inactive-series, and JSON report meanings are finalized in
+[`docs/stonks/ohlcv-validation-report-contract.md`](../stonks/ohlcv-validation-report-contract.md).
+
 The shared report contract should cover:
 
 - Acquisition and parse status.

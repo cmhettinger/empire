@@ -233,6 +233,20 @@ deterministic counts and bounded safe issue samples. The reconciled shared
 output retains every accepted Symbol List listing and its metadata, including
 listings without a quote, and attaches at most one daily bar to each batch.
 
+## Validation and report contract
+
+The shared validation boundary is documented in
+[`docs/stonks/ohlcv-validation-report-contract.md`](../../docs/stonks/ohlcv-validation-report-contract.md).
+`ProviderValidationResult` carries accepted shared batches alongside one
+`FeedOutcomeCounts` per source and market plus separate bounded failure and
+warning summaries. `SourceMarketWriteCounts` preserves listing and bar write
+outcomes at their distinct source/market grains for later import reports.
+
+Issue totals remain complete while safe samples are capped at 100. The report
+contract also defines active/inactive coverage, calendar and weekday freshness,
+stale candidates, and weekday-shaped gap warnings as non-calendar-authoritative
+operational heuristics.
+
 ## Development
 
 Install the package environment and run its tests from this directory:
@@ -248,5 +262,5 @@ Shared models, provider-native persistence/query helpers, Core raw-object
 storage, source-snapshot registration, run lifecycle, the transactional import
 boundary, EODData six-request acquisition, and EODData Symbol List parsing are
 implemented along with EODData Quote List parsing and reconciliation. Later
-provider parsers, validation/reporting, provider import CLIs, and Airflow
-entrypoints are added in later tasks.
+provider parsers, validation execution, health queries, stored reports, provider
+import CLIs, and Airflow entrypoints are added in later tasks.

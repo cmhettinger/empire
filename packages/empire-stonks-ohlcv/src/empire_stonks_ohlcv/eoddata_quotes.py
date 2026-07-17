@@ -21,6 +21,12 @@ from empire_stonks_ohlcv.source_conventions import (
     EODDATA_DAILY_SOURCE,
     EODDATA_SYMBOL_LIST_SOURCE,
 )
+from empire_stonks_ohlcv.validation import (
+    MAX_ISSUE_SAMPLES,
+    BoundedIssueSummary,
+    FeedOutcomeCounts,
+    ProviderValidationResult,
+)
 
 
 _ISSUE_SAMPLE_LIMIT = 100
@@ -70,6 +76,96 @@ class EODDataQuoteListParseResult:
         return ParsedProviderOutput(
             sources=(EODDATA_SYMBOL_LIST_SOURCE, EODDATA_DAILY_SOURCE),
             batches=self.batches,
+        )
+
+    def to_validation_result(
+        self,
+        *,
+        symbol_list: EODDataSymbolListParseResult,
+    ) -> ProviderValidationResult:
+        """Carry EODData feed outcomes into the shared validation boundary."""
+
+        if not isinstance(symbol_list, EODDataSymbolListParseResult):
+            raise TypeError(
+                "symbol_list must be an EODDataSymbolListParseResult."
+            )
+        if symbol_list.exchange != self.exchange:
+            raise ValueError(
+                "symbol_list exchange must match the Quote List exchange."
+            )
+        symbol_warning_count = symbol_list.compatible_duplicate_groups
+        quote_warning_count = self.compatible_duplicate_groups + int(
+            self.empty_quote_list
+        )
+        warning_samples: list[ImportIssue] = []
+        if symbol_warning_count:
+            warning_samples.append(
+                _aggregate_warning(
+                    code="eoddata_symbol_duplicates_collapsed",
+                    message="Compatible Symbol List duplicates were collapsed.",
+                    source_code=EODDATA_SYMBOL_LIST_SOURCE.source_code,
+                    exchange=self.exchange,
+                )
+            )
+        if self.compatible_duplicate_groups:
+            warning_samples.append(
+                _aggregate_warning(
+                    code="eoddata_quote_duplicates_collapsed",
+                    message="Compatible Quote List duplicates were collapsed.",
+                    source_code=EODDATA_DAILY_SOURCE.source_code,
+                    exchange=self.exchange,
+                )
+            )
+        if self.empty_quote_list:
+            warning_samples.append(
+                _aggregate_warning(
+                    code="eoddata_quote_list_empty",
+                    message="Quote List was empty for the effective date.",
+                    source_code=EODDATA_DAILY_SOURCE.source_code,
+                    exchange=self.exchange,
+                )
+            )
+        failure_samples = (symbol_list.issues + self.issues)[
+            :MAX_ISSUE_SAMPLES
+        ]
+        return ProviderValidationResult(
+            output=self.to_parsed_provider_output(),
+            feed_counts=(
+                FeedOutcomeCounts(
+                    source_code=EODDATA_SYMBOL_LIST_SOURCE.source_code,
+                    market=self.exchange,
+                    input_rows=symbol_list.row_count,
+                    accepted_records=symbol_list.listing_count,
+                    rejected_records=(
+                        symbol_list.conflicting_duplicate_groups
+                    ),
+                    duplicate_rows_collapsed=(
+                        symbol_list.collapsed_duplicate_rows
+                    ),
+                    warning_count=symbol_warning_count,
+                ),
+                FeedOutcomeCounts(
+                    source_code=EODDATA_DAILY_SOURCE.source_code,
+                    market=self.exchange,
+                    input_rows=self.row_count,
+                    accepted_records=self.bar_count,
+                    rejected_records=(
+                        self.conflicting_duplicate_groups
+                        + self.invalid_quote_groups
+                        + self.unmatched_quote_groups
+                    ),
+                    duplicate_rows_collapsed=self.collapsed_duplicate_rows,
+                    warning_count=quote_warning_count,
+                ),
+            ),
+            failures=BoundedIssueSummary(
+                total_count=symbol_list.issue_count + self.issue_count,
+                samples=failure_samples,
+            ),
+            warnings=BoundedIssueSummary(
+                total_count=symbol_warning_count + quote_warning_count,
+                samples=tuple(warning_samples),
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -341,4 +437,19 @@ def _append_issue(
             source_code=EODDATA_DAILY_SOURCE.source_code,
             record_reference=f"{exchange}:{ticker}",
         )
+    )
+
+
+def _aggregate_warning(
+    *,
+    code: str,
+    message: str,
+    source_code: str,
+    exchange: str,
+) -> ImportIssue:
+    return ImportIssue(
+        code=code,
+        message=message,
+        source_code=source_code,
+        record_reference=exchange,
     )
