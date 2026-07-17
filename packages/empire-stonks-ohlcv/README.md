@@ -26,11 +26,21 @@ EMPIRE_STONKS_OHLCV_HTTP_TIMEOUT_SECONDS=30
 EMPIRE_STONKS_OHLCV_MAX_RETRIES=3
 ```
 
-EODData acquisition uses this runtime credential:
+EODData nightly acquisition uses:
 
 ```text
-EMPIRE_STONKS_OHLCV_EODDATA_API_KEY
+EMPIRE_STONKS_OHLCV_EODDATA_API_KEY=<required secret>
+EMPIRE_STONKS_OHLCV_EODDATA_BASE_URL=https://api.eoddata.com
+EMPIRE_STONKS_OHLCV_EODDATA_EXCHANGES=NYSE,NASDAQ,AMEX
 ```
+
+The initial source contract makes Symbol List requests for all three exchanges
+before their effective-date Quote List requests. It stores six exchange-scoped
+JSON objects and keeps EODData name/type/currency data best-effort on provider
+listings while leaving `instrument_type_code` as `UNKNOWN`. See
+[`docs/stonks/ohlcv-eoddata-source-contract.md`](../../docs/stonks/ohlcv-eoddata-source-contract.md)
+for request, duplicate, reconciliation, delivery, and provider-native value
+semantics.
 
 Stooq and Yahoo do not require credentials in the current package contract.
 
@@ -105,8 +115,9 @@ and parsed listings must match the active provider. Provider adapters may use
 functions or bound methods and do not share a downloader base class, registry,
 remote request model, or arbitrary metadata contract.
 
-Concrete provider endpoints, formats, implementations, and runners remain
-later tasks.
+The EODData endpoints and formats are selected in its source contract. Their
+acquisition, parsing, reporting, and runner implementations remain later Phase
+6 tasks. Stooq and Yahoo endpoints remain later provider-contract tasks.
 
 Production source metadata is exposed as immutable constants:
 
@@ -122,8 +133,9 @@ Source codes identify logical feeds, not endpoints, dates, symbols, or file
 partitions. Parser versions use source-specific `MAJOR.MINOR.PATCH` values and
 change when parsing or interpretation can change shared output. Stooq daily and
 historical records discover their own series; Yahoo has no initial broad symbol
-discovery or historical-file source. Concrete endpoints and formats remain
-owned by the later provider source-contract tasks.
+discovery or historical-file source. EODData's concrete endpoints are selected
+in its source contract; Stooq and Yahoo endpoints remain owned by their later
+provider source-contract tasks.
 
 ## Provider fixtures
 

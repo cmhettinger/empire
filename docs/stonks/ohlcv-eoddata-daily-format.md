@@ -3,10 +3,11 @@
 ## Scope
 
 This note records the evidence used to construct the first sanitized EODData
-daily parser fixture for A5.3. It is not the full production source contract
-required by E6.1: authentication behavior, retry/error bodies, native price
-adjustment semantics, delivery timing, and production request bounds remain to
-be finalized there.
+daily parser fixture for A5.3. The full production interpretation is now
+defined by
+[`ohlcv-eoddata-source-contract.md`](ohlcv-eoddata-source-contract.md),
+including authentication, request partitions, duplicate handling, native price
+semantics, and delivery timing.
 
 ## Request evidence
 
@@ -17,6 +18,9 @@ GET <base-url>/Quote/List/<exchange>
     ?ApiKey=<runtime-secret>
     &DateStamp=YYYY-MM-DD
 ```
+
+This preserves the casing used by that evidence request. The production
+contract selects the provider-documented `apiKey` spelling.
 
 It expects HTTP 200 and a top-level JSON array. The active Empire environment
 uses `EMPIRE_STONKS_OHLCV_EODDATA_BASE_URL` and

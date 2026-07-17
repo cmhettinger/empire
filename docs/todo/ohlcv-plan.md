@@ -764,11 +764,21 @@ EMPIRE_STONKS_OHLCV_STOOQ_*
 EMPIRE_STONKS_OHLCV_YAHOO_*
 ```
 
-The initial EODData credential name is:
+The EODData nightly source contract uses:
 
 ```text
-EMPIRE_STONKS_OHLCV_EODDATA_API_KEY
+EMPIRE_STONKS_OHLCV_EODDATA_API_KEY=<required secret>
+EMPIRE_STONKS_OHLCV_EODDATA_BASE_URL=https://api.eoddata.com
+EMPIRE_STONKS_OHLCV_EODDATA_EXCHANGES=NYSE,NASDAQ,AMEX
 ```
+
+The initial workflow requires those three exchanges exactly once and requests
+them in the configured order. The base URL must be an HTTPS URL without user
+information, query, or fragment. Acquisition sends the API key only as the
+provider's `apiKey` query parameter and never exposes a query-bearing URL in an
+operational artifact. Exact request, response, filename, delivery, duplicate,
+and native-value rules are defined in
+`docs/stonks/ohlcv-eoddata-source-contract.md`.
 
 Stooq and Yahoo do not have a required secret in the approved architecture.
 If the selected source contract later requires one, it must follow the provider
@@ -861,6 +871,47 @@ Yahoo likewise imports an explicitly controlled symbol set and has no broad
 listing-discovery or historical-file workflow in the initial plan. Adding
 identifiers for those unimplemented workflows would not authorize them.
 
+### EODData selected nightly contract
+
+The authoritative EODData production contract is
+`docs/stonks/ohlcv-eoddata-source-contract.md`. One run uses an explicit US
+exchange effective date and makes six exchange-partitioned requests in this
+order:
+
+```text
+Symbol/List/NYSE
+Symbol/List/NASDAQ
+Symbol/List/AMEX
+Quote/List/NYSE?DateStamp=YYYY-MM-DD
+Quote/List/NASDAQ?DateStamp=YYYY-MM-DD
+Quote/List/AMEX?DateStamp=YYYY-MM-DD
+```
+
+The API key is also sent on every request but is omitted above deliberately.
+Each response is a separate short-lived Core JSON object. Exchange partitions
+use `raw-nyse.json`, `raw-nasdaq.json`, and `raw-amex.json` under each of the
+two established source-code keys.
+
+Symbol List supplies the exact provider ticker plus best-effort name, type, and
+currency. Type and currency remain listing JSON metadata;
+`instrument_type_code` stays `UNKNOWN`. Quote-like Symbol List fields are
+ignored. Quote List alone supplies daily OHLCV, and each accepted quote must
+match the request exchange, daily interval, explicit effective date, and an
+accepted same-exchange Symbol List identity.
+
+Compatible duplicate symbol rows coalesce only when each selected descriptive
+field has at most one distinct usable value. Conflicting symbol identities and
+conflicting duplicate bars are rejected and reported rather than resolved by
+input order. Exactly equal duplicate bars may collapse with a warning. Missing
+quotes for discovered symbols are normal; quotes without an accepted listing
+are rejected; absent symbols never cause automatic deletion or inactivation.
+
+EODData says end-of-day data may receive corrections until 7 p.m. market time,
+so the initial Airflow schedule should run no earlier than 8 p.m.
+`America/New_York`. The selected provider material does not establish the OHLC
+or volume adjustment basis. Reports must label both as unspecified and must not
+use listing currency metadata to infer or convert bar currency.
+
 ### Provider fixture policy
 
 Provider parser fixtures live under
@@ -887,8 +938,9 @@ fixtures; volume and chunk-boundary tests generate deterministic local data.
 
 No raw provider fixture is committed before its source format is evidenced. The
 initial EODData NASDAQ daily fixture is constructed from the bounded live-format
-evidence in `docs/stonks/ohlcv-eoddata-daily-format.md`; it does not finalize
-the broader E6.1 production source contract. Stooq and Yahoo fixtures remain
+evidence in `docs/stonks/ohlcv-eoddata-daily-format.md` and is interpreted by
+the production contract in
+`docs/stonks/ohlcv-eoddata-source-contract.md`. Stooq and Yahoo fixtures remain
 deferred until T7.1/H8.1 and Y9.1 provide equivalent format evidence.
 
 ### Shared parser test contract
