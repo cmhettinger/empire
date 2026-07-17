@@ -1,6 +1,13 @@
 """Reusable provider-native OHLCV ingestion utilities for Empire stonks."""
 
 from empire_stonks_ohlcv.config import EODDataCredentials, OHLCVConfig
+from empire_stonks_ohlcv.eoddata import (
+    EODDATA_CONTENT_TYPE,
+    EODDATA_PROVIDER_CODE,
+    EODDataHTTPResponse,
+    EODDataHTTPTransport,
+    acquire_eoddata_objects,
+)
 from empire_stonks_ohlcv.exceptions import (
     EmpireStonksOHLCVError,
     OHLCVAcquisitionError,
@@ -70,9 +77,13 @@ __all__ = [
     "AcquireProviderObjects",
     "DailyBarDateRange",
     "DailyBarWriteInput",
+    "EODDATA_CONTENT_TYPE",
     "EODDATA_DAILY_SOURCE",
+    "EODDATA_PROVIDER_CODE",
     "EODDATA_SYMBOL_LIST_SOURCE",
     "EODDataCredentials",
+    "EODDataHTTPResponse",
+    "EODDataHTTPTransport",
     "DailyBar",
     "EmpireStonksOHLCVError",
     "ImportIssue",
@@ -100,6 +111,7 @@ __all__ = [
     "STOOQ_DAILY_SOURCE",
     "STOOQ_HISTORY_SOURCE",
     "YAHOO_DAILY_SOURCE",
+    "acquire_eoddata_objects",
     "build_raw_filename",
     "build_raw_object_key",
     "build_run_summary",

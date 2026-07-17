@@ -181,7 +181,7 @@ values provider-native.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | E6.1 | [x] | Document EODData source, duplicate, and config contract | Specify `Symbol/List/{exchangeCode}` for listing discovery followed by `Quote/List/{exchangeCode}` for daily bars across NYSE, NASDAQ, and AMEX; finalize `EMPIRE_STONKS_OHLCV_EODDATA_*` settings, API-key authentication, explicit effective-date behavior, JSON formats, delivery timing, native price semantics, and six stable exchange-partitioned raw filenames. Map symbol `name` best-effort and preserve available `type`/`currency` only as metadata while keeping `instrument_type_code='UNKNOWN'`. Define deterministic handling and reporting for duplicate symbol identities, duplicate bars, missing descriptive fields, quote/listing mismatches, empty responses, and symbols without a quote; never infer canonical identity or automatically inactivate absent symbols. Secrets come from `deploy/env/local.env` at runtime. | A5.1-A5.2, B1.6-B1.7 |
-| E6.2 | [ ] | Implement EODData six-request acquisition | Acquire and store the three Symbol List payloads before the three Quote List payloads using deterministic exchange order, the two established source codes, stable exchange part keys, timeouts, bounded retries, clear errors, injected HTTP/object-storage dependencies, and Core raw-object storage. Tests cover all six successful objects, partial failure with retained raw evidence, retryable and non-retryable responses, invalid/empty content according to E6.1, and secret-safe errors/metadata. | E6.1, C4.2, A5.5 |
+| E6.2 | [x] | Implement EODData six-request acquisition | Acquire and store the three Symbol List payloads before the three Quote List payloads using deterministic exchange order, the two established source codes, stable exchange part keys, timeouts, bounded retries, clear errors, injected HTTP/object-storage dependencies, and Core raw-object storage. Tests cover all six successful objects, partial failure with retained raw evidence, retryable and non-retryable responses, invalid/empty content according to E6.1, and secret-safe errors/metadata. | E6.1, C4.2, A5.5 |
 | E6.3 | [ ] | Implement EODData Symbol List parser | Parse exchange-scoped Symbol List fixtures into one shared `ProviderListing` per exact `(EODDATA, exchange, code)` identity. Ignore quote-like fields in this endpoint, keep `instrument_type_code='UNKNOWN'`, retain `name`, `type`, and `currency` only on a best-effort basis, and implement the documented deterministic duplicate policy without arbitrary first/last-wins behavior. Focused and shared parser-contract tests cover all three exchanges, missing optional fields, compatible duplicates, and conflicting duplicates. | E6.1-E6.2, A5.3-A5.4 |
 | E6.4 | [ ] | Implement EODData Quote List parser and reconciliation | Parse exchange-scoped daily Quote List fixtures, require the requested exchange, daily interval, and effective trading date, and reconcile each accepted quote to the same-exchange Symbol List identity without synthesizing a canonical or unlisted series. Produce one unique shared listing batch per provider identity with its bar, while preserving symbol-list metadata. Tests cover symbols without quotes, quotes without listings, duplicate/conflicting quotes, exchange/date/interval mismatches, deterministic ordering, and NYSE/NASDAQ/AMEX ticker overlap. | E6.1-E6.3, A5.3-A5.4 |
 | E6.5 | [ ] | Define shared validation, issue, count, and report contract | Define structural OHLC checks, null/volume handling, hard failures versus row rejections and warnings, bounded issue samples, and separate listing-feed, quote-feed, listing-write, and bar-write counts by source and market. Define freshness, coverage, stale-series, and weekday-shaped gap metrics, and state that gaps are not exchange-calendar authoritative. Extend the shared result boundary only as much as required to carry deterministic accepted/rejected/warning results from parsing and validation into persistence and reporting. | E6.4, P0.3, S2.2, M3.3, M3.6 |
@@ -202,6 +202,16 @@ duplicate, reconciliation, and unspecified-adjustment rules. Focused package
 tests passed (20), combined Airflow Compose config validation passed, supplied
 JSON samples validated as arrays with 2 compatible symbol duplicate groups and
 0 duplicate quote groups, and consistency scans plus `git diff --check` passed.
+
+Done: 2026-07-17 — added environment-validated EODData source settings and
+public six-request acquisition/transport contracts in
+`packages/empire-stonks-ohlcv/src/empire_stonks_ohlcv/{config.py,eoddata.py,
+object_store.py,__init__.py}`, with deterministic Symbol-before-Quote Core
+storage, bounded transport/429/5xx retries, JSON-array and empty-feed rules,
+partial raw-evidence retention, safe market metadata, and secret-free errors.
+Focused tests passed (49), the full package suite passed (216 passed, 9
+skipped), and Poetry lock, compileall, pip check, public import, package build,
+88-column scan, and `git diff --check` passed.
 
 ## Phase 7: Stooq Daily End-To-End Vertical Slice
 

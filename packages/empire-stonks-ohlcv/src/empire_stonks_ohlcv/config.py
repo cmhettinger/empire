@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass, field
 from math import isfinite
 from typing import Self
+from urllib.parse import urlsplit
 
 from empire_stonks_ohlcv.exceptions import OHLCVConfigError
 
@@ -14,12 +15,16 @@ DEFAULT_STORAGE_KEY = "stonks/ohlcv"
 DEFAULT_RAW_RETENTION_DAYS = 7
 DEFAULT_HTTP_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_RETRIES = 3
+DEFAULT_EODDATA_BASE_URL = "https://api.eoddata.com"
+DEFAULT_EODDATA_EXCHANGES = ("NYSE", "NASDAQ", "AMEX")
 
 STORAGE_KEY_ENV = "EMPIRE_STORAGE_KEY_STONKS_OHLCV"
 RAW_RETENTION_DAYS_ENV = "EMPIRE_STONKS_OHLCV_RAW_RETENTION_DAYS"
 HTTP_TIMEOUT_SECONDS_ENV = "EMPIRE_STONKS_OHLCV_HTTP_TIMEOUT_SECONDS"
 MAX_RETRIES_ENV = "EMPIRE_STONKS_OHLCV_MAX_RETRIES"
 EODDATA_API_KEY_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_API_KEY"
+EODDATA_BASE_URL_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_BASE_URL"
+EODDATA_EXCHANGES_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_EXCHANGES"
 
 
 def _environment_int(name: str, default: int) -> int:
@@ -42,6 +47,48 @@ def _environment_float(name: str, default: float) -> float:
     except ValueError:
         pass
     raise OHLCVConfigError(f"{name} must be a number.")
+
+
+def _environment_eoddata_exchanges() -> tuple[str, ...]:
+    raw_value = os.environ.get(EODDATA_EXCHANGES_ENV)
+    if raw_value is None:
+        return DEFAULT_EODDATA_EXCHANGES
+    return tuple(item.strip() for item in raw_value.split(","))
+
+
+def _validate_eoddata_base_url(value: object) -> None:
+    if not isinstance(value, str) or not value:
+        raise OHLCVConfigError(f"{EODDATA_BASE_URL_ENV} is required.")
+    if value != value.strip() or value.endswith("/"):
+        raise OHLCVConfigError(
+            f"{EODDATA_BASE_URL_ENV} must not contain whitespace or a trailing slash."
+        )
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        raise OHLCVConfigError(f"{EODDATA_BASE_URL_ENV} is invalid.") from None
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+        or port is not None and not 1 <= port <= 65535
+    ):
+        raise OHLCVConfigError(
+            f"{EODDATA_BASE_URL_ENV} must be an HTTPS origin without credentials, "
+            "path, query, or fragment."
+        )
+
+
+def _validate_eoddata_exchanges(value: object) -> None:
+    if value != DEFAULT_EODDATA_EXCHANGES:
+        raise OHLCVConfigError(
+            f"{EODDATA_EXCHANGES_ENV} must be NYSE,NASDAQ,AMEX in that order."
+        )
 
 
 class EODDataCredentials:
@@ -90,6 +137,8 @@ class OHLCVConfig:
     raw_retention_days: int = DEFAULT_RAW_RETENTION_DAYS
     http_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS
     max_retries: int = DEFAULT_MAX_RETRIES
+    eoddata_base_url: str = DEFAULT_EODDATA_BASE_URL
+    eoddata_exchanges: tuple[str, ...] = DEFAULT_EODDATA_EXCHANGES
     eoddata_credentials: EODDataCredentials | None = field(
         default=None,
         repr=False,
@@ -111,6 +160,8 @@ class OHLCVConfig:
             )
         if self.max_retries < 0:
             raise OHLCVConfigError(f"{MAX_RETRIES_ENV} cannot be negative.")
+        _validate_eoddata_base_url(self.eoddata_base_url)
+        _validate_eoddata_exchanges(self.eoddata_exchanges)
 
     @classmethod
     def from_env(cls) -> "OHLCVConfig":
@@ -118,6 +169,10 @@ class OHLCVConfig:
 
         storage_key = os.environ.get(STORAGE_KEY_ENV, DEFAULT_STORAGE_KEY).strip()
         api_key = os.environ.get(EODDATA_API_KEY_ENV)
+        eoddata_base_url = os.environ.get(
+            EODDATA_BASE_URL_ENV,
+            DEFAULT_EODDATA_BASE_URL,
+        ).strip().rstrip("/")
 
         credentials: EODDataCredentials | None = None
         if api_key:
@@ -134,6 +189,8 @@ class OHLCVConfig:
                 DEFAULT_HTTP_TIMEOUT_SECONDS,
             ),
             max_retries=_environment_int(MAX_RETRIES_ENV, DEFAULT_MAX_RETRIES),
+            eoddata_base_url=eoddata_base_url,
+            eoddata_exchanges=_environment_eoddata_exchanges(),
             eoddata_credentials=credentials,
         )
 
@@ -154,5 +211,7 @@ class OHLCVConfig:
             "raw_retention_days": self.raw_retention_days,
             "http_timeout_seconds": self.http_timeout_seconds,
             "max_retries": self.max_retries,
+            "eoddata_base_url": self.eoddata_base_url,
+            "eoddata_exchanges": ",".join(self.eoddata_exchanges),
             "eoddata_configured": self.eoddata_credentials is not None,
         }

@@ -183,6 +183,28 @@ bin/stonks-ohlcv-config --env-file deploy/env/local.example.env
 The same command is exposed as the package script `stonks-ohlcv-config` for
 installed runtimes; environment loading remains the caller's responsibility.
 
+## EODData acquisition
+
+`acquire_eoddata_objects()` performs the package-owned EODData acquisition
+stage. It requests NYSE, NASDAQ, and AMEX Symbol List payloads first, followed
+by the three effective-date Quote List payloads, and stores every validated
+JSON array immediately through Core. The returned tuple contains six
+`AcquiredObject` references in that deterministic order.
+
+The function accepts an injected `EODDataHTTPTransport` and sleep callable for
+tests. Its default transport uses the Python standard library, keeps the API
+key separate from the base URL until the request is sent, applies the common
+timeout, and retries transport failures, HTTP 429, and HTTP 5xx responses up to
+the configured bound. Safe numeric `Retry-After` values are honored with a
+60-second cap; otherwise bounded exponential backoff is used.
+
+HTTP failures, malformed/non-array JSON, non-JSON media types, and empty Symbol
+List payloads stop acquisition with a source/exchange-specific but secret-safe
+error. Empty Quote List arrays remain valid. Successful objects from earlier
+partitions remain durable when a later request fails, while response bodies,
+query-bearing URLs, and transport exception details are excluded from surfaced
+errors and Core metadata.
+
 ## Development
 
 Install the package environment and run its tests from this directory:
@@ -195,6 +217,7 @@ poetry run pytest
 ## Status
 
 Shared models, provider-native persistence/query helpers, Core raw-object
-storage, source-snapshot registration, run lifecycle, and the transactional
-import boundary are implemented. Provider contracts, provider import CLIs, and
-Airflow entrypoints are added in later tasks.
+storage, source-snapshot registration, run lifecycle, the transactional import
+boundary, and EODData six-request acquisition are implemented. Provider
+parsers, validation/reporting, provider import CLIs, and Airflow entrypoints are
+added in later tasks.

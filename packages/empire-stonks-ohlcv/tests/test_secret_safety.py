@@ -106,5 +106,7 @@ def test_safe_dict_excludes_secrets_from_operational_surfaces() -> None:
         "raw_retention_days",
         "http_timeout_seconds",
         "max_retries",
+        "eoddata_base_url",
+        "eoddata_exchanges",
         "eoddata_configured",
     }

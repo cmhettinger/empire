@@ -18,7 +18,9 @@ def test_config_script_prints_secret_safe_json(monkeypatch, capsys) -> None:
     output = capsys.readouterr().out
     assert secret not in output
     assert json.loads(output) == {
+        "eoddata_base_url": "https://api.eoddata.com",
         "eoddata_configured": True,
+        "eoddata_exchanges": "NYSE,NASDAQ,AMEX",
         "http_timeout_seconds": 12.5,
         "max_retries": 2,
         "raw_retention_days": 5,

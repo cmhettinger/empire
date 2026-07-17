@@ -29,6 +29,7 @@ _SAFE_PROVIDER_METADATA_KEYS = frozenset(
         "etag",
         "http_status",
         "last_modified",
+        "market",
         "provider_file_date",
         "request_scope",
     }
