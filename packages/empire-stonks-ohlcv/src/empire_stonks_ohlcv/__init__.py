@@ -51,6 +51,7 @@ from empire_stonks_ohlcv.runner import (
     OHLCVRunResult,
     build_run_summary,
     run_provider_import,
+    run_provider_pipeline,
 )
 from empire_stonks_ohlcv.source_snapshots import (
     SourceSnapshotRegistration,
@@ -111,6 +112,7 @@ __all__ = [
     "select_provider_latest_trading_date",
     "select_provider_listing_coverage",
     "run_provider_import",
+    "run_provider_pipeline",
     "store_raw_bytes",
     "store_raw_file",
 ]

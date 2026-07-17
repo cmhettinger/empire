@@ -80,6 +80,7 @@ def test_public_exports_are_explicit() -> None:
         "select_provider_latest_trading_date",
         "select_provider_listing_coverage",
         "run_provider_import",
+        "run_provider_pipeline",
         "store_raw_bytes",
         "store_raw_file",
     ]

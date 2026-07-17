@@ -12,6 +12,11 @@ from empire_core import RunContext, RunService
 
 from empire_stonks_ohlcv.config import OHLCVConfig
 from empire_stonks_ohlcv.exceptions import OHLCVConfigError, OHLCVWorkflowError
+from empire_stonks_ohlcv.import_boundary import execute_import_boundary
+from empire_stonks_ohlcv.provider_contract import (
+    AcquireProviderObjects,
+    ParseProviderObjects,
+)
 from empire_stonks_ohlcv.results import ProviderImportResult
 
 
@@ -114,6 +119,56 @@ def run_provider_import(
         raise
 
 
+def run_provider_pipeline(
+    *,
+    run_service: RunService,
+    connection: Any,
+    config: OHLCVConfig,
+    provider_code: str,
+    job_name: str,
+    effective_date: date,
+    run_type: str,
+    runner: str,
+    acquire: AcquireProviderObjects,
+    parse: ParseProviderObjects,
+    subject_key: str = DEFAULT_SUBJECT_KEY,
+    runner_ref: dict[str, Any] | None = None,
+) -> OHLCVRunResult:
+    """Run injected provider acquisition and parsing through shared boundaries.
+
+    The caller owns ``connection``. This seam neither creates nor closes it, so
+    CLIs, Airflow, and tests can supply their normal runtime connection scope.
+    """
+
+    _validate_pipeline_collaborators(
+        connection=connection,
+        acquire=acquire,
+        parse=parse,
+    )
+
+    def work(run_context: RunContext) -> ProviderImportResult:
+        return execute_import_boundary(
+            connection=connection,
+            run_context=run_context,
+            provider_code=provider_code,
+            acquire=acquire,
+            parse=parse,
+        )
+
+    return run_provider_import(
+        run_service=run_service,
+        config=config,
+        provider_code=provider_code,
+        job_name=job_name,
+        effective_date=effective_date,
+        run_type=run_type,
+        runner=runner,
+        work=work,
+        subject_key=subject_key,
+        runner_ref=runner_ref,
+    )
+
+
 def build_run_summary(import_result: ProviderImportResult) -> dict[str, Any]:
     """Build the compact secret-safe Core summary for a successful run."""
 
@@ -173,3 +228,20 @@ def _validate_run_inputs(
         raise OHLCVConfigError("subject_key must be non-blank and trimmed.")
     if not callable(work):
         raise TypeError("work must be callable.")
+
+
+def _validate_pipeline_collaborators(
+    *,
+    connection: Any,
+    acquire: AcquireProviderObjects,
+    parse: ParseProviderObjects,
+) -> None:
+    for method_name in ("cursor", "commit", "rollback"):
+        if not callable(getattr(connection, method_name, None)):
+            raise TypeError(
+                "connection must provide cursor, commit, and rollback methods."
+            )
+    if not callable(acquire):
+        raise TypeError("acquire must be callable.")
+    if not callable(parse):
+        raise TypeError("parse must be callable.")

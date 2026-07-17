@@ -878,6 +878,41 @@ calls; silently normalizing, accepting, or dropping that invalid input fails
 the contract. This parser-level rule does not define the later validation
 policy or import-level rejected-row counts, which remain owned by E6.4-E6.5.
 
+### Provider runner seam
+
+`run_provider_pipeline()` composes the Core lifecycle and transactional import
+boundary while leaving provider work injected:
+
+```python
+run_provider_pipeline(
+    run_service=run_service,
+    connection=connection,
+    config=config,
+    provider_code=provider_code,
+    job_name=job_name,
+    effective_date=effective_date,
+    run_type=run_type,
+    runner=runner,
+    acquire=acquire_provider_objects,
+    parse=parse_provider_objects,
+)
+```
+
+The acquisition and parser values use the A5.1 callable aliases. The seam
+validates the connection protocol and both collaborators before starting Core,
+then delegates run start/completion/failure to `run_provider_import()` and the
+ordered acquisition/parse/transaction work to `execute_import_boundary()`.
+Provider exceptions retain the existing secret-safe workflow-stage behavior.
+
+The caller owns the injected database connection; the seam does not create,
+commit outside the import/Core boundaries, or close it. Tests use fake
+collaborators and need no network. Provider-specific daily runners added by the
+vertical slices bind real acquisition/parser implementations. A CLI or Airflow
+task remains responsible only for runtime context/configuration, connection
+scope, calling the package runner, and returning its compact JSON-ready result.
+No provider registry, downloader base class, Airflow dependency, or environment
+file loading is introduced.
+
 Their remote APIs and file layouts do not need a forced common downloader
 interface. Provider-specific modules may acquire and parse differently as long
 as they return the shared package records and use the same persistence, Core,

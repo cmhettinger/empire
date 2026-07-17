@@ -144,6 +144,19 @@ provider and native identity, optional/required volume behavior,
 `OHLCVParseError` rejection. This test seam does not impose one production
 parser signature.
 
+## Provider runner seam
+
+`run_provider_pipeline()` accepts an existing `RunService`, caller-owned
+database connection, and injected A5.1 acquisition/parser callables. It composes
+the Core lifecycle with `execute_import_boundary()` and returns the same compact
+`OHLCVRunResult`. Invalid collaborators are rejected before a Core run starts;
+workflow failures retain the secret-safe acquisition/parsing/persistence stage.
+
+The package seam performs no network access by itself and does not load an
+environment file, create a provider registry, or depend on Airflow. Future
+provider runners bind their concrete collaborators; CLI and Airflow callers
+only establish runtime scope and call the package.
+
 ## CLI
 
 Local commands use `bin/env-load` to load `deploy/env/local.env` before calling
