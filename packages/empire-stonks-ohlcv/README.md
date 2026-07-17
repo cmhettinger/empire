@@ -262,6 +262,26 @@ excluded from the daily-bar writer and reported through `skipped_inactive`.
 listing/bar persistence counts, bounded validation issues, and snapshot lineage
 without returning full bar payloads.
 
+## Provider health queries
+
+The public health helpers are provider-parameterized and return deterministic
+inputs for the stored report builder:
+
+- `select_provider_market_health()` separates active and inactive listing and
+  bar coverage by market, including active first/last stored dates.
+- `select_provider_series_health()` returns ordered coverage and freshness
+  inputs for every active and inactive provider-native series.
+- `select_provider_weekday_gaps()` counts active-series weekday-shaped gaps and
+  returns at most 100 deterministic samples. These are operational candidates,
+  not exchange-calendar-authoritative missing sessions.
+
+The queries are read-only and do not calculate report presentation or accept an
+EODData-specific exchange branch. PostgreSQL integration coverage exercises the
+same provider-scoped API for EODData across NYSE, NASDAQ, and AMEX using 4,500
+listings and 139,200 daily bars. Existing provider-listing and daily-bar primary
+and identity indexes provide the required access paths, so E6.7 adds no schema
+index.
+
 ## Development
 
 Install the package environment and run its tests from this directory:
@@ -276,6 +296,6 @@ poetry run pytest
 Shared models, provider-native persistence/query helpers, Core raw-object
 storage, source-snapshot registration, run lifecycle, the transactional import
 boundary, EODData six-request acquisition, and EODData Symbol List parsing are
-implemented along with EODData Quote List parsing and reconciliation. Later
-provider parsers, health queries, stored reports, provider import CLIs, and
-Airflow entrypoints are added in later tasks.
+implemented along with EODData Quote List parsing/reconciliation, atomic import,
+and shared provider health queries. Later provider parsers, stored reports,
+provider import CLIs, and Airflow entrypoints are added in later tasks.

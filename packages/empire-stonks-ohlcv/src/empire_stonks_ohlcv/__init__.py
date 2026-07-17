@@ -29,6 +29,15 @@ from empire_stonks_ohlcv.exceptions import (
     OHLCVWorkflowError,
 )
 from empire_stonks_ohlcv.import_boundary import execute_import_boundary
+from empire_stonks_ohlcv.health import (
+    ProviderMarketHealth,
+    ProviderSeriesHealth,
+    ProviderWeekdayGapResult,
+    WeekdayGapCandidate,
+    select_provider_market_health,
+    select_provider_series_health,
+    select_provider_weekday_gaps,
+)
 from empire_stonks_ohlcv.models import DailyBar, ProviderListing
 from empire_stonks_ohlcv.object_store import (
     RAW_SOURCE_OBJECT_KIND,
@@ -127,9 +136,12 @@ __all__ = [
     "ProviderListing",
     "ProviderListingCoverage",
     "ProviderListingWriteResult",
+    "ProviderMarketHealth",
     "ProviderImportResult",
     "ProviderSourceMetadata",
+    "ProviderSeriesHealth",
     "ProviderValidationResult",
+    "ProviderWeekdayGapResult",
     "RAW_SOURCE_OBJECT_KIND",
     "ResolvedProviderListing",
     "SAFE_FAILURE_MESSAGE",
@@ -138,6 +150,7 @@ __all__ = [
     "STOOQ_DAILY_SOURCE",
     "STOOQ_HISTORY_SOURCE",
     "YAHOO_DAILY_SOURCE",
+    "WeekdayGapCandidate",
     "acquire_eoddata_objects",
     "build_raw_filename",
     "build_raw_object_key",
@@ -153,6 +166,9 @@ __all__ = [
     "select_latest_trading_date",
     "select_provider_latest_trading_date",
     "select_provider_listing_coverage",
+    "select_provider_market_health",
+    "select_provider_series_health",
+    "select_provider_weekday_gaps",
     "run_provider_import",
     "run_provider_pipeline",
     "store_raw_bytes",

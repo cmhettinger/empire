@@ -186,7 +186,7 @@ values provider-native.
 | E6.4 | [x] | Implement EODData Quote List parser and reconciliation | Parse exchange-scoped daily Quote List fixtures, require the requested exchange, daily interval, and effective trading date, and reconcile each accepted quote to the same-exchange Symbol List identity without synthesizing a canonical or unlisted series. Produce one unique shared listing batch per provider identity with its bar, while preserving symbol-list metadata. Tests cover symbols without quotes, quotes without listings, duplicate/conflicting quotes, exchange/date/interval mismatches, deterministic ordering, and NYSE/NASDAQ/AMEX ticker overlap. | E6.1-E6.3, A5.3-A5.4 |
 | E6.5 | [x] | Define shared validation, issue, count, and report contract | Define structural OHLC checks, null/volume handling, hard failures versus row rejections and warnings, bounded issue samples, and separate listing-feed, quote-feed, listing-write, and bar-write counts by source and market. Define freshness, coverage, stale-series, and weekday-shaped gap metrics, and state that gaps are not exchange-calendar authoritative. Extend the shared result boundary only as much as required to carry deterministic accepted/rejected/warning results from parsing and validation into persistence and reporting. | E6.4, P0.3, S2.2, M3.3, M3.6 |
 | E6.6 | [x] | Implement atomic EODData import service | Validate the reconciled output, register source-snapshot membership for all six acquired objects, upsert every discovered provider listing, resolve active listing IDs, and then upsert accepted daily bars in one database transaction. Return the separate E6.5 parse/validation and persistence counts, including derived maintenance. Tests prove rollback across all snapshot/listing/bar writes on failure, inactive-listing behavior, duplicate-policy outcomes, corrections, and an unchanged idempotent rerun. | E6.2-E6.5, M3.4-M3.5, C4.3-C4.6 |
-| E6.7 | [ ] | Implement EODData health queries | Add the first deterministic health queries for the shared report contract, parameterized by provider and exercised for EODData across NYSE, NASDAQ, and AMEX. Include active/inactive handling and validate existing indexes against representative fixture volume before adding any new index. | E6.5-E6.6 |
+| E6.7 | [x] | Implement EODData health queries | Add the first deterministic health queries for the shared report contract, parameterized by provider and exercised for EODData across NYSE, NASDAQ, and AMEX. Include active/inactive handling and validate existing indexes against representative fixture volume before adding any new index. | E6.5-E6.6 |
 | E6.8 | [ ] | Build and store EODData report | Produce a common Empire-style JSON report with per-source and per-market acquisition, parse, validation, listing-write, and bar-write counts; duplicate and cross-feed mismatch outcomes; freshness, coverage, stale series, gap warnings, bounded failures/warnings, and native-semantics notes. Store it under the active Core run; tests cover provider/market scoping, paths, metadata, and secret safety. | E6.6-E6.7, C4.2, C4.5 |
 | E6.9 | [ ] | Add EODData daily runner | Add package-owned sequencing for the ordered Symbol List and Quote List acquisition, parsing/reconciliation, atomic snapshot/listing/bar persistence, reporting, and Core run completion/failure. Support an explicit effective date and return only a compact secret-safe result. Tests cover success, acquisition/parse/persistence/report failures, partial raw evidence, and rerun behavior. | E6.8, B1.8 |
 | E6.10 | [ ] | Add EODData CLI | Add an operator CLI and `bin` wrapper that receives `deploy/env/local.env` through `bin/env-load`, supports an explicit effective date, calls the package daily runner, and emits its secret-safe JSON summary without duplicating sequencing. | E6.9, B1.8 |
@@ -254,6 +254,19 @@ rollback-only PostgreSQL integration passed (1), and the full configured suite
 passed (288) with no skips, proving rollback after snapshot/listing/bar writes,
 insert, unchanged rerun, correction, inactive behavior, and duplicate outcomes.
 Poetry check/build, compileall, pip check, public import, 88-column scan, and
+`git diff --check` passed.
+
+Done: 2026-07-17 — added public provider-parameterized market coverage,
+ordered active/inactive series health, and bounded active-series weekday-gap
+queries in `empire_stonks_ohlcv/health.py`, with complete gap totals and explicit
+non-calendar-authoritative semantics. Unit tests cover deterministic ordering,
+empty states, status separation, bounds, validation, and JSON-ready results.
+The rolled-back PostgreSQL integration exercised EODData across NYSE, NASDAQ,
+and AMEX at 4,500 listings and 139,200 bars, verified 150 known active-series
+gap candidates while excluding inactive-series gaps, and confirmed the existing
+provider-listing and `pk_ohlcv_daily` access paths; no new index was added.
+The full configured package suite passed (299) with no skips, and Poetry check,
+compileall, pip check, public import, package build, 88-column scan, and
 `git diff --check` passed.
 
 ## Phase 7: Stooq Daily End-To-End Vertical Slice
