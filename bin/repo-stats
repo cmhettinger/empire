@@ -1,0 +1,268 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# repo-stats
+#
+# Purpose:
+#   Print a cleaner "how big is this repo?" snapshot for a git-based monorepo.
+#
+# Strategy:
+#   - Prefer git-tracked files only (avoids .git, __pycache__, .venv, build junk, etc.)
+#   - Run cloc only against tracked files
+#   - Show basic repo metrics plus top-level directory sizes
+#
+# Usage:
+#   repo-stats
+#   repo-stats /path/to/repo
+#   repo-stats --all               # use filesystem walk instead of git tracked files
+#   repo-stats --no-topdirs        # skip top-level dir size summary
+#
+# Requirements:
+#   - cloc
+#   - git
+#
+# Install cloc:
+#   brew install cloc
+
+USE_ALL=0
+SHOW_TOPDIRS=1
+TARGET_DIR=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --all)
+      USE_ALL=1
+      shift
+      ;;
+    --no-topdirs)
+      SHOW_TOPDIRS=0
+      shift
+      ;;
+    -h|--help)
+      sed -n '2,32p' "$0"
+      exit 0
+      ;;
+    *)
+      if [[ -z "${TARGET_DIR}" ]]; then
+        TARGET_DIR="$1"
+      else
+        echo "error: unexpected argument: $1" >&2
+        exit 1
+      fi
+      shift
+      ;;
+  esac
+done
+
+if ! command -v cloc >/dev/null 2>&1; then
+  echo "error: cloc is not installed. Run: brew install cloc" >&2
+  exit 1
+fi
+
+if [[ -z "${TARGET_DIR}" ]]; then
+  TARGET_DIR="."
+fi
+
+TARGET_DIR="$(cd "${TARGET_DIR}" && pwd)"
+
+if [[ ! -d "${TARGET_DIR}" ]]; then
+  echo "error: directory not found: ${TARGET_DIR}" >&2
+  exit 1
+fi
+
+REPO_ROOT="${TARGET_DIR}"
+IN_GIT_REPO=0
+
+if git -C "${TARGET_DIR}" rev-parse --show-toplevel >/dev/null 2>&1; then
+  REPO_ROOT="$(git -C "${TARGET_DIR}" rev-parse --show-toplevel)"
+  IN_GIT_REPO=1
+fi
+
+cd "${REPO_ROOT}"
+
+echo "============================================================"
+echo "Repo stats"
+echo "============================================================"
+echo "Root: ${REPO_ROOT}"
+echo "Mode: $( [[ ${USE_ALL} -eq 1 ]] && echo "all files (with exclusions)" || { [[ ${IN_GIT_REPO} -eq 1 ]] && echo "git-tracked files only"; } )"
+if [[ ${USE_ALL} -eq 0 && ${IN_GIT_REPO} -eq 0 ]]; then
+  echo "Mode: all files (not a git repo; using exclusions)"
+fi
+echo
+
+echo "------------------------------------------------------------"
+echo "Basic size"
+echo "------------------------------------------------------------"
+echo "Disk usage: $(du -sh . | awk '{print $1}')"
+
+if [[ ${IN_GIT_REPO} -eq 1 ]]; then
+  TRACKED_FILES="$(git ls-files | wc -l | awk '{print $1}')"
+  echo "Tracked files: ${TRACKED_FILES}"
+else
+  ALL_FILES="$(find . -type f | wc -l | awk '{print $1}')"
+  echo "Files: ${ALL_FILES}"
+fi
+echo
+
+COMMON_EXCLUDE_DIRS=".git,.svn,.hg,__pycache__,.pytest_cache,.mypy_cache,.ruff_cache,.tox,.nox,.venv,venv,node_modules,dist,build,target,out,coverage,htmlcov,.eggs,.idea,.vscode,.DS_Store"
+
+COMMON_EXCLUDE_EXT="png,jpg,jpeg,gif,webp,pdf,svg,ico,lock,min.js,min.css,pyc,pyo,json,csv"
+
+echo "------------------------------------------------------------"
+echo "CLOC summary"
+echo "------------------------------------------------------------"
+
+if [[ ${USE_ALL} -eq 0 && ${IN_GIT_REPO} -eq 1 ]]; then
+  TMPFILE="$(mktemp)"
+  trap 'rm -f "${TMPFILE}"' EXIT
+
+  git ls-files > "${TMPFILE}"
+
+  if [[ ! -s "${TMPFILE}" ]]; then
+    echo "No tracked files found."
+  else
+    cloc \
+      --list-file="${TMPFILE}" \
+      --exclude-ext="${COMMON_EXCLUDE_EXT}"
+  fi
+else
+  cloc . \
+    --exclude-dir="${COMMON_EXCLUDE_DIRS}" \
+    --exclude-ext="${COMMON_EXCLUDE_EXT}"
+fi
+echo
+
+if [[ ${SHOW_TOPDIRS} -eq 1 ]]; then
+  echo "------------------------------------------------------------"
+  echo "Top-level directory sizes"
+  echo "------------------------------------------------------------"
+  find . -mindepth 1 -maxdepth 1 -type d -not -name '.git' -print0 \
+    | xargs -0 du -sh 2>/dev/null \
+    | sort -h || true
+  echo
+fi
+
+if [[ ${IN_GIT_REPO} -eq 1 ]]; then
+  echo "------------------------------------------------------------"
+  echo "Top-level tracked file counts"
+  echo "------------------------------------------------------------"
+  git ls-files \
+    | awk -F/ '
+        NF == 1 { counts["(repo root)"]++ }
+        NF > 1  { counts[$1]++ }
+        END {
+          for (k in counts) {
+            printf "%7d  %s\n", counts[k], k
+          }
+        }
+      ' \
+    | sort -nr
+  echo
+fi
+
+echo "------------------------------------------------------------"
+echo "Summary (copy/paste)"
+echo "------------------------------------------------------------"
+
+TOTAL_CODE=""
+TOTAL_DOCS=""
+PRIMARY_CODE_LANGS=""
+DOC_LANGS=""
+
+if [[ ${USE_ALL} -eq 0 && ${IN_GIT_REPO} -eq 1 ]]; then
+  TMPFILE_SUM="$(mktemp)"
+  trap 'rm -f "${TMPFILE_SUM}"' EXIT
+
+  git ls-files > "${TMPFILE_SUM}"
+
+  CLOC_OUT="$(cloc --list-file="${TMPFILE_SUM}" --exclude-ext="${COMMON_EXCLUDE_EXT}" --quiet --csv)"
+else
+  CLOC_OUT="$(cloc . --exclude-dir="${COMMON_EXCLUDE_DIRS}" --exclude-ext="${COMMON_EXCLUDE_EXT}" --quiet --csv)"
+fi
+
+# Define doc languages here
+DOC_FILTER='^(AsciiDoc|Markdown|reStructuredText)$'
+
+# Total code LOC (excluding docs)
+TOTAL_CODE="$(echo "${CLOC_OUT}" \
+  | awk -F, -v docs="${DOC_FILTER}" '
+      NR > 1 && $2 != "SUM" && $2 !~ docs { sum += $5 }
+      END { print sum + 0 }
+    ')"
+
+# Total doc LOC
+TOTAL_DOCS="$(echo "${CLOC_OUT}" \
+  | awk -F, -v docs="${DOC_FILTER}" '
+      NR > 1 && $2 ~ docs { sum += $5 }
+      END { print sum + 0 }
+    ')"
+
+# Top 3 code languages by code size, with shell variants normalized
+PRIMARY_CODE_LANGS="$(echo "${CLOC_OUT}" \
+  | awk -F, -v docs="${DOC_FILTER}" '
+      NR > 1 && $2 != "SUM" && $2 !~ docs {
+        lang = $2
+        if (lang ~ /Shell/ || lang == "zsh" || lang == "bash") lang = "Shell"
+        code[lang] += $5
+      }
+      END {
+        for (lang in code) {
+          printf "%s,%d\n", lang, code[lang]
+        }
+      }
+    ' \
+  | sort -t, -k2 -nr \
+  | head -3 \
+  | awk -F, '{print $1}' \
+  | tr '\n' ',' \
+  | sed 's/,$//' \
+  | sed 's/,/, /g')"
+
+# Doc languages present, ordered by doc LOC
+DOC_LANGS="$(echo "${CLOC_OUT}" \
+  | awk -F, -v docs="${DOC_FILTER}" '
+      NR > 1 && $2 ~ docs {
+        doc[$2] += $5
+      }
+      END {
+        for (lang in doc) {
+          printf "%s,%d\n", lang, doc[lang]
+        }
+      }
+    ' \
+  | sort -t, -k2 -nr \
+  | awk -F, '{print $1}' \
+  | tr '\n' ',' \
+  | sed 's/,$//' \
+  | sed 's/,/, /g')"
+
+FILE_COUNT="${TRACKED_FILES:-$ALL_FILES}"
+DISK_SIZE="$(du -sh . | awk '{print $1}')"
+
+echo
+echo "STONKS REPO SNAPSHOT"
+echo "Files:        ${FILE_COUNT}"
+echo "LOC (code):   ${TOTAL_CODE}"
+[[ "${TOTAL_DOCS}" != "0" ]] && echo "LOC (docs):   ${TOTAL_DOCS}"
+echo "Languages:    ${PRIMARY_CODE_LANGS}"
+[[ -n "${DOC_LANGS}" ]] && echo "Docs:         ${DOC_LANGS}"
+echo "Disk size:    ${DISK_SIZE}"
+echo
+
+echo "One-liner:"
+if [[ "${TOTAL_DOCS}" != "0" ]]; then
+  echo "Monorepo (~${FILE_COUNT} files, ~${TOTAL_CODE} code LOC, ~${TOTAL_DOCS} doc LOC) using ${PRIMARY_CODE_LANGS}; includes Python data pipelines, SQL schema/migrations, shell automation, and documented architecture."
+else
+  echo "Monorepo (~${FILE_COUNT} files, ~${TOTAL_CODE} LOC) using ${PRIMARY_CODE_LANGS}; includes Python data pipelines, SQL schema/migrations, and shell automation."
+fi
+echo
+
+echo "Badge:"
+if [[ "${TOTAL_DOCS}" != "0" ]]; then
+  echo "~${FILE_COUNT} files | ~${TOTAL_CODE} code LOC | ~${TOTAL_DOCS} doc LOC | ${PRIMARY_CODE_LANGS}"
+else
+  echo "~${FILE_COUNT} files | ~${TOTAL_CODE} LOC | ${PRIMARY_CODE_LANGS}"
+fi
+echo
+
+echo "Done."
