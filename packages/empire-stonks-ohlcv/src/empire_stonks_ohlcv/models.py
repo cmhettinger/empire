@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -61,12 +62,20 @@ class ProviderListing:
     ticker: str
     name: str | None = None
     instrument_type_code: str = UNKNOWN_INSTRUMENT_TYPE_CODE
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         _validate_code("provider_code", self.provider_code)
         _validate_native_identity("market", self.market)
         _validate_native_identity("ticker", self.ticker)
         _validate_code("instrument_type_code", self.instrument_type_code)
+        if self.metadata is not None:
+            if not isinstance(self.metadata, dict):
+                raise TypeError("metadata must be a dictionary or None.")
+            try:
+                json.dumps(self.metadata, allow_nan=False)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("metadata must contain valid JSON values.") from exc
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-ready representation without normalizing identity."""
@@ -77,6 +86,7 @@ class ProviderListing:
             "ticker": self.ticker,
             "name": self.name,
             "instrument_type_code": self.instrument_type_code,
+            "metadata": self.metadata,
         }
 
 

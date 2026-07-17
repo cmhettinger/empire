@@ -90,6 +90,7 @@ def execute_import_boundary(
                         bar=bar,
                     )
                     for batch in parsed_output.batches
+                    if listing_result.provider_listing_is_active(batch.listing)
                     for bar in batch.bars
                 ),
             )

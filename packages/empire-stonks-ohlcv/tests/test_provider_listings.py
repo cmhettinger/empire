@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from uuid import UUID
 
 import pytest
@@ -24,7 +25,7 @@ class FakeProviderListingCursor:
 
     def execute(self, query: str, params: tuple[object, ...]) -> None:
         if "INSERT INTO stonks.provider_listing" in query:
-            provider_code, market, ticker, name, instrument_type_code = params
+            provider_code, market, ticker, name, instrument_type_code, metadata = params
             identity = (str(provider_code), str(market), str(ticker))
             self.insert_identities.append(identity)
             row = self.rows.get(identity)
@@ -35,6 +36,8 @@ class FakeProviderListingCursor:
                     "provider_listing_id": provider_listing_id,
                     "name": name,
                     "instrument_type_code": instrument_type_code,
+                    "metadata": None if metadata is None else json.loads(str(metadata)),
+                    "status": "ACTIVE",
                 }
                 self.rows[identity] = row
                 self._result = (provider_listing_id,)
@@ -69,12 +72,14 @@ class FakeProviderListingCursor:
                     row["provider_listing_id"],
                     row["name"],
                     row["instrument_type_code"],
+                    row["metadata"],
+                    row["status"],
                 )
             )
             return
 
         if "UPDATE stonks.provider_listing" in query:
-            name, instrument_type_code, provider_listing_id = params
+            name, instrument_type_code, metadata, provider_listing_id = params
             row = next(
                 candidate
                 for candidate in self.rows.values()
@@ -82,6 +87,9 @@ class FakeProviderListingCursor:
             )
             row["name"] = name
             row["instrument_type_code"] = instrument_type_code
+            row["metadata"] = (
+                None if metadata is None else json.loads(str(metadata))
+            )
             self.update_count += 1
             self._result = None
             return
@@ -99,6 +107,7 @@ def listing(
     ticker: str = "AAPL",
     name: str | None = None,
     instrument_type_code: str = "UNKNOWN",
+    metadata: dict[str, object] | None = None,
 ) -> ProviderListing:
     return ProviderListing(
         provider_code=provider_code,
@@ -106,6 +115,7 @@ def listing(
         ticker=ticker,
         name=name,
         instrument_type_code=instrument_type_code,
+        metadata=metadata,
     )
 
 
@@ -153,6 +163,34 @@ def test_rerun_is_unchanged_and_does_not_update_metadata() -> None:
     assert second.provider_listing_id_for(source) == first.provider_listing_id_for(
         source
     )
+
+
+def test_updates_non_null_provider_metadata_and_preserves_it_when_omitted() -> None:
+    cursor = FakeProviderListingCursor()
+    source = listing(metadata={"figi": "OLD"})
+    upsert_provider_listings(cursor=cursor, listings=(source,))
+
+    updated = listing(metadata={"figi": "BBG000B9XRY4"})
+    update_result = upsert_provider_listings(cursor=cursor, listings=(updated,))
+    preserved = upsert_provider_listings(cursor=cursor, listings=(listing(),))
+
+    row = cursor.rows[("EODDATA", "NASDAQ", "AAPL")]
+    assert update_result.updated == 1
+    assert preserved.unchanged == 1
+    assert row["metadata"] == {"figi": "BBG000B9XRY4"}
+
+
+def test_stored_inactive_status_is_returned_and_never_overwritten() -> None:
+    cursor = FakeProviderListingCursor()
+    source = listing()
+    upsert_provider_listings(cursor=cursor, listings=(source,))
+    cursor.rows[("EODDATA", "NASDAQ", "AAPL")]["status"] = "INACTIVE"
+
+    result = upsert_provider_listings(cursor=cursor, listings=(source,))
+
+    assert result.provider_listing_is_active(source) is False
+    assert result.resolved[0].status == "INACTIVE"
+    assert result.resolved[0].to_dict()["status"] == "INACTIVE"
 
 
 def test_updates_non_null_name_and_non_unknown_instrument_type_only() -> None:

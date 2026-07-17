@@ -967,55 +967,63 @@
 <!-- provider_listing -->
 <g id="node22" class="node">
 <title>provider_listing</title>
-<polygon fill="lightblue" stroke="transparent" points="1107.24,-1036 1107.24,-1056 1353.24,-1056 1353.24,-1036 1107.24,-1036"/>
+<polygon fill="lightblue" stroke="transparent" points="1107.24,-1056 1107.24,-1076 1353.24,-1076 1353.24,-1056 1107.24,-1056"/>
+<polygon fill="none" stroke="black" points="1107.24,-1056 1107.24,-1076 1353.24,-1076 1353.24,-1056 1107.24,-1056"/>
+<text text-anchor="start" x="1189.74" y="-1064.8" font-family="Verdana" font-weight="bold" font-size="9.00">provider_listing</text>
 <polygon fill="none" stroke="black" points="1107.24,-1036 1107.24,-1056 1353.24,-1056 1353.24,-1036 1107.24,-1036"/>
-<text text-anchor="start" x="1189.74" y="-1044.8" font-family="Verdana" font-weight="bold" font-size="9.00">provider_listing</text>
+<text text-anchor="start" x="1112.24" y="-1044.8" font-family="Verdana" font-weight="bold" font-size="9.00">provider_listing_id</text>
+<text text-anchor="start" x="1207.24" y="-1044.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1214.24" y="-1044.8" font-family="Verdana" font-style="italic" font-size="9.00">UUID &#160;NOT NULL</text>
 <polygon fill="none" stroke="black" points="1107.24,-1016 1107.24,-1036 1353.24,-1036 1353.24,-1016 1107.24,-1016"/>
-<text text-anchor="start" x="1112.24" y="-1024.8" font-family="Verdana" font-weight="bold" font-size="9.00">provider_listing_id</text>
-<text text-anchor="start" x="1207.24" y="-1024.8" font-family="Verdana" font-size="9.00">: </text>
-<text text-anchor="start" x="1214.24" y="-1024.8" font-family="Verdana" font-style="italic" font-size="9.00">UUID &#160;NOT NULL</text>
+<text text-anchor="start" x="1112.24" y="-1024.8" font-family="Verdana" font-weight="bold" font-size="9.00">provider_code</text>
+<text text-anchor="start" x="1185.24" y="-1024.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1192.24" y="-1024.8" font-family="Verdana" font-style="italic" font-size="9.00">VARCHAR(32) &#160;NOT NULL</text>
 <polygon fill="none" stroke="black" points="1107.24,-996 1107.24,-1016 1353.24,-1016 1353.24,-996 1107.24,-996"/>
-<text text-anchor="start" x="1112.24" y="-1004.8" font-family="Verdana" font-weight="bold" font-size="9.00">provider_code</text>
-<text text-anchor="start" x="1185.24" y="-1004.8" font-family="Verdana" font-size="9.00">: </text>
-<text text-anchor="start" x="1192.24" y="-1004.8" font-family="Verdana" font-style="italic" font-size="9.00">VARCHAR(32) &#160;NOT NULL</text>
+<text text-anchor="start" x="1112.24" y="-1004.8" font-family="Verdana" font-weight="bold" font-size="9.00">market</text>
+<text text-anchor="start" x="1149.24" y="-1004.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1156.24" y="-1004.8" font-family="Verdana" font-style="italic" font-size="9.00">TEXT &#160;NOT NULL</text>
 <polygon fill="none" stroke="black" points="1107.24,-976 1107.24,-996 1353.24,-996 1353.24,-976 1107.24,-976"/>
-<text text-anchor="start" x="1112.24" y="-984.8" font-family="Verdana" font-weight="bold" font-size="9.00">market</text>
-<text text-anchor="start" x="1149.24" y="-984.8" font-family="Verdana" font-size="9.00">: </text>
-<text text-anchor="start" x="1156.24" y="-984.8" font-family="Verdana" font-style="italic" font-size="9.00">TEXT &#160;NOT NULL</text>
+<text text-anchor="start" x="1112.24" y="-984.8" font-family="Verdana" font-weight="bold" font-size="9.00">ticker</text>
+<text text-anchor="start" x="1142.24" y="-984.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1149.24" y="-984.8" font-family="Verdana" font-style="italic" font-size="9.00">TEXT &#160;NOT NULL</text>
 <polygon fill="none" stroke="black" points="1107.24,-956 1107.24,-976 1353.24,-976 1353.24,-956 1107.24,-956"/>
-<text text-anchor="start" x="1112.24" y="-964.8" font-family="Verdana" font-weight="bold" font-size="9.00">ticker</text>
-<text text-anchor="start" x="1142.24" y="-964.8" font-family="Verdana" font-size="9.00">: </text>
-<text text-anchor="start" x="1149.24" y="-964.8" font-family="Verdana" font-style="italic" font-size="9.00">TEXT &#160;NOT NULL</text>
+<text text-anchor="start" x="1112.24" y="-964.8" font-family="Verdana" font-weight="bold" font-size="9.00">name</text>
+<text text-anchor="start" x="1141.24" y="-964.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1148.24" y="-964.8" font-family="Verdana" font-style="italic" font-size="9.00">TEXT </text>
 <polygon fill="none" stroke="black" points="1107.24,-936 1107.24,-956 1353.24,-956 1353.24,-936 1107.24,-936"/>
-<text text-anchor="start" x="1112.24" y="-944.8" font-family="Verdana" font-weight="bold" font-size="9.00">name</text>
-<text text-anchor="start" x="1141.24" y="-944.8" font-family="Verdana" font-size="9.00">: </text>
-<text text-anchor="start" x="1148.24" y="-944.8" font-family="Verdana" font-style="italic" font-size="9.00">TEXT </text>
+<text text-anchor="start" x="1112.24" y="-944.8" font-family="Verdana" font-weight="bold" font-size="9.00">instrument_type_code</text>
+<text text-anchor="start" x="1227.24" y="-944.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1234.24" y="-944.8" font-family="Verdana" font-style="italic" font-size="9.00">VARCHAR(32) &#160;NOT NULL</text>
 <polygon fill="none" stroke="black" points="1107.24,-916 1107.24,-936 1353.24,-936 1353.24,-916 1107.24,-916"/>
-<text text-anchor="start" x="1112.24" y="-924.8" font-family="Verdana" font-weight="bold" font-size="9.00">instrument_type_code</text>
-<text text-anchor="start" x="1227.24" y="-924.8" font-family="Verdana" font-size="9.00">: </text>
-<text text-anchor="start" x="1234.24" y="-924.8" font-family="Verdana" font-style="italic" font-size="9.00">VARCHAR(32) &#160;NOT NULL</text>
+<text text-anchor="start" x="1112.24" y="-924.8" font-family="Verdana" font-weight="bold" font-size="9.00">first_seen</text>
+<text text-anchor="start" x="1162.24" y="-924.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1169.24" y="-924.8" font-family="Verdana" font-style="italic" font-size="9.00">DATE </text>
 <polygon fill="none" stroke="black" points="1107.24,-896 1107.24,-916 1353.24,-916 1353.24,-896 1107.24,-896"/>
-<text text-anchor="start" x="1112.24" y="-904.8" font-family="Verdana" font-weight="bold" font-size="9.00">first_seen</text>
-<text text-anchor="start" x="1162.24" y="-904.8" font-family="Verdana" font-size="9.00">: </text>
-<text text-anchor="start" x="1169.24" y="-904.8" font-family="Verdana" font-style="italic" font-size="9.00">DATE </text>
+<text text-anchor="start" x="1112.24" y="-904.8" font-family="Verdana" font-weight="bold" font-size="9.00">last_seen</text>
+<text text-anchor="start" x="1160.24" y="-904.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1167.24" y="-904.8" font-family="Verdana" font-style="italic" font-size="9.00">DATE </text>
 <polygon fill="none" stroke="black" points="1107.24,-876 1107.24,-896 1353.24,-896 1353.24,-876 1107.24,-876"/>
-<text text-anchor="start" x="1112.24" y="-884.8" font-family="Verdana" font-weight="bold" font-size="9.00">last_seen</text>
-<text text-anchor="start" x="1160.24" y="-884.8" font-family="Verdana" font-size="9.00">: </text>
-<text text-anchor="start" x="1167.24" y="-884.8" font-family="Verdana" font-style="italic" font-size="9.00">DATE </text>
+<text text-anchor="start" x="1112.24" y="-884.8" font-family="Verdana" font-weight="bold" font-size="9.00">created_at</text>
+<text text-anchor="start" x="1167.24" y="-884.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1174.24" y="-884.8" font-family="Verdana" font-style="italic" font-size="9.00">TIMESTAMPTZ &#160;NOT NULL</text>
 <polygon fill="none" stroke="black" points="1107.24,-856 1107.24,-876 1353.24,-876 1353.24,-856 1107.24,-856"/>
-<text text-anchor="start" x="1112.24" y="-864.8" font-family="Verdana" font-weight="bold" font-size="9.00">created_at</text>
-<text text-anchor="start" x="1167.24" y="-864.8" font-family="Verdana" font-size="9.00">: </text>
-<text text-anchor="start" x="1174.24" y="-864.8" font-family="Verdana" font-style="italic" font-size="9.00">TIMESTAMPTZ &#160;NOT NULL</text>
+<text text-anchor="start" x="1112.24" y="-864.8" font-family="Verdana" font-weight="bold" font-size="9.00">updated_at</text>
+<text text-anchor="start" x="1171.24" y="-864.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1178.24" y="-864.8" font-family="Verdana" font-style="italic" font-size="9.00">TIMESTAMPTZ &#160;NOT NULL</text>
 <polygon fill="none" stroke="black" points="1107.24,-836 1107.24,-856 1353.24,-856 1353.24,-836 1107.24,-836"/>
-<text text-anchor="start" x="1112.24" y="-844.8" font-family="Verdana" font-weight="bold" font-size="9.00">updated_at</text>
-<text text-anchor="start" x="1171.24" y="-844.8" font-family="Verdana" font-size="9.00">: </text>
-<text text-anchor="start" x="1178.24" y="-844.8" font-family="Verdana" font-style="italic" font-size="9.00">TIMESTAMPTZ &#160;NOT NULL</text>
+<text text-anchor="start" x="1112.24" y="-844.8" font-family="Verdana" font-weight="bold" font-size="9.00">status</text>
+<text text-anchor="start" x="1145.24" y="-844.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1152.24" y="-844.8" font-family="Verdana" font-style="italic" font-size="9.00">VARCHAR(32) &#160;NOT NULL</text>
+<polygon fill="none" stroke="black" points="1107.24,-816 1107.24,-836 1353.24,-836 1353.24,-816 1107.24,-816"/>
+<text text-anchor="start" x="1112.24" y="-824.8" font-family="Verdana" font-weight="bold" font-size="9.00">metadata</text>
+<text text-anchor="start" x="1162.24" y="-824.8" font-family="Verdana" font-size="9.00">: </text>
+<text text-anchor="start" x="1169.24" y="-824.8" font-family="Verdana" font-style="italic" font-size="9.00">JSONB </text>
 </g>
 <!-- ohlcv_daily&#45;&gt;provider_listing -->
 <g id="edge29" class="edge">
 <title>ohlcv_daily:provider_listing_id&#45;&gt;provider_listing:provider_listing_id</title>
-<path fill="none" stroke="black" d="M1287.24,-1450C1302.47,-1450 1293.54,-1189.36 1286.24,-1176 1240.82,-1092.79 1153.74,-1142.62 1107.24,-1060 1102.32,-1051.25 1096.83,-1039.13 1098.12,-1031.97"/>
-<polygon fill="black" stroke="black" points="1100.26,-1034.74 1106.24,-1026 1096.11,-1029.1 1100.26,-1034.74"/>
+<path fill="none" stroke="black" d="M1287.24,-1450C1302.47,-1450 1294.09,-1189.05 1286.24,-1176 1239.75,-1098.62 1154.73,-1156.77 1107.24,-1080 1101.9,-1071.36 1096.46,-1058.98 1098.05,-1051.79"/>
+<polygon fill="black" stroke="black" points="1100.1,-1054.63 1106.24,-1046 1096.06,-1048.91 1100.1,-1054.63"/>
 </g>
 <!-- provider_evidence -->
 <g id="node21" class="node">
@@ -1207,13 +1215,13 @@
 <!-- provider_listing&#45;&gt;instrument_type -->
 <g id="edge35" class="edge">
 <title>provider_listing:instrument_type_code&#45;&gt;instrument_type:type_code</title>
-<path fill="none" stroke="black" d="M1354.24,-926C1418.45,-926 1358.24,-832.27 1408.24,-792 1482.68,-732.06 1552.97,-823.89 1620.24,-756 1705.16,-670.31 1593.62,-586.51 1663.24,-488 1741.64,-377.08 1796.3,-339.82 1928.2,-338.07"/>
+<path fill="none" stroke="black" d="M1354.24,-946C1426.78,-946 1352.81,-838.77 1408.24,-792 1481.29,-730.37 1552.97,-823.89 1620.24,-756 1705.16,-670.31 1593.62,-586.51 1663.24,-488 1741.64,-377.08 1796.3,-339.82 1928.2,-338.07"/>
 <polygon fill="black" stroke="black" points="1928.27,-341.57 1938.24,-338 1928.22,-334.57 1928.27,-341.57"/>
 </g>
 <!-- provider_listing&#45;&gt;provider -->
 <g id="edge36" class="edge">
 <title>provider_listing:provider_code&#45;&gt;provider:provider_code</title>
-<path fill="none" stroke="black" d="M1106.24,-1006C1094.32,-1006 1091.42,-803.86 1090.24,-792 1084.89,-737.8 1126.5,-671.23 1084.22,-662.88"/>
+<path fill="none" stroke="black" d="M1106.24,-1026C1093.21,-1026 1091.49,-804.97 1090.24,-792 1085.06,-737.79 1126.52,-671.23 1084.22,-662.87"/>
 <polygon fill="black" stroke="black" points="1084.51,-659.39 1074.24,-662 1083.9,-666.36 1084.51,-659.39"/>
 </g>
 <!-- provider_observation&#45;&gt;provider -->

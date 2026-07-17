@@ -294,8 +294,11 @@ CREATE TABLE stonks.provider_listing (
     last_seen date,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    status character varying(32) DEFAULT 'ACTIVE'::character varying NOT NULL,
+    metadata jsonb,
     CONSTRAINT ck_provider_listing_market CHECK (((market <> ''::text) AND (market = btrim(market)))),
     CONSTRAINT ck_provider_listing_seen_dates CHECK ((((first_seen IS NULL) AND (last_seen IS NULL)) OR ((first_seen IS NOT NULL) AND (last_seen IS NOT NULL) AND (last_seen >= first_seen)))),
+    CONSTRAINT ck_provider_listing_status CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'INACTIVE'::character varying])::text[]))),
     CONSTRAINT ck_provider_listing_ticker CHECK (((ticker <> ''::text) AND (ticker = btrim(ticker))))
 );
 

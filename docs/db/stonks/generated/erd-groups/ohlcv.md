@@ -45,6 +45,8 @@ erDiagram
     DATE last_seen
     TIMESTAMPTZ created_at
     TIMESTAMPTZ updated_at
+    VARCHAR status
+    JSONB metadata
   }
 
   provider_listing ||--o{ ohlcv_daily : "fk_ohlcv_daily_provider_listing"

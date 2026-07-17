@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any, Iterable, Literal
 from uuid import UUID
@@ -15,6 +16,7 @@ from empire_stonks_ohlcv.results import PersistenceCounts
 
 
 ProviderListingOutcome = Literal["inserted", "updated", "unchanged"]
+ProviderListingStatus = Literal["ACTIVE", "INACTIVE"]
 ProviderListingIdentity = tuple[str, str, str]
 
 
@@ -25,11 +27,17 @@ class ResolvedProviderListing:
     listing: ProviderListing
     provider_listing_id: UUID
     outcome: ProviderListingOutcome
+    status: ProviderListingStatus = "ACTIVE"
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == "ACTIVE"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "listing": self.listing.to_dict(),
             "provider_listing_id": str(self.provider_listing_id),
+            "status": self.status,
             "outcome": self.outcome,
         }
 
@@ -71,6 +79,15 @@ class ProviderListingWriteResult:
                 return item.provider_listing_id
         raise KeyError(target)
 
+    def provider_listing_is_active(self, listing: ProviderListing) -> bool:
+        """Return whether imports are enabled for an input's stored series."""
+
+        target = _identity(listing)
+        for item in self.resolved:
+            if _identity(item.listing) == target:
+                return item.is_active
+        raise KeyError(target)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "counts": self.counts.to_dict(),
@@ -104,9 +121,10 @@ def upsert_provider_listings(
                 market,
                 ticker,
                 name,
-                instrument_type_code
+                instrument_type_code,
+                metadata
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s::jsonb)
             ON CONFLICT ON CONSTRAINT uq_provider_listing_identity DO NOTHING
             RETURNING provider_listing_id
             """,
@@ -116,6 +134,7 @@ def upsert_provider_listings(
                 listing.ticker,
                 listing.name,
                 listing.instrument_type_code,
+                _metadata_json(listing.metadata),
             ),
         )
         row = cursor.fetchone()
@@ -149,7 +168,9 @@ def upsert_provider_listings(
     for listing in ordered:
         identity = _identity(listing)
         provider_listing_id = resolved_ids[identity]
-        stored_name, stored_instrument_type = locked_rows[provider_listing_id]
+        stored_name, stored_instrument_type, stored_metadata, status = locked_rows[
+            provider_listing_id
+        ]
         if identity in inserted_ids:
             outcome: ProviderListingOutcome = "inserted"
         else:
@@ -159,9 +180,13 @@ def upsert_provider_listings(
                 if listing.instrument_type_code != UNKNOWN_INSTRUMENT_TYPE_CODE
                 else stored_instrument_type
             )
+            new_metadata = (
+                listing.metadata if listing.metadata is not None else stored_metadata
+            )
             if (
                 new_name == stored_name
                 and new_instrument_type == stored_instrument_type
+                and new_metadata == stored_metadata
             ):
                 outcome = "unchanged"
             else:
@@ -171,16 +196,23 @@ def upsert_provider_listings(
                     SET
                         name = %s,
                         instrument_type_code = %s,
+                        metadata = %s::jsonb,
                         updated_at = now()
                     WHERE provider_listing_id = %s
                     """,
-                    (new_name, new_instrument_type, provider_listing_id),
+                    (
+                        new_name,
+                        new_instrument_type,
+                        _metadata_json(new_metadata),
+                        provider_listing_id,
+                    ),
                 )
                 outcome = "updated"
         resolved.append(
             ResolvedProviderListing(
                 listing=listing,
                 provider_listing_id=provider_listing_id,
+                status=status,
                 outcome=outcome,
             )
         )
@@ -192,12 +224,15 @@ def _lock_resolved_listings(
     *,
     cursor: Any,
     provider_listing_ids: Iterable[UUID],
-) -> dict[UUID, tuple[str | None, str]]:
-    locked: dict[UUID, tuple[str | None, str]] = {}
+) -> dict[UUID, tuple[str | None, str, dict[str, Any] | None, ProviderListingStatus]]:
+    locked: dict[
+        UUID,
+        tuple[str | None, str, dict[str, Any] | None, ProviderListingStatus],
+    ] = {}
     for provider_listing_id in sorted(set(provider_listing_ids), key=str):
         cursor.execute(
             """
-            SELECT provider_listing_id, name, instrument_type_code
+            SELECT provider_listing_id, name, instrument_type_code, metadata, status
             FROM stonks.provider_listing
             WHERE provider_listing_id = %s
             FOR UPDATE
@@ -209,7 +244,7 @@ def _lock_resolved_listings(
             raise OHLCVPersistenceError(
                 "Resolved provider listing disappeared before it could be locked."
             )
-        locked[row[0]] = (row[1], row[2])
+        locked[row[0]] = (row[1], row[2], row[3], row[4])
     return locked
 
 
@@ -229,3 +264,9 @@ def _validate_inputs(listings: tuple[ProviderListing, ...]) -> None:
 
 def _identity(listing: ProviderListing) -> ProviderListingIdentity:
     return (listing.provider_code, listing.market, listing.ticker)
+
+
+def _metadata_json(metadata: dict[str, Any] | None) -> str | None:
+    if metadata is None:
+        return None
+    return json.dumps(metadata, allow_nan=False, sort_keys=True)

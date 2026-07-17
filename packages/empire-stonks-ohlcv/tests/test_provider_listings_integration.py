@@ -77,6 +77,7 @@ def test_provider_listing_writer_round_trip_against_postgres(
                     ticker="AAPL",
                     name="Apple Inc.",
                     instrument_type_code=known_instrument_type,
+                    metadata={"figi": "BBG000B9XRY4"},
                 ),
             ),
         )
@@ -102,7 +103,7 @@ def test_provider_listing_writer_round_trip_against_postgres(
 
         cursor.execute(
             """
-            SELECT name, instrument_type_code, first_seen, last_seen
+            SELECT name, instrument_type_code, first_seen, last_seen, status, metadata
             FROM stonks.provider_listing
             WHERE provider_code = 'EODDATA'
               AND market = 'M34_NASDAQ'
@@ -110,7 +111,32 @@ def test_provider_listing_writer_round_trip_against_postgres(
             """
         )
         stored = cursor.fetchone()
-        assert stored == ("Apple Inc.", known_instrument_type, None, None)
+        assert stored == (
+            "Apple Inc.",
+            known_instrument_type,
+            None,
+            None,
+            "ACTIVE",
+            {"figi": "BBG000B9XRY4"},
+        )
+
+        cursor.execute(
+            """
+            UPDATE stonks.provider_listing
+            SET status = 'INACTIVE'
+            WHERE provider_code = 'EODDATA'
+              AND market = 'M34_NASDAQ'
+              AND ticker = 'AAPL'
+            """
+        )
+        inactive = upsert_provider_listings(
+            cursor=cursor,
+            listings=(corrected.resolved[0].listing,),
+        )
+        assert (
+            inactive.provider_listing_is_active(corrected.resolved[0].listing)
+            is False
+        )
 
         cursor.execute(
             """

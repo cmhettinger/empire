@@ -231,6 +231,8 @@ erDiagram
     DATE last_seen
     TIMESTAMPTZ created_at
     TIMESTAMPTZ updated_at
+    VARCHAR status
+    JSONB metadata
   }
 
   provider_observation {

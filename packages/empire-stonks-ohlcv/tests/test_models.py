@@ -21,6 +21,7 @@ def test_provider_listing_defaults_and_preserves_native_identity() -> None:
     assert listing.ticker == "aapl.US"
     assert listing.name is None
     assert listing.instrument_type_code == "UNKNOWN"
+    assert listing.metadata is None
 
 
 def test_provider_listing_accepts_optional_metadata() -> None:
@@ -30,10 +31,35 @@ def test_provider_listing_accepts_optional_metadata() -> None:
         ticker="AAPL.US",
         name="Apple Inc.",
         instrument_type_code="COMMON_STOCK",
+        metadata={"figi": "BBG000B9XRY4", "is_primary": True},
     )
 
     assert listing.name == "Apple Inc."
     assert listing.instrument_type_code == "COMMON_STOCK"
+    assert listing.metadata == {
+        "figi": "BBG000B9XRY4",
+        "is_primary": True,
+    }
+    assert listing.to_dict()["metadata"] == listing.metadata
+
+
+@pytest.mark.parametrize("metadata", [[], "figi", 1])
+def test_provider_listing_rejects_non_object_metadata(metadata: object) -> None:
+    with pytest.raises(TypeError, match="metadata must be a dictionary"):
+        ProviderListing(  # type: ignore[arg-type]
+            "EODDATA",
+            "NASDAQ",
+            "AAPL",
+            metadata=metadata,
+        )
+
+
+@pytest.mark.parametrize("metadata", [{"value": object()}, {"value": float("nan")}])
+def test_provider_listing_rejects_non_json_metadata(
+    metadata: dict[str, object],
+) -> None:
+    with pytest.raises(ValueError, match="valid JSON values"):
+        ProviderListing("EODDATA", "NASDAQ", "AAPL", metadata=metadata)
 
 
 def test_provider_listing_is_immutable() -> None:

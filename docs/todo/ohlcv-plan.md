@@ -37,6 +37,8 @@ resolution before importing data.
 - Provider-specific OHLCV source acquisition and parsing.
 - Shared provider-listing and daily-bar dataclasses.
 - Provider-native listing-series persistence.
+- Optional provider-native listing facts and identifiers supplied with a
+  provider series, stored as JSON metadata.
 - Provider-native daily OHLCV persistence.
 - Current-state idempotent upserts.
 - Core run tracking and short-lived raw-object integration.
@@ -53,8 +55,9 @@ resolution before importing data.
 - Cross-provider price or adjustment normalization.
 - Corporate-action normalization.
 - A canonical or authoritative OHLCV series.
-- Sector, industry, fundamentals, descriptive enrichment, or other non-OHLCV
-  metadata exposed by a provider.
+- Sector, industry, fundamentals, or broad descriptive enrichment exposed by a
+  provider. Optional provider-native listing facts and identifiers, such as a
+  FIGI, may be retained on the provider listing as JSON metadata.
 - Intraday or extended-hours data in the first implementation.
 - Append-only provider bar revision history.
 
@@ -117,8 +120,10 @@ ingestion does not infer that relationship.
 
 `first_seen` and `last_seen` are the minimum and maximum accepted trading dates
 observed for the provider series. They are coverage metadata only and do not
-prove listing validity dates or current activity. The initial table has no
-status column.
+prove listing validity dates or current activity. The operator-controlled
+`status` column enables or disables imports for the provider series; it does
+not claim that the real-world instrument or canonical listing is active or
+inactive.
 
 ## Provider-Native Value Policy
 
@@ -144,14 +149,18 @@ report should document:
 - The provider source/feed code.
 - The parser version.
 
-The initial database deliberately stores one OHLC series, optional volume, and
-five derived values used by downstream analysis. It has no adjusted-close,
-adjustment, currency, or arbitrary metadata columns. Consumers must use the
-provider source contract when interpreting values; the database does not claim
-that different providers use comparable adjustment bases.
+The initial daily-bar table deliberately stores one OHLC series, optional
+volume, and five derived values used by downstream analysis. It has no
+adjusted-close, adjustment, currency, or arbitrary bar-metadata columns.
+Optional JSON metadata belongs to the provider listing rather than an
+individual bar. Consumers must use the provider source contract when
+interpreting values; the database does not claim that different providers use
+comparable adjustment bases.
 
-Sector, industry, fundamentals, and unrelated provider metadata are outside the
-OHLCV package even when the same provider exposes them.
+Provider-native listing facts and identifiers useful for interpreting or later
+reconciling the series, such as FIGI values, may be stored in the listing's JSON
+metadata. Sector, industry, fundamentals, and unrelated provider enrichment
+remain outside the OHLCV package even when the same provider exposes them.
 
 ## Initial Database Shape
 
@@ -185,6 +194,8 @@ ticker               TEXT         NOT NULL
 name                 TEXT         NULL
 instrument_type_code VARCHAR(32)  NOT NULL  FK -> stonks.instrument_type,
                                              default 'UNKNOWN'
+status               VARCHAR(32)  NOT NULL  default 'ACTIVE'
+metadata             JSONB        NULL
 first_seen           DATE         NULL
 last_seen            DATE         NULL
 created_at           TIMESTAMPTZ  NOT NULL  default now()
@@ -206,15 +217,27 @@ series use them. `name` is descriptive only and has no uniqueness or non-blank
 constraint. `updated_at` is maintained by the writer when stored values change;
 the initial migration does not add a general timestamp trigger.
 
+`status` is constrained to `ACTIVE` or `INACTIVE`. It is owned by operators and
+is never accepted from or overwritten by provider input. `ACTIVE` allows daily
+bars for the series to be imported. `INACTIVE` causes the transactional import
+boundary to skip that series' bars, and the lower-level daily-bar writer rejects
+direct writes to it. The listing may still be resolved and its descriptive
+fields or provider metadata refreshed while inactive.
+
+`metadata` is an optional JSON object for provider-native listing facts and
+identifiers that do not justify first-class columns, such as FIGI values. It is
+not a general store for fundamentals, sector/industry enrichment, credentials,
+request details, or raw provider payloads.
+
 The unique lookup index also supports provider-scoped series scans because
 `provider_code` is its leading column. A separate partial index on
 `(provider_code, last_seen DESC)` where `last_seen IS NOT NULL` supports
 provider-scoped freshness and stale-series reporting. No indexes are added for
 the optional name or instrument type without a demonstrated query.
 
-The table intentionally omits status, currency, adjustment, and JSON metadata
-columns. `UNKNOWN` already exists in `stonks.instrument_type`, so providers can
-be imported without inferring a type.
+The table intentionally omits currency and adjustment columns. `UNKNOWN`
+already exists in `stonks.instrument_type`, so providers can be imported
+without inferring a type.
 
 It must not contain `listing_id` or another canonical-identity FK.
 
@@ -325,12 +348,13 @@ deterministic.
 
 ### Transaction and concurrency boundary
 
-One accepted import batch or bounded historical chunk writes its provider
-listings, bars, derived values, and listing coverage dates in one database
-transaction. Repository helpers share the caller's cursor and do not commit
-independently. Any SQL, constraint, or duplicate-key error rolls back the whole
-writer call and is raised to the import service; persistence errors are not
-converted into rejected-row counts.
+One accepted import batch or bounded historical chunk resolves its provider
+listings and writes bars, derived values, and listing coverage dates for active
+series in one database transaction. Bars parsed for inactive series are
+intentionally omitted before reaching daily-bar persistence. Repository helpers
+share the caller's cursor and do not commit independently. Any SQL, constraint,
+or duplicate-key error rolls back the whole writer call and is raised to the
+import service; persistence errors are not converted into rejected-row counts.
 
 After resolving provider-listing IDs, the writer locks affected
 `provider_listing` rows in deterministic ID order. This serializes bar and
@@ -352,11 +376,15 @@ For an existing series:
   erase a stored name.
 - A non-`UNKNOWN` incoming `instrument_type_code` replaces a distinct stored
   value. `UNKNOWN` never downgrades a known type.
+- Non-null incoming `metadata` replaces distinct stored metadata. Null does not
+  erase stored metadata; an explicit empty object clears it to `{}`.
+- Incoming provider records never set or change `status`. A manually assigned
+  `INACTIVE` status remains in place across provider-listing upserts.
 - `first_seen` becomes the least accepted trading date ever written for the
   series and `last_seen` becomes the greatest. They are initialized together
   by the first accepted bar and change only when accepted coverage expands.
-- `updated_at` changes only when name, instrument type, or coverage actually
-  changes. Resolving an identical series does not touch the row.
+- `updated_at` changes only when name, instrument type, metadata, or coverage
+  actually changes. Resolving an identical series does not touch the row.
 
 The listing writer reports one mutually exclusive result for each unique series
 processed: `inserted`, `updated`, or `unchanged`. A newly inserted listing is
@@ -430,6 +458,11 @@ counts. The import/validation layer adds `rejected` and `warning` counts to the
 combined result; persistence does not guess those outcomes. A failed writer
 call returns no success counts because its transaction is rolled back.
 
+Bars belonging to an inactive provider listing never reach the daily-bar
+writer, so they do not appear in its accepted-input counts. The provider
+listing itself is still reported as inserted, updated, or unchanged according
+to normal listing-upsert behavior.
+
 This is an intentional early-stage current-state tradeoff. A future requirement
 for provider revision history must be designed separately rather than inferred
 from Core run records.
@@ -487,8 +520,9 @@ Provider work uses this ordered durability boundary:
 3. The parsing collaborator fully parses the acquired objects in memory. No
    source snapshot, provider listing, or daily bar is written while parsing.
 4. One database transaction registers every acquired source snapshot, resolves
-   every provider listing, and writes every daily bar. The boundary commits
-   once only after all writes succeed and otherwise rolls the transaction back.
+   every provider listing, and writes daily bars only for listings whose stored
+   status is `ACTIVE`. The boundary commits once only after all writes succeed
+   and otherwise rolls the transaction back.
 5. The run wrapper records the compact success summary after that commit.
 
 The failure contract is deliberately forward-only:
@@ -774,9 +808,11 @@ and returns one immutable `ParsedProviderOutput` containing:
 Each source code appears once in the metadata and the metadata source-code set
 must exactly match the acquired objects' source-code set. Every parsed listing
 must use the provider code of the active import. The boundary carries no URLs,
-credentials, headers, retry policy, remote request model, arbitrary metadata,
-or provider-specific records. Exact source-code and parser-version values are
-assigned by the provider source-code convention and source-contract tasks.
+credentials, headers, retry policy, remote request model, or provider-specific
+record types. A shared `ProviderListing` may carry an optional validated JSON
+object containing provider-native listing facts and identifiers. Exact
+source-code and parser-version values are assigned by the provider source-code
+convention and source-contract tasks.
 
 Adapters may satisfy these aliases with functions, bound methods, or other
 callables. They do not inherit a shared base class and are not registered in a
@@ -867,6 +903,8 @@ committed fixtures. The assertions call every valid case twice and require:
 
 - The expected uppercase provider code on every listing.
 - Exact provider-native market and ticker text, including case and punctuation.
+- Stable JSON-ready provider-listing metadata when the source contract exposes
+  supported listing facts or identifiers.
 - `date` trading dates and `Decimal` OHLCV values rather than floats.
 - At least one populated-volume case. A source declaring optional volume also
   supplies a `volume=None` case; a required-volume source must never emit one.
@@ -939,6 +977,11 @@ The shared report contract should cover:
 - Weekday-shaped gap warnings.
 - Bounded samples of failures and warnings.
 - Provider-native adjustment/interpretation notes.
+
+Reports should exclude intentionally inactive provider listings from ordinary
+freshness, stale-series, and gap warnings or present them in a clearly separate
+inactive-series section. A manual import disablement must not be reported as an
+unexpected provider-health failure.
 
 The initial schema has no authoritative exchange calendar. Reports must not
 claim that a missing exchange holiday is definitively a missing bar.

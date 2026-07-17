@@ -67,9 +67,10 @@ def test_provider_listing_and_daily_bar_are_json_ready() -> None:
             "provider_code": "EODDATA",
             "market": "Nasdaq",
             "ticker": "aapl.US",
-            "name": "Apple Inc.",
-            "instrument_type_code": "COMMON_STOCK",
-        },
+                "name": "Apple Inc.",
+                "instrument_type_code": "COMMON_STOCK",
+                "metadata": None,
+            },
         "bar": {
             "trading_date": "2026-07-15",
             "open": "210.1250000001",

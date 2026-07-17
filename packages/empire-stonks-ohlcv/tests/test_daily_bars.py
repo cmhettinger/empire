@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
-from empire_stonks_ohlcv import DailyBar, DailyBarWriteInput, OHLCVPersistenceError
+from empire_stonks_ohlcv import (
+    DailyBar,
+    DailyBarWriteInput,
+    OHLCVPersistenceError,
+    upsert_daily_bars,
+)
 from empire_stonks_ohlcv.daily_bars import _to_database_scale
 
 
@@ -45,4 +50,39 @@ def test_database_scale_rounding_and_precision_boundary() -> None:
             Decimal("1" + "0" * 20),
             scale=Decimal("0.0000000001"),
             integer_digits=20,
+        )
+
+
+class InactiveListingCursor:
+    def __init__(self, provider_listing_id: UUID) -> None:
+        self.provider_listing_id = provider_listing_id
+
+    def execute(self, query: str, params: tuple[object, ...]) -> None:
+        assert "FROM stonks.provider_listing" in query
+        assert params == (self.provider_listing_id,)
+
+    def fetchone(self) -> tuple[UUID, None, None, str]:
+        return (self.provider_listing_id, None, None, "INACTIVE")
+
+
+def test_daily_bar_writer_rejects_direct_writes_to_inactive_listing() -> None:
+    provider_listing_id = uuid4()
+    cursor = InactiveListingCursor(provider_listing_id)
+    daily_bar = DailyBar(
+        trading_date=date(2026, 7, 15),
+        open=Decimal("10"),
+        high=Decimal("12"),
+        low=Decimal("9"),
+        close=Decimal("11"),
+    )
+
+    with pytest.raises(OHLCVPersistenceError, match="listing is inactive"):
+        upsert_daily_bars(
+            cursor=cursor,
+            bars=(
+                DailyBarWriteInput(
+                    provider_listing_id=provider_listing_id,
+                    bar=daily_bar,
+                ),
+            ),
         )

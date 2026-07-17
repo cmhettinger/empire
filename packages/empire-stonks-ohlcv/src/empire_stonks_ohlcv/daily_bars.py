@@ -235,7 +235,7 @@ def _lock_listings(
     for provider_listing_id in provider_listing_ids:
         cursor.execute(
             """
-            SELECT provider_listing_id, first_seen, last_seen
+            SELECT provider_listing_id, first_seen, last_seen, status
             FROM stonks.provider_listing
             WHERE provider_listing_id = %s
             FOR UPDATE
@@ -246,6 +246,11 @@ def _lock_listings(
         if row is None:
             raise OHLCVPersistenceError(
                 "Provider listing does not exist and cannot be locked for daily bars."
+            )
+        if row[3] != "ACTIVE":
+            raise OHLCVPersistenceError(
+                "Provider listing is inactive and cannot accept daily bars: "
+                f"{provider_listing_id}."
             )
         locked[row[0]] = (row[1], row[2])
     return locked

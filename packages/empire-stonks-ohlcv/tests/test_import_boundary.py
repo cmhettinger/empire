@@ -123,6 +123,7 @@ def test_success_persists_all_ohlcv_records_in_one_commit(
 
     listing_result = SimpleNamespace(
         counts=PersistenceCounts(inserted=1),
+        provider_listing_is_active=lambda listing: True,
         provider_listing_id_for=lambda listing: UUID(
             "30000000-0000-4000-8000-000000000003"
         ),
@@ -159,6 +160,50 @@ def test_success_persists_all_ohlcv_records_in_one_commit(
     assert result.acquired_objects == (acquired,)
     assert result.listing_counts == PersistenceCounts(inserted=1)
     assert result.bar_counts == PersistenceCounts(inserted=1)
+
+
+def test_inactive_provider_listing_skips_its_bars(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = FakeConnection()
+    batch = parsed_batch()
+    listing_result = SimpleNamespace(
+        counts=PersistenceCounts(unchanged=1),
+        provider_listing_is_active=lambda listing: False,
+        provider_listing_id_for=lambda listing: pytest.fail(
+            "inactive listing must not be passed to the bar writer"
+        ),
+    )
+    written_bars: list[object] = []
+
+    monkeypatch.setattr(
+        import_boundary,
+        "upsert_provider_source_snapshot",
+        lambda **_values: None,
+    )
+    monkeypatch.setattr(
+        import_boundary,
+        "upsert_provider_listings",
+        lambda **_values: listing_result,
+    )
+
+    def write_bars(**values: object) -> PersistenceCounts:
+        written_bars.extend(values["bars"])  # type: ignore[arg-type]
+        return PersistenceCounts()
+
+    monkeypatch.setattr(import_boundary, "upsert_daily_bars", write_bars)
+
+    result = execute_import_boundary(
+        connection=connection,
+        run_context=run_context(),
+        provider_code="EODDATA",
+        acquire=lambda _context: (acquired_object(),),
+        parse=lambda _objects: parsed_output(batch),
+    )
+
+    assert written_bars == []
+    assert result.listing_counts == PersistenceCounts(unchanged=1)
+    assert result.bar_counts == PersistenceCounts()
 
 
 @pytest.mark.parametrize(
@@ -264,6 +309,9 @@ def test_commit_failure_is_reported_as_persistence_and_rolls_back(
     connection = FakeConnection(commit_error=RuntimeError("secret commit detail"))
     listing_result = SimpleNamespace(
         counts=PersistenceCounts(),
+        provider_listing_is_active=lambda listing: pytest.fail(
+            "empty parse output must not inspect listing status"
+        ),
         provider_listing_id_for=lambda listing: pytest.fail(
             "empty parse output must not resolve listings"
         ),
