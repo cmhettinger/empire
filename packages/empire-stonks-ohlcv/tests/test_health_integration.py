@@ -84,6 +84,14 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
             cursor=cursor,
             provider_code="EODDATA",
         ).total_count
+        baseline_market_gaps = {
+            market: select_provider_weekday_gaps(
+                cursor=cursor,
+                provider_code="EODDATA",
+                market=market,
+            ).total_count
+            for market in MARKETS
+        }
 
         cursor.execute(
             """
@@ -161,6 +169,14 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
             cursor=cursor,
             provider_code="EODDATA",
         )
+        market_gaps = {
+            market: select_provider_weekday_gaps(
+                cursor=cursor,
+                provider_code="EODDATA",
+                market=market,
+            )
+            for market in MARKETS
+        }
 
         assert len(series) == baseline_series_count + 4_500
         inserted_series = [
@@ -172,6 +188,11 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
         assert gaps.total_count == baseline_gap_count + ACTIVE_GAPS
         assert gaps.to_dict()["calendar_authoritative"] is False
         assert gaps.sample_count <= 100
+        assert all(
+            market_gaps[market].total_count
+            == baseline_market_gaps[market] + 50
+            for market in MARKETS
+        )
 
         for market in MARKETS:
             current = markets[market]
@@ -205,7 +226,7 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
         gap_plan = _plan_text(
             cursor,
             health._WEEKDAY_GAPS_SQL,
-            ("EODDATA", 100),
+            ("EODDATA", None, None, 100),
         )
         assert any(
             index_name in series_plan

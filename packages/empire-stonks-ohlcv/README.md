@@ -282,6 +282,22 @@ listings and 139,200 daily bars. Existing provider-listing and daily-bar primary
 and identity indexes provide the required access paths, so E6.7 adds no schema
 index.
 
+## EODData stored report
+
+`build_eoddata_report()` combines one `EODDataImportResult` with provider-
+scoped database health queries. Its schema-version-1 JSON keeps acquisition,
+feed, duplicate, cross-feed reconciliation, listing-write, and bar-write
+outcomes at their source/market grains. It adds active coverage and freshness,
+bounded stale/no-data and weekday-gap candidates, a separate inactive-series
+summary, bounded failures/warnings, and the required provider-native value
+semantics.
+
+`store_eoddata_report()` writes deterministic JSON as a durable Core run object
+under `<storage_key>/eoddata/runs/YYYY/MM/DD/<run_id>/reports/report.json`.
+The object has no expiration and its metadata contains only schema version,
+provider, effective/generated dates, and outcome. Runtime credentials are not
+accepted by the report builder and are never serialized from `OHLCVConfig`.
+
 ## Development
 
 Install the package environment and run its tests from this directory:
@@ -297,5 +313,5 @@ Shared models, provider-native persistence/query helpers, Core raw-object
 storage, source-snapshot registration, run lifecycle, the transactional import
 boundary, EODData six-request acquisition, and EODData Symbol List parsing are
 implemented along with EODData Quote List parsing/reconciliation, atomic import,
-and shared provider health queries. Later provider parsers, stored reports,
-provider import CLIs, and Airflow entrypoints are added in later tasks.
+shared provider health queries, and the stored EODData report. Later provider
+parsers, provider import CLIs, and Airflow entrypoints are added in later tasks.

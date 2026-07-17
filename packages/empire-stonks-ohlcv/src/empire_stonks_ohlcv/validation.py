@@ -151,6 +151,27 @@ class SourceMarketWriteCounts:
 
 
 @dataclass(frozen=True)
+class CrossFeedOutcomeCounts:
+    """Reconciliation outcomes between listing discovery and bar feeds."""
+
+    market: str
+    listings_without_bars: int = 0
+    bars_without_listings: int = 0
+
+    def __post_init__(self) -> None:
+        _validate_text("market", self.market)
+        _validate_count("listings_without_bars", self.listings_without_bars)
+        _validate_count("bars_without_listings", self.bars_without_listings)
+
+    def to_dict(self) -> dict[str, str | int]:
+        return {
+            "market": self.market,
+            "listings_without_bars": self.listings_without_bars,
+            "bars_without_listings": self.bars_without_listings,
+        }
+
+
+@dataclass(frozen=True)
 class ProviderValidationResult:
     """Accepted shared output plus scoped outcomes and bounded issues."""
 
@@ -158,6 +179,7 @@ class ProviderValidationResult:
     feed_counts: tuple[FeedOutcomeCounts, ...]
     failures: BoundedIssueSummary = BoundedIssueSummary()
     warnings: BoundedIssueSummary = BoundedIssueSummary()
+    cross_feed_counts: CrossFeedOutcomeCounts | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.output, ParsedProviderOutput):
@@ -183,6 +205,19 @@ class ProviderValidationResult:
             raise TypeError("failures must be a BoundedIssueSummary.")
         if not isinstance(self.warnings, BoundedIssueSummary):
             raise TypeError("warnings must be a BoundedIssueSummary.")
+        if self.cross_feed_counts is not None and not isinstance(
+            self.cross_feed_counts,
+            CrossFeedOutcomeCounts,
+        ):
+            raise TypeError(
+                "cross_feed_counts must be CrossFeedOutcomeCounts or None."
+            )
+        if self.cross_feed_counts is not None:
+            markets = {item.market for item in self.feed_counts}
+            if markets != {self.cross_feed_counts.market}:
+                raise ValueError(
+                    "cross_feed_counts market must match the feed-count market."
+                )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -192,4 +227,9 @@ class ProviderValidationResult:
             "feed_counts": [item.to_dict() for item in self.feed_counts],
             "failures": self.failures.to_dict(),
             "warnings": self.warnings.to_dict(),
+            "cross_feed_counts": (
+                None
+                if self.cross_feed_counts is None
+                else self.cross_feed_counts.to_dict()
+            ),
         }

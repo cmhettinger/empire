@@ -387,6 +387,12 @@ def test_reconciled_result_builds_shared_validation_counts_and_issues() -> None:
     assert result.failures.total_count == 1
     assert result.failures.samples[0].record_reference == "NYSE:BAD"
     assert result.warnings.total_count == 2
+    assert result.cross_feed_counts is not None
+    assert result.cross_feed_counts.to_dict() == {
+        "market": "NYSE",
+        "listings_without_bars": 1,
+        "bars_without_listings": 0,
+    }
     assert tuple(issue.code for issue in result.warnings.samples) == (
         "eoddata_symbol_duplicates_collapsed",
         "eoddata_quote_list_empty",

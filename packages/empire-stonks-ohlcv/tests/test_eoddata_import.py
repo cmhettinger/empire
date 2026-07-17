@@ -238,6 +238,7 @@ def test_atomic_service_registers_all_sources_then_writes_listings_and_bars(
     assert result.skipped_inactive_bars == 0
     assert result.failures.total_count == 0
     assert len(result.source_snapshots) == 6
+    assert tuple(item.market for item in result.cross_feed_counts) == MARKETS
     assert tuple((item.source_code, item.market) for item in result.feed_counts) == (
         ("eoddata_symbol_list", "NYSE"),
         ("eoddata_symbol_list", "NASDAQ"),

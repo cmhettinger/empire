@@ -187,7 +187,7 @@ values provider-native.
 | E6.5 | [x] | Define shared validation, issue, count, and report contract | Define structural OHLC checks, null/volume handling, hard failures versus row rejections and warnings, bounded issue samples, and separate listing-feed, quote-feed, listing-write, and bar-write counts by source and market. Define freshness, coverage, stale-series, and weekday-shaped gap metrics, and state that gaps are not exchange-calendar authoritative. Extend the shared result boundary only as much as required to carry deterministic accepted/rejected/warning results from parsing and validation into persistence and reporting. | E6.4, P0.3, S2.2, M3.3, M3.6 |
 | E6.6 | [x] | Implement atomic EODData import service | Validate the reconciled output, register source-snapshot membership for all six acquired objects, upsert every discovered provider listing, resolve active listing IDs, and then upsert accepted daily bars in one database transaction. Return the separate E6.5 parse/validation and persistence counts, including derived maintenance. Tests prove rollback across all snapshot/listing/bar writes on failure, inactive-listing behavior, duplicate-policy outcomes, corrections, and an unchanged idempotent rerun. | E6.2-E6.5, M3.4-M3.5, C4.3-C4.6 |
 | E6.7 | [x] | Implement EODData health queries | Add the first deterministic health queries for the shared report contract, parameterized by provider and exercised for EODData across NYSE, NASDAQ, and AMEX. Include active/inactive handling and validate existing indexes against representative fixture volume before adding any new index. | E6.5-E6.6 |
-| E6.8 | [ ] | Build and store EODData report | Produce a common Empire-style JSON report with per-source and per-market acquisition, parse, validation, listing-write, and bar-write counts; duplicate and cross-feed mismatch outcomes; freshness, coverage, stale series, gap warnings, bounded failures/warnings, and native-semantics notes. Store it under the active Core run; tests cover provider/market scoping, paths, metadata, and secret safety. | E6.6-E6.7, C4.2, C4.5 |
+| E6.8 | [x] | Build and store EODData report | Produce a common Empire-style JSON report with per-source and per-market acquisition, parse, validation, listing-write, and bar-write counts; duplicate and cross-feed mismatch outcomes; freshness, coverage, stale series, gap warnings, bounded failures/warnings, and native-semantics notes. Store it under the active Core run; tests cover provider/market scoping, paths, metadata, and secret safety. | E6.6-E6.7, C4.2, C4.5 |
 | E6.9 | [ ] | Add EODData daily runner | Add package-owned sequencing for the ordered Symbol List and Quote List acquisition, parsing/reconciliation, atomic snapshot/listing/bar persistence, reporting, and Core run completion/failure. Support an explicit effective date and return only a compact secret-safe result. Tests cover success, acquisition/parse/persistence/report failures, partial raw evidence, and rerun behavior. | E6.8, B1.8 |
 | E6.10 | [ ] | Add EODData CLI | Add an operator CLI and `bin` wrapper that receives `deploy/env/local.env` through `bin/env-load`, supports an explicit effective date, calls the package daily runner, and emits its secret-safe JSON summary without duplicating sequencing. | E6.9, B1.8 |
 | E6.11 | [ ] | Add EODData nightly DAG | Add one thin scheduled DAG that obtains Airflow context/config from the Compose environment, derives or receives the intended effective date, calls the package daily runner, and returns only small secret-safe summaries/object IDs. DAG tests cover schedule relative to documented delivery timing, catchup, overlap, context, effective date, and imports. | E6.9-E6.10, B1.5-B1.7 |
@@ -268,6 +268,19 @@ provider-listing and `pk_ohlcv_daily` access paths; no new index was added.
 The full configured package suite passed (299) with no skips, and Poetry check,
 compileall, pip check, public import, package build, 88-column scan, and
 `git diff --check` passed.
+
+Done: 2026-07-17 — added the schema-version-1 EODData report builder,
+deterministic JSON serializer, Core run path, and durable report storage in
+`empire_stonks_ohlcv/reporting.py`. The report preserves six-object acquisition,
+feed/duplicate/cross-feed/write counts at source and NYSE/NASDAQ/AMEX grains;
+adds active coverage/freshness, bounded stale/no-data/gap candidates, separate
+inactive counts, bounded issues, outcome, and native-semantics notes; and stores
+only safe metadata without expiration. Exact typed cross-feed outcomes now flow
+from reconciliation through import, and weekday-gap queries accept an optional
+exact market scope. Focused report/contract tests and the rolled-back 4,500-
+listing/139,200-bar PostgreSQL test passed; the full configured suite passed
+(304) with no skips. Poetry check/build, compileall, pip check, public import,
+88-column scan, secret-key scan, and `git diff --check` passed.
 
 ## Phase 7: Stooq Daily End-To-End Vertical Slice
 

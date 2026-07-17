@@ -196,6 +196,7 @@ def test_weekday_gap_query_has_complete_total_and_bounded_samples() -> None:
     assert result.truncated is True
     assert result.to_dict() == {
         "provider_code": "EODDATA",
+        "market": None,
         "total_count": 125,
         "sample_count": 1,
         "truncated": True,
@@ -211,7 +212,7 @@ def test_weekday_gap_query_has_complete_total_and_bounded_samples() -> None:
             ).to_dict()
         ],
     }
-    assert cursor.executions[0][1] == ("EODDATA", 1)
+    assert cursor.executions[0][1] == ("EODDATA", None, None, 1)
     assert "listing.status = 'ACTIVE'" in cursor.executions[0][0]
     assert "extract(isodow FROM missing_day) <= 5" in cursor.executions[0][0]
 
@@ -224,12 +225,31 @@ def test_weekday_gap_query_returns_explicit_empty_result() -> None:
 
     assert result.to_dict() == {
         "provider_code": "EODDATA",
+        "market": None,
         "total_count": 0,
         "sample_count": 0,
         "truncated": False,
         "calendar_authoritative": False,
         "samples": [],
     }
+
+
+def test_weekday_gap_query_can_scope_one_exact_market() -> None:
+    cursor = HealthCursor([])
+
+    result = select_provider_weekday_gaps(
+        cursor=cursor,
+        provider_code="EODDATA",
+        market="NASDAQ",
+    )
+
+    assert result.market == "NASDAQ"
+    assert cursor.executions[0][1] == (
+        "EODDATA",
+        "NASDAQ",
+        "NASDAQ",
+        MAX_ISSUE_SAMPLES,
+    )
 
 
 @pytest.mark.parametrize(

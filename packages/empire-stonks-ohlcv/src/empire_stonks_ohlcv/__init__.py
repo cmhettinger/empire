@@ -64,6 +64,14 @@ from empire_stonks_ohlcv.provider_contract import (
     AcquireProviderObjects,
     ParseProviderObjects,
 )
+from empire_stonks_ohlcv.reporting import (
+    REPORT_OBJECT_KIND,
+    REPORT_SCHEMA_VERSION,
+    build_eoddata_report,
+    build_report_object_key,
+    eoddata_report_to_json,
+    store_eoddata_report,
+)
 from empire_stonks_ohlcv.results import (
     AcquiredObject,
     ImportIssue,
@@ -95,6 +103,7 @@ from empire_stonks_ohlcv.source_conventions import (
 from empire_stonks_ohlcv.validation import (
     MAX_ISSUE_SAMPLES,
     BoundedIssueSummary,
+    CrossFeedOutcomeCounts,
     FeedOutcomeCounts,
     ProviderValidationResult,
     SourceMarketWriteCounts,
@@ -104,6 +113,7 @@ __all__ = [
     "AcquiredObject",
     "AcquireProviderObjects",
     "BoundedIssueSummary",
+    "CrossFeedOutcomeCounts",
     "DailyBarDateRange",
     "DailyBarWriteInput",
     "EODDATA_CONTENT_TYPE",
@@ -143,6 +153,8 @@ __all__ = [
     "ProviderValidationResult",
     "ProviderWeekdayGapResult",
     "RAW_SOURCE_OBJECT_KIND",
+    "REPORT_OBJECT_KIND",
+    "REPORT_SCHEMA_VERSION",
     "ResolvedProviderListing",
     "SAFE_FAILURE_MESSAGE",
     "SourceSnapshotRegistration",
@@ -154,6 +166,9 @@ __all__ = [
     "acquire_eoddata_objects",
     "build_raw_filename",
     "build_raw_object_key",
+    "build_eoddata_report",
+    "build_report_object_key",
+    "eoddata_report_to_json",
     "build_run_summary",
     "execute_import_boundary",
     "import_eoddata_daily",
@@ -172,5 +187,6 @@ __all__ = [
     "run_provider_import",
     "run_provider_pipeline",
     "store_raw_bytes",
+    "store_eoddata_report",
     "store_raw_file",
 ]

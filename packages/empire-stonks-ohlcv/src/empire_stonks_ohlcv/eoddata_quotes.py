@@ -24,6 +24,7 @@ from empire_stonks_ohlcv.source_conventions import (
 from empire_stonks_ohlcv.validation import (
     MAX_ISSUE_SAMPLES,
     BoundedIssueSummary,
+    CrossFeedOutcomeCounts,
     FeedOutcomeCounts,
     ProviderValidationResult,
 )
@@ -165,6 +166,11 @@ class EODDataQuoteListParseResult:
             warnings=BoundedIssueSummary(
                 total_count=symbol_warning_count + quote_warning_count,
                 samples=tuple(warning_samples),
+            ),
+            cross_feed_counts=CrossFeedOutcomeCounts(
+                market=self.exchange,
+                listings_without_bars=self.symbols_without_quotes,
+                bars_without_listings=self.unmatched_quote_groups,
             ),
         )
 

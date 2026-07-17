@@ -110,6 +110,7 @@ class ProviderWeekdayGapResult:
     """Complete gap total with deterministic bounded active-series samples."""
 
     provider_code: str
+    market: str | None
     total_count: int
     samples: tuple[WeekdayGapCandidate, ...]
 
@@ -124,6 +125,7 @@ class ProviderWeekdayGapResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "provider_code": self.provider_code,
+            "market": self.market,
             "total_count": self.total_count,
             "sample_count": self.sample_count,
             "truncated": self.truncated,
@@ -221,6 +223,7 @@ _WEEKDAY_GAPS_SQL = """
         JOIN stonks.ohlcv_daily AS daily
           ON daily.provider_listing_id = listing.provider_listing_id
         WHERE listing.provider_code = %s
+          AND (%s::text IS NULL OR listing.market = %s::text)
           AND listing.status = 'ACTIVE'
     ), gaps AS (
         SELECT
@@ -284,21 +287,27 @@ def select_provider_weekday_gaps(
     *,
     cursor: Any,
     provider_code: str,
+    market: str | None = None,
     sample_limit: int = MAX_ISSUE_SAMPLES,
 ) -> ProviderWeekdayGapResult:
     """Return active-series weekday-shaped gaps with a complete total."""
 
     _validate_provider_code(provider_code)
+    _validate_market(market)
     if isinstance(sample_limit, bool) or not isinstance(sample_limit, int):
         raise TypeError("sample_limit must be an integer.")
     if not 1 <= sample_limit <= MAX_ISSUE_SAMPLES:
         raise ValueError(
             f"sample_limit must be between 1 and {MAX_ISSUE_SAMPLES}."
         )
-    cursor.execute(_WEEKDAY_GAPS_SQL, (provider_code, sample_limit))
+    cursor.execute(
+        _WEEKDAY_GAPS_SQL,
+        (provider_code, market, market, sample_limit),
+    )
     rows = cursor.fetchall()
     return ProviderWeekdayGapResult(
         provider_code=provider_code,
+        market=market,
         total_count=0 if not rows else rows[0][6],
         samples=tuple(WeekdayGapCandidate(*row[:6]) for row in rows),
     )
@@ -311,6 +320,15 @@ def _validate_provider_code(provider_code: object) -> None:
         raise ValueError("provider_code must be non-empty and trimmed.")
     if len(provider_code) > 32 or provider_code != provider_code.upper():
         raise ValueError("provider_code must be uppercase and at most 32 characters.")
+
+
+def _validate_market(market: object) -> None:
+    if market is None:
+        return
+    if not isinstance(market, str):
+        raise TypeError("market must be a string or None.")
+    if not market or market != market.strip():
+        raise ValueError("market must be non-empty and trimmed.")
 
 
 def _date_to_string(value: date | None) -> str | None:

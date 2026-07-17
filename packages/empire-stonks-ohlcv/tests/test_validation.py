@@ -7,6 +7,7 @@ import pytest
 from empire_stonks_ohlcv import (
     MAX_ISSUE_SAMPLES,
     BoundedIssueSummary,
+    CrossFeedOutcomeCounts,
     EODDATA_DAILY_SOURCE,
     FeedOutcomeCounts,
     ImportIssue,
@@ -188,6 +189,21 @@ def test_provider_validation_result_carries_output_counts_and_issues() -> None:
             samples=(_issue(),),
         ).to_dict(),
         "warnings": BoundedIssueSummary(total_count=1).to_dict(),
+        "cross_feed_counts": None,
+    }
+
+
+def test_cross_feed_counts_are_typed_scoped_and_json_ready() -> None:
+    counts = CrossFeedOutcomeCounts(
+        market="NYSE",
+        listings_without_bars=3,
+        bars_without_listings=2,
+    )
+
+    assert counts.to_dict() == {
+        "market": "NYSE",
+        "listings_without_bars": 3,
+        "bars_without_listings": 2,
     }
 
 

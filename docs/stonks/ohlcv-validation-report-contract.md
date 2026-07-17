@@ -127,6 +127,14 @@ provider totals may sum the same record kind across markets, but reports must
 retain the scoped rows. A rolled-back transaction has no successful write
 counts.
 
+### Cross-feed outcomes
+
+`CrossFeedOutcomeCounts` retains exact reconciliation outcomes for one market:
+`listings_without_bars` counts accepted discovery identities with no source bar,
+and `bars_without_listings` counts bar identities rejected because the same-
+market listing feed did not contain them. These expected/rejected cross-feed
+conditions remain distinct from generic feed rejection and duplicate counts.
+
 ### Shared validation boundary
 
 `ProviderValidationResult` carries accepted `ParsedProviderOutput` into
@@ -188,6 +196,8 @@ markets[]
   quote_or_bar_feed
   listing_write
   bar_write
+  duplicate_outcomes
+  cross_feed_outcomes
   coverage
   freshness
   stale_candidates

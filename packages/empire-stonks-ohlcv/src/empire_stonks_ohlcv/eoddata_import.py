@@ -27,6 +27,7 @@ from empire_stonks_ohlcv.source_snapshots import (
 from empire_stonks_ohlcv.validation import (
     MAX_ISSUE_SAMPLES,
     BoundedIssueSummary,
+    CrossFeedOutcomeCounts,
     FeedOutcomeCounts,
     ProviderValidationResult,
     SourceMarketWriteCounts,
@@ -52,6 +53,7 @@ class EODDataImportResult:
     write_counts: tuple[SourceMarketWriteCounts, ...]
     failures: BoundedIssueSummary
     warnings: BoundedIssueSummary
+    cross_feed_counts: tuple[CrossFeedOutcomeCounts, ...]
 
     def __post_init__(self) -> None:
         if type(self.effective_date) is not date:
@@ -92,6 +94,21 @@ class EODDataImportResult:
             raise TypeError("failures must be a BoundedIssueSummary.")
         if not isinstance(self.warnings, BoundedIssueSummary):
             raise TypeError("warnings must be a BoundedIssueSummary.")
+        if not isinstance(self.cross_feed_counts, tuple) or any(
+            not isinstance(item, CrossFeedOutcomeCounts)
+            for item in self.cross_feed_counts
+        ):
+            raise TypeError(
+                "cross_feed_counts must contain CrossFeedOutcomeCounts records."
+            )
+        if len(self.cross_feed_counts) != len(DEFAULT_EODDATA_EXCHANGES):
+            raise ValueError("cross_feed_counts must contain three records.")
+        if tuple(item.market for item in self.cross_feed_counts) != (
+            DEFAULT_EODDATA_EXCHANGES
+        ):
+            raise ValueError(
+                "cross_feed_counts must use configured EODData market order."
+            )
 
     @property
     def listing_counts(self) -> PersistenceCounts:
@@ -126,6 +143,9 @@ class EODDataImportResult:
             "skipped_inactive_bars": self.skipped_inactive_bars,
             "failures": self.failures.to_dict(),
             "warnings": self.warnings.to_dict(),
+            "cross_feed_counts": [
+                item.to_dict() for item in self.cross_feed_counts
+            ],
         }
 
 
@@ -263,6 +283,11 @@ def import_eoddata_daily(
         warnings=_combine_issue_summaries(
             tuple(result.warnings for result in ordered_results)
         ),
+        cross_feed_counts=tuple(
+            validated_by_market[market].cross_feed_counts
+            for market in DEFAULT_EODDATA_EXCHANGES
+            if validated_by_market[market].cross_feed_counts is not None
+        ),
     )
 
 
@@ -342,6 +367,10 @@ def _validate_results(
                 "each validation result must contain exactly one market."
             )
         market = next(iter(markets))
+        if result.cross_feed_counts is None:
+            raise ValueError(
+                "EODData validation result must contain cross-feed counts."
+            )
         if market not in DEFAULT_EODDATA_EXCHANGES or market in by_market:
             raise ValueError(
                 "validation_results must contain unique supported markets."
