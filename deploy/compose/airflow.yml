@@ -4,6 +4,7 @@ x-airflow-common: &airflow-common
     dockerfile: deploy/docker/airflow/Dockerfile
 
   image: ${EMPIRE_AIRFLOW_IMAGE}
+  pull_policy: build
 
   user: "${AIRFLOW_UID:-50000}:${AIRFLOW_GID:-0}"
 
