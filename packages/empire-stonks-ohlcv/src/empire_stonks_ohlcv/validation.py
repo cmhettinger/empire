@@ -123,6 +123,7 @@ class SourceMarketWriteCounts:
     market: str
     record_kind: str
     counts: PersistenceCounts
+    skipped_inactive: int = 0
 
     def __post_init__(self) -> None:
         _validate_text("source_code", self.source_code)
@@ -133,6 +134,11 @@ class SourceMarketWriteCounts:
             raise ValueError("record_kind must be listing or bar.")
         if not isinstance(self.counts, PersistenceCounts):
             raise TypeError("counts must be PersistenceCounts.")
+        _validate_count("skipped_inactive", self.skipped_inactive)
+        if self.record_kind == "listing" and self.skipped_inactive:
+            raise ValueError(
+                "skipped_inactive applies only to bar write counts."
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -140,6 +146,7 @@ class SourceMarketWriteCounts:
             "market": self.market,
             "record_kind": self.record_kind,
             "counts": self.counts.to_dict(),
+            "skipped_inactive": self.skipped_inactive,
         }
 
 

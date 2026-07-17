@@ -152,6 +152,7 @@ def test_source_market_write_counts_preserve_record_kind() -> None:
             "unchanged": 2,
             "derived_updated": 1,
         },
+        "skipped_inactive": 0,
     }
 
 

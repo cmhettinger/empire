@@ -119,7 +119,8 @@ Each `SourceMarketWriteCounts` is keyed by exact
 `(source_code, market, record_kind)`, where `record_kind` is `listing` or `bar`.
 Its existing `PersistenceCounts` contains mutually exclusive `inserted`,
 `updated`, and `unchanged` input outcomes plus separate `derived_updated`
-maintenance.
+maintenance. Bar records also carry `skipped_inactive`; listing records always
+use zero because inactivity does not prevent listing metadata resolution.
 
 Listing writes and bar writes remain separate by source and market. Aggregate
 provider totals may sum the same record kind across markets, but reports must

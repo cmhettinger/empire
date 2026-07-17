@@ -247,6 +247,21 @@ contract also defines active/inactive coverage, calendar and weekday freshness,
 stale candidates, and weekday-shaped gap warnings as non-calendar-authoritative
 operational heuristics.
 
+## EODData atomic import
+
+`import_eoddata_daily()` accepts the six acquired Core object references and
+one `ProviderValidationResult` for each of NYSE, NASDAQ, and AMEX. It validates
+the complete run shape before opening a transaction, then registers all six
+source snapshots, upserts every accepted Symbol List listing, resolves active
+listing IDs, and writes accepted Quote List bars in one commit boundary.
+
+Work is ordered by production source and configured market order. Inactive
+listings are still resolved and may receive metadata updates, but their bars are
+excluded from the daily-bar writer and reported through `skipped_inactive`.
+`EODDataImportResult` retains source/market feed and write counts, aggregate
+listing/bar persistence counts, bounded validation issues, and snapshot lineage
+without returning full bar payloads.
+
 ## Development
 
 Install the package environment and run its tests from this directory:
@@ -262,5 +277,5 @@ Shared models, provider-native persistence/query helpers, Core raw-object
 storage, source-snapshot registration, run lifecycle, the transactional import
 boundary, EODData six-request acquisition, and EODData Symbol List parsing are
 implemented along with EODData Quote List parsing and reconciliation. Later
-provider parsers, validation execution, health queries, stored reports, provider
-import CLIs, and Airflow entrypoints are added in later tasks.
+provider parsers, health queries, stored reports, provider import CLIs, and
+Airflow entrypoints are added in later tasks.
