@@ -136,6 +136,14 @@ oversized, drifted, unsafe, or unknown-source payloads.
 Provider payloads are added only after repository evidence or a source-contract
 task documents the real format. Tests never acquire live fixture data.
 
+Provider parser tests reuse `tests/parser_contract.py`. They adapt their parser
+to a bytes-in callable and provide exact valid and invalid cases, declaring
+whether their documented source permits absent volume. The assertions verify
+provider and native identity, optional/required volume behavior,
+`date`/`Decimal` types, deterministic ordered output, and deterministic
+`OHLCVParseError` rejection. This test seam does not impose one production
+parser signature.
+
 ## CLI
 
 Local commands use `bin/env-load` to load `deploy/env/local.env` before calling

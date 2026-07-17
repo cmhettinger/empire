@@ -855,6 +855,29 @@ evidence in `docs/stonks/ohlcv-eoddata-daily-format.md`; it does not finalize
 the broader E6.1 production source contract. Stooq and Yahoo fixtures remain
 deferred until T7.1/H8.1 and Y9.1 provide equivalent format evidence.
 
+### Shared parser test contract
+
+Provider parser tests adapt their parser entrypoint to the test-only
+`Callable[[bytes], ParsedProviderOutput]` alias and call the reusable assertions
+in `tests/parser_contract.py`. This is a test seam only; production adapters do
+not need an identical bytes-based API.
+
+Each provider contract suite supplies exact expected shared records for its
+committed fixtures. The assertions call every valid case twice and require:
+
+- The expected uppercase provider code on every listing.
+- Exact provider-native market and ticker text, including case and punctuation.
+- `date` trading dates and `Decimal` OHLCV values rather than floats.
+- At least one populated-volume case. A source declaring optional volume also
+  supplies a `volume=None` case; a required-volume source must never emit one.
+- Stable listing, bar, source-metadata, batch ordering, and JSON-ready output.
+
+Every suite also supplies at least one structurally invalid row or payload. It
+must raise `OHLCVParseError` with the same non-empty safe message on repeated
+calls; silently normalizing, accepting, or dropping that invalid input fails
+the contract. This parser-level rule does not define the later validation
+policy or import-level rejected-row counts, which remain owned by E6.4-E6.5.
+
 Their remote APIs and file layouts do not need a forced common downloader
 interface. Provider-specific modules may acquire and parse differently as long
 as they return the shared package records and use the same persistence, Core,

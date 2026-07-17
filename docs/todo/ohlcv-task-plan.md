@@ -180,7 +180,7 @@ allowing their acquisition and parsing details to differ.
 | A5.1 | [x] | Define provider output contract | Define the minimal provider interface or callable contract that yields shared listing and daily-bar batches plus source metadata. Do not require unrelated metadata or identical remote APIs. | M3.1-M3.3, C4.6 |
 | A5.2 | [x] | Define source-code conventions | Assign stable provider/source/parser-version identifiers for listing discovery, nightly daily data, and historical files so source snapshots remain interpretable. | C4.3, A5.1 |
 | A5.3 | [x] | Add provider fixture policy | Add small committed fixtures derived from documented provider formats, sanitized of credentials and limited to records needed for parser and edge-case tests. | A5.1-A5.2 |
-| A5.4 | [ ] | Add shared parser contract tests | Add reusable assertions for provider code, exact market/ticker preservation, date/Decimal parsing, optional volume, rejected invalid rows, and deterministic output. | A5.3 |
+| A5.4 | [x] | Add shared parser contract tests | Add reusable assertions for provider code, exact market/ticker preservation, date/Decimal parsing, optional volume, rejected invalid rows, and deterministic output. | A5.3 |
 | A5.5 | [ ] | Add provider runner seam | Make package runners accept provider acquisition/parser collaborators so tests do not require network access and Airflow remains a thin caller. | C4.5-C4.6, A5.1 |
 
 Done: 2026-07-16 — added the public callable aliases and immutable parsed-output
@@ -211,6 +211,15 @@ fixture, SHA-256 manifest, and evidence note under `tests/fixtures/eoddata` and
 passed (192), focused policy tests passed (3), and JSON validation, Poetry lock,
 compileall, pip check, package build, changed-Python-file 88-column scan, and
 `git diff --check` passed (no formatter/linter is configured).
+
+Done: 2026-07-16 — added the reusable bytes-adapter parser assertions and
+test-only reference suite in `packages/empire-stonks-ohlcv/tests/
+{parser_contract.py,test_parser_contract.py}` and documented the test seam in
+`docs/todo/ohlcv-plan.md` and the package README; the database-backed package
+suite passed (193), the focused contract test passed (1), and Poetry lock,
+compileall, pip check, helper import, package build, changed-Python-file
+88-column scan, and `git diff --check` passed (no formatter/linter is
+configured).
 
 ## Phase 6: EODData End-To-End Vertical Slice
 
