@@ -25,7 +25,14 @@ class OHLCVWorkflowError(EmpireStonksOHLCVError):
     """Secret-safe failure at one acquisition-to-import workflow stage."""
 
     def __init__(self, stage: str) -> None:
-        if stage not in {"acquisition", "parsing", "persistence"}:
-            raise ValueError("stage must be acquisition, parsing, or persistence.")
+        if stage not in {
+            "acquisition",
+            "parsing",
+            "persistence",
+            "reporting",
+        }:
+            raise ValueError(
+                "stage must be acquisition, parsing, persistence, or reporting."
+            )
         self.stage = stage
         super().__init__(f"OHLCV provider workflow failed during {stage}.")

@@ -20,6 +20,11 @@ from empire_stonks_ohlcv.eoddata_import import (
     EODDataImportResult,
     import_eoddata_daily,
 )
+from empire_stonks_ohlcv.eoddata_runner import (
+    EODDATA_DAILY_JOB_NAME,
+    EODDataDailyRunResult,
+    run_eoddata_daily,
+)
 from empire_stonks_ohlcv.exceptions import (
     EmpireStonksOHLCVError,
     OHLCVAcquisitionError,
@@ -118,9 +123,11 @@ __all__ = [
     "DailyBarWriteInput",
     "EODDATA_CONTENT_TYPE",
     "EODDATA_DAILY_SOURCE",
+    "EODDATA_DAILY_JOB_NAME",
     "EODDATA_PROVIDER_CODE",
     "EODDATA_SYMBOL_LIST_SOURCE",
     "EODDataCredentials",
+    "EODDataDailyRunResult",
     "EODDataHTTPResponse",
     "EODDataHTTPTransport",
     "EODDataImportResult",
@@ -186,6 +193,7 @@ __all__ = [
     "select_provider_weekday_gaps",
     "run_provider_import",
     "run_provider_pipeline",
+    "run_eoddata_daily",
     "store_raw_bytes",
     "store_eoddata_report",
     "store_raw_file",

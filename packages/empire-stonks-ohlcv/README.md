@@ -298,6 +298,25 @@ The object has no expiration and its metadata contains only schema version,
 provider, effective/generated dates, and outcome. Runtime credentials are not
 accepted by the report builder and are never serialized from `OHLCVConfig`.
 
+## EODData daily runner
+
+`run_eoddata_daily()` owns the provider's nightly package sequence under one
+Core run: acquire the three Symbol List objects followed by three Quote List
+objects, read and parse/reconcile them in NYSE/NASDAQ/AMEX order, execute the
+atomic import, build and store the detailed report, and complete the Core run.
+Callers provide the connection, Core services, explicit effective date, and
+runtime identity; the package neither loads environment files nor depends on
+Airflow.
+
+The returned `EODDataDailyRunResult` contains only the run/report IDs, status,
+effective date, aggregate write/issue counts, inactive skip count, and report
+outcome. Core params and summaries use `OHLCVConfig.to_safe_dict()` and never
+contain credentials, source payloads, issue text, or full report contents.
+Acquisition, parsing, persistence, and reporting failures are recorded as safe
+stage names while the original exception is re-raised. Previously stored raw
+objects and successfully committed import data are not deleted on later-stage
+failure, making a new Core run for the same effective date safe to retry.
+
 ## Development
 
 Install the package environment and run its tests from this directory:
@@ -314,4 +333,4 @@ storage, source-snapshot registration, run lifecycle, the transactional import
 boundary, EODData six-request acquisition, and EODData Symbol List parsing are
 implemented along with EODData Quote List parsing/reconciliation, atomic import,
 shared provider health queries, and the stored EODData report. Later provider
-parsers, provider import CLIs, and Airflow entrypoints are added in later tasks.
+parsers, the EODData CLI, and Airflow entrypoints are added in later tasks.

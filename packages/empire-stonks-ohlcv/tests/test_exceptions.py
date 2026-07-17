@@ -26,8 +26,15 @@ def test_public_exception_hierarchy() -> None:
 
 
 def test_workflow_error_rejects_unknown_stage_text() -> None:
-    with pytest.raises(ValueError, match="acquisition, parsing, or persistence"):
+    with pytest.raises(ValueError, match="persistence, or reporting"):
         OHLCVWorkflowError("secret provider detail")
+
+
+def test_workflow_error_accepts_reporting_stage() -> None:
+    error = OHLCVWorkflowError("reporting")
+
+    assert error.stage == "reporting"
+    assert str(error) == "OHLCV provider workflow failed during reporting."
 
 
 def test_public_exports_are_explicit() -> None:
@@ -42,9 +49,11 @@ def test_public_exports_are_explicit() -> None:
         "DailyBarWriteInput",
         "EODDATA_CONTENT_TYPE",
         "EODDATA_DAILY_SOURCE",
+        "EODDATA_DAILY_JOB_NAME",
         "EODDATA_PROVIDER_CODE",
         "EODDATA_SYMBOL_LIST_SOURCE",
         "EODDataCredentials",
+        "EODDataDailyRunResult",
         "EODDataHTTPResponse",
         "EODDataHTTPTransport",
         "EODDataImportResult",
@@ -110,6 +119,7 @@ def test_public_exports_are_explicit() -> None:
         "select_provider_weekday_gaps",
         "run_provider_import",
         "run_provider_pipeline",
+        "run_eoddata_daily",
         "store_raw_bytes",
         "store_eoddata_report",
         "store_raw_file",

@@ -188,7 +188,7 @@ values provider-native.
 | E6.6 | [x] | Implement atomic EODData import service | Validate the reconciled output, register source-snapshot membership for all six acquired objects, upsert every discovered provider listing, resolve active listing IDs, and then upsert accepted daily bars in one database transaction. Return the separate E6.5 parse/validation and persistence counts, including derived maintenance. Tests prove rollback across all snapshot/listing/bar writes on failure, inactive-listing behavior, duplicate-policy outcomes, corrections, and an unchanged idempotent rerun. | E6.2-E6.5, M3.4-M3.5, C4.3-C4.6 |
 | E6.7 | [x] | Implement EODData health queries | Add the first deterministic health queries for the shared report contract, parameterized by provider and exercised for EODData across NYSE, NASDAQ, and AMEX. Include active/inactive handling and validate existing indexes against representative fixture volume before adding any new index. | E6.5-E6.6 |
 | E6.8 | [x] | Build and store EODData report | Produce a common Empire-style JSON report with per-source and per-market acquisition, parse, validation, listing-write, and bar-write counts; duplicate and cross-feed mismatch outcomes; freshness, coverage, stale series, gap warnings, bounded failures/warnings, and native-semantics notes. Store it under the active Core run; tests cover provider/market scoping, paths, metadata, and secret safety. | E6.6-E6.7, C4.2, C4.5 |
-| E6.9 | [ ] | Add EODData daily runner | Add package-owned sequencing for the ordered Symbol List and Quote List acquisition, parsing/reconciliation, atomic snapshot/listing/bar persistence, reporting, and Core run completion/failure. Support an explicit effective date and return only a compact secret-safe result. Tests cover success, acquisition/parse/persistence/report failures, partial raw evidence, and rerun behavior. | E6.8, B1.8 |
+| E6.9 | [x] | Add EODData daily runner | Add package-owned sequencing for the ordered Symbol List and Quote List acquisition, parsing/reconciliation, atomic snapshot/listing/bar persistence, reporting, and Core run completion/failure. Support an explicit effective date and return only a compact secret-safe result. Tests cover success, acquisition/parse/persistence/report failures, partial raw evidence, and rerun behavior. | E6.8, B1.8 |
 | E6.10 | [ ] | Add EODData CLI | Add an operator CLI and `bin` wrapper that receives `deploy/env/local.env` through `bin/env-load`, supports an explicit effective date, calls the package daily runner, and emits its secret-safe JSON summary without duplicating sequencing. | E6.9, B1.8 |
 | E6.11 | [ ] | Add EODData nightly DAG | Add one thin scheduled DAG that obtains Airflow context/config from the Compose environment, derives or receives the intended effective date, calls the package daily runner, and returns only small secret-safe summaries/object IDs. DAG tests cover schedule relative to documented delivery timing, catchup, overlap, context, effective date, and imports. | E6.9-E6.10, B1.5-B1.7 |
 | E6.12 | [ ] | Verify EODData Airflow discovery | Rebuild/restart the Airflow image as required and verify the EODData DAG appears with its intended schedule/tags and imports without credentials in the DAG source. | E6.11 |
@@ -281,6 +281,20 @@ exact market scope. Focused report/contract tests and the rolled-back 4,500-
 listing/139,200-bar PostgreSQL test passed; the full configured suite passed
 (304) with no skips. Poetry check/build, compileall, pip check, public import,
 88-column scan, secret-key scan, and `git diff --check` passed.
+
+Done: 2026-07-17 — added public `run_eoddata_daily()` and compact
+`EODDataDailyRunResult` in `empire_stonks_ohlcv/eoddata_runner.py`. The runner
+starts one Core run, acquires Symbol List then Quote List partitions, parses and
+reconciles NYSE/NASDAQ/AMEX in configured order, invokes the atomic import,
+builds/stores the detailed report, and completes with IDs and aggregate safe
+counts only. Acquisition, parsing, persistence, and reporting failures store
+only a safe stage and fixed message before re-raising; partial raw evidence and
+already committed data remain durable. Tests cover success/order, all four
+failure stages, preflight without a run, partial evidence, real six-object parse
+composition, secret safety, and same-date reruns with distinct Core run IDs and
+unchanged counts. The full configured suite passed (314) with no skips.
+Poetry check/build, compileall, pip check, public import, 88-column scan,
+secret-key scan, and `git diff --check` passed.
 
 ## Phase 7: Stooq Daily End-To-End Vertical Slice
 
