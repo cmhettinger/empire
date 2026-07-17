@@ -1,0 +1,57 @@
+[
+  {
+    "exchangeCode": "NYSE",
+    "symbolCode": "EMP.A",
+    "interval": "d",
+    "dateStamp": "2026-07-15",
+    "open": 10.00,
+    "high": 11.00,
+    "low": 9.50,
+    "close": 10.50,
+    "volume": 1000
+  },
+  {
+    "exchangeCode": "NYSE",
+    "symbolCode": "EMP.A",
+    "interval": "d",
+    "dateStamp": "2026-07-15",
+    "open": 10.00,
+    "high": 11.00,
+    "low": 9.50,
+    "close": 10.50,
+    "volume": 1000
+  },
+  {
+    "exchangeCode": "NYSE",
+    "symbolCode": "CLASH",
+    "interval": "d",
+    "dateStamp": "2026-07-15",
+    "open": 20.00,
+    "high": 21.00,
+    "low": 19.00,
+    "close": 20.50,
+    "volume": 2000
+  },
+  {
+    "exchangeCode": "NYSE",
+    "symbolCode": "CLASH",
+    "interval": "d",
+    "dateStamp": "2026-07-15",
+    "open": 20.00,
+    "high": 21.00,
+    "low": 19.00,
+    "close": 20.75,
+    "volume": 2000
+  },
+  {
+    "exchangeCode": "NYSE",
+    "symbolCode": "GHOST",
+    "interval": "d",
+    "dateStamp": "2026-07-15",
+    "open": 5.00,
+    "high": 5.50,
+    "low": 4.75,
+    "close": 5.25,
+    "volume": 500
+  }
+]

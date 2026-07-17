@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "provider_code": "EODDATA",
+  "source_code": "eoddata_daily",
+  "parser_version": "1.0.0",
+  "format_reference": "docs/stonks/ohlcv-eoddata-source-contract.md#quote-list-contract",
+  "provenance": "constructed_from_documented_format",
+  "payload_file": "nyse_daily_duplicates.json",
+  "payload_size_bytes": 1051,
+  "payload_sha256": "f33e6da752c193d76de4fbbd120127d439eb238a027b3c75ba564250b5d07095",
+  "sanitization": [
+    "Used fixed fictional symbols.",
+    "Used small representative OHLCV values.",
+    "Excluded all request, authentication, account, and URL data."
+  ],
+  "cases": [
+    "compatible duplicate quote rows collapse deterministically",
+    "conflicting duplicate quote rows are rejected",
+    "quote without an accepted same-exchange listing is rejected"
+  ]
+}

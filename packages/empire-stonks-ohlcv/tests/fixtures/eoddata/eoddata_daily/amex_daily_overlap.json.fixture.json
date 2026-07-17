@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "provider_code": "EODDATA",
+  "source_code": "eoddata_daily",
+  "parser_version": "1.0.0",
+  "format_reference": "docs/stonks/ohlcv-eoddata-source-contract.md#quote-list-contract",
+  "provenance": "constructed_from_documented_format",
+  "payload_file": "amex_daily_overlap.json",
+  "payload_size_bytes": 216,
+  "payload_sha256": "de0d938c403279038c9840b4654258223b55ba16d7c3e1f40ad23b4718abc484",
+  "sanitization": [
+    "Used a fixed fictional symbol shared with other exchange test inputs.",
+    "Used small representative OHLCV values.",
+    "Excluded all request, authentication, account, and URL data."
+  ],
+  "cases": [
+    "valid AMEX daily quote",
+    "same ticker text remains isolated by exchange"
+  ]
+}

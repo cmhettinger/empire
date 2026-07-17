@@ -12,6 +12,10 @@ from empire_stonks_ohlcv.eoddata_symbols import (
     EODDataSymbolListParseResult,
     parse_eoddata_symbol_list,
 )
+from empire_stonks_ohlcv.eoddata_quotes import (
+    EODDataQuoteListParseResult,
+    parse_eoddata_quote_list,
+)
 from empire_stonks_ohlcv.exceptions import (
     EmpireStonksOHLCVError,
     OHLCVAcquisitionError,
@@ -88,6 +92,7 @@ __all__ = [
     "EODDataCredentials",
     "EODDataHTTPResponse",
     "EODDataHTTPTransport",
+    "EODDataQuoteListParseResult",
     "EODDataSymbolListParseResult",
     "DailyBar",
     "EmpireStonksOHLCVError",
@@ -121,6 +126,7 @@ __all__ = [
     "build_raw_object_key",
     "build_run_summary",
     "execute_import_boundary",
+    "parse_eoddata_quote_list",
     "parse_eoddata_symbol_list",
     "upsert_provider_listings",
     "upsert_daily_bars",

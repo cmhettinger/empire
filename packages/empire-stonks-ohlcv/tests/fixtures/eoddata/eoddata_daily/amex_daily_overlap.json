@@ -1,0 +1,13 @@
+[
+  {
+    "exchangeCode": "AMEX",
+    "symbolCode": "OVERLAP",
+    "interval": "d",
+    "dateStamp": "2026-07-15",
+    "open": 30.00,
+    "high": 31.00,
+    "low": 29.50,
+    "close": 30.50,
+    "volume": 3000
+  }
+]

@@ -219,6 +219,20 @@ issue sample. `to_parsed_provider_output()` adapts accepted listings to the
 shared listing-batch boundary with no bars; Quote List reconciliation owns bars
 in the next stage.
 
+## EODData Quote List parsing
+
+`parse_eoddata_quote_list()` requires one trusted exchange partition, an
+explicit effective date, and that exchange's accepted Symbol List result. It
+hard-fails exchange, daily-interval, and date scope mismatches, parses JSON
+numbers directly to `Decimal`, and reconciles quotes only to exact accepted
+same-exchange ticker identities.
+
+Compatible quote duplicates collapse to one bar. Conflicting duplicates,
+invalid OHLCV groups, and quotes without an accepted listing are rejected with
+deterministic counts and bounded safe issue samples. The reconciled shared
+output retains every accepted Symbol List listing and its metadata, including
+listings without a quote, and attaches at most one daily bar to each batch.
+
 ## Development
 
 Install the package environment and run its tests from this directory:
@@ -233,5 +247,6 @@ poetry run pytest
 Shared models, provider-native persistence/query helpers, Core raw-object
 storage, source-snapshot registration, run lifecycle, the transactional import
 boundary, EODData six-request acquisition, and EODData Symbol List parsing are
-implemented. Quote List and later provider parsers, validation/reporting,
-provider import CLIs, and Airflow entrypoints are added in later tasks.
+implemented along with EODData Quote List parsing and reconciliation. Later
+provider parsers, validation/reporting, provider import CLIs, and Airflow
+entrypoints are added in later tasks.
