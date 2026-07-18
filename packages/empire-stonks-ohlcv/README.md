@@ -57,8 +57,16 @@ recursive stock members using `StooqHistoryScope`, and yields one-shot
 `StooqHistoryChunk` records bounded by an explicit positive bar count. It keeps
 only one ticker member plus the current output chunk in memory. After complete
 consumption, `parser.summary` exposes per-market input, filtered, accepted,
-rejected, and duplicate counts with bounded safe issue samples. Database writes,
-Core run orchestration, and report storage remain later Phase 7 boundaries.
+rejected, and duplicate counts with bounded safe issue samples. Core run
+orchestration and report storage remain later Phase 7 boundaries.
+
+`StooqHistoryChunkWriter` writes parser chunks in strict numeric order. Each
+chunk independently resolves its distinct provider listings, skips bars for
+inactive series, upserts active daily bars, and commits exactly once. A failure
+rolls back only that chunk and increments the bounded cumulative failure count;
+previous chunk commits remain durable and a new writer can safely replay the
+same chunks. Per-chunk results and `writer.summary` keep listing and bar
+inserted, updated, unchanged, and derived-only update counts separate.
 
 Credentials are excluded from config and credential representations. Use
 `OHLCVConfig.to_safe_dict()` when placing configuration details in Core run

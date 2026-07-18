@@ -267,9 +267,9 @@ Operational progress includes, at minimum:
 
 The runner emits a progress update at least every 100 completed ticker files and
 at every chunk commit. Issue details remain bounded by the shared validation and
-report contract. Exact chunk-size defaults and maximums are owned by H7.3/H7.6
-after representative performance testing; they must be positive and bounded,
-and may not weaken the one-transaction-per-chunk contract.
+report contract. The parser requires an explicit positive chunk size; CLI
+defaults and maximums remain owned by H7.6 after representative performance
+testing and may not weaken the one-transaction-per-chunk contract.
 
 ## Restart And Idempotency
 
@@ -284,6 +284,14 @@ as a unit. A rerun starts discovery from the beginning; current-state listing
 and bar upserts classify previously committed content as unchanged and safely
 continue through the remainder. No checkpoint table, staging schema, manual row
 deletion, or compensating write is required.
+
+The package writer accepts chunks in strict numeric order, deduplicates listing
+identities repeated by a parser boundary, and uses one caller connection commit
+per chunk. Its bounded summary retains only cumulative completed/failed chunk,
+listing, bar, derived-only update, and inactive-skip counts; it does not retain
+every chunk result in memory. Validation failures occur before a transaction.
+Persistence failures are rolled back and raised as a secret-safe
+`OHLCVWorkflowError` scoped to `stooq_history`.
 
 The final report distinguishes a complete run from a partial failed run and
 records the exact safe input scope and last committed boundary. The operator

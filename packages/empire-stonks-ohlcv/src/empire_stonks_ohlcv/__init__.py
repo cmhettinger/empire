@@ -125,6 +125,11 @@ from empire_stonks_ohlcv.stooq_history import (
     StooqHistoryScope,
     inspect_stooq_history_archive,
 )
+from empire_stonks_ohlcv.stooq_history_writer import (
+    StooqHistoryChunkWriteResult,
+    StooqHistoryChunkWriter,
+    StooqHistoryWriteSummary,
+)
 from empire_stonks_ohlcv.validation import (
     MAX_ISSUE_SAMPLES,
     BoundedIssueSummary,
@@ -197,12 +202,15 @@ __all__ = [
     "STOOQ_HISTORY_MARKETS",
     "STOOQ_HISTORY_PROVIDER_CODE",
     "StooqHistoryChunk",
+    "StooqHistoryChunkWriteResult",
+    "StooqHistoryChunkWriter",
     "StooqHistoryDiscovery",
     "StooqHistoryMarketParseCounts",
     "StooqHistoryMember",
     "StooqHistoryParser",
     "StooqHistoryParseSummary",
     "StooqHistoryScope",
+    "StooqHistoryWriteSummary",
     "YAHOO_DAILY_SOURCE",
     "WeekdayGapCandidate",
     "acquire_eoddata_objects",
