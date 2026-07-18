@@ -37,13 +37,13 @@ COPY packages/empire-core /opt/empire/packages/empire-core
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-core
 
-COPY packages/empire-stonks-ohlcv /opt/empire/packages/empire-stonks-ohlcv
-
-RUN pip install --no-cache-dir /opt/empire/packages/empire-stonks-ohlcv
-
 COPY packages/empire-reports /opt/empire/packages/empire-reports
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-reports
+
+COPY packages/empire-stonks-ohlcv /opt/empire/packages/empire-stonks-ohlcv
+
+RUN pip install --no-cache-dir /opt/empire/packages/empire-stonks-ohlcv
 
 COPY packages/empire-youtube /opt/empire/packages/empire-youtube
 

@@ -9,6 +9,7 @@ packages = [{ include = "empire_stonks_ohlcv", from = "src" }]
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
 empire-core = { path = "../empire-core" }
+empire-reports = { path = "../empire-reports" }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
@@ -23,4 +24,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "../empire-core/src"]
+pythonpath = ["src", "../empire-core/src", "../empire-reports/src"]

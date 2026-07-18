@@ -70,12 +70,18 @@ from empire_stonks_ohlcv.provider_contract import (
     ParseProviderObjects,
 )
 from empire_stonks_ohlcv.reporting import (
+    PDF_REPORT_OBJECT_KIND,
     REPORT_OBJECT_KIND,
     REPORT_SCHEMA_VERSION,
     build_eoddata_report,
     build_report_object_key,
     eoddata_report_to_json,
+    store_eoddata_pdf_report,
     store_eoddata_report,
+)
+from empire_stonks_ohlcv.reports import (
+    EODDATA_DAILY_PDF_REPORT_ID,
+    render_eoddata_daily_pdf,
 )
 from empire_stonks_ohlcv.results import (
     AcquiredObject,
@@ -125,6 +131,7 @@ __all__ = [
     "EODDATA_CONTENT_TYPE",
     "EODDATA_DAILY_SOURCE",
     "EODDATA_DAILY_JOB_NAME",
+    "EODDATA_DAILY_PDF_REPORT_ID",
     "EODDATA_PROVIDER_CODE",
     "EODDATA_SYMBOL_LIST_SOURCE",
     "EODDataCredentials",
@@ -147,6 +154,7 @@ __all__ = [
     "OHLCVPersistenceError",
     "OHLCVWorkflowError",
     "OHLCVRunResult",
+    "PDF_REPORT_OBJECT_KIND",
     "ParsedListingBatch",
     "ParsedProviderOutput",
     "ParseProviderObjects",
@@ -196,7 +204,9 @@ __all__ = [
     "run_provider_import",
     "run_provider_pipeline",
     "run_eoddata_daily",
+    "render_eoddata_daily_pdf",
     "store_raw_bytes",
     "store_eoddata_report",
+    "store_eoddata_pdf_report",
     "store_raw_file",
 ]

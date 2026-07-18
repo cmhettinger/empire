@@ -24,6 +24,7 @@ from empire_stonks_ohlcv import (
     ProviderMarketHealth,
     ProviderSeriesHealth,
     ProviderWeekdayGapResult,
+    PDF_REPORT_OBJECT_KIND,
     REPORT_OBJECT_KIND,
     RowRejectionSummary,
     SourceMarketWriteCounts,
@@ -32,6 +33,8 @@ from empire_stonks_ohlcv import (
     build_eoddata_report,
     build_report_object_key,
     eoddata_report_to_json,
+    render_eoddata_daily_pdf,
+    store_eoddata_pdf_report,
     store_eoddata_report,
 )
 
@@ -382,6 +385,60 @@ def test_stores_secret_safe_report_under_active_core_run(
     assert SECRET.encode() not in payload
     assert SECRET not in json.dumps(stored.metadata)
     assert json.loads(payload) == report
+
+
+def test_renders_human_readable_eoddata_pdf(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_health(monkeypatch)
+    report = build_eoddata_report(
+        cursor=object(),
+        import_result=_import_result(),
+        generated_at=GENERATED_AT,
+    )
+
+    result = render_eoddata_daily_pdf(
+        report=report,
+        output_dir=tmp_path,
+    )
+
+    pdf_path = result.primary_artifact.path
+    assert result.report.report_id == "stonks.ohlcv.eoddata-daily-summary"
+    assert pdf_path.name == "report.pdf"
+    assert pdf_path.read_bytes().startswith(b"%PDF-")
+    assert pdf_path.stat().st_size > 10_000
+
+
+def test_stores_pdf_report_beside_json_report(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_health(monkeypatch)
+    report = build_eoddata_report(
+        cursor=object(),
+        import_result=_import_result(),
+        generated_at=GENERATED_AT,
+    )
+    repository = FakeObjectRepository(tmp_path / "objects")
+
+    stored = store_eoddata_pdf_report(
+        object_store=ObjectStore(repository),
+        run_context=_run_context(),
+        config=OHLCVConfig(
+            eoddata_credentials=EODDataCredentials(api_key=SECRET),
+        ),
+        report=report,
+        output_dir=tmp_path / "render",
+    )
+
+    assert stored.filename == "report.pdf"
+    assert stored.logical_name == "eoddata_daily_pdf_report"
+    assert stored.object_kind == PDF_REPORT_OBJECT_KIND
+    assert stored.content_type == "application/pdf"
+    assert stored.object_key.endswith(f"/{RUN_ID}/reports")
+    assert stored.metadata["outcome"] == "WARN"
+    assert ObjectStore(repository).get_bytes(stored.object_id).startswith(b"%PDF-")
 
 
 def test_report_path_requires_active_matching_run() -> None:

@@ -30,6 +30,7 @@ from empire_stonks_ohlcv.exceptions import (
 )
 from empire_stonks_ohlcv.reporting import (
     build_eoddata_report,
+    store_eoddata_pdf_report,
     store_eoddata_report,
 )
 from empire_stonks_ohlcv.results import AcquiredObject, PersistenceCounts
@@ -57,6 +58,7 @@ class EODDataDailyRunResult:
     status: str
     effective_date: date
     report_object_id: UUID
+    pdf_report_object_id: UUID
     report_outcome: str
     listing_counts: PersistenceCounts
     bar_counts: PersistenceCounts
@@ -75,6 +77,8 @@ class EODDataDailyRunResult:
             raise TypeError("effective_date must be a date.")
         if not isinstance(self.report_object_id, UUID):
             raise TypeError("report_object_id must be a UUID.")
+        if not isinstance(self.pdf_report_object_id, UUID):
+            raise TypeError("pdf_report_object_id must be a UUID.")
         if self.report_outcome not in {"PASS", "WARN", "FAIL"}:
             raise ValueError("report_outcome is invalid.")
         if not isinstance(self.listing_counts, PersistenceCounts):
@@ -101,6 +105,7 @@ class EODDataDailyRunResult:
             "provider_code": EODDATA_PROVIDER_CODE,
             "effective_date": self.effective_date.isoformat(),
             "report_object_id": str(self.report_object_id),
+            "pdf_report_object_id": str(self.pdf_report_object_id),
             "report_outcome": self.report_outcome,
             "listing_counts": self.listing_counts.to_dict(),
             "bar_counts": self.bar_counts.to_dict(),
@@ -169,7 +174,7 @@ def run_eoddata_daily(
             acquired_objects=acquired_objects,
             validation_results=validation_results,
         )
-        report, stored_report = _report(
+        report, stored_report, stored_pdf_report = _report(
             connection=connection,
             object_store=object_store,
             run_context=run_context,
@@ -180,6 +185,7 @@ def run_eoddata_daily(
             import_result=import_result,
             report=report,
             stored_report=stored_report,
+            stored_pdf_report=stored_pdf_report,
         )
         completed = run_service.complete_run(run_context.run_id, summary=summary)
         return EODDataDailyRunResult(
@@ -187,6 +193,7 @@ def run_eoddata_daily(
             status=completed.status,
             effective_date=effective_date,
             report_object_id=stored_report.object_id,
+            pdf_report_object_id=stored_pdf_report.object_id,
             report_outcome=report["outcome"],
             listing_counts=import_result.listing_counts,
             bar_counts=import_result.bar_counts,
@@ -338,7 +345,7 @@ def _report(
     run_context: RunContext,
     config: OHLCVConfig,
     import_result: EODDataImportResult,
-) -> tuple[dict[str, Any], StoredObject]:
+) -> tuple[dict[str, Any], StoredObject, StoredObject]:
     try:
         with connection.cursor() as cursor:
             report = build_eoddata_report(
@@ -351,9 +358,20 @@ def _report(
             config=config,
             report=report,
         )
-        if not isinstance(stored, StoredObject) or stored.run_id != run_context.run_id:
+        stored_pdf = store_eoddata_pdf_report(
+            object_store=object_store,
+            run_context=run_context,
+            config=config,
+            report=report,
+        )
+        if (
+            not isinstance(stored, StoredObject)
+            or stored.run_id != run_context.run_id
+            or not isinstance(stored_pdf, StoredObject)
+            or stored_pdf.run_id != run_context.run_id
+        ):
             raise TypeError("EODData report storage returned an invalid Core object.")
-        return report, stored
+        return report, stored, stored_pdf
     except Exception as exc:
         raise OHLCVWorkflowError("reporting") from exc
 
@@ -398,6 +416,7 @@ def _success_summary(
     import_result: EODDataImportResult,
     report: dict[str, Any],
     stored_report: StoredObject,
+    stored_pdf_report: StoredObject,
 ) -> dict[str, Any]:
     return {
         "provider_code": EODDATA_PROVIDER_CODE,
@@ -416,6 +435,7 @@ def _success_summary(
         "failure_count": report["hard_failures"]["total_count"],
         "warning_count": import_result.warnings.total_count,
         "report_object_id": str(stored_report.object_id),
+        "pdf_report_object_id": str(stored_pdf_report.object_id),
         "report_outcome": report["outcome"],
     }
 

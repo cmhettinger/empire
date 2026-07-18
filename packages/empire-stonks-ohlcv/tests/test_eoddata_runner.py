@@ -283,6 +283,12 @@ def _install_success(
         lambda **values: events.append("store_report")
         or _stored_report(values["run_context"].run_id),
     )
+    monkeypatch.setattr(
+        eoddata_runner,
+        "store_eoddata_pdf_report",
+        lambda **values: events.append("store_pdf_report")
+        or _stored_report(values["run_context"].run_id),
+    )
 
 
 def test_daily_runner_sequences_and_returns_only_compact_safe_result(
@@ -311,6 +317,7 @@ def test_daily_runner_sequences_and_returns_only_compact_safe_result(
         "persist",
         "build_report",
         "store_report",
+        "store_pdf_report",
     ]
     assert repository.events == ["start", "complete"]
     assert result.status == "succeeded"
@@ -321,6 +328,7 @@ def test_daily_runner_sequences_and_returns_only_compact_safe_result(
     assert summary["acquired_object_count"] == 6
     assert summary["source_snapshot_count"] == 6
     assert summary["report_object_id"] == str(result.report_object_id)
+    assert summary["pdf_report_object_id"] == str(result.pdf_report_object_id)
     assert result.to_dict()["provider_code"] == "EODDATA"
     serialized = repr(
         {

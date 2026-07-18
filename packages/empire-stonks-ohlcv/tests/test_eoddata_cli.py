@@ -43,6 +43,7 @@ def _result() -> EODDataDailyRunResult:
         status="succeeded",
         effective_date=EFFECTIVE_DATE,
         report_object_id=UUID("20000000-0000-4000-8000-000000000002"),
+        pdf_report_object_id=UUID("30000000-0000-4000-8000-000000000003"),
         report_outcome="WARN",
         listing_counts=PersistenceCounts(inserted=3),
         bar_counts=PersistenceCounts(inserted=2, unchanged=1),

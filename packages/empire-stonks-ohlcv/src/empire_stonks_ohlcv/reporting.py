@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from empire_core import ObjectStore, RunContext, StoredObject
@@ -20,6 +22,10 @@ from empire_stonks_ohlcv.health import (
     select_provider_weekday_gaps,
 )
 from empire_stonks_ohlcv.object_store import DEFAULT_STORAGE_ROOT
+from empire_stonks_ohlcv.reports.eoddata_daily_pdf import (
+    EODDATA_DAILY_PDF_REPORT_ID,
+    render_eoddata_daily_pdf,
+)
 from empire_stonks_ohlcv.source_conventions import (
     EODDATA_DAILY_SOURCE,
     EODDATA_SYMBOL_LIST_SOURCE,
@@ -30,7 +36,10 @@ from empire_stonks_ohlcv.validation import MAX_ISSUE_SAMPLES, BoundedIssueSummar
 REPORT_SCHEMA_VERSION = 2
 REPORT_OBJECT_KIND = "stonks_ohlcv_provider_report"
 REPORT_CONTENT_TYPE = "application/json"
+PDF_REPORT_OBJECT_KIND = "stonks_ohlcv_provider_pdf_report"
+PDF_REPORT_CONTENT_TYPE = "application/pdf"
 _REPORT_FILENAME = "report.json"
+_PDF_REPORT_FILENAME = "report.pdf"
 _SOURCES = (EODDATA_SYMBOL_LIST_SOURCE, EODDATA_DAILY_SOURCE)
 _PATH_TOKEN_PATTERN = re.compile(r"^[a-z0-9]+(?:[_-][a-z0-9]+)*$")
 
@@ -256,6 +265,70 @@ def store_eoddata_report(
         object_kind=REPORT_OBJECT_KIND,
         metadata={
             "schema_version": REPORT_SCHEMA_VERSION,
+            "provider_code": EODDATA_PROVIDER_CODE,
+            "effective_date": report["effective_date"],
+            "generated_at": report["generated_at"],
+            "outcome": report["outcome"],
+        },
+    )
+
+
+def store_eoddata_pdf_report(
+    *,
+    object_store: ObjectStore,
+    run_context: RunContext,
+    config: OHLCVConfig,
+    report: dict[str, Any],
+    storage_root: str = DEFAULT_STORAGE_ROOT,
+    output_dir: str | Path | None = None,
+) -> StoredObject:
+    """Render and store the human-readable companion to an EODData report."""
+
+    if not isinstance(object_store, ObjectStore):
+        raise TypeError("object_store must be a Core ObjectStore.")
+    if not isinstance(config, OHLCVConfig):
+        raise TypeError("config must be an OHLCVConfig.")
+    _validate_run_context(run_context)
+    _validate_report(report)
+    if report["provider_code"] != EODDATA_PROVIDER_CODE:
+        raise ValueError("report provider_code must be EODDATA.")
+    if report["effective_date"] != run_context.effective_date.isoformat():
+        raise ValueError("report effective_date must match the Core run.")
+
+    render_root = Path(
+        output_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp")
+    )
+    render_dir = (
+        render_root
+        / "empire"
+        / "stonks-ohlcv"
+        / str(run_context.run_id)
+        / "reports"
+    )
+    result = render_eoddata_daily_pdf(
+        report=report,
+        output_dir=render_dir,
+        filename=_PDF_REPORT_FILENAME,
+    )
+    return object_store.put_file(
+        run_context=run_context,
+        object_scope="run",
+        domain="stonks",
+        logical_name="eoddata_daily_pdf_report",
+        storage_root=storage_root,
+        object_key=build_report_object_key(
+            storage_key=config.storage_key,
+            run_context=run_context,
+            provider_code=EODDATA_PROVIDER_CODE,
+        ),
+        filename=_PDF_REPORT_FILENAME,
+        source_path=result.primary_artifact.path,
+        move=False,
+        content_type=PDF_REPORT_CONTENT_TYPE,
+        object_kind=PDF_REPORT_OBJECT_KIND,
+        metadata={
+            "schema_version": REPORT_SCHEMA_VERSION,
+            "report_id": EODDATA_DAILY_PDF_REPORT_ID,
             "provider_code": EODDATA_PROVIDER_CODE,
             "effective_date": report["effective_date"],
             "generated_at": report["generated_at"],
