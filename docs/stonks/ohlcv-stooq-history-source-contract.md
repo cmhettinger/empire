@@ -166,9 +166,9 @@ The selected fields map as follows:
 
 `<PER>` must be `D`. `<TIME>` and `<OPENINT>` are retained only as structural
 input columns and are not persisted. A member must use one ticker throughout,
-and that exact ticker must correspond case-insensitively to the member basename;
-the uppercase row value remains the stored provider ticker. Two selected members
-must not claim the same exact `(market, ticker)` identity.
+and that exact uppercase ticker must equal the member basename converted to
+uppercase. Two selected members must not claim the same exact
+`(market, ticker)` identity.
 
 Prices and volume are parsed directly to `Decimal` without a binary-float round
 trip. Volume must not be coerced to an integer: the supplied archive contains
@@ -234,6 +234,19 @@ central directory and verify at least:
 The inspected archive passes `unzip -tq`. Later implementation tests use small
 sanitized fixtures and generated volume data; this full archive is local
 operator input and must not be committed as a repository fixture.
+
+The initial parser enforces these deliberately generous safety ceilings:
+
+| Resource | Maximum |
+|----------|---------|
+| ZIP file size | 4 GiB |
+| ZIP central-directory entries | 100,000 |
+| Selected stock members | 50,000 |
+| Total selected uncompressed bytes | 20 GiB |
+| One selected member's uncompressed bytes | 256 MiB |
+
+These limits are package constants, not environment settings. Raising one
+requires new representative evidence and tests; a caller cannot disable them.
 
 ## Progress And Resource Bounds
 
@@ -313,4 +326,3 @@ Phase 7 does not include:
 - One Core object per extracted member or retention of a full extracted tree.
 - Committing the full source archive or a large historical sample as a test
   fixture.
-

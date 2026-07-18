@@ -52,6 +52,14 @@ and never automates Stooq download or browser verification. See
 [`docs/stonks/ohlcv-stooq-history-source-contract.md`](../../docs/stonks/ohlcv-stooq-history-source-contract.md)
 for archive layout, filters, native semantics, progress, and restart rules.
 
+`StooqHistoryParser` inspects the ZIP central directory, selects deterministic
+recursive stock members using `StooqHistoryScope`, and yields one-shot
+`StooqHistoryChunk` records bounded by an explicit positive bar count. It keeps
+only one ticker member plus the current output chunk in memory. After complete
+consumption, `parser.summary` exposes per-market input, filtered, accepted,
+rejected, and duplicate counts with bounded safe issue samples. Database writes,
+Core run orchestration, and report storage remain later Phase 7 boundaries.
+
 Credentials are excluded from config and credential representations. Use
 `OHLCVConfig.to_safe_dict()` when placing configuration details in Core run
 parameters, object metadata, reports, logs, or serialized results. Pass the

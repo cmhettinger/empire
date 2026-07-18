@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "provider_code": "STOOQ",
+  "source_code": "stooq_history",
+  "parser_version": "1.0.0",
+  "format_reference": "docs/stonks/ohlcv-stooq-history-source-contract.md#member-and-row-format",
+  "provenance": "constructed_from_documented_format",
+  "payload_file": "nasdaq_stocks_valid.txt",
+  "payload_size_bytes": 192,
+  "payload_sha256": "011d799fafcaa2b0eeb15287cc1aac33517b173ccb209c441f629848d9546908",
+  "sanitization": [
+    "Replaced the provider ticker with the fixed fictional identity AAA.US.",
+    "Retained only two rows needed to prove exact syntax and fractional volume."
+  ],
+  "cases": [
+    "Exact Nasdaq stock market and uppercase .US ticker identity",
+    "YYYYMMDD daily rows with Decimal OHLC values",
+    "Fractional and integral required volume values"
+  ]
+}
