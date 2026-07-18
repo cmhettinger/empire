@@ -74,15 +74,18 @@ also apply:
 ```text
 EMPIRE_STONKS_OHLCV_HTTP_TIMEOUT_SECONDS=30
 EMPIRE_STONKS_OHLCV_MAX_RETRIES=3
+EMPIRE_STONKS_OHLCV_EODDATA_REQUEST_DELAY_SECONDS=2
 EMPIRE_STONKS_OHLCV_RAW_RETENTION_DAYS=7
 EMPIRE_STORAGE_KEY_STONKS_OHLCV=stonks/ohlcv
 ```
 
 EODData membership levels have plan-dependent call limits. One normal nightly
 run makes six initial HTTP requests before any bounded retry: two endpoints for
-three exchanges. Acquisition must treat rate limiting as an explicit provider
-response, honor a safe `Retry-After` value when supplied, and never log the
-authenticated URL.
+three exchanges. Acquisition spaces consecutive requests by the configured
+delay, treats rate limiting as an explicit provider response, honors a safe
+`Retry-After` value when supplied, and never logs the authenticated URL. When
+the provider omits `Retry-After`, bounded exponential backoff begins at two
+seconds.
 
 ## Effective Date And Delivery Window
 
@@ -97,11 +100,13 @@ effective-date request parameter in this workflow; a symbol row's `dateStamp`
 is provider observation data and does not define listing validity, activity,
 `first_seen`, or `last_seen`.
 
-EODData says end-of-day data may be corrected until 7 p.m. market time. The
-initial nightly DAG should therefore run no earlier than 8 p.m. in the
+EODData says end-of-day data may be corrected until 7 p.m. market time. Any
+future nightly schedule should therefore run no earlier than 8 p.m. in the
 `America/New_York` timezone, leaving a one-hour operational buffer for NYSE,
-NASDAQ, and AMEX. E6.11 will select the exact Airflow expression. Manual runs
-and reruns may use any explicit effective date.
+NASDAQ, and AMEX. The initial Airflow DAG is manual-only (`schedule=None`), with
+catchup disabled and at most one active DAG run. Manual runs and reruns may
+provide `dag_run.conf.effective_date` as an explicit `YYYY-MM-DD` override; if
+omitted, the DAG derives the New York date from `data_interval_end`.
 
 Empire does not yet own an exchange calendar. A weekday may be a market
 holiday, and a provider may publish late. Consequently, response dates and
@@ -321,6 +326,13 @@ under the shared E6.5 validation/result contract. Compatible duplicates and an
 empty Quote List are warnings. Symbols without a quote and absent optional
 listing metadata are expected provider conditions, though aggregate metadata
 omission counts may still appear in reports.
+
+A safely rejected group does not fail the completed run. It produces a `WARN`
+report outcome and is counted under its exact market, source, and rejection
+reason with separate grouped-identity and raw-row totals. `FAIL` is reserved for
+partition/run-integrity failures. Aborting acquisition and parsing failures add
+the safe market and source code to the Core failure summary when the failing
+partition is known; persistence/reporting failures remain whole-run scoped.
 
 All issue samples are bounded and contain only safe provider identity fields;
 they never include response bodies, authenticated URLs, request headers, or

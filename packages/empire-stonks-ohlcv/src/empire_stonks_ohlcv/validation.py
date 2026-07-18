@@ -70,6 +70,64 @@ class BoundedIssueSummary:
 
 
 @dataclass(frozen=True)
+class RowRejectionSummary:
+    """One market/source/reason bucket of safely rejected provider records."""
+
+    source_code: str
+    market: str
+    code: str
+    rejected_records: int
+    rejected_rows: int
+    samples: tuple[ImportIssue, ...] = ()
+
+    def __post_init__(self) -> None:
+        _validate_text("source_code", self.source_code)
+        if not _SOURCE_CODE_PATTERN.fullmatch(self.source_code):
+            raise ValueError("source_code must be lowercase and path-safe.")
+        _validate_text("market", self.market)
+        _validate_text("code", self.code)
+        _validate_count("rejected_records", self.rejected_records)
+        _validate_count("rejected_rows", self.rejected_rows)
+        if self.rejected_records == 0 or self.rejected_rows == 0:
+            raise ValueError("row rejection counts must be positive.")
+        if not isinstance(self.samples, tuple) or any(
+            not isinstance(issue, ImportIssue) for issue in self.samples
+        ):
+            raise TypeError("samples must contain only ImportIssue records.")
+        if len(self.samples) > MAX_ISSUE_SAMPLES:
+            raise ValueError(
+                f"samples must contain at most {MAX_ISSUE_SAMPLES} issues."
+            )
+        if len(self.samples) > self.rejected_records:
+            raise ValueError("samples cannot exceed rejected_records.")
+        if any(
+            issue.code != self.code or issue.source_code != self.source_code
+            for issue in self.samples
+        ):
+            raise ValueError("samples must match the rejection code and source.")
+
+    @property
+    def sample_count(self) -> int:
+        return len(self.samples)
+
+    @property
+    def truncated(self) -> bool:
+        return self.sample_count < self.rejected_records
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_code": self.source_code,
+            "market": self.market,
+            "code": self.code,
+            "rejected_records": self.rejected_records,
+            "rejected_rows": self.rejected_rows,
+            "sample_count": self.sample_count,
+            "truncated": self.truncated,
+            "samples": [issue.to_dict() for issue in self.samples],
+        }
+
+
+@dataclass(frozen=True)
 class FeedOutcomeCounts:
     """Parse/validation outcomes for one source and market partition."""
 
@@ -177,6 +235,7 @@ class ProviderValidationResult:
 
     output: ParsedProviderOutput
     feed_counts: tuple[FeedOutcomeCounts, ...]
+    row_rejections: tuple[RowRejectionSummary, ...] = ()
     failures: BoundedIssueSummary = BoundedIssueSummary()
     warnings: BoundedIssueSummary = BoundedIssueSummary()
     cross_feed_counts: CrossFeedOutcomeCounts | None = None
@@ -203,6 +262,25 @@ class ProviderValidationResult:
             )
         if not isinstance(self.failures, BoundedIssueSummary):
             raise TypeError("failures must be a BoundedIssueSummary.")
+        if not isinstance(self.row_rejections, tuple) or any(
+            not isinstance(item, RowRejectionSummary)
+            for item in self.row_rejections
+        ):
+            raise TypeError(
+                "row_rejections must contain only RowRejectionSummary records."
+            )
+        rejection_keys = [
+            (item.source_code, item.market, item.code)
+            for item in self.row_rejections
+        ]
+        if len(set(rejection_keys)) != len(rejection_keys):
+            raise ValueError("row_rejections must have unique scope/reason keys.")
+        if sum(item.rejected_records for item in self.row_rejections) != sum(
+            item.rejected_records for item in self.feed_counts
+        ):
+            raise ValueError(
+                "row_rejections must match feed rejected-record counts."
+            )
         if not isinstance(self.warnings, BoundedIssueSummary):
             raise TypeError("warnings must be a BoundedIssueSummary.")
         if self.cross_feed_counts is not None and not isinstance(
@@ -225,6 +303,9 @@ class ProviderValidationResult:
             "listing_count": self.output.listing_count,
             "bar_count": self.output.bar_count,
             "feed_counts": [item.to_dict() for item in self.feed_counts],
+            "row_rejections": [
+                item.to_dict() for item in self.row_rejections
+            ],
             "failures": self.failures.to_dict(),
             "warnings": self.warnings.to_dict(),
             "cross_feed_counts": (

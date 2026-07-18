@@ -111,6 +111,7 @@ from empire_stonks_ohlcv.validation import (
     CrossFeedOutcomeCounts,
     FeedOutcomeCounts,
     ProviderValidationResult,
+    RowRejectionSummary,
     SourceMarketWriteCounts,
 )
 
@@ -158,6 +159,7 @@ __all__ = [
     "ProviderSourceMetadata",
     "ProviderSeriesHealth",
     "ProviderValidationResult",
+    "RowRejectionSummary",
     "ProviderWeekdayGapResult",
     "RAW_SOURCE_OBJECT_KIND",
     "REPORT_OBJECT_KIND",

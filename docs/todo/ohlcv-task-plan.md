@@ -190,8 +190,8 @@ values provider-native.
 | E6.8 | [x] | Build and store EODData report | Produce a common Empire-style JSON report with per-source and per-market acquisition, parse, validation, listing-write, and bar-write counts; duplicate and cross-feed mismatch outcomes; freshness, coverage, stale series, gap warnings, bounded failures/warnings, and native-semantics notes. Store it under the active Core run; tests cover provider/market scoping, paths, metadata, and secret safety. | E6.6-E6.7, C4.2, C4.5 |
 | E6.9 | [x] | Add EODData daily runner | Add package-owned sequencing for the ordered Symbol List and Quote List acquisition, parsing/reconciliation, atomic snapshot/listing/bar persistence, reporting, and Core run completion/failure. Support an explicit effective date and return only a compact secret-safe result. Tests cover success, acquisition/parse/persistence/report failures, partial raw evidence, and rerun behavior. | E6.8, B1.8 |
 | E6.10 | [x] | Add EODData CLI | Add an operator CLI and `bin` wrapper that receives `deploy/env/local.env` through `bin/env-load`, supports an explicit effective date, calls the package daily runner, and emits its secret-safe JSON summary without duplicating sequencing. | E6.9, B1.8 |
-| E6.11 | [ ] | Add EODData nightly DAG | Add one thin scheduled DAG that obtains Airflow context/config from the Compose environment, derives or receives the intended effective date, calls the package daily runner, and returns only small secret-safe summaries/object IDs. DAG tests cover schedule relative to documented delivery timing, catchup, overlap, context, effective date, and imports. | E6.9-E6.10, B1.5-B1.7 |
-| E6.12 | [ ] | Verify EODData Airflow discovery | Rebuild/restart the Airflow image as required and verify the EODData DAG appears with its intended schedule/tags and imports without credentials in the DAG source. | E6.11 |
+| E6.11 | [x] | Add EODData manual DAG | Add one thin manual-only DAG that obtains Airflow context/config from the Compose environment, derives or receives the intended effective date, calls the package daily runner, and returns only small secret-safe summaries/object IDs. DAG tests cover manual scheduling, catchup, overlap, context, effective date, and imports. | E6.9-E6.10, B1.5-B1.7 |
+| E6.12 | [x] | Verify EODData Airflow discovery | Rebuild/restart the Airflow image as required and verify the EODData DAG appears with its intended schedule/tags and imports without credentials in the DAG source. | E6.11 |
 | E6.13 | [ ] | Run EODData six-object fixture vertical test | Run the full three-exchange Symbol List plus Quote List fixture path through the DAG-callable package runner and stored report. Confirm one Core run, six raw objects and snapshot memberships, atomic listing-before-bar persistence, separate listing/bar counts, duplicate and mismatch reporting, market isolation, and the durable run/object/snapshot/report chain; then prove a rerun is unchanged. | E6.11-E6.12, S2.6 |
 
 Done: 2026-07-17 — added the production EODData source contract in
@@ -237,7 +237,8 @@ Done: 2026-07-17 — finalized the shared validation/count/report contract in
 `docs/stonks/ohlcv-validation-report-contract.md`; added public bounded issue,
 source/market feed, source/market write, and validated-output records in
 `empire_stonks_ohlcv/validation.py`; and adapted reconciled EODData results to
-carry both feed grains and deterministic failure/warning summaries. The contract
+carry feed grains, typed row rejections, and deterministic hard-failure/warning
+summaries. The contract
 defines OHLC/null/volume severity, 100-sample bounds, active/inactive coverage,
 calendar/weekday freshness, stale candidates, non-calendar-authoritative gaps,
 and the versioned stored-report shape. Focused tests passed (82), the full suite
@@ -269,7 +270,7 @@ The full configured package suite passed (299) with no skips, and Poetry check,
 compileall, pip check, public import, package build, 88-column scan, and
 `git diff --check` passed.
 
-Done: 2026-07-17 — added the schema-version-1 EODData report builder,
+Done: 2026-07-17 — added the schema-version-2 EODData report builder,
 deterministic JSON serializer, Core run path, and durable report storage in
 `empire_stonks_ohlcv/reporting.py`. The report preserves six-object acquisition,
 feed/duplicate/cross-feed/write counts at source and NYSE/NASDAQ/AMEX grains;
@@ -309,6 +310,79 @@ failure, and secret-safety tests passed; the full configured suite passed (321)
 with no skips.
 Poetry install/check/build, installed command help, compileall, pip check,
 88-column scan, shell syntax, secret-key scan, and `git diff --check` passed.
+
+Done: 2026-07-17 — added the thin manual-only Airflow DAG
+`stonks_ohlcv_eoddata_daily_scrape`, with `schedule=None`, catchup disabled, and
+one active run. Manual runs may provide a strict
+`dag_run.conf.effective_date` override; otherwise the DAG derives the provider
+effective date from the New York date at `data_interval_end`. Its single task
+loads Compose-provided environment configuration, constructs Core services,
+calls `run_eoddata_daily()` once, and returns/logs only compact safe IDs and
+counts.
+DAG tests cover imports, manual scheduling, overlap, date derivation/override,
+invalid context input, service delegation, runner identity, and the returned
+payload. The full configured suite passed (330) with no skips. Poetry
+check/build, compileall, pip check, public import, Compose config validation,
+88-column scan, credential-source scan, and `git diff --check` passed.
+
+Done: 2026-07-17 — rebuilt the Airflow image and recreated the API,
+scheduler, DAG processor, triggerer, and worker after confirming the previous
+image contained an older `empire-stonks-ohlcv` installation without the public
+`run_eoddata_daily` export. The recreated image imports the export from
+`empire_stonks_ohlcv.eoddata_runner`; Airflow reports no DAG import errors and
+discovers `stonks_ohlcv_eoddata_daily_scrape` paused with `schedule=None`,
+catchup disabled, one active run, the `stonks`/`ohlcv`/`eoddata`/`manual` tags,
+and the single `run_eoddata_daily` task.
+
+Follow-up: the first live manual run retained its NYSE Symbol List object but
+then received HTTP 429 for NASDAQ because the new client sent consecutive
+partitions without the two-second pacing used by the proven legacy client.
+Acquisition now spaces all six requests with the environment-configurable
+`EMPIRE_STONKS_OHLCV_EODDATA_REQUEST_DELAY_SECONDS` (default `2`) and uses a
+two-second bounded exponential retry base when `Retry-After` is absent. Tests
+cover pacing, provider-directed delay, fallback retry timing, retained partial
+evidence, and secret safety. The configured suite passed (333) with no skips;
+the Airflow image was rebuilt/recreated and verified with the new settings.
+
+The next live rerun acquired all six objects and committed the import, then
+exposed PostgreSQL's `sum(bigint) -> numeric` behavior in report health counts:
+`active_bar_count` and `inactive_bar_count` arrived as Python `Decimal` values.
+The shared health-query boundary now normalizes all aggregate counts to its
+declared integer contract before reporting. Unit coverage uses Decimal-shaped
+database rows, PostgreSQL integration verifies integer/JSON-ready results, and
+integration fixtures no longer assume an empty live EODData provider scope or
+one fixed query-plan choice. The configured suite passed (333) with no skips;
+the rebuilt Airflow worker JSON-serialized the live NYSE/NASDAQ/AMEX health
+results successfully and Airflow reported no import errors.
+
+The following live manual rerun completed one Core run and stored all six raw
+objects plus the report. Its idempotent persistence result was 13,601 unchanged
+listings and 12,161 unchanged bars. The technical run succeeded, while the
+original stored quality outcome was `FAIL`: 464 structurally invalid OHLC
+groups (1
+NYSE, 4 NASDAQ, 459 AMEX) and 3 conflicting duplicate groups (2 NASDAQ, 1
+AMEX) were rejected; no quote lacked a same-market Symbol List identity. Raw
+samples show the dominant AMEX defect is zero-volume data whose close lies
+outside the provider-supplied open/high/low range. Validation remains strict.
+The report contract was subsequently corrected so these safely excluded rows
+produce `WARN`, not `FAIL`: rejection buckets now retain exact market, source,
+reason, rejected-identity count, rejected-row count, and bounded samples. Only
+partition/run-integrity problems are hard failures; aborting acquisition or
+parsing failures also record safe market/source scope when known. The DAG
+remains manual pending further operational review.
+
+Done: 2026-07-17 — revised the EODData quality boundary after the first live
+run. Safe row/group exclusions now flow through typed market/source/reason
+rejection summaries and produce `WARN`; `FAIL` is reserved for hard
+partition/run-integrity findings. Reports use schema version 2, retain grouped
+identity and raw-row totals per market, and expose market-specific hard-failure
+sections. Compact runner/Core summaries include rejection totals, while
+aborting acquisition and parsing failures retain safe market/source scope when
+known. The configured PostgreSQL suite passed (335). Replaying the retained six
+live objects produced `WARN`, zero hard failures, 467 rejected identities, and
+470 rejected rows: NYSE 1/1, NASDAQ 6/8, and AMEX 460/461. The rebuilt Airflow
+worker loaded the schema-version-2 package and the manual DAG had no import
+errors.
 
 ## Phase 7: Stooq Daily End-To-End Vertical Slice
 

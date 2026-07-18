@@ -27,6 +27,7 @@ from empire_stonks_ohlcv.validation import (
     CrossFeedOutcomeCounts,
     FeedOutcomeCounts,
     ProviderValidationResult,
+    RowRejectionSummary,
 )
 
 
@@ -126,9 +127,44 @@ class EODDataQuoteListParseResult:
                     exchange=self.exchange,
                 )
             )
-        failure_samples = (symbol_list.issues + self.issues)[
-            :MAX_ISSUE_SAMPLES
-        ]
+        row_rejections = tuple(
+            item
+            for item in (
+                _row_rejection(
+                    source_code=EODDATA_SYMBOL_LIST_SOURCE.source_code,
+                    exchange=self.exchange,
+                    code="eoddata_symbol_duplicate_conflict",
+                    rejected_records=symbol_list.conflicting_duplicate_groups,
+                    rejected_rows=symbol_list.rejected_rows,
+                    issues=symbol_list.issues,
+                ),
+                _row_rejection(
+                    source_code=EODDATA_DAILY_SOURCE.source_code,
+                    exchange=self.exchange,
+                    code="eoddata_quote_duplicate_conflict",
+                    rejected_records=self.conflicting_duplicate_groups,
+                    rejected_rows=self.conflicting_duplicate_rows,
+                    issues=self.issues,
+                ),
+                _row_rejection(
+                    source_code=EODDATA_DAILY_SOURCE.source_code,
+                    exchange=self.exchange,
+                    code="eoddata_quote_invalid_ohlcv",
+                    rejected_records=self.invalid_quote_groups,
+                    rejected_rows=self.invalid_quote_rows,
+                    issues=self.issues,
+                ),
+                _row_rejection(
+                    source_code=EODDATA_DAILY_SOURCE.source_code,
+                    exchange=self.exchange,
+                    code="eoddata_quote_without_listing",
+                    rejected_records=self.unmatched_quote_groups,
+                    rejected_rows=self.unmatched_quote_rows,
+                    issues=self.issues,
+                ),
+            )
+            if item is not None
+        )
         return ProviderValidationResult(
             output=self.to_parsed_provider_output(),
             feed_counts=(
@@ -159,10 +195,8 @@ class EODDataQuoteListParseResult:
                     warning_count=quote_warning_count,
                 ),
             ),
-            failures=BoundedIssueSummary(
-                total_count=symbol_list.issue_count + self.issue_count,
-                samples=failure_samples,
-            ),
+            row_rejections=row_rejections,
+            failures=BoundedIssueSummary(),
             warnings=BoundedIssueSummary(
                 total_count=symbol_warning_count + quote_warning_count,
                 samples=tuple(warning_samples),
@@ -196,6 +230,29 @@ class EODDataQuoteListParseResult:
             "issue_count": self.issue_count,
             "issues": [issue.to_dict() for issue in self.issues],
         }
+
+
+def _row_rejection(
+    *,
+    source_code: str,
+    exchange: str,
+    code: str,
+    rejected_records: int,
+    rejected_rows: int,
+    issues: tuple[ImportIssue, ...],
+) -> RowRejectionSummary | None:
+    if not rejected_records:
+        return None
+    return RowRejectionSummary(
+        source_code=source_code,
+        market=exchange,
+        code=code,
+        rejected_records=rejected_records,
+        rejected_rows=rejected_rows,
+        samples=tuple(issue for issue in issues if issue.code == code)[
+            :MAX_ISSUE_SAMPLES
+        ],
+    )
 
 
 def parse_eoddata_quote_list(

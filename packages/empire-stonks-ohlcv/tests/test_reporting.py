@@ -18,12 +18,14 @@ from empire_stonks_ohlcv import (
     EODDataCredentials,
     EODDataImportResult,
     FeedOutcomeCounts,
+    ImportIssue,
     OHLCVConfig,
     PersistenceCounts,
     ProviderMarketHealth,
     ProviderSeriesHealth,
     ProviderWeekdayGapResult,
     REPORT_OBJECT_KIND,
+    RowRejectionSummary,
     SourceMarketWriteCounts,
     SourceSnapshotRegistration,
     WeekdayGapCandidate,
@@ -76,7 +78,11 @@ def _import_result() -> EODDataImportResult:
                     market=market,
                     input_rows=4,
                     accepted_records=3 if is_listing else 2,
-                    rejected_records=0,
+                    rejected_records=(
+                        1
+                        if not is_listing and market in {"NYSE", "AMEX"}
+                        else 0
+                    ),
                     duplicate_rows_collapsed=1,
                     warning_count=1,
                 )
@@ -96,6 +102,38 @@ def _import_result() -> EODDataImportResult:
         source_snapshots=tuple(snapshots),
         feed_counts=tuple(feed_counts),
         write_counts=tuple(write_counts),
+        row_rejections=(
+            RowRejectionSummary(
+                source_code="eoddata_daily",
+                market="NYSE",
+                code="eoddata_quote_invalid_ohlcv",
+                rejected_records=1,
+                rejected_rows=1,
+                samples=(
+                    ImportIssue(
+                        code="eoddata_quote_invalid_ohlcv",
+                        message="Invalid Quote List OHLCV rows were rejected.",
+                        source_code="eoddata_daily",
+                        record_reference="NYSE:BAD",
+                    ),
+                ),
+            ),
+            RowRejectionSummary(
+                source_code="eoddata_daily",
+                market="AMEX",
+                code="eoddata_quote_duplicate_conflict",
+                rejected_records=1,
+                rejected_rows=2,
+                samples=(
+                    ImportIssue(
+                        code="eoddata_quote_duplicate_conflict",
+                        message="Conflicting duplicate Quote List rows were rejected.",
+                        source_code="eoddata_daily",
+                        record_reference="AMEX:CLASH",
+                    ),
+                ),
+            ),
+        ),
         failures=BoundedIssueSummary(),
         warnings=BoundedIssueSummary(),
         cross_feed_counts=tuple(
@@ -255,7 +293,7 @@ def test_builds_complete_deterministic_scoped_eoddata_report(
         generated_at=GENERATED_AT,
     )
 
-    assert report["schema_version"] == 1
+    assert report["schema_version"] == 2
     assert report["provider_code"] == "EODDATA"
     assert report["effective_date"] == "2026-07-15"
     assert report["generated_at"] == "2026-07-16T02:30:00+00:00"
@@ -271,12 +309,20 @@ def test_builds_complete_deterministic_scoped_eoddata_report(
     assert nyse["stale_candidates"]["total_count"] == 1
     assert nyse["no_data_candidates"]["total_count"] == 1
     assert nyse["weekday_gap_warnings"]["total_count"] == 1
+    assert nyse["row_rejections"]["rejected_records"] == 1
+    assert nyse["row_rejections"]["reasons"][0]["market"] == "NYSE"
     assert nyse["cross_feed_outcomes"] == {
         "market": "NYSE",
         "listings_without_bars": 1,
         "bars_without_listings": 0,
     }
     assert report["inactive_series"]["total_count"] == 3
+    assert report["hard_failures"]["total_count"] == 0
+    assert [item["market"] for item in report["hard_failures"]["markets"]] == list(
+        MARKETS
+    )
+    assert report["row_rejections"]["rejected_records"] == 2
+    assert report["row_rejections"]["rejected_rows"] == 3
     assert calls == [
         ("markets", "EODDATA"),
         ("series", "EODDATA"),
@@ -323,7 +369,7 @@ def test_stores_secret_safe_report_under_active_core_run(
     assert stored.content_type == "application/json"
     assert stored.expires_at is None
     assert stored.metadata == {
-        "schema_version": 1,
+        "schema_version": 2,
         "provider_code": "EODDATA",
         "effective_date": "2026-07-15",
         "generated_at": "2026-07-16T02:30:00+00:00",
@@ -333,6 +379,51 @@ def test_stores_secret_safe_report_under_active_core_run(
     assert SECRET.encode() not in payload
     assert SECRET not in json.dumps(stored.metadata)
     assert json.loads(payload) == report
+
+
+def test_hard_failures_are_grouped_by_market_and_reason(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_health(monkeypatch)
+    series = list(_series_health())
+    nasdaq_index = next(
+        index
+        for index, item in enumerate(series)
+        if item.market == "NASDAQ" and item.status == "ACTIVE"
+    )
+    series[nasdaq_index] = ProviderSeriesHealth(
+        **{
+            **series[nasdaq_index].__dict__,
+            "last_trading_date": date(2026, 7, 16),
+        }
+    )
+    monkeypatch.setattr(
+        reporting,
+        "select_provider_series_health",
+        lambda **_values: tuple(series),
+    )
+
+    report = build_eoddata_report(
+        cursor=object(),
+        import_result=_import_result(),
+        generated_at=GENERATED_AT,
+    )
+
+    assert report["outcome"] == "FAIL"
+    assert report["hard_failures"]["total_count"] == 1
+    by_market = {
+        item["market"]: item for item in report["hard_failures"]["markets"]
+    }
+    assert by_market["NYSE"]["total_count"] == 0
+    assert by_market["NASDAQ"]["total_count"] == 1
+    assert by_market["NASDAQ"]["reasons"] == [
+        {
+            "source_code": "eoddata_daily",
+            "code": "future_last_trading_date",
+            "total_count": 1,
+        }
+    ]
+    assert by_market["AMEX"]["total_count"] == 0
 
 
 def test_report_path_requires_active_matching_run() -> None:

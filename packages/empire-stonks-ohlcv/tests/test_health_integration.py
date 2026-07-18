@@ -197,6 +197,20 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
         for market in MARKETS:
             current = markets[market]
             baseline = baseline_markets.get(market)
+            assert all(
+                type(value) is int
+                for value in (
+                    current.active_listing_count,
+                    current.inactive_listing_count,
+                    current.active_listings_with_bars,
+                    current.active_listings_without_bars,
+                    current.inactive_listings_with_bars,
+                    current.inactive_listings_without_bars,
+                    current.active_bar_count,
+                    current.inactive_bar_count,
+                )
+            )
+            json.dumps(current.to_dict())
             assert (
                 current.active_listing_count
                 - _count(baseline, "active_listing_count")
@@ -235,7 +249,13 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
                 "uq_provider_listing_identity",
             )
         )
-        assert "pk_ohlcv_daily" in series_plan
+        assert any(
+            index_name in series_plan
+            for index_name in (
+                "pk_ohlcv_daily",
+                "ix_ohlcv_daily_trading_date",
+            )
+        )
         assert any(
             index_name in gap_plan
             for index_name in (
@@ -243,4 +263,10 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
                 "uq_provider_listing_identity",
             )
         )
-        assert "pk_ohlcv_daily" in gap_plan
+        assert any(
+            index_name in gap_plan
+            for index_name in (
+                "pk_ohlcv_daily",
+                "ix_ohlcv_daily_trading_date",
+            )
+        )

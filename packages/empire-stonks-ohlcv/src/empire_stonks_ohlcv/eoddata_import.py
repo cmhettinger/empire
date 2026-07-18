@@ -30,6 +30,7 @@ from empire_stonks_ohlcv.validation import (
     CrossFeedOutcomeCounts,
     FeedOutcomeCounts,
     ProviderValidationResult,
+    RowRejectionSummary,
     SourceMarketWriteCounts,
 )
 
@@ -51,6 +52,7 @@ class EODDataImportResult:
     source_snapshots: tuple[SourceSnapshotRegistration, ...]
     feed_counts: tuple[FeedOutcomeCounts, ...]
     write_counts: tuple[SourceMarketWriteCounts, ...]
+    row_rejections: tuple[RowRejectionSummary, ...]
     failures: BoundedIssueSummary
     warnings: BoundedIssueSummary
     cross_feed_counts: tuple[CrossFeedOutcomeCounts, ...]
@@ -92,6 +94,29 @@ class EODDataImportResult:
             raise ValueError("feed_counts and write_counts must contain six records.")
         if not isinstance(self.failures, BoundedIssueSummary):
             raise TypeError("failures must be a BoundedIssueSummary.")
+        if not isinstance(self.row_rejections, tuple) or any(
+            not isinstance(item, RowRejectionSummary)
+            for item in self.row_rejections
+        ):
+            raise TypeError(
+                "row_rejections must contain only RowRejectionSummary records."
+            )
+        rejection_counts = {
+            (source_code, market): sum(
+                item.rejected_records
+                for item in self.row_rejections
+                if item.source_code == source_code and item.market == market
+            )
+            for source_code, market in _EXPECTED_OBJECT_KEYS
+        }
+        if any(
+            item.rejected_records
+            != rejection_counts[(item.source_code, item.market)]
+            for item in self.feed_counts
+        ):
+            raise ValueError(
+                "row_rejections must match feed rejected-record counts."
+            )
         if not isinstance(self.warnings, BoundedIssueSummary):
             raise TypeError("warnings must be a BoundedIssueSummary.")
         if not isinstance(self.cross_feed_counts, tuple) or any(
@@ -141,6 +166,9 @@ class EODDataImportResult:
             "listing_counts": self.listing_counts.to_dict(),
             "bar_counts": self.bar_counts.to_dict(),
             "skipped_inactive_bars": self.skipped_inactive_bars,
+            "row_rejections": [
+                item.to_dict() for item in self.row_rejections
+            ],
             "failures": self.failures.to_dict(),
             "warnings": self.warnings.to_dict(),
             "cross_feed_counts": [
@@ -277,6 +305,11 @@ def import_eoddata_daily(
             for source in _SOURCES
             for market in DEFAULT_EODDATA_EXCHANGES
         ),
+        row_rejections=tuple(
+            rejection
+            for result in ordered_results
+            for rejection in result.row_rejections
+        ),
         failures=_combine_issue_summaries(
             tuple(result.failures for result in ordered_results)
         ),
@@ -397,11 +430,11 @@ def _validate_results(
             raise ValueError(
                 "validation feed counts must match accepted shared output."
             )
-        if sum(item.rejected_records for item in result.feed_counts) != (
-            result.failures.total_count
+        if sum(item.rejected_records for item in result.feed_counts) != sum(
+            item.rejected_records for item in result.row_rejections
         ):
             raise ValueError(
-                "validation rejected records must match failure totals."
+                "validation rejected records must match row-rejection totals."
             )
         if sum(item.warning_count for item in result.feed_counts) != (
             result.warnings.total_count

@@ -30,7 +30,7 @@ EODDATA_CONTENT_TYPE = "application/json"
 EODDATA_USER_AGENT = "empire-stonks-ohlcv/0.1"
 
 _RETRYABLE_HTTP_STATUSES = frozenset({429, *range(500, 600)})
-_DEFAULT_RETRY_BACKOFF_SECONDS = 0.5
+_DEFAULT_RETRY_BACKOFF_SECONDS = 2.0
 _MAX_RETRY_DELAY_SECONDS = 60.0
 
 Sleep = Callable[[float], None]
@@ -107,7 +107,9 @@ def acquire_eoddata_objects(
         raise TypeError("transport must be callable.")
 
     acquired: list[AcquiredObject] = []
-    for spec in _request_specs(config):
+    for request_index, spec in enumerate(_request_specs(config)):
+        if request_index:
+            sleep(config.eoddata_request_delay_seconds)
         query = {"apiKey": credentials.api_key}
         if spec.source_code == EODDATA_DAILY_SOURCE.source_code:
             effective_date = run_context.effective_date
@@ -142,9 +144,7 @@ def acquire_eoddata_objects(
                 },
             )
         except Exception:
-            raise OHLCVAcquisitionError(
-                _safe_failure(spec, "raw-object storage failed")
-            ) from None
+            raise _acquisition_error(spec, "raw-object storage failed") from None
         acquired.append(stored)
     return tuple(acquired)
 
@@ -199,8 +199,8 @@ def _request_with_retries(
             if attempt < max_retries:
                 sleep(_retry_delay(attempt=attempt, headers={}))
                 continue
-            raise OHLCVAcquisitionError(
-                _safe_failure(spec, f"transport failed after {attempts} attempts")
+            raise _acquisition_error(
+                spec, f"transport failed after {attempts} attempts"
             ) from None
 
         if response.status_code == 200:
@@ -209,11 +209,9 @@ def _request_with_retries(
             sleep(_retry_delay(attempt=attempt, headers=response.headers))
             continue
         qualifier = " after retries" if attempt else ""
-        raise OHLCVAcquisitionError(
-            _safe_failure(
-                spec,
-                f"returned HTTP {response.status_code}{qualifier}",
-            )
+        raise _acquisition_error(
+            spec,
+            f"returned HTTP {response.status_code}{qualifier}",
         )
     raise AssertionError("bounded EODData retry loop did not return or raise")
 
@@ -240,27 +238,30 @@ def _validate_json_array(
     if content_type is not None:
         media_type = content_type.partition(";")[0].strip().lower()
         if media_type != EODDATA_CONTENT_TYPE and not media_type.endswith("+json"):
-            raise OHLCVAcquisitionError(
-                _safe_failure(spec, "returned a non-JSON content type")
-            )
+            raise _acquisition_error(spec, "returned a non-JSON content type")
     try:
         payload = json.loads(response.body)
     except (UnicodeDecodeError, json.JSONDecodeError):
-        raise OHLCVAcquisitionError(
-            _safe_failure(spec, "returned invalid JSON")
-        ) from None
+        raise _acquisition_error(spec, "returned invalid JSON") from None
     if not isinstance(payload, list):
-        raise OHLCVAcquisitionError(
-            _safe_failure(spec, "returned a non-array JSON payload")
-        )
+        raise _acquisition_error(spec, "returned a non-array JSON payload")
     if not payload and not spec.allow_empty:
-        raise OHLCVAcquisitionError(
-            _safe_failure(spec, "returned an empty required payload")
-        )
+        raise _acquisition_error(spec, "returned an empty required payload")
 
 
 def _safe_failure(spec: _RequestSpec, detail: str) -> str:
     return f"EODData {spec.endpoint_name} for {spec.exchange} {detail}."
+
+
+def _acquisition_error(
+    spec: _RequestSpec,
+    detail: str,
+) -> OHLCVAcquisitionError:
+    return OHLCVAcquisitionError(
+        _safe_failure(spec, detail),
+        market=spec.exchange,
+        source_code=spec.source_code,
+    )
 
 
 def _validate_inputs(

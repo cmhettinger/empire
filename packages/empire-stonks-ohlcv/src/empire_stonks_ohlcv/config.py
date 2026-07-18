@@ -17,6 +17,7 @@ DEFAULT_HTTP_TIMEOUT_SECONDS = 30.0
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_EODDATA_BASE_URL = "https://api.eoddata.com"
 DEFAULT_EODDATA_EXCHANGES = ("NYSE", "NASDAQ", "AMEX")
+DEFAULT_EODDATA_REQUEST_DELAY_SECONDS = 2.0
 
 STORAGE_KEY_ENV = "EMPIRE_STORAGE_KEY_STONKS_OHLCV"
 RAW_RETENTION_DAYS_ENV = "EMPIRE_STONKS_OHLCV_RAW_RETENTION_DAYS"
@@ -25,6 +26,9 @@ MAX_RETRIES_ENV = "EMPIRE_STONKS_OHLCV_MAX_RETRIES"
 EODDATA_API_KEY_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_API_KEY"
 EODDATA_BASE_URL_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_BASE_URL"
 EODDATA_EXCHANGES_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_EXCHANGES"
+EODDATA_REQUEST_DELAY_SECONDS_ENV = (
+    "EMPIRE_STONKS_OHLCV_EODDATA_REQUEST_DELAY_SECONDS"
+)
 
 
 def _environment_int(name: str, default: int) -> int:
@@ -139,6 +143,7 @@ class OHLCVConfig:
     max_retries: int = DEFAULT_MAX_RETRIES
     eoddata_base_url: str = DEFAULT_EODDATA_BASE_URL
     eoddata_exchanges: tuple[str, ...] = DEFAULT_EODDATA_EXCHANGES
+    eoddata_request_delay_seconds: float = DEFAULT_EODDATA_REQUEST_DELAY_SECONDS
     eoddata_credentials: EODDataCredentials | None = field(
         default=None,
         repr=False,
@@ -162,6 +167,13 @@ class OHLCVConfig:
             raise OHLCVConfigError(f"{MAX_RETRIES_ENV} cannot be negative.")
         _validate_eoddata_base_url(self.eoddata_base_url)
         _validate_eoddata_exchanges(self.eoddata_exchanges)
+        if (
+            not isfinite(self.eoddata_request_delay_seconds)
+            or self.eoddata_request_delay_seconds < 0
+        ):
+            raise OHLCVConfigError(
+                f"{EODDATA_REQUEST_DELAY_SECONDS_ENV} cannot be negative."
+            )
 
     @classmethod
     def from_env(cls) -> "OHLCVConfig":
@@ -191,6 +203,10 @@ class OHLCVConfig:
             max_retries=_environment_int(MAX_RETRIES_ENV, DEFAULT_MAX_RETRIES),
             eoddata_base_url=eoddata_base_url,
             eoddata_exchanges=_environment_eoddata_exchanges(),
+            eoddata_request_delay_seconds=_environment_float(
+                EODDATA_REQUEST_DELAY_SECONDS_ENV,
+                DEFAULT_EODDATA_REQUEST_DELAY_SECONDS,
+            ),
             eoddata_credentials=credentials,
         )
 
@@ -213,5 +229,6 @@ class OHLCVConfig:
             "max_retries": self.max_retries,
             "eoddata_base_url": self.eoddata_base_url,
             "eoddata_exchanges": ",".join(self.eoddata_exchanges),
+            "eoddata_request_delay_seconds": self.eoddata_request_delay_seconds,
             "eoddata_configured": self.eoddata_credentials is not None,
         }

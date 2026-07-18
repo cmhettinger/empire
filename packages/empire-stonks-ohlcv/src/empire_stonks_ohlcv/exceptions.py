@@ -12,6 +12,17 @@ class OHLCVConfigError(EmpireStonksOHLCVError):
 class OHLCVAcquisitionError(EmpireStonksOHLCVError):
     """Raised when provider source acquisition fails."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        market: str | None = None,
+        source_code: str | None = None,
+    ) -> None:
+        self.market = market
+        self.source_code = source_code
+        super().__init__(message)
+
 
 class OHLCVParseError(EmpireStonksOHLCVError):
     """Raised when provider source data cannot be parsed."""
@@ -24,7 +35,13 @@ class OHLCVPersistenceError(EmpireStonksOHLCVError):
 class OHLCVWorkflowError(EmpireStonksOHLCVError):
     """Secret-safe failure at one acquisition-to-import workflow stage."""
 
-    def __init__(self, stage: str) -> None:
+    def __init__(
+        self,
+        stage: str,
+        *,
+        market: str | None = None,
+        source_code: str | None = None,
+    ) -> None:
         if stage not in {
             "acquisition",
             "parsing",
@@ -35,4 +52,6 @@ class OHLCVWorkflowError(EmpireStonksOHLCVError):
                 "stage must be acquisition, parsing, persistence, or reporting."
             )
         self.stage = stage
+        self.market = market
+        self.source_code = source_code
         super().__init__(f"OHLCV provider workflow failed during {stage}.")

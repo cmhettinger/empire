@@ -84,6 +84,7 @@ def test_public_exports_are_explicit() -> None:
         "ProviderSourceMetadata",
         "ProviderSeriesHealth",
         "ProviderValidationResult",
+        "RowRejectionSummary",
         "ProviderWeekdayGapResult",
         "RAW_SOURCE_OBJECT_KIND",
         "REPORT_OBJECT_KIND",

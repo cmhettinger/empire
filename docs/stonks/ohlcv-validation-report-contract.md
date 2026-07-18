@@ -65,8 +65,14 @@ duplicates, and quotes without an accepted same-exchange Symbol List identity.
 
 `rejected_records` counts post-grouping record identities, not raw rows. A
 provider-specific result may additionally retain rejected-row counts for
-diagnostics. Rejected identities have failure issues; they do not reach either
+diagnostics. Rejected identities have rejection issues; they do not reach either
 writer.
+
+Rejected identities are not hard failures. A completed import with any row
+rejections has report outcome `WARN`, provided no partition/run-integrity
+failure is present. Every rejection bucket retains its exact `market`,
+`source_code`, reason `code`, rejected identity count, rejected raw-row count,
+and bounded safe samples.
 
 ### Warnings and expected conditions
 
@@ -81,9 +87,10 @@ reported as a provider parse failure.
 
 ## Bounded Issues
 
-Failures and warnings use separate `BoundedIssueSummary` values. Each contains
-the full deterministic `total_count` and at most `MAX_ISSUE_SAMPLES` (100) safe
-`ImportIssue` samples. `sample_count` and `truncated` make omission explicit.
+Hard failures and warnings use bounded issue summaries. Row rejections use
+`RowRejectionSummary`, which applies the same `MAX_ISSUE_SAMPLES` (100) bound
+within each exact market/source/reason bucket. `sample_count` and `truncated`
+make omission explicit.
 
 Providers order samples by their stable source order, configured market order,
 exact provider record identity, and issue code. Samples may contain safe source
@@ -138,7 +145,8 @@ conditions remain distinct from generic feed rejection and duplicate counts.
 ### Shared validation boundary
 
 `ProviderValidationResult` carries accepted `ParsedProviderOutput` into
-persistence alongside feed counts and bounded failure/warning summaries. Its
+persistence alongside feed counts, typed row-rejection buckets, and bounded
+hard-failure/warning summaries. Its
 compact JSON form reports sources and counts without serializing every bar.
 Provider-specific parsers may keep richer diagnostics, but persistence and
 reporting consume this shared boundary.
@@ -178,7 +186,7 @@ are definitively missing exchange sessions.
 
 ## Stored Report Shape
 
-The initial JSON report uses `schema_version: 1` and contains:
+The EODData JSON report uses `schema_version: 2` and contains:
 
 ```text
 schema_version
@@ -192,6 +200,7 @@ sources[]
   acquired_objects by market
 markets[]
   market
+  row_rejections
   listing_feed
   quote_or_bar_feed
   listing_write
@@ -203,14 +212,19 @@ markets[]
   stale_candidates
   weekday_gap_warnings
 inactive_series
-failures
+hard_failures by market and reason
+row_rejections by market, source, and reason
 warnings
 native_value_semantics
 ```
 
-Every market section retains the scoped feed and write records above. The
-top-level failures and warnings use bounded issue summaries. Native-value notes
-state interval, adjustment basis, adjusted-close presence, volume basis,
-correction behavior, and provider-specific currency caveats. Reports and Core
-run summaries remain secret-safe; only the stored report contains detailed
-health samples, while Airflow and CLI results stay compact.
+Every market section retains the scoped feed/write records and its rejection
+summary. Top-level row rejections include rejected identity and raw-row totals;
+hard failures contain an entry for every configured market and reason counts
+for affected markets. `PASS` means no hard failures, rejections, or warnings;
+safe rejections or warnings produce `WARN`; only integrity failures produce
+`FAIL`. Native-value notes state interval, adjustment basis, adjusted-close
+presence, volume basis, correction behavior, and provider-specific currency
+caveats. Reports and Core run summaries remain secret-safe; only the stored
+report contains detailed health samples, while Airflow and CLI results stay
+compact.

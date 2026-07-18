@@ -190,7 +190,9 @@ def build_failure_summary(
     provider_code: str,
     *,
     failed_stage: str | None = None,
-) -> dict[str, str]:
+    market: str | None = None,
+    source_code: str | None = None,
+) -> dict[str, Any]:
     """Build a detail-free Core summary for a failed provider run."""
 
     summary = {
@@ -199,6 +201,10 @@ def build_failure_summary(
     }
     if failed_stage is not None:
         summary["failed_stage"] = failed_stage
+    if market is not None:
+        summary["market"] = market
+    if source_code is not None:
+        summary["source_code"] = source_code
     return summary
 
 

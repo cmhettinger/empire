@@ -32,6 +32,7 @@ EODData nightly acquisition uses:
 EMPIRE_STONKS_OHLCV_EODDATA_API_KEY=<required secret>
 EMPIRE_STONKS_OHLCV_EODDATA_BASE_URL=https://api.eoddata.com
 EMPIRE_STONKS_OHLCV_EODDATA_EXCHANGES=NYSE,NASDAQ,AMEX
+EMPIRE_STONKS_OHLCV_EODDATA_REQUEST_DELAY_SECONDS=2
 ```
 
 The initial source contract makes Symbol List requests for all three exchanges
@@ -210,9 +211,10 @@ JSON array immediately through Core. The returned tuple contains six
 The function accepts an injected `EODDataHTTPTransport` and sleep callable for
 tests. Its default transport uses the Python standard library, keeps the API
 key separate from the base URL until the request is sent, applies the common
-timeout, and retries transport failures, HTTP 429, and HTTP 5xx responses up to
-the configured bound. Safe numeric `Retry-After` values are honored with a
-60-second cap; otherwise bounded exponential backoff is used.
+timeout, spaces consecutive requests by the configured EODData delay, and
+retries transport failures, HTTP 429, and HTTP 5xx responses up to the
+configured bound. Safe numeric `Retry-After` values are honored with a
+60-second cap; otherwise bounded exponential backoff starts at two seconds.
 
 HTTP failures, malformed/non-array JSON, non-JSON media types, and empty Symbol
 List payloads stop acquisition with a source/exchange-specific but secret-safe
@@ -254,8 +256,9 @@ listings without a quote, and attaches at most one daily bar to each batch.
 The shared validation boundary is documented in
 [`docs/stonks/ohlcv-validation-report-contract.md`](../../docs/stonks/ohlcv-validation-report-contract.md).
 `ProviderValidationResult` carries accepted shared batches alongside one
-`FeedOutcomeCounts` per source and market plus separate bounded failure and
-warning summaries. `SourceMarketWriteCounts` preserves listing and bar write
+`FeedOutcomeCounts` per source and market, typed `RowRejectionSummary` buckets,
+and separate bounded hard-failure and warning summaries.
+`SourceMarketWriteCounts` preserves listing and bar write
 outcomes at their distinct source/market grains for later import reports.
 
 Issue totals remain complete while safe samples are capped at 100. The report
@@ -274,9 +277,10 @@ listing IDs, and writes accepted Quote List bars in one commit boundary.
 Work is ordered by production source and configured market order. Inactive
 listings are still resolved and may receive metadata updates, but their bars are
 excluded from the daily-bar writer and reported through `skipped_inactive`.
-`EODDataImportResult` retains source/market feed and write counts, aggregate
-listing/bar persistence counts, bounded validation issues, and snapshot lineage
-without returning full bar payloads.
+`EODDataImportResult` retains source/market feed and write counts, exact
+market/source/reason rejection buckets, aggregate listing/bar persistence
+counts, bounded validation issues, and snapshot lineage without returning full
+bar payloads.
 
 ## Provider health queries
 
@@ -301,12 +305,14 @@ index.
 ## EODData stored report
 
 `build_eoddata_report()` combines one `EODDataImportResult` with provider-
-scoped database health queries. Its schema-version-1 JSON keeps acquisition,
+scoped database health queries. Its schema-version-2 JSON keeps acquisition,
 feed, duplicate, cross-feed reconciliation, listing-write, and bar-write
 outcomes at their source/market grains. It adds active coverage and freshness,
 bounded stale/no-data and weekday-gap candidates, a separate inactive-series
-summary, bounded failures/warnings, and the required provider-native value
-semantics.
+summary, bounded warnings, market-specific hard failures, market/source/reason
+row rejections, and the required provider-native value semantics. Safe row
+rejections produce `WARN`; only partition/run-integrity failures produce
+`FAIL`.
 
 `store_eoddata_report()` writes deterministic JSON as a durable Core run object
 under `<storage_key>/eoddata/runs/YYYY/MM/DD/<run_id>/reports/report.json`.
@@ -325,13 +331,29 @@ runtime identity; the package neither loads environment files nor depends on
 Airflow.
 
 The returned `EODDataDailyRunResult` contains only the run/report IDs, status,
-effective date, aggregate write/issue counts, inactive skip count, and report
-outcome. Core params and summaries use `OHLCVConfig.to_safe_dict()` and never
+effective date, aggregate write/issue and rejected-row counts, inactive skip
+count, and report outcome. Core params and summaries use
+`OHLCVConfig.to_safe_dict()` and never
 contain credentials, source payloads, issue text, or full report contents.
-Acquisition, parsing, persistence, and reporting failures are recorded as safe
-stage names while the original exception is re-raised. Previously stored raw
+Acquisition and parsing failures also record the safe market and source code
+when the failed partition is known; all runtime failures record a safe stage
+while the original exception is re-raised. Previously stored raw
 objects and successfully committed import data are not deleted on later-stage
 failure, making a new Core run for the same effective date safe to retry.
+
+## EODData manual DAG
+
+Airflow DAG `stonks_ohlcv_eoddata_daily_scrape` is manual-only
+(`schedule=None`). It disables catchup and permits one active run so EODData
+acquisitions cannot overlap. The task reads runtime settings from the
+Compose-provided process environment and delegates the complete workflow to
+`run_eoddata_daily()`.
+
+For a manual run or rerun, pass an explicit provider date with DAG run
+configuration such as `{"effective_date": "2026-07-15"}`. If omitted, the DAG
+uses the New York date at `data_interval_end`. The task returns only the
+runner's compact secret-safe summary; detailed diagnostics remain in the stored
+report.
 
 ## Development
 
@@ -348,5 +370,5 @@ Shared models, provider-native persistence/query helpers, Core raw-object
 storage, source-snapshot registration, run lifecycle, the transactional import
 boundary, EODData six-request acquisition, and EODData Symbol List parsing are
 implemented along with EODData Quote List parsing/reconciliation, atomic import,
-shared provider health queries, and the stored EODData report. Later provider
-parsers and Airflow entrypoints are added in later tasks.
+shared provider health queries, the stored EODData report, and the scheduled
+EODData Airflow entrypoint. Later provider parsers are added in later tasks.

@@ -58,12 +58,26 @@ def test_query_helpers_return_ordered_coverage_and_empty_states(
     database_connection: object,
 ) -> None:
     connection = database_connection
+    provider_code = "TEST_M36"
+    empty_provider_code = "TEST_M36_NONE"
     first_date = date(2026, 1, 2)
     last_date = date(2026, 1, 5)
     with connection.cursor() as cursor:  # type: ignore[union-attr]
-        empty = ProviderListing("EODDATA", "M36_EMPTY", "EMPTY")
-        nasdaq = ProviderListing("EODDATA", "M36_NASDAQ", "AAPL")
-        nyse = ProviderListing("EODDATA", "M36_NYSE", "MSFT")
+        cursor.execute(
+            """
+            INSERT INTO stonks.provider (
+                provider_code,
+                provider_name,
+                provider_type,
+                description
+            )
+            VALUES (%s, 'OHLCV query test', 'TEST', 'Rollback-only test row')
+            """,
+            (provider_code,),
+        )
+        empty = ProviderListing(provider_code, "M36_EMPTY", "EMPTY")
+        nasdaq = ProviderListing(provider_code, "M36_NASDAQ", "AAPL")
+        nyse = ProviderListing(provider_code, "M36_NYSE", "MSFT")
         resolved = upsert_provider_listings(
             cursor=cursor,
             listings=(nyse, empty, nasdaq),
@@ -102,16 +116,16 @@ def test_query_helpers_return_ordered_coverage_and_empty_states(
         ) is None
         assert select_provider_latest_trading_date(
             cursor=cursor,
-            provider_code="EODDATA",
+            provider_code=provider_code,
         ) == last_date
         assert select_provider_latest_trading_date(
             cursor=cursor,
-            provider_code="YAHOO",
+            provider_code=empty_provider_code,
         ) is None
 
         coverage = select_provider_listing_coverage(
             cursor=cursor,
-            provider_code="EODDATA",
+            provider_code=provider_code,
         )
         assert [
             (item.market, item.ticker, item.bar_count) for item in coverage
@@ -130,5 +144,5 @@ def test_query_helpers_return_ordered_coverage_and_empty_states(
         assert coverage[1].last_trading_date == last_date
         assert select_provider_listing_coverage(
             cursor=cursor,
-            provider_code="YAHOO",
+            provider_code=empty_provider_code,
         ) == ()

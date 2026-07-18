@@ -9,6 +9,7 @@ from empire_stonks_ohlcv.config import (
     EODDATA_API_KEY_ENV,
     EODDATA_BASE_URL_ENV,
     EODDATA_EXCHANGES_ENV,
+    EODDATA_REQUEST_DELAY_SECONDS_ENV,
     HTTP_TIMEOUT_SECONDS_ENV,
     MAX_RETRIES_ENV,
     RAW_RETENTION_DAYS_ENV,
@@ -24,6 +25,7 @@ OHLCV_ENV_VARS = (
     EODDATA_API_KEY_ENV,
     EODDATA_BASE_URL_ENV,
     EODDATA_EXCHANGES_ENV,
+    EODDATA_REQUEST_DELAY_SECONDS_ENV,
 )
 
 
@@ -42,6 +44,7 @@ def test_config_uses_defaults() -> None:
     assert config.max_retries == 3
     assert config.eoddata_base_url == "https://api.eoddata.com"
     assert config.eoddata_exchanges == ("NYSE", "NASDAQ", "AMEX")
+    assert config.eoddata_request_delay_seconds == 2.0
     assert config.eoddata_credentials is None
 
 
@@ -84,11 +87,13 @@ def test_config_loads_eoddata_source_settings(
 ) -> None:
     monkeypatch.setenv(EODDATA_BASE_URL_ENV, "https://market.example.test/")
     monkeypatch.setenv(EODDATA_EXCHANGES_ENV, "NYSE, NASDAQ, AMEX")
+    monkeypatch.setenv(EODDATA_REQUEST_DELAY_SECONDS_ENV, "3.5")
 
     config = OHLCVConfig.from_env()
 
     assert config.eoddata_base_url == "https://market.example.test"
     assert config.eoddata_exchanges == ("NYSE", "NASDAQ", "AMEX")
+    assert config.eoddata_request_delay_seconds == 3.5
 
 
 @pytest.mark.parametrize(
@@ -108,6 +113,9 @@ def test_config_loads_eoddata_source_settings(
         (EODDATA_EXCHANGES_ENV, "NASDAQ,NYSE,AMEX", "NYSE,NASDAQ,AMEX"),
         (EODDATA_EXCHANGES_ENV, "NYSE,NASDAQ", "NYSE,NASDAQ,AMEX"),
         (EODDATA_EXCHANGES_ENV, "NYSE,NASDAQ,AMEX,AMEX", "NYSE,NASDAQ,AMEX"),
+        (EODDATA_REQUEST_DELAY_SECONDS_ENV, "-1", "cannot be negative"),
+        (EODDATA_REQUEST_DELAY_SECONDS_ENV, "nan", "cannot be negative"),
+        (EODDATA_REQUEST_DELAY_SECONDS_ENV, "slow", "number"),
     ],
 )
 def test_config_rejects_invalid_common_values(

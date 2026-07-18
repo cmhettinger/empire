@@ -384,8 +384,14 @@ def test_reconciled_result_builds_shared_validation_counts_and_issues() -> None:
     )
     assert result.output.listing_count == 1
     assert result.output.bar_count == 0
-    assert result.failures.total_count == 1
-    assert result.failures.samples[0].record_reference == "NYSE:BAD"
+    assert result.failures.total_count == 0
+    assert len(result.row_rejections) == 1
+    rejection = result.row_rejections[0]
+    assert rejection.market == "NYSE"
+    assert rejection.code == "eoddata_symbol_duplicate_conflict"
+    assert rejection.rejected_records == 1
+    assert rejection.rejected_rows == 2
+    assert rejection.samples[0].record_reference == "NYSE:BAD"
     assert result.warnings.total_count == 2
     assert result.cross_feed_counts is not None
     assert result.cross_feed_counts.to_dict() == {

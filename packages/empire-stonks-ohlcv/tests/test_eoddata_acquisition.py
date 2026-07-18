@@ -110,6 +110,7 @@ def test_acquires_six_objects_in_contract_order_with_secret_safe_metadata(
 ) -> None:
     object_store, repository = _store(tmp_path)
     calls: list[dict[str, object]] = []
+    sleeps: list[float] = []
 
     def transport(**request: object) -> EODDataHTTPResponse:
         calls.append(request)
@@ -123,7 +124,7 @@ def test_acquires_six_objects_in_contract_order_with_secret_safe_metadata(
         run_context=_run_context(),
         config=_config(),
         transport=transport,
-        sleep=lambda _seconds: None,
+        sleep=sleeps.append,
     )
 
     expected_urls = [
@@ -135,6 +136,7 @@ def test_acquires_six_objects_in_contract_order_with_secret_safe_metadata(
         "https://api.eoddata.com/Quote/List/AMEX",
     ]
     assert [call["url"] for call in calls] == expected_urls
+    assert sleeps == [2.0] * 5
     assert [item.source_code for item in acquired] == [
         EODDATA_SYMBOL_LIST_SOURCE.source_code,
         EODDATA_SYMBOL_LIST_SOURCE.source_code,
@@ -181,7 +183,7 @@ def test_acquires_six_objects_in_contract_order_with_secret_safe_metadata(
     ("status_code", "headers", "expected_delay"),
     [
         (429, {"Retry-After": "120"}, 60.0),
-        (503, {}, 0.5),
+        (503, {}, 2.0),
     ],
 )
 def test_retries_transient_http_failure_then_succeeds(
@@ -218,7 +220,7 @@ def test_retries_transient_http_failure_then_succeeds(
     assert len(acquired) == 6
     assert len(repository.objects) == 6
     assert calls == 7
-    assert sleeps == [expected_delay]
+    assert sleeps == [expected_delay, *([2.0] * 5)]
 
 
 def test_non_retryable_failure_retains_prior_raw_objects(tmp_path: Path) -> None:
@@ -247,6 +249,8 @@ def test_non_retryable_failure_retains_prior_raw_objects(tmp_path: Path) -> None
 
     assert len(calls) == 3
     assert len(repository.objects) == 2
+    assert caught.value.market == "AMEX"
+    assert caught.value.source_code == "eoddata_symbol_list"
     assert SECRET not in str(caught.value)
 
 
@@ -277,7 +281,7 @@ def test_transport_failure_is_bounded_and_secret_safe(tmp_path: Path) -> None:
         )
     )
     assert calls == 3
-    assert sleeps == [0.5, 1.0]
+    assert sleeps == [2.0, 4.0]
     assert len(repository.objects) == 0
     assert SECRET not in formatted
     assert caught.value.__cause__ is None

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
 import pytest
@@ -86,14 +87,14 @@ def test_market_health_query_is_provider_scoped_and_order_preserving() -> None:
         (
             "EODDATA",
             "AMEX",
-            3,
-            1,
-            2,
-            1,
-            1,
-            0,
-            10,
-            2,
+            Decimal("3"),
+            Decimal("1"),
+            Decimal("2"),
+            Decimal("1"),
+            Decimal("1"),
+            Decimal("0"),
+            Decimal("10"),
+            Decimal("2"),
             date(2026, 1, 2),
             date(2026, 1, 30),
         ),
@@ -121,6 +122,20 @@ def test_market_health_query_is_provider_scoped_and_order_preserving() -> None:
 
     assert tuple(item.market for item in result) == ("AMEX", "NYSE")
     assert result[0].inactive_listing_count == 1
+    assert all(
+        type(value) is int
+        for value in (
+            result[0].active_listing_count,
+            result[0].inactive_listing_count,
+            result[0].active_listings_with_bars,
+            result[0].active_listings_without_bars,
+            result[0].inactive_listings_with_bars,
+            result[0].inactive_listings_without_bars,
+            result[0].active_bar_count,
+            result[0].inactive_bar_count,
+        )
+    )
+    json.dumps(result[0].to_dict())
     assert cursor.executions[0][1] == ("EODDATA",)
     assert "listing.status" in cursor.executions[0][0]
 

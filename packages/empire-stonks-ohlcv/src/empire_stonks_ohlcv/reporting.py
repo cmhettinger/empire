@@ -28,7 +28,7 @@ from empire_stonks_ohlcv.source_conventions import (
 from empire_stonks_ohlcv.validation import MAX_ISSUE_SAMPLES, BoundedIssueSummary
 
 
-REPORT_SCHEMA_VERSION = 1
+REPORT_SCHEMA_VERSION = 2
 REPORT_OBJECT_KIND = "stonks_ohlcv_provider_report"
 REPORT_CONTENT_TYPE = "application/json"
 _REPORT_FILENAME = "report.json"
@@ -42,7 +42,7 @@ def build_eoddata_report(
     import_result: EODDataImportResult,
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
-    """Build the schema-version-1 EODData report from persisted state."""
+    """Build the schema-version-2 EODData report from persisted state."""
 
     if not isinstance(import_result, EODDataImportResult):
         raise TypeError("import_result must be an EODDataImportResult.")
@@ -78,7 +78,7 @@ def build_eoddata_report(
         for market in DEFAULT_EODDATA_EXCHANGES
     }
 
-    future_issues: list[ImportIssue] = []
+    future_issues: list[tuple[str, ImportIssue]] = []
     market_sections: list[dict[str, Any]] = []
     health_warning_count = 0
     for market in DEFAULT_EODDATA_EXCHANGES:
@@ -105,11 +105,14 @@ def build_eoddata_report(
         )
         for item in future:
             future_issues.append(
-                ImportIssue(
-                    code="future_last_trading_date",
-                    message="Stored last trading date is after the report date.",
-                    source_code=EODDATA_DAILY_SOURCE.source_code,
-                    record_reference=f"{market}:{item.ticker}",
+                (
+                    market,
+                    ImportIssue(
+                        code="future_last_trading_date",
+                        message="Stored last trading date is after the report date.",
+                        source_code=EODDATA_DAILY_SOURCE.source_code,
+                        record_reference=f"{market}:{item.ticker}",
+                    ),
                 )
             )
         gaps = select_provider_weekday_gaps(
@@ -121,6 +124,10 @@ def build_eoddata_report(
         market_sections.append(
             {
                 "market": market,
+                "row_rejections": _row_rejections(
+                    import_result,
+                    market=market,
+                ),
                 "listing_feed": feed_counts[
                     (EODDATA_SYMBOL_LIST_SOURCE.source_code, market)
                 ].to_dict(),
@@ -150,10 +157,19 @@ def build_eoddata_report(
             }
         )
 
-    failures = _combine_issues(import_result.failures, tuple(future_issues))
+    if import_result.failures.total_count:
+        raise ValueError(
+            "EODData import hard failures must abort before report generation."
+        )
+    hard_failures = _market_issue_summary(tuple(future_issues))
+    row_rejections = _row_rejections(import_result)
     outcome = _outcome(
-        failure_count=failures.total_count,
-        warning_count=import_result.warnings.total_count + health_warning_count,
+        failure_count=hard_failures["total_count"],
+        warning_count=(
+            import_result.warnings.total_count
+            + health_warning_count
+            + row_rejections["rejected_records"]
+        ),
     )
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -164,7 +180,8 @@ def build_eoddata_report(
         "sources": _source_sections(import_result),
         "markets": market_sections,
         "inactive_series": _inactive_series(market_health),
-        "failures": failures.to_dict(),
+        "hard_failures": hard_failures,
+        "row_rejections": row_rejections,
         "warnings": import_result.warnings.to_dict(),
         "native_value_semantics": {
             "interval": "daily",
@@ -400,15 +417,57 @@ def _weekday_age(last_date: date, as_of_date: date) -> int:
     return weekdays
 
 
-def _combine_issues(
-    existing: BoundedIssueSummary,
-    additions: tuple[ImportIssue, ...],
-) -> BoundedIssueSummary:
-    samples = (existing.samples + additions)[:MAX_ISSUE_SAMPLES]
-    return BoundedIssueSummary(
-        total_count=existing.total_count + len(additions),
-        samples=samples,
+def _row_rejections(
+    import_result: EODDataImportResult,
+    *,
+    market: str | None = None,
+) -> dict[str, Any]:
+    reasons = tuple(
+        item
+        for item in import_result.row_rejections
+        if market is None or item.market == market
     )
+    return {
+        "rejected_records": sum(item.rejected_records for item in reasons),
+        "rejected_rows": sum(item.rejected_rows for item in reasons),
+        "reasons": [item.to_dict() for item in reasons],
+    }
+
+
+def _market_issue_summary(
+    scoped_issues: tuple[tuple[str, ImportIssue], ...],
+) -> dict[str, Any]:
+    markets = []
+    for market in DEFAULT_EODDATA_EXCHANGES:
+        scoped = tuple(
+            issue
+            for issue_market, issue in scoped_issues
+            if issue_market == market
+        )
+        summary = BoundedIssueSummary(
+            total_count=len(scoped),
+            samples=scoped[:MAX_ISSUE_SAMPLES],
+        ).to_dict()
+        by_reason = []
+        for source_code, code in sorted(
+            {(issue.source_code, issue.code) for issue in scoped},
+            key=lambda value: (value[0] or "", value[1]),
+        ):
+            by_reason.append(
+                {
+                    "source_code": source_code,
+                    "code": code,
+                    "total_count": sum(
+                        issue.source_code == source_code and issue.code == code
+                        for issue in scoped
+                    ),
+                }
+            )
+        markets.append({"market": market, **summary, "reasons": by_reason})
+    return {
+        "total_count": len(scoped_issues),
+        "markets": markets,
+    }
 
 
 def _outcome(*, failure_count: int, warning_count: int) -> str:
@@ -484,13 +543,14 @@ def _validate_report(report: object) -> None:
         "sources",
         "markets",
         "inactive_series",
-        "failures",
+        "hard_failures",
+        "row_rejections",
         "warnings",
         "native_value_semantics",
     }
     if set(report) != required:
-        raise ValueError("report does not match schema version 1.")
+        raise ValueError("report does not match schema version 2.")
     if report["schema_version"] != REPORT_SCHEMA_VERSION:
-        raise ValueError("report schema_version must be 1.")
+        raise ValueError("report schema_version must be 2.")
     if report["outcome"] not in {"PASS", "WARN", "FAIL"}:
         raise ValueError("report outcome is invalid.")

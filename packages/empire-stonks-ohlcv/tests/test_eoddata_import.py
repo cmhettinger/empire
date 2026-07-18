@@ -384,11 +384,22 @@ def test_duplicate_policy_outcomes_are_carried_without_writing_rejected_rows(
 
     assert "GHOST" not in written_tickers
     assert set(written_tickers[:2]) == {"CLASH", "EMP.A"}
-    assert result.failures.total_count == 2
+    assert result.failures.total_count == 0
     assert result.warnings.total_count == 1
-    assert tuple(issue.record_reference for issue in result.failures.samples) == (
+    assert tuple(
+        issue.record_reference
+        for rejection in result.row_rejections
+        for issue in rejection.samples
+    ) == (
         "NYSE:CLASH",
         "NYSE:GHOST",
+    )
+    assert tuple(
+        (item.market, item.code, item.rejected_records, item.rejected_rows)
+        for item in result.row_rejections
+    ) == (
+        ("NYSE", "eoddata_quote_duplicate_conflict", 1, 2),
+        ("NYSE", "eoddata_quote_without_listing", 1, 1),
     )
     nyse_daily = next(
         item

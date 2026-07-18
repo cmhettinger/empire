@@ -221,6 +221,7 @@ def _import_result() -> EODDataImportResult:
         source_snapshots=snapshots,
         feed_counts=feed_counts,
         write_counts=write_counts,
+        row_rejections=(),
         failures=BoundedIssueSummary(),
         warnings=BoundedIssueSummary(),
         cross_feed_counts=tuple(
@@ -273,7 +274,8 @@ def _install_success(
     monkeypatch.setattr(
         eoddata_runner,
         "build_eoddata_report",
-        lambda **_values: events.append("build_report") or {"outcome": "PASS"},
+        lambda **_values: events.append("build_report")
+        or {"outcome": "PASS", "hard_failures": {"total_count": 0}},
     )
     monkeypatch.setattr(
         eoddata_runner,
@@ -459,6 +461,45 @@ def test_acquisition_failure_keeps_partial_raw_evidence(
     assert stored.run_id == next(iter(run_repository.runs))
 
 
+def test_daily_runner_records_safe_market_and_source_for_partition_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = FakeRunRepository()
+    events: list[str] = []
+    _install_success(monkeypatch, events)
+    monkeypatch.setattr(
+        eoddata_runner,
+        "_parse",
+        lambda **_values: (_ for _ in ()).throw(
+            OHLCVWorkflowError(
+                "parsing",
+                market="AMEX",
+                source_code="eoddata_daily",
+            )
+        ),
+    )
+
+    with pytest.raises(OHLCVWorkflowError):
+        run_eoddata_daily(
+            run_service=RunService(repository),
+            connection=FakeConnection(),
+            object_store=ObjectStore(FakeObjectRepository(tmp_path)),
+            config=_config(),
+            effective_date=EFFECTIVE_DATE,
+            run_type="cli",
+            runner="pytest",
+            sleep=lambda _delay: None,
+        )
+
+    failed = next(iter(repository.runs.values()))
+    assert failed.summary == {
+        "provider_code": "EODDATA",
+        "outcome": "failed",
+        "failed_stage": "parsing",
+        "market": "AMEX",
+        "source_code": "eoddata_daily",
+    }
 def test_runner_rerun_uses_new_core_run_and_preserves_unchanged_counts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

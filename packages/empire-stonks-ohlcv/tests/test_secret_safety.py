@@ -108,5 +108,6 @@ def test_safe_dict_excludes_secrets_from_operational_surfaces() -> None:
         "max_retries",
         "eoddata_base_url",
         "eoddata_exchanges",
+        "eoddata_request_delay_seconds",
         "eoddata_configured",
     }

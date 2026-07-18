@@ -47,6 +47,8 @@ def _result() -> EODDataDailyRunResult:
         listing_counts=PersistenceCounts(inserted=3),
         bar_counts=PersistenceCounts(inserted=2, unchanged=1),
         skipped_inactive_bars=1,
+        row_rejection_count=3,
+        row_rejection_row_count=4,
         failure_count=0,
         warning_count=2,
     )

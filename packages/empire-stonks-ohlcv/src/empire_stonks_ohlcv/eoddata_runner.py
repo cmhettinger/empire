@@ -24,6 +24,7 @@ from empire_stonks_ohlcv.eoddata_import import (
 from empire_stonks_ohlcv.eoddata_quotes import parse_eoddata_quote_list
 from empire_stonks_ohlcv.eoddata_symbols import parse_eoddata_symbol_list
 from empire_stonks_ohlcv.exceptions import (
+    OHLCVAcquisitionError,
     OHLCVConfigError,
     OHLCVWorkflowError,
 )
@@ -60,6 +61,8 @@ class EODDataDailyRunResult:
     listing_counts: PersistenceCounts
     bar_counts: PersistenceCounts
     skipped_inactive_bars: int
+    row_rejection_count: int
+    row_rejection_row_count: int
     failure_count: int
     warning_count: int
 
@@ -80,6 +83,8 @@ class EODDataDailyRunResult:
             raise TypeError("bar_counts must be PersistenceCounts.")
         for field_name in (
             "skipped_inactive_bars",
+            "row_rejection_count",
+            "row_rejection_row_count",
             "failure_count",
             "warning_count",
         ):
@@ -100,6 +105,8 @@ class EODDataDailyRunResult:
             "listing_counts": self.listing_counts.to_dict(),
             "bar_counts": self.bar_counts.to_dict(),
             "skipped_inactive_bars": self.skipped_inactive_bars,
+            "row_rejection_count": self.row_rejection_count,
+            "row_rejection_row_count": self.row_rejection_row_count,
             "failure_count": self.failure_count,
             "warning_count": self.warning_count,
         }
@@ -184,7 +191,13 @@ def run_eoddata_daily(
             listing_counts=import_result.listing_counts,
             bar_counts=import_result.bar_counts,
             skipped_inactive_bars=import_result.skipped_inactive_bars,
-            failure_count=import_result.failures.total_count,
+            row_rejection_count=sum(
+                item.rejected_records for item in import_result.row_rejections
+            ),
+            row_rejection_row_count=sum(
+                item.rejected_rows for item in import_result.row_rejections
+            ),
+            failure_count=report["hard_failures"]["total_count"],
             warning_count=import_result.warnings.total_count,
         )
     except Exception as exc:
@@ -196,6 +209,14 @@ def run_eoddata_daily(
             summary=build_failure_summary(
                 EODDATA_PROVIDER_CODE,
                 failed_stage=failed_stage,
+                market=(
+                    exc.market if isinstance(exc, OHLCVWorkflowError) else None
+                ),
+                source_code=(
+                    exc.source_code
+                    if isinstance(exc, OHLCVWorkflowError)
+                    else None
+                ),
             ),
         )
         raise
@@ -223,7 +244,17 @@ def _acquire(
         )
         return acquired
     except Exception as exc:
-        raise OHLCVWorkflowError("acquisition") from exc
+        raise OHLCVWorkflowError(
+            "acquisition",
+            market=(
+                exc.market if isinstance(exc, OHLCVAcquisitionError) else None
+            ),
+            source_code=(
+                exc.source_code
+                if isinstance(exc, OHLCVAcquisitionError)
+                else None
+            ),
+        ) from exc
 
 
 def _parse(
@@ -237,22 +268,40 @@ def _parse(
         objects = _objects_by_source_market(acquired_objects, markets=markets)
         results: list[ProviderValidationResult] = []
         for market in markets:
-            symbols = parse_eoddata_symbol_list(
-                object_store.get_bytes(
-                    objects[(EODDATA_SYMBOL_LIST_SOURCE.source_code, market)].object_id
-                ),
-                exchange=market,
-            )
-            quotes = parse_eoddata_quote_list(
-                object_store.get_bytes(
-                    objects[(EODDATA_DAILY_SOURCE.source_code, market)].object_id
-                ),
-                exchange=market,
-                effective_date=effective_date,
-                symbol_list=symbols,
-            )
+            try:
+                symbols = parse_eoddata_symbol_list(
+                    object_store.get_bytes(
+                        objects[
+                            (EODDATA_SYMBOL_LIST_SOURCE.source_code, market)
+                        ].object_id
+                    ),
+                    exchange=market,
+                )
+            except Exception as exc:
+                raise OHLCVWorkflowError(
+                    "parsing",
+                    market=market,
+                    source_code=EODDATA_SYMBOL_LIST_SOURCE.source_code,
+                ) from exc
+            try:
+                quotes = parse_eoddata_quote_list(
+                    object_store.get_bytes(
+                        objects[(EODDATA_DAILY_SOURCE.source_code, market)].object_id
+                    ),
+                    exchange=market,
+                    effective_date=effective_date,
+                    symbol_list=symbols,
+                )
+            except Exception as exc:
+                raise OHLCVWorkflowError(
+                    "parsing",
+                    market=market,
+                    source_code=EODDATA_DAILY_SOURCE.source_code,
+                ) from exc
             results.append(quotes.to_validation_result(symbol_list=symbols))
         return tuple(results)
+    except OHLCVWorkflowError:
+        raise
     except Exception as exc:
         raise OHLCVWorkflowError("parsing") from exc
 
@@ -358,7 +407,13 @@ def _success_summary(
         "listing_counts": import_result.listing_counts.to_dict(),
         "bar_counts": import_result.bar_counts.to_dict(),
         "skipped_inactive_bars": import_result.skipped_inactive_bars,
-        "failure_count": import_result.failures.total_count,
+        "row_rejection_count": sum(
+            item.rejected_records for item in import_result.row_rejections
+        ),
+        "row_rejection_row_count": sum(
+            item.rejected_rows for item in import_result.row_rejections
+        ),
+        "failure_count": report["hard_failures"]["total_count"],
         "warning_count": import_result.warnings.total_count,
         "report_object_id": str(stored_report.object_id),
         "report_outcome": report["outcome"],

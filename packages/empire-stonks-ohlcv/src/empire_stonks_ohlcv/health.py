@@ -268,7 +268,7 @@ def select_provider_market_health(
 
     _validate_provider_code(provider_code)
     cursor.execute(_MARKET_HEALTH_SQL, (provider_code,))
-    return tuple(ProviderMarketHealth(*row) for row in cursor.fetchall())
+    return tuple(_market_health_from_row(row) for row in cursor.fetchall())
 
 
 def select_provider_series_health(
@@ -281,6 +281,15 @@ def select_provider_series_health(
     _validate_provider_code(provider_code)
     cursor.execute(_SERIES_HEALTH_SQL, (provider_code,))
     return tuple(ProviderSeriesHealth(*row) for row in cursor.fetchall())
+
+
+def _market_health_from_row(row: Any) -> ProviderMarketHealth:
+    """Normalize PostgreSQL aggregate counts to the integer model contract."""
+
+    values = list(row)
+    for index in range(2, 10):
+        values[index] = int(values[index])
+    return ProviderMarketHealth(*values)
 
 
 def select_provider_weekday_gaps(

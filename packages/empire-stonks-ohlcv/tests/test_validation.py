@@ -14,6 +14,7 @@ from empire_stonks_ohlcv import (
     ParsedProviderOutput,
     PersistenceCounts,
     ProviderValidationResult,
+    RowRejectionSummary,
     SourceMarketWriteCounts,
 )
 
@@ -175,7 +176,16 @@ def test_provider_validation_result_carries_output_counts_and_issues() -> None:
     result = ProviderValidationResult(
         output=output,
         feed_counts=(_feed_counts(),),
-        failures=BoundedIssueSummary(total_count=2, samples=(_issue(),)),
+        row_rejections=(
+            RowRejectionSummary(
+                source_code="eoddata_daily",
+                market="NYSE",
+                code="invalid_row",
+                rejected_records=2,
+                rejected_rows=3,
+                samples=(_issue(),),
+            ),
+        ),
         warnings=BoundedIssueSummary(total_count=1),
     )
 
@@ -184,10 +194,8 @@ def test_provider_validation_result_carries_output_counts_and_issues() -> None:
         "listing_count": 0,
         "bar_count": 0,
         "feed_counts": [_feed_counts().to_dict()],
-        "failures": BoundedIssueSummary(
-            total_count=2,
-            samples=(_issue(),),
-        ).to_dict(),
+        "row_rejections": [result.row_rejections[0].to_dict()],
+        "failures": BoundedIssueSummary().to_dict(),
         "warnings": BoundedIssueSummary(total_count=1).to_dict(),
         "cross_feed_counts": None,
     }
