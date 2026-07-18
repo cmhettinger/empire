@@ -140,6 +140,9 @@ def test_stores_bytes_with_core_checksum_metadata_and_expiration(
     assert stored.logical_name == "eoddata_daily"
     assert stored.object_kind == RAW_SOURCE_OBJECT_KIND
     assert stored.content_type == "text/csv"
+    assert object_store.get_path(acquired.object_id) == (
+        tmp_path / acquired.object_key / acquired.filename
+    ).resolve()
     assert stored.expires_at == STORED_AT + timedelta(days=7)
     assert stored.metadata == {
         "schema_version": 1,

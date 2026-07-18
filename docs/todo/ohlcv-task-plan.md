@@ -185,7 +185,7 @@ never be built.
 | H7.1 | [x] | Define historical import inputs and bounds | Document supported operator-supplied Stooq historical source files, manual acquisition boundary, environment settings, date bounds, symbol/market filters, expected volume, restart behavior, and explicit exclusions. The package does not automate CAPTCHA or browser verification. | E6.13, A5.1-A5.2 |
 | H7.2 | [x] | Add streaming/chunked historical parser | Parse historical input without loading the entire dataset into memory. Tests prove the documented Stooq format, stable chunk boundaries, and equivalent results across chunk sizes. | H7.1, A5.3-A5.4 |
 | H7.3 | [x] | Add chunked database writer | Write provider listings and bars in bounded transactions with cumulative inserted/updated/unchanged/derived-updated/failure counts. A failed chunk can be rerun safely. | H7.2, M3.4-M3.5 |
-| H7.4 | [ ] | Add historical import run tracking | Start one Core run with explicit non-secret parameters and progress summaries; retain the operator-supplied input through the normal source-snapshot and raw-object policy. Failure leaves enough context for an operator rerun. | H7.3, C4.3-C4.6 |
+| H7.4 | [x] | Add historical import run tracking | Start one Core run with explicit non-secret parameters and progress summaries; retain the operator-supplied input through the normal source-snapshot and raw-object policy. Failure leaves enough context for an operator rerun. | H7.3, C4.3-C4.6 |
 | H7.5 | [ ] | Add historical import report | Build and store a Stooq backfill report with input bounds, chunk progress, write counts, resulting coverage, failures, warnings, and native-semantics notes. Tests cover partial and successful runs. | H7.4, E6.7-E6.8 |
 | H7.6 | [ ] | Add historical Stooq CLI | Add `stonks-ohlcv-stooq-backfill` using `bin/env-load`, with an explicit local input path plus date/filter/chunk options and a secret-safe JSON summary. It does not download from Stooq or mutate canonical tables. | H7.5, B1.8 |
 | H7.7 | [ ] | Add historical fixture vertical test | Import a multi-symbol, multi-date fixture twice, store its report, and prove stable provider-listing IDs, unchanged second-run counts, correct date ranges, and bounded transactions. | H7.6 |
@@ -226,6 +226,24 @@ Focused tests passed (10, 1 environment skip), the full package suite passed
 (346, 13 environment skips), and the live database integration test passed.
 Poetry check, compileall, pip check, public import, 88-column scan, and
 `git diff --check` passed.
+
+Done: 2026-07-18 — added the public CLI-oriented
+`run_stooq_history_backfill()` lifecycle with one heartbeat-enabled Core run,
+explicit safe scope/chunk/storage parameters, non-moving raw ZIP retention,
+streaming from Core's validated `raw.zip` path, checksum source-snapshot
+registration, sequential chunk persistence, and JSON-ready success/failure
+summaries. Parser progress is now typed and emitted after discovery, every 100
+completed members, and every chunk commit; partial failures retain acquired
+object identity, exact rerun scope, parse position, cumulative write/failure
+counts, and last committed chunk without exception details. Added reusable Core
+`ObjectStore.get_path()` for bounded filesystem-backed streaming. Unit tests
+cover success sequencing, raw-copy ownership, safe parameters/progress,
+heartbeats, failure recovery context, pre-run validation, and 100-file progress.
+PostgreSQL integration proved the Core run, raw object, snapshot membership,
+listing/bar writes, heartbeat, and stored summary. Core tests passed (29); the
+OHLCV suite passed (350, 14 environment skips); live H7.3/H7.4 database tests
+passed (2). Poetry checks, dependency checks, compileall, public import,
+88-column scan, and `git diff --check` passed.
 
 ## Phase 8: Yahoo Daily End-To-End Vertical Slice
 

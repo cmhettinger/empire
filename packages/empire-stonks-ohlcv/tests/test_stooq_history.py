@@ -102,6 +102,41 @@ def _consume(parser: StooqHistoryParser) -> tuple:
     return chunks, parser.summary
 
 
+def test_parser_reports_progress_at_each_hundred_completed_members(
+    tmp_path: Path,
+) -> None:
+    members = {
+        f"1/t{index:03d}.us.txt": _member(
+            f"T{index:03d}.US",
+            (
+                f"T{index:03d}.US,D,20260102,000000,10,11,9,10.5,"
+                "100,0"
+            ),
+        )
+        for index in range(100)
+    }
+    progress = []
+    parser = StooqHistoryParser(
+        _write_archive(tmp_path, _archive_bytes(nasdaq=members)),
+        scope=StooqHistoryScope(
+            effective_date=date(2026, 1, 6),
+            markets=("nasdaq",),
+        ),
+        chunk_size=1000,
+        progress_callback=progress.append,
+    )
+
+    _consume(parser)
+
+    assert len(progress) == 1
+    assert progress[0].files_discovered == 100
+    assert progress[0].files_completed == 100
+    assert progress[0].accepted_records == 100
+    assert progress[0].chunks_emitted == 0
+    assert parser.progress.files_completed == 100
+    assert parser.progress.chunks_emitted == 1
+
+
 def _flatten_batches(chunks: tuple) -> tuple[ParsedListingBatch, ...]:
     grouped: dict[ProviderListing, list[DailyBar]] = {}
     for chunk in chunks:

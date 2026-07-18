@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import csv
 import stat
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path, PurePosixPath
+from typing import Any
 from zipfile import BadZipFile, ZipFile, ZipInfo
 
 from empire_stonks_ohlcv.exceptions import OHLCVParseError
@@ -20,6 +21,7 @@ from empire_stonks_ohlcv.validation import MAX_ISSUE_SAMPLES
 
 STOOQ_HISTORY_PROVIDER_CODE = "STOOQ"
 STOOQ_HISTORY_ARCHIVE_NAME = "d_us_txt.zip"
+STOOQ_HISTORY_CORE_ARCHIVE_NAME = "raw.zip"
 STOOQ_HISTORY_MARKETS = ("nasdaq", "nyse", "nysemkt")
 STOOQ_HISTORY_HEADER = (
     "<TICKER>",
@@ -39,6 +41,7 @@ MAX_ARCHIVE_MEMBERS = 100_000
 MAX_SELECTED_MEMBERS = 50_000
 MAX_SELECTED_UNCOMPRESSED_BYTES = 20 * 1024**3
 MAX_MEMBER_UNCOMPRESSED_BYTES = 256 * 1024**2
+PROGRESS_FILE_INTERVAL = 100
 
 _ARCHIVE_PREFIX = ("data", "daily", "us")
 
@@ -102,6 +105,19 @@ class StooqHistoryScope:
                     "tickers must be exact uppercase Stooq values ending in .US."
                 )
         object.__setattr__(self, "tickers", tuple(sorted(self.tickers)))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "effective_date": self.effective_date.isoformat(),
+            "start_date": (
+                self.start_date.isoformat() if self.start_date is not None else None
+            ),
+            "end_date": (
+                self.end_date.isoformat() if self.end_date is not None else None
+            ),
+            "markets": list(self.markets),
+            "tickers": list(self.tickers),
+        }
 
 
 @dataclass(frozen=True)
@@ -186,6 +202,68 @@ class StooqHistoryMarketParseCounts:
         if accounted_rows != self.input_rows:
             raise ValueError("market parse counts must account for every input row.")
 
+    def to_dict(self) -> dict[str, int | str]:
+        return {
+            "market": self.market,
+            "files_completed": self.files_completed,
+            "input_rows": self.input_rows,
+            "date_filtered_rows": self.date_filtered_rows,
+            "accepted_records": self.accepted_records,
+            "rejected_records": self.rejected_records,
+            "rejected_rows": self.rejected_rows,
+            "duplicate_rows_collapsed": self.duplicate_rows_collapsed,
+        }
+
+
+@dataclass(frozen=True)
+class StooqHistoryParseProgress:
+    """Current bounded parser progress at a safe streaming boundary."""
+
+    files_discovered: int
+    files_completed: int = 0
+    chunks_emitted: int = 0
+    input_rows: int = 0
+    date_filtered_rows: int = 0
+    accepted_records: int = 0
+    rejected_records: int = 0
+    rejected_rows: int = 0
+    duplicate_rows_collapsed: int = 0
+    current_member: str | None = None
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "files_discovered",
+            "files_completed",
+            "chunks_emitted",
+            "input_rows",
+            "date_filtered_rows",
+            "accepted_records",
+            "rejected_records",
+            "rejected_rows",
+            "duplicate_rows_collapsed",
+        ):
+            _nonnegative_int(field_name, getattr(self, field_name))
+        if self.files_completed > self.files_discovered:
+            raise ValueError("files_completed must not exceed files_discovered.")
+        if self.current_member is not None and (
+            not isinstance(self.current_member, str) or not self.current_member
+        ):
+            raise ValueError("current_member must be non-empty or None.")
+
+    def to_dict(self) -> dict[str, int | str | None]:
+        return {
+            "files_discovered": self.files_discovered,
+            "files_completed": self.files_completed,
+            "chunks_emitted": self.chunks_emitted,
+            "input_rows": self.input_rows,
+            "date_filtered_rows": self.date_filtered_rows,
+            "accepted_records": self.accepted_records,
+            "rejected_records": self.rejected_records,
+            "rejected_rows": self.rejected_rows,
+            "duplicate_rows_collapsed": self.duplicate_rows_collapsed,
+            "current_member": self.current_member,
+        }
+
 
 @dataclass(frozen=True)
 class StooqHistoryParseSummary:
@@ -247,6 +325,21 @@ class StooqHistoryParseSummary:
             item.duplicate_rows_collapsed for item in self.market_counts
         )
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "files_discovered": self.files_discovered,
+            "files_completed": self.files_completed,
+            "chunks_emitted": self.chunks_emitted,
+            "input_rows": self.input_rows,
+            "date_filtered_rows": self.date_filtered_rows,
+            "accepted_records": self.accepted_records,
+            "rejected_records": self.rejected_records,
+            "rejected_rows": self.rejected_rows,
+            "duplicate_rows_collapsed": self.duplicate_rows_collapsed,
+            "market_counts": [item.to_dict() for item in self.market_counts],
+            "issue_samples": [item.to_dict() for item in self.issue_samples],
+        }
+
 
 @dataclass(frozen=True)
 class StooqHistoryChunk:
@@ -301,6 +394,7 @@ class StooqHistoryParser:
         *,
         scope: StooqHistoryScope,
         chunk_size: int,
+        progress_callback: Callable[[StooqHistoryParseProgress], None] | None = None,
     ) -> None:
         if not isinstance(scope, StooqHistoryScope):
             raise TypeError("scope must be a StooqHistoryScope.")
@@ -308,6 +402,8 @@ class StooqHistoryParser:
             raise TypeError("chunk_size must be an integer.")
         if chunk_size <= 0:
             raise ValueError("chunk_size must be greater than zero.")
+        if progress_callback is not None and not callable(progress_callback):
+            raise TypeError("progress_callback must be callable or None.")
         self.archive_path = _validated_archive_path(archive_path)
         self.scope = scope
         self.chunk_size = chunk_size
@@ -315,8 +411,16 @@ class StooqHistoryParser:
             self.archive_path,
             scope=scope,
         )
+        self.progress_callback = progress_callback
         self._started = False
         self._summary: StooqHistoryParseSummary | None = None
+        self._progress = StooqHistoryParseProgress(
+            files_discovered=self.discovery.selected_member_count,
+        )
+
+    @property
+    def progress(self) -> StooqHistoryParseProgress:
+        return self._progress
 
     @property
     def summary(self) -> StooqHistoryParseSummary:
@@ -352,6 +456,19 @@ class StooqHistoryParser:
                         issues=issues,
                     )
                     counts[member.market].files_completed += 1
+                    self._progress = _parse_progress(
+                        files_discovered=self.discovery.selected_member_count,
+                        counts=counts,
+                        chunks_emitted=chunk_number,
+                        current_member=member.member_path,
+                    )
+                    if (
+                        self.progress_callback is not None
+                        and self._progress.files_completed
+                        % PROGRESS_FILE_INTERVAL
+                        == 0
+                    ):
+                        self.progress_callback(self._progress)
 
                     offset = 0
                     while offset < len(bars):
@@ -367,6 +484,14 @@ class StooqHistoryParser:
                         offset += len(selected)
                         if pending_bars == self.chunk_size:
                             chunk_number += 1
+                            self._progress = _parse_progress(
+                                files_discovered=(
+                                    self.discovery.selected_member_count
+                                ),
+                                counts=counts,
+                                chunks_emitted=chunk_number,
+                                current_member=member.member_path,
+                            )
                             yield StooqHistoryChunk(
                                 chunk_number=chunk_number,
                                 batches=tuple(pending),
@@ -376,6 +501,14 @@ class StooqHistoryParser:
 
                 if pending:
                     chunk_number += 1
+                    self._progress = _parse_progress(
+                        files_discovered=self.discovery.selected_member_count,
+                        counts=counts,
+                        chunks_emitted=chunk_number,
+                        current_member=(
+                            self.discovery.members[-1].member_path
+                        ),
+                    )
                     yield StooqHistoryChunk(
                         chunk_number=chunk_number,
                         batches=tuple(pending),
@@ -412,6 +545,42 @@ class StooqHistoryParser:
                 "Stooq history scope did not contain any accepted bars."
             )
         self._summary = summary
+        self._progress = StooqHistoryParseProgress(
+            files_discovered=summary.files_discovered,
+            files_completed=summary.files_completed,
+            chunks_emitted=summary.chunks_emitted,
+            input_rows=summary.input_rows,
+            date_filtered_rows=summary.date_filtered_rows,
+            accepted_records=summary.accepted_records,
+            rejected_records=summary.rejected_records,
+            rejected_rows=summary.rejected_rows,
+            duplicate_rows_collapsed=summary.duplicate_rows_collapsed,
+            current_member=self.discovery.members[-1].member_path,
+        )
+
+
+def _parse_progress(
+    *,
+    files_discovered: int,
+    counts: dict[str, _MutableMarketCounts],
+    chunks_emitted: int,
+    current_member: str,
+) -> StooqHistoryParseProgress:
+    values = tuple(counts.values())
+    return StooqHistoryParseProgress(
+        files_discovered=files_discovered,
+        files_completed=sum(item.files_completed for item in values),
+        chunks_emitted=chunks_emitted,
+        input_rows=sum(item.input_rows for item in values),
+        date_filtered_rows=sum(item.date_filtered_rows for item in values),
+        accepted_records=sum(item.accepted_records for item in values),
+        rejected_records=sum(item.rejected_records for item in values),
+        rejected_rows=sum(item.rejected_rows for item in values),
+        duplicate_rows_collapsed=sum(
+            item.duplicate_rows_collapsed for item in values
+        ),
+        current_member=current_member,
+    )
 
 
 def inspect_stooq_history_archive(
@@ -472,9 +641,13 @@ def _validated_archive_path(archive_path: str | Path) -> Path:
         raise OHLCVParseError(
             "Stooq history archive must be an existing regular file."
         )
-    if path.name != STOOQ_HISTORY_ARCHIVE_NAME:
+    if path.name not in {
+        STOOQ_HISTORY_ARCHIVE_NAME,
+        STOOQ_HISTORY_CORE_ARCHIVE_NAME,
+    }:
         raise OHLCVParseError(
-            f"Stooq history archive must be named {STOOQ_HISTORY_ARCHIVE_NAME}."
+            f"Stooq history archive must be named {STOOQ_HISTORY_ARCHIVE_NAME} "
+            f"(operator) or {STOOQ_HISTORY_CORE_ARCHIVE_NAME} (Core)."
         )
     return path
 

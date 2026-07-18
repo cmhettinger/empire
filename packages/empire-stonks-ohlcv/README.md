@@ -58,7 +58,8 @@ recursive stock members using `StooqHistoryScope`, and yields one-shot
 only one ticker member plus the current output chunk in memory. After complete
 consumption, `parser.summary` exposes per-market input, filtered, accepted,
 rejected, and duplicate counts with bounded safe issue samples. Core run
-orchestration and report storage remain later Phase 7 boundaries.
+orchestration is described below; report storage remains the next Phase 7
+boundary.
 
 `StooqHistoryChunkWriter` writes parser chunks in strict numeric order. Each
 chunk independently resolves its distinct provider listings, skips bars for
@@ -67,6 +68,16 @@ rolls back only that chunk and increments the bounded cumulative failure count;
 previous chunk commits remain durable and a new writer can safely replay the
 same chunks. Per-chunk results and `writer.summary` keep listing and bar
 inserted, updated, unchanged, and derived-only update counts separate.
+
+`run_stooq_history_backfill()` owns the manual backfill sequence without adding
+a DAG. It starts one heartbeat-enabled Core run with the exact safe scope and
+chunk parameters, copies the operator-owned `d_us_txt.zip` to the normal
+short-lived `raw.zip` object, preflights and streams that stored copy, registers
+its checksum-based `stooq_history` source snapshot, and delegates each chunk to
+the writer. Progress payloads are emitted after discovery, every 100 completed
+members, and every committed chunk. Success and failure Core summaries retain
+the checksum, source-snapshot identity when registered, parser position, write
+counts, and last committed chunk needed for an idempotent new-run replay.
 
 Credentials are excluded from config and credential representations. Use
 `OHLCVConfig.to_safe_dict()` when placing configuration details in Core run

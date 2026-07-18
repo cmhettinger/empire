@@ -180,6 +180,15 @@ class ObjectStore:
         stored = self.get_object(object_id)
         return self._backend_for_object(stored).read_bytes(stored.object_key, stored.filename)
 
+    def get_path(self, object_id: UUID) -> Path:
+        """Return the validated local path for a filesystem-backed object."""
+
+        stored = self.get_object(object_id)
+        return self._backend_for_object(stored).resolve_path(
+            stored.object_key,
+            stored.filename,
+        )
+
     def get_object(self, object_id: UUID) -> StoredObject:
         stored = self.repository.get_object(object_id)
         if stored is None or stored.deleted_at is not None:

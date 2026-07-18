@@ -43,6 +43,9 @@ def test_put_and_get_bytes(tmp_path):
     assert stored.size_bytes == len(data)
     assert stored.checksum_sha256 == hashlib.sha256(data).hexdigest()
     assert store.get_bytes(stored.object_id) == data
+    assert store.get_path(stored.object_id) == (
+        tmp_path / stored.object_key / stored.filename
+    ).resolve()
 
 
 def test_put_file_moves_source_by_default(tmp_path):

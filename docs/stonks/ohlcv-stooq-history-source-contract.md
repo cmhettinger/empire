@@ -271,6 +271,15 @@ report contract. The parser requires an explicit positive chunk size; CLI
 defaults and maximums remain owned by H7.6 after representative performance
 testing and may not weaken the one-transaction-per-chunk contract.
 
+The package runner uses Core job `stonks_ohlcv_stooq_backfill`, subject
+`us_stocks`, and a 900-second heartbeat timeout. Run parameters contain only the
+fixed provider/source/parser identities, operator-file mode and filename, exact
+date/market/ticker scope, chunk size, storage key, and raw retention period; the
+local input path, browser state, and authentication state are not stored. Each
+progress payload combines elapsed time, current bounded parser counts, and the
+cumulative writer summary. A failing progress observer is non-fatal; Core
+heartbeat failures remain run failures.
+
 ## Restart And Idempotency
 
 A failed execution is not resumed inside the failed Core run. The operator
@@ -297,6 +306,13 @@ The final report distinguishes a complete run from a partial failed run and
 records the exact safe input scope and last committed boundary. The operator
 must use the same scope when relying on idempotent restart behavior; changing
 filters or bounds is a new import scope rather than a continuation.
+
+Before report construction is added, the Core success/failure summary already
+records that restart context: archive object ID/key/size/checksum, registered
+source-snapshot identity when available, exact scope and chunk size, current
+parse totals, cumulative write/failure counts, elapsed time, and last committed
+chunk. Core stores only the shared safe failure message, never an underlying
+database, filesystem, ZIP, or callback exception string.
 
 ## Runtime Settings
 
