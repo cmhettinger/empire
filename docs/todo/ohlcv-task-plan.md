@@ -192,7 +192,7 @@ values provider-native.
 | E6.10 | [x] | Add EODData CLI | Add an operator CLI and `bin` wrapper that receives `deploy/env/local.env` through `bin/env-load`, supports an explicit effective date, calls the package daily runner, and emits its secret-safe JSON summary without duplicating sequencing. | E6.9, B1.8 |
 | E6.11 | [x] | Add EODData manual DAG | Add one thin manual-only DAG that obtains Airflow context/config from the Compose environment, derives or receives the intended effective date, calls the package daily runner, and returns only small secret-safe summaries/object IDs. DAG tests cover manual scheduling, catchup, overlap, context, effective date, and imports. | E6.9-E6.10, B1.5-B1.7 |
 | E6.12 | [x] | Verify EODData Airflow discovery | Rebuild/restart the Airflow image as required and verify the EODData DAG appears with its intended schedule/tags and imports without credentials in the DAG source. | E6.11 |
-| E6.13 | [ ] | Run EODData six-object fixture vertical test | Run the full three-exchange Symbol List plus Quote List fixture path through the DAG-callable package runner and stored report. Confirm one Core run, six raw objects and snapshot memberships, atomic listing-before-bar persistence, separate listing/bar counts, duplicate and mismatch reporting, market isolation, and the durable run/object/snapshot/report chain; then prove a rerun is unchanged. | E6.11-E6.12, S2.6 |
+| E6.13 | [x] | Run EODData six-object fixture vertical test | Run the full three-exchange Symbol List plus Quote List fixture path through the DAG-callable package runner and stored report. Confirm one Core run, six raw objects and snapshot memberships, atomic listing-before-bar persistence, separate listing/bar counts, duplicate and mismatch reporting, market isolation, and the durable run/object/snapshot/report chain; then prove a rerun is unchanged. | E6.11-E6.12, S2.6 |
 
 Done: 2026-07-17 — added the production EODData source contract in
 `docs/stonks/ohlcv-eoddata-source-contract.md`, aligned the architecture,
@@ -394,6 +394,18 @@ preflight already requires accepted bars to match the effective date. The
 configured PostgreSQL suite passed (336). Replaying the retained six objects
 produced `WARN`, zero hard failures, 8 rejected identities, 11 rejected rows,
 12,665 in-scope bars, and `current` freshness for all three markets.
+
+Done: 2026-07-17 — added a configured PostgreSQL/Core vertical integration
+test that drives generated NYSE, NASDAQ, and AMEX Symbol List and Quote List
+fixtures through the public DAG-callable EODData runner. Each invocation proves
+one Core run, six raw objects, six snapshot memberships, a stored report,
+listing-before-bar write order, separate per-market listing/bar counts,
+market-isolated overlapping tickers, and exact duplicate/mismatch rejection
+buckets. The first import inserted five listings and three bars; an identical
+second run created a new durable run/object/report chain while all five listings
+and three bars were unchanged. The full configured suite passed (337) with no
+skips; Poetry lock/check/build, compileall, pip check, public import,
+88-column scan, and `git diff --check` passed.
 
 ## Phase 7: Stooq Daily End-To-End Vertical Slice
 
