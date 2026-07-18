@@ -189,7 +189,7 @@ never be built.
 | H7.5 | [x] | Add historical import report | Build and store a Stooq backfill report with input bounds, chunk progress, write counts, resulting coverage, failures, warnings, and native-semantics notes. Tests cover partial and successful runs. | H7.4, E6.7-E6.8 |
 | H7.6 | [x] | Add historical Stooq CLI | Add `stonks-ohlcv-stooq-backfill` using `bin/env-load`, with an explicit local input path plus date/filter/chunk options and a secret-safe JSON summary. It does not download from Stooq or mutate canonical tables. | H7.5, B1.8 |
 | H7.7 | [x] | Add historical fixture vertical test | Import a multi-symbol, multi-date fixture twice, store its report, and prove stable provider-listing IDs, unchanged second-run counts, correct date ranges, and bounded transactions. | H7.6 |
-| H7.8 | [ ] | Run bounded development backfill | Manually obtain a source file, run a deliberately small local/dev date-and-symbol range using `deploy/env/local.env`, inspect performance/counts/reporting, and record the acquisition date, command, and result before any broad import. | H7.7 |
+| H7.8 | [x] | Run bounded development backfill | Manually obtain a source file, run a deliberately small local/dev date-and-symbol range using `deploy/env/local.env`, inspect performance/counts/reporting, and record the acquisition date, command, and result before any broad import. | H7.7 |
 
 Done: 2026-07-18 — added
 `docs/stonks/ohlcv-stooq-history-source-contract.md` with the manual
@@ -293,6 +293,46 @@ coverage. Fixture-policy tests passed (3); the live H7.7 PostgreSQL test passed
 (1). The full package suite passed (369, 16 environment-dependent skips).
 Poetry check, dependency check, compileall, changed-file line-length scan, and
 `git diff --check` passed.
+
+Done: 2026-07-18 — completed the bounded development rehearsal with the real
+operator-supplied archive and the real CLI. The archive was acquired and
+inspected on 2026-07-18; it was 537,380,289 bytes with SHA-256
+`faf932285b47ae216461345e7bac7a1085d210cbddd2f02f8a575ab47ff50435`.
+The wrapper loaded its default `deploy/env/local.env` and the exact command was:
+
+```bash
+bin/stonks-ohlcv-stooq-backfill \
+  --input-path tmp/d_us_txt.zip \
+  --effective-date 2026-07-18 \
+  --start-date 2025-04-07 \
+  --end-date 2025-04-11 \
+  --market nasdaq \
+  --ticker AACB.US \
+  --chunk-size 50000
+```
+
+The CLI succeeded as Core run
+`1c948ab4-e075-4b75-be96-4fce8f2c2afb`. Archive acquisition progress arrived
+at 0.274 seconds, selected-member discovery at 0.358 seconds, the database run
+completed in 0.406 seconds, and CLI wall time was 0.75 seconds. The parser
+discovered and completed one file, read 223 rows, date-filtered 218, accepted
+five, and rejected none. One actual five-row transaction completed under the
+50,000-row configured maximum; it inserted one provider listing and five bars
+with no updates, unchanged rows, derived repairs, inactive skips, failed
+chunks, duplicates, or warnings. This validates the initial default on the
+bounded path but is not a 50,000-row capacity benchmark; a broad run must still
+be monitored through its per-chunk progress.
+
+The stored source snapshot is
+`9b045178-22e7-4e43-aa45-94a21b71990d`, backed by raw object
+`576ff9c8-ebf1-4d8d-99f0-c30b4088aa66`. Durable PASS report
+`a33a34ce-8775-420a-8ee3-5cb73fc3105d` records complete status, zero warnings
+and hard failures, one active `nasdaq/AACB.US` series, five persisted/scoped
+bars, exact coverage from 2025-04-07 through 2025-04-11, and
+`canonical_identity_mutation=false`. Database inspection matched all five
+provider OHLCV rows and the report's listing UUID
+`7f83335f-6368-4c0e-95bf-7ad6e39b33ab`. The retained raw object remains under
+the normal expiration policy; the report and source snapshot remain durable.
 
 ## Phase 8: Yahoo Daily End-To-End Vertical Slice
 

@@ -270,8 +270,11 @@ at every chunk commit. Issue details remain bounded by the shared validation and
 report contract. The parser requires an explicit positive chunk size. The H7.6
 CLI defaults to 50,000 bars, matching the supplied prior implementation's
 bounded row batch, and rejects values above 100,000. The H7.8 bounded
-development run must evaluate this initial operating value before any broad
-import. These CLI bounds do not weaken the one-transaction-per-chunk contract.
+development run retained this initial operating value after a real-archive CLI
+run completed one actual five-row transaction. That result validates the
+bounded path, not 50,000-row capacity; any broad import must still be monitored
+through per-chunk progress. These CLI bounds do not weaken the
+one-transaction-per-chunk contract.
 
 The package runner uses Core job `stonks_ohlcv_stooq_backfill`, subject
 `us_stocks`, and a 900-second heartbeat timeout. Run parameters contain only the
