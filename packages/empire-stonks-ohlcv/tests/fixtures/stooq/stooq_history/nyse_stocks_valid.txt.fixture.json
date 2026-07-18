@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "provider_code": "STOOQ",
+  "source_code": "stooq_history",
+  "parser_version": "1.0.0",
+  "format_reference": "docs/stonks/ohlcv-stooq-history-source-contract.md#member-and-row-format",
+  "provenance": "constructed_from_documented_format",
+  "payload_file": "nyse_stocks_valid.txt",
+  "payload_size_bytes": 221,
+  "payload_sha256": "e516839d6342bc8f3204911e474c7a61a3385c7f6366286f87ebe6814d7bfc99",
+  "sanitization": [
+    "Used the fixed fictional provider identity BBB.US.",
+    "Kept three rows spanning one pre-scope and two in-scope dates."
+  ],
+  "cases": [
+    "Exact NYSE stock market and uppercase .US ticker identity",
+    "Inclusive trading-date filtering across multiple daily rows",
+    "Integral required volume values"
+  ]
+}

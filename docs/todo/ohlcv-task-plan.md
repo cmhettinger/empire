@@ -188,7 +188,7 @@ never be built.
 | H7.4 | [x] | Add historical import run tracking | Start one Core run with explicit non-secret parameters and progress summaries; retain the operator-supplied input through the normal source-snapshot and raw-object policy. Failure leaves enough context for an operator rerun. | H7.3, C4.3-C4.6 |
 | H7.5 | [x] | Add historical import report | Build and store a Stooq backfill report with input bounds, chunk progress, write counts, resulting coverage, failures, warnings, and native-semantics notes. Tests cover partial and successful runs. | H7.4, E6.7-E6.8 |
 | H7.6 | [x] | Add historical Stooq CLI | Add `stonks-ohlcv-stooq-backfill` using `bin/env-load`, with an explicit local input path plus date/filter/chunk options and a secret-safe JSON summary. It does not download from Stooq or mutate canonical tables. | H7.5, B1.8 |
-| H7.7 | [ ] | Add historical fixture vertical test | Import a multi-symbol, multi-date fixture twice, store its report, and prove stable provider-listing IDs, unchanged second-run counts, correct date ranges, and bounded transactions. | H7.6 |
+| H7.7 | [x] | Add historical fixture vertical test | Import a multi-symbol, multi-date fixture twice, store its report, and prove stable provider-listing IDs, unchanged second-run counts, correct date ranges, and bounded transactions. | H7.6 |
 | H7.8 | [ ] | Run bounded development backfill | Manually obtain a source file, run a deliberately small local/dev date-and-symbol range using `deploy/env/local.env`, inspect performance/counts/reporting, and record the acquisition date, command, and result before any broad import. | H7.7 |
 
 Done: 2026-07-18 — added
@@ -277,6 +277,21 @@ message. No downloader, browser automation, DAG, or canonical-table path was
 added. CLI tests passed (16); the full package suite passed (369, 15
 environment-dependent skips). Wrapper syntax/help, Poetry check, dependency
 check, compileall, public CLI import, 88-column changed-file scan, and
+`git diff --check` passed.
+
+Done: 2026-07-18 — added manifested NYSE and NYSE MKT historical members and a
+PostgreSQL vertical test that builds one bounded three-market ZIP from those
+members plus the existing Nasdaq fixture. The test imports the same six-bar,
+three-symbol, multi-date scope twice through the complete package runner. It
+proves distinct Core runs/raw objects/reports reuse one checksum snapshot,
+provider-listing UUIDs and per-series date ranges remain stable, and the second
+run records three unchanged listings and six unchanged bars with no inserts,
+updates, or derived repairs. Instrumentation proves six two-row bar writes and,
+per run, exactly one snapshot commit plus three independently committed chunks.
+Both stored PASS reports reproduce the exact scope, write outcomes, and market
+coverage. Fixture-policy tests passed (3); the live H7.7 PostgreSQL test passed
+(1). The full package suite passed (369, 16 environment-dependent skips).
+Poetry check, dependency check, compileall, changed-file line-length scan, and
 `git diff --check` passed.
 
 ## Phase 8: Yahoo Daily End-To-End Vertical Slice
