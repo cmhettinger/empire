@@ -187,7 +187,7 @@ never be built.
 | H7.3 | [x] | Add chunked database writer | Write provider listings and bars in bounded transactions with cumulative inserted/updated/unchanged/derived-updated/failure counts. A failed chunk can be rerun safely. | H7.2, M3.4-M3.5 |
 | H7.4 | [x] | Add historical import run tracking | Start one Core run with explicit non-secret parameters and progress summaries; retain the operator-supplied input through the normal source-snapshot and raw-object policy. Failure leaves enough context for an operator rerun. | H7.3, C4.3-C4.6 |
 | H7.5 | [x] | Add historical import report | Build and store a Stooq backfill report with input bounds, chunk progress, write counts, resulting coverage, failures, warnings, and native-semantics notes. Tests cover partial and successful runs. | H7.4, E6.7-E6.8 |
-| H7.6 | [ ] | Add historical Stooq CLI | Add `stonks-ohlcv-stooq-backfill` using `bin/env-load`, with an explicit local input path plus date/filter/chunk options and a secret-safe JSON summary. It does not download from Stooq or mutate canonical tables. | H7.5, B1.8 |
+| H7.6 | [x] | Add historical Stooq CLI | Add `stonks-ohlcv-stooq-backfill` using `bin/env-load`, with an explicit local input path plus date/filter/chunk options and a secret-safe JSON summary. It does not download from Stooq or mutate canonical tables. | H7.5, B1.8 |
 | H7.7 | [ ] | Add historical fixture vertical test | Import a multi-symbol, multi-date fixture twice, store its report, and prove stable provider-listing IDs, unchanged second-run counts, correct date ranges, and bounded transactions. | H7.6 |
 | H7.8 | [ ] | Run bounded development backfill | Manually obtain a source file, run a deliberately small local/dev date-and-symbol range using `deploy/env/local.env`, inspect performance/counts/reporting, and record the acquisition date, command, and result before any broad import. | H7.7 |
 
@@ -263,6 +263,21 @@ durable object contents, safe Core summaries, and partial database coverage.
 The OHLCV suite passed (353, 15 environment skips); both live H7.5 database
 paths passed. Poetry checks, dependency checks, compileall, public import,
 88-column scan, and `git diff --check` passed.
+
+Done: 2026-07-18 — added the package and executable
+`stonks-ohlcv-stooq-backfill` operator entry points with `bin/env-load`, a
+required existing local `d_us_txt.zip`, explicit acquisition date, optional
+inclusive trading-date bounds, repeatable exact market/ticker filters, and a
+bounded chunk option. The initial 50,000-bar default follows the supplied prior
+implementation's row batch and is capped at 100,000 pending H7.8 performance
+validation. Arguments and scope are rejected before database connection;
+package progress is emitted as secret-safe JSON lines on stderr while stdout is
+reserved for one final JSON result. Runtime failures expose only a fixed safe
+message. No downloader, browser automation, DAG, or canonical-table path was
+added. CLI tests passed (16); the full package suite passed (369, 15
+environment-dependent skips). Wrapper syntax/help, Poetry check, dependency
+check, compileall, public CLI import, 88-column changed-file scan, and
+`git diff --check` passed.
 
 ## Phase 8: Yahoo Daily End-To-End Vertical Slice
 

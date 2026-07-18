@@ -17,6 +17,7 @@ pytest = "^8.0"
 [tool.poetry.scripts]
 stonks-ohlcv-config = "empire_stonks_ohlcv.scripts.config:main"
 stonks-ohlcv-eoddata-daily = "empire_stonks_ohlcv.scripts.eoddata_daily:main"
+stonks-ohlcv-stooq-backfill = "empire_stonks_ohlcv.scripts.stooq_backfill:main"
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]

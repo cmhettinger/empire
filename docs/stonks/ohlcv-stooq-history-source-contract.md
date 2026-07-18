@@ -267,9 +267,11 @@ Operational progress includes, at minimum:
 
 The runner emits a progress update at least every 100 completed ticker files and
 at every chunk commit. Issue details remain bounded by the shared validation and
-report contract. The parser requires an explicit positive chunk size; CLI
-defaults and maximums remain owned by H7.6 after representative performance
-testing and may not weaken the one-transaction-per-chunk contract.
+report contract. The parser requires an explicit positive chunk size. The H7.6
+CLI defaults to 50,000 bars, matching the supplied prior implementation's
+bounded row batch, and rejects values above 100,000. The H7.8 bounded
+development run must evaluate this initial operating value before any broad
+import. These CLI bounds do not weaken the one-transaction-per-chunk contract.
 
 The package runner uses Core job `stonks_ohlcv_stooq_backfill`, subject
 `us_stocks`, and a 900-second heartbeat timeout. Run parameters contain only the
@@ -360,6 +362,27 @@ operator inputs rather than hidden environment behavior.
 Reusable package code reads only `os.environ` where environment configuration
 is its responsibility. Local wrappers use `bin/env-load`; the package never
 opens `deploy/env/local.env` or depends on the repository location.
+
+The operator entry point is:
+
+```bash
+bin/stonks-ohlcv-stooq-backfill \
+  --input-path "$EMPIRE_TEMP_DIR/d_us_txt.zip" \
+  --effective-date 2026-07-18 \
+  --start-date 2024-01-01 \
+  --end-date 2026-07-17 \
+  --market nasdaq \
+  --ticker AACB.US \
+  --chunk-size 50000
+```
+
+`--input-path` and `--effective-date` are required. Market and ticker options
+are repeatable exact filters; omitting either selects its documented full
+scope. Start/end dates are optional inclusive bounds. The CLI validates its
+argument scope before connecting to the database, sends JSON progress records
+to stderr, and reserves stdout for one secret-safe final JSON result. The local
+path is passed to the runner but is not written to Core parameters, progress,
+or final output. Runtime failures expose only a fixed message and nonzero exit.
 
 ## Explicit Exclusions
 

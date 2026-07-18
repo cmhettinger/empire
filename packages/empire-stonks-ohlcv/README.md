@@ -243,6 +243,27 @@ expects its runtime environment to be loaded already. Invalid dates are rejected
 before opening a database connection; runtime failures print only a fixed safe
 message and return nonzero.
 
+Run the one-shot Stooq historical backfill against an operator-supplied archive:
+
+```bash
+bin/stonks-ohlcv-stooq-backfill \
+  --input-path "$EMPIRE_TEMP_DIR/d_us_txt.zip" \
+  --effective-date 2026-07-18 \
+  --start-date 2024-01-01 \
+  --market nasdaq \
+  --ticker AACB.US \
+  --chunk-size 50000
+```
+
+`--market` and `--ticker` are repeatable exact filters; omitting them selects all
+three supported markets and all their tickers. The optional inclusive start/end
+dates are trading-date filters. Chunk size defaults to 50,000 bars and is capped
+at 100,000 bars per transaction. The wrapper validates the local
+`d_us_txt.zip`, sources `bin/env-load`, and invokes the package command; it does
+not download from Stooq or add a DAG. Progress is emitted as JSON lines on
+stderr, while successful stdout contains only the compact final JSON result.
+Runtime failures return nonzero with a fixed safe message.
+
 ## EODData acquisition
 
 `acquire_eoddata_objects()` performs the package-owned EODData acquisition
