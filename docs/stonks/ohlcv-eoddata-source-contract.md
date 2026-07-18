@@ -334,6 +334,12 @@ partition/run-integrity failures. Aborting acquisition and parsing failures add
 the safe market and source code to the Core failure summary when the failing
 partition is known; persistence/reporting failures remain whole-run scoped.
 
+Report coverage, freshness, series, and weekday-gap health are evaluated as of
+the run effective date. Stored bars from a later successful run are excluded
+from those calculations, so rerunning an older provider date does not create
+false future-date failures. Wrong-date rows in the current payload still fail
+the trusted request-scope checks before persistence.
+
 All issue samples are bounded and contain only safe provider identity fields;
 they never include response bodies, authenticated URLs, request headers, or
 credentials.

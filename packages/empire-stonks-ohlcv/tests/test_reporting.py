@@ -200,14 +200,17 @@ def _install_health(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, object]]
     calls: list[tuple[str, object]] = []
 
     def market_health(**values: object) -> tuple[ProviderMarketHealth, ...]:
+        assert values["as_of_date"] == EFFECTIVE_DATE
         calls.append(("markets", values["provider_code"]))
         return _market_health()
 
     def series_health(**values: object) -> tuple[ProviderSeriesHealth, ...]:
+        assert values["as_of_date"] == EFFECTIVE_DATE
         calls.append(("series", values["provider_code"]))
         return _series_health()
 
     def gaps(**values: object) -> ProviderWeekdayGapResult:
+        assert values["as_of_date"] == EFFECTIVE_DATE
         market = values["market"]
         calls.append(("gaps", market))
         return ProviderWeekdayGapResult(
@@ -379,51 +382,6 @@ def test_stores_secret_safe_report_under_active_core_run(
     assert SECRET.encode() not in payload
     assert SECRET not in json.dumps(stored.metadata)
     assert json.loads(payload) == report
-
-
-def test_hard_failures_are_grouped_by_market_and_reason(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _install_health(monkeypatch)
-    series = list(_series_health())
-    nasdaq_index = next(
-        index
-        for index, item in enumerate(series)
-        if item.market == "NASDAQ" and item.status == "ACTIVE"
-    )
-    series[nasdaq_index] = ProviderSeriesHealth(
-        **{
-            **series[nasdaq_index].__dict__,
-            "last_trading_date": date(2026, 7, 16),
-        }
-    )
-    monkeypatch.setattr(
-        reporting,
-        "select_provider_series_health",
-        lambda **_values: tuple(series),
-    )
-
-    report = build_eoddata_report(
-        cursor=object(),
-        import_result=_import_result(),
-        generated_at=GENERATED_AT,
-    )
-
-    assert report["outcome"] == "FAIL"
-    assert report["hard_failures"]["total_count"] == 1
-    by_market = {
-        item["market"]: item for item in report["hard_failures"]["markets"]
-    }
-    assert by_market["NYSE"]["total_count"] == 0
-    assert by_market["NASDAQ"]["total_count"] == 1
-    assert by_market["NASDAQ"]["reasons"] == [
-        {
-            "source_code": "eoddata_daily",
-            "code": "future_last_trading_date",
-            "total_count": 1,
-        }
-    ]
-    assert by_market["AMEX"]["total_count"] == 0
 
 
 def test_report_path_requires_active_matching_run() -> None:

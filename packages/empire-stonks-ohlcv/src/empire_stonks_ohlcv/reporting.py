@@ -20,7 +20,6 @@ from empire_stonks_ohlcv.health import (
     select_provider_weekday_gaps,
 )
 from empire_stonks_ohlcv.object_store import DEFAULT_STORAGE_ROOT
-from empire_stonks_ohlcv.results import ImportIssue
 from empire_stonks_ohlcv.source_conventions import (
     EODDATA_DAILY_SOURCE,
     EODDATA_SYMBOL_LIST_SOURCE,
@@ -54,11 +53,13 @@ def build_eoddata_report(
         for item in select_provider_market_health(
             cursor=cursor,
             provider_code=EODDATA_PROVIDER_CODE,
+            as_of_date=as_of_date,
         )
     }
     series = select_provider_series_health(
         cursor=cursor,
         provider_code=EODDATA_PROVIDER_CODE,
+        as_of_date=as_of_date,
     )
     _validate_health_scope(market_health, series)
 
@@ -78,7 +79,6 @@ def build_eoddata_report(
         for market in DEFAULT_EODDATA_EXCHANGES
     }
 
-    future_issues: list[tuple[str, ImportIssue]] = []
     market_sections: list[dict[str, Any]] = []
     health_warning_count = 0
     for market in DEFAULT_EODDATA_EXCHANGES:
@@ -97,28 +97,11 @@ def build_eoddata_report(
             for item in active_series
             if item.last_trading_date is None
         )
-        future = tuple(
-            item
-            for item in active_series
-            if item.last_trading_date is not None
-            and item.last_trading_date > as_of_date
-        )
-        for item in future:
-            future_issues.append(
-                (
-                    market,
-                    ImportIssue(
-                        code="future_last_trading_date",
-                        message="Stored last trading date is after the report date.",
-                        source_code=EODDATA_DAILY_SOURCE.source_code,
-                        record_reference=f"{market}:{item.ticker}",
-                    ),
-                )
-            )
         gaps = select_provider_weekday_gaps(
             cursor=cursor,
             provider_code=EODDATA_PROVIDER_CODE,
             market=market,
+            as_of_date=as_of_date,
         )
         health_warning_count += len(stale) + len(no_data) + gaps.total_count
         market_sections.append(
@@ -161,7 +144,7 @@ def build_eoddata_report(
         raise ValueError(
             "EODData import hard failures must abort before report generation."
         )
-    hard_failures = _market_issue_summary(tuple(future_issues))
+    hard_failures = _empty_market_issue_summary()
     row_rejections = _row_rejections(import_result)
     outcome = _outcome(
         failure_count=hard_failures["total_count"],
@@ -434,39 +417,17 @@ def _row_rejections(
     }
 
 
-def _market_issue_summary(
-    scoped_issues: tuple[tuple[str, ImportIssue], ...],
-) -> dict[str, Any]:
-    markets = []
-    for market in DEFAULT_EODDATA_EXCHANGES:
-        scoped = tuple(
-            issue
-            for issue_market, issue in scoped_issues
-            if issue_market == market
-        )
-        summary = BoundedIssueSummary(
-            total_count=len(scoped),
-            samples=scoped[:MAX_ISSUE_SAMPLES],
-        ).to_dict()
-        by_reason = []
-        for source_code, code in sorted(
-            {(issue.source_code, issue.code) for issue in scoped},
-            key=lambda value: (value[0] or "", value[1]),
-        ):
-            by_reason.append(
-                {
-                    "source_code": source_code,
-                    "code": code,
-                    "total_count": sum(
-                        issue.source_code == source_code and issue.code == code
-                        for issue in scoped
-                    ),
-                }
-            )
-        markets.append({"market": market, **summary, "reasons": by_reason})
+def _empty_market_issue_summary() -> dict[str, Any]:
     return {
-        "total_count": len(scoped_issues),
-        "markets": markets,
+        "total_count": 0,
+        "markets": [
+            {
+                "market": market,
+                **BoundedIssueSummary().to_dict(),
+                "reasons": [],
+            }
+            for market in DEFAULT_EODDATA_EXCHANGES
+        ],
     }
 
 

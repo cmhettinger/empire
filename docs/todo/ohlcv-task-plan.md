@@ -384,6 +384,17 @@ live objects produced `WARN`, zero hard failures, 467 rejected identities, and
 worker loaded the schema-version-2 package and the manual DAG had no import
 errors.
 
+Done: 2026-07-17 — corrected backdated report health after a 2026-07-16 run
+followed an already imported 2026-07-17 run. The shared market, series, and
+weekday-gap queries now accept an inclusive `as_of_date`; report coverage,
+freshness, bar counts, and gaps exclude later stored bars without hiding
+listings that have no in-scope data. The redundant current-state
+`future_last_trading_date` report failure was removed because parser/import
+preflight already requires accepted bars to match the effective date. The
+configured PostgreSQL suite passed (336). Replaying the retained six objects
+produced `WARN`, zero hard failures, 8 rejected identities, 11 rejected rows,
+12,665 in-scope bars, and `current` freshness for all three markets.
+
 ## Phase 7: Stooq Daily End-To-End Vertical Slice
 
 Goal: add Stooq acquisition, persistence, provider-scoped reporting, and its
@@ -452,6 +463,7 @@ provider operation one proven vertical slice at a time.
 | V10.9 | [ ] | Run and enable bounded Stooq daily | Run a bounded live Stooq daily import, inspect its report and overlap with EODData, then enable its nightly DAG only after results are healthy. | V10.8, T7.9 |
 | V10.10 | [ ] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V10.9, H8.8 |
 | V10.11 | [ ] | Run and enable selected Yahoo mode | Run a bounded live Yahoo import, inspect lineage/native semantics/reporting, and enable only the scheduling mode selected in Y9.8. Record the decision. | V10.10, Y9.9 |
+| V10.12 | [ ] | Audit derived daily-bar consistency | Recompute expected `change` and `changepct` from each provider listing's nearest preceding stored bar and compare them with every `ohlcv_daily` row, covering first rows, zero predecessor closes, gaps, corrections, and out-of-order imports. Report bounded discrepancy counts and samples by provider and market. If discrepancies exist, identify the cause and add a tested, bounded, idempotent repair command or workflow; if none exist, record the evidence and do not add a scheduled mutation task. | V10.11, H8.8 |
 
 ---
 
@@ -463,7 +475,7 @@ security-master contracts are stable enough to support temporal mappings.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| X11.1 | [ ] | Confirm bridge readiness | Record the concrete consumers and stable OHLCV/security-master contracts that require provider-to-canonical mapping. | V10.11 plus future securities readiness |
+| X11.1 | [ ] | Confirm bridge readiness | Record the concrete consumers and stable OHLCV/security-master contracts that require provider-to-canonical mapping. | V10.12 plus future securities readiness |
 | X11.2 | [ ] | Review provider-series identity evidence | Evaluate what market, ticker, date-range, identifier, and provider metadata is actually available after live ingestion. Do not assume ticker reuse can be detected automatically. | X11.1 |
 | X11.3 | [ ] | Design temporal mapping storage | Design mappings that can attach different date ranges of one provider series to different canonical listings and multiple provider series to one listing. Preserve candidate/decision evidence and ambiguity. | X11.2 |
 | X11.4 | [ ] | Decide bridge package creation | Create `empire-stonks-ohlcv-bridge` only when implemented mapping or canonical-series logic justifies a separate Python package. | X11.3 |

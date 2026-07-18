@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import date
 from typing import Iterator
 from uuid import uuid4
 
@@ -44,12 +45,17 @@ def database_connection() -> Iterator[object]:
         connection.close()
 
 
-def _market_rows(cursor: object) -> dict[str, object]:
+def _market_rows(
+    cursor: object,
+    *,
+    as_of_date: date | None = None,
+) -> dict[str, object]:
     return {
         row.market: row
         for row in select_provider_market_health(
             cursor=cursor,
             provider_code="EODDATA",
+            as_of_date=as_of_date,
         )
     }
 
@@ -74,6 +80,13 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
 
     with connection.cursor() as cursor:  # type: ignore[union-attr]
         baseline_markets = _market_rows(cursor)
+        as_of_date = date(2026, 1, 13)
+        baseline_as_of_markets = _market_rows(cursor, as_of_date=as_of_date)
+        baseline_as_of_gaps = select_provider_weekday_gaps(
+            cursor=cursor,
+            provider_code="EODDATA",
+            as_of_date=as_of_date,
+        ).total_count
         baseline_series_count = len(
             select_provider_series_health(
                 cursor=cursor,
@@ -161,6 +174,7 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
         )
 
         markets = _market_rows(cursor)
+        as_of_markets = _market_rows(cursor, as_of_date=as_of_date)
         series = select_provider_series_health(
             cursor=cursor,
             provider_code="EODDATA",
@@ -168,6 +182,16 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
         gaps = select_provider_weekday_gaps(
             cursor=cursor,
             provider_code="EODDATA",
+        )
+        as_of_series = select_provider_series_health(
+            cursor=cursor,
+            provider_code="EODDATA",
+            as_of_date=as_of_date,
+        )
+        as_of_gaps = select_provider_weekday_gaps(
+            cursor=cursor,
+            provider_code="EODDATA",
+            as_of_date=as_of_date,
         )
         market_gaps = {
             market: select_provider_weekday_gaps(
@@ -186,6 +210,7 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
         assert sum(row.is_active for row in inserted_series) == 4_050
         assert sum(not row.is_active for row in inserted_series) == 450
         assert gaps.total_count == baseline_gap_count + ACTIVE_GAPS
+        assert as_of_gaps.total_count == baseline_as_of_gaps
         assert gaps.to_dict()["calendar_authoritative"] is False
         assert gaps.sample_count <= 100
         assert all(
@@ -193,6 +218,14 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
             == baseline_market_gaps[market] + 50
             for market in MARKETS
         )
+        inserted_as_of_series = [
+            row for row in as_of_series if row.ticker.startswith(ticker_prefix)
+        ]
+        assert len(inserted_as_of_series) == 4_500
+        assert {row.bar_count for row in inserted_as_of_series} == {8}
+        assert {row.last_trading_date for row in inserted_as_of_series} == {
+            as_of_date
+        }
 
         for market in MARKETS:
             current = markets[market]
@@ -231,16 +264,29 @@ def test_eoddata_health_queries_and_existing_indexes_at_representative_volume(
                 - _count(baseline, "inactive_bar_count")
                 == INACTIVE_BARS_PER_MARKET
             )
+            as_of_current = as_of_markets[market]
+            as_of_baseline = baseline_as_of_markets.get(market)
+            assert (
+                as_of_current.active_bar_count
+                - _count(as_of_baseline, "active_bar_count")
+                == ACTIVE_PER_MARKET * 8
+            )
+            assert (
+                as_of_current.inactive_bar_count
+                - _count(as_of_baseline, "inactive_bar_count")
+                == INACTIVE_PER_MARKET * 8
+            )
+            assert as_of_current.last_trading_date == as_of_date
 
         series_plan = _plan_text(
             cursor,
             health._SERIES_HEALTH_SQL,
-            ("EODDATA",),
+            (None, None, "EODDATA"),
         )
         gap_plan = _plan_text(
             cursor,
             health._WEEKDAY_GAPS_SQL,
-            ("EODDATA", None, None, 100),
+            ("EODDATA", None, None, None, None, 100),
         )
         assert any(
             index_name in series_plan

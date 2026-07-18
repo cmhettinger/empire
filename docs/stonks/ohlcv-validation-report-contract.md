@@ -159,9 +159,11 @@ separate count or section and do not create ordinary provider-health warnings.
 
 For an explicit report `as_of_date`:
 
-- `first_trading_date` and `last_trading_date` are the minimum and maximum
-  stored dates in scope.
-- `bar_count` is the stored current-row count, not an expected-session count.
+- `first_trading_date`, `last_trading_date`, `bar_count`, coverage, and gap
+  inputs include only stored bars whose `trading_date <= as_of_date`. This keeps
+  a backdated report independent of later dates that were already imported.
+- `bar_count` is the stored in-scope current-row count, not an expected-session
+  count.
 - `listing_count`, `listings_with_bars`, and `listings_without_bars` describe
   active provider series; inactive listing counts are separate.
 - `latest_bar_calendar_age_days` is
@@ -170,8 +172,9 @@ For an explicit report `as_of_date`:
   `(last_trading_date, as_of_date]`, or is null when no bar exists.
 - Provider/market freshness is `current` at weekday age 0, `delayed` at weekday
   age 1, `stale_candidate` at weekday age 2 or greater, and `no_data` when no
-  bar exists. A future last date is a data-quality failure rather than a
-  negative age.
+  in-scope bar exists. Accepted source bars are already required to match the
+  run effective date at the parser/import boundary; later successfully imported
+  dates are not integrity failures for a backdated report.
 - An active series is a stale candidate when its weekday age is at least 2.
   An active series with no bars is reported separately as a no-data candidate.
 - A weekday-shaped gap is a missing Monday-Friday date strictly between two

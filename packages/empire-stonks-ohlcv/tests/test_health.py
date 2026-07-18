@@ -118,6 +118,7 @@ def test_market_health_query_is_provider_scoped_and_order_preserving() -> None:
     result = select_provider_market_health(
         cursor=cursor,
         provider_code="EODDATA",
+        as_of_date=date(2026, 1, 31),
     )
 
     assert tuple(item.market for item in result) == ("AMEX", "NYSE")
@@ -136,7 +137,12 @@ def test_market_health_query_is_provider_scoped_and_order_preserving() -> None:
         )
     )
     json.dumps(result[0].to_dict())
-    assert cursor.executions[0][1] == ("EODDATA",)
+    assert cursor.executions[0][1] == (
+        date(2026, 1, 31),
+        date(2026, 1, 31),
+        "EODDATA",
+    )
+    assert "daily.trading_date <= %s::date" in cursor.executions[0][0]
     assert "listing.status" in cursor.executions[0][0]
 
 
@@ -175,13 +181,18 @@ def test_series_health_query_returns_active_inactive_and_empty_series() -> None:
     result = select_provider_series_health(
         cursor=cursor,
         provider_code="EODDATA",
+        as_of_date=date(2026, 1, 31),
     )
 
     assert result[0].is_active is True
     assert result[1].is_active is False
     assert result[1].last_trading_date is None
     assert result[1].to_dict()["bar_count"] == 0
-    assert cursor.executions[0][1] == ("EODDATA",)
+    assert cursor.executions[0][1] == (
+        date(2026, 1, 31),
+        date(2026, 1, 31),
+        "EODDATA",
+    )
     assert "ORDER BY listing.market, listing.ticker" in cursor.executions[0][0]
 
 
@@ -202,6 +213,7 @@ def test_weekday_gap_query_has_complete_total_and_bounded_samples() -> None:
     result = select_provider_weekday_gaps(
         cursor=cursor,
         provider_code="EODDATA",
+        as_of_date=date(2026, 1, 31),
         sample_limit=1,
     )
 
@@ -227,7 +239,14 @@ def test_weekday_gap_query_has_complete_total_and_bounded_samples() -> None:
             ).to_dict()
         ],
     }
-    assert cursor.executions[0][1] == ("EODDATA", None, None, 1)
+    assert cursor.executions[0][1] == (
+        "EODDATA",
+        None,
+        None,
+        date(2026, 1, 31),
+        date(2026, 1, 31),
+        1,
+    )
     assert "listing.status = 'ACTIVE'" in cursor.executions[0][0]
     assert "extract(isodow FROM missing_day) <= 5" in cursor.executions[0][0]
 
@@ -263,6 +282,8 @@ def test_weekday_gap_query_can_scope_one_exact_market() -> None:
         "EODDATA",
         "NASDAQ",
         "NASDAQ",
+        None,
+        None,
         MAX_ISSUE_SAMPLES,
     )
 
@@ -302,5 +323,19 @@ def test_health_queries_reject_invalid_scope_before_execution(
                 provider_code=provider_code,
                 sample_limit=sample_limit,  # type: ignore[arg-type]
             )
+
+    assert cursor.executions == []
+
+
+@pytest.mark.parametrize("as_of_date", ("2026-01-31", True))
+def test_health_queries_reject_invalid_as_of_date(as_of_date: object) -> None:
+    cursor = HealthCursor([])
+
+    with pytest.raises(TypeError, match="as_of_date"):
+        select_provider_market_health(
+            cursor=cursor,
+            provider_code="EODDATA",
+            as_of_date=as_of_date,  # type: ignore[arg-type]
+        )
 
     assert cursor.executions == []

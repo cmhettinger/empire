@@ -149,6 +149,7 @@ _SERIES_HEALTH_SQL = """
     FROM stonks.provider_listing AS listing
     LEFT JOIN stonks.ohlcv_daily AS daily
       ON daily.provider_listing_id = listing.provider_listing_id
+     AND (%s::date IS NULL OR daily.trading_date <= %s::date)
     WHERE listing.provider_code = %s
     GROUP BY
         listing.provider_listing_id,
@@ -174,6 +175,7 @@ _MARKET_HEALTH_SQL = """
         FROM stonks.provider_listing AS listing
         LEFT JOIN stonks.ohlcv_daily AS daily
           ON daily.provider_listing_id = listing.provider_listing_id
+         AND (%s::date IS NULL OR daily.trading_date <= %s::date)
         WHERE listing.provider_code = %s
         GROUP BY
             listing.provider_listing_id,
@@ -225,6 +227,7 @@ _WEEKDAY_GAPS_SQL = """
         WHERE listing.provider_code = %s
           AND (%s::text IS NULL OR listing.market = %s::text)
           AND listing.status = 'ACTIVE'
+          AND (%s::date IS NULL OR daily.trading_date <= %s::date)
     ), gaps AS (
         SELECT
             provider_listing_id,
@@ -263,11 +266,13 @@ def select_provider_market_health(
     *,
     cursor: Any,
     provider_code: str,
+    as_of_date: date | None = None,
 ) -> tuple[ProviderMarketHealth, ...]:
-    """Return ordered active/inactive market coverage for one provider."""
+    """Return ordered market coverage through an optional inclusive date."""
 
     _validate_provider_code(provider_code)
-    cursor.execute(_MARKET_HEALTH_SQL, (provider_code,))
+    _validate_as_of_date(as_of_date)
+    cursor.execute(_MARKET_HEALTH_SQL, (as_of_date, as_of_date, provider_code))
     return tuple(_market_health_from_row(row) for row in cursor.fetchall())
 
 
@@ -275,11 +280,13 @@ def select_provider_series_health(
     *,
     cursor: Any,
     provider_code: str,
+    as_of_date: date | None = None,
 ) -> tuple[ProviderSeriesHealth, ...]:
-    """Return deterministic series-level freshness inputs for one provider."""
+    """Return series-level freshness through an optional inclusive date."""
 
     _validate_provider_code(provider_code)
-    cursor.execute(_SERIES_HEALTH_SQL, (provider_code,))
+    _validate_as_of_date(as_of_date)
+    cursor.execute(_SERIES_HEALTH_SQL, (as_of_date, as_of_date, provider_code))
     return tuple(ProviderSeriesHealth(*row) for row in cursor.fetchall())
 
 
@@ -297,12 +304,14 @@ def select_provider_weekday_gaps(
     cursor: Any,
     provider_code: str,
     market: str | None = None,
+    as_of_date: date | None = None,
     sample_limit: int = MAX_ISSUE_SAMPLES,
 ) -> ProviderWeekdayGapResult:
     """Return active-series weekday-shaped gaps with a complete total."""
 
     _validate_provider_code(provider_code)
     _validate_market(market)
+    _validate_as_of_date(as_of_date)
     if isinstance(sample_limit, bool) or not isinstance(sample_limit, int):
         raise TypeError("sample_limit must be an integer.")
     if not 1 <= sample_limit <= MAX_ISSUE_SAMPLES:
@@ -311,7 +320,7 @@ def select_provider_weekday_gaps(
         )
     cursor.execute(
         _WEEKDAY_GAPS_SQL,
-        (provider_code, market, market, sample_limit),
+        (provider_code, market, market, as_of_date, as_of_date, sample_limit),
     )
     rows = cursor.fetchall()
     return ProviderWeekdayGapResult(
@@ -338,6 +347,11 @@ def _validate_market(market: object) -> None:
         raise TypeError("market must be a string or None.")
     if not market or market != market.strip():
         raise ValueError("market must be non-empty and trimmed.")
+
+
+def _validate_as_of_date(as_of_date: object) -> None:
+    if as_of_date is not None and type(as_of_date) is not date:
+        raise TypeError("as_of_date must be a date or None.")
 
 
 def _date_to_string(value: date | None) -> str | None:

@@ -295,6 +295,11 @@ inputs for the stored report builder:
   returns at most 100 deterministic samples. These are operational candidates,
   not exchange-calendar-authoritative missing sessions.
 
+All three helpers accept an optional inclusive `as_of_date`. EODData reports
+pass their run effective date so a backdated run excludes bars that were
+already imported for later dates while retaining listings with zero in-scope
+bars.
+
 The queries are read-only and do not calculate report presentation or accept an
 EODData-specific exchange branch. PostgreSQL integration coverage exercises the
 same provider-scoped API for EODData across NYSE, NASDAQ, and AMEX using 4,500
