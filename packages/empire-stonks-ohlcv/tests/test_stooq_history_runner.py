@@ -297,6 +297,7 @@ def test_runner_tracks_stored_archive_snapshot_chunks_and_safe_progress(
     assert result.write_summary.bar_counts.inserted == 4
     assert result.report_outcome == "PASS"
     assert object_repo.objects[result.report_object_id].filename == "report.json"
+    assert object_repo.objects[result.pdf_report_object_id].filename == "report.pdf"
     assert [item["stage"] for item in progress] == [
         "acquisition",
         "parsing",
@@ -321,6 +322,9 @@ def test_runner_tracks_stored_archive_snapshot_chunks_and_safe_progress(
         result.acquired_object.checksum_sha256
     )
     assert run.summary["report_object_id"] == str(result.report_object_id)
+    assert run.summary["pdf_report_object_id"] == str(
+        result.pdf_report_object_id
+    )
     json.dumps(result.to_dict())
     json.dumps(run.summary)
 
@@ -367,8 +371,11 @@ def test_failure_summary_preserves_exact_rerun_scope_and_committed_boundary(
     assert run.summary["write_summary"]["last_completed_chunk"] == 1
     assert run.summary["report_outcome"] == "FAIL"
     assert run.summary["report_object_id"] is not None
+    assert run.summary["pdf_report_object_id"] is not None
     report_id = UUID(run.summary["report_object_id"])
     assert object_repo.objects[report_id].filename == "report.json"
+    pdf_report_id = UUID(run.summary["pdf_report_object_id"])
+    assert object_repo.objects[pdf_report_id].filename == "report.pdf"
     report = json.loads(object_store.get_bytes(report_id))
     assert report["run_status"] == "partial"
     assert report["hard_failures"]["failed_stage"] == "persistence"

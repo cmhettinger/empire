@@ -334,6 +334,20 @@ provider OHLCV rows and the report's listing UUID
 `7f83335f-6368-4c0e-95bf-7ad6e39b33ab`. The retained raw object remains under
 the normal expiration policy; the report and source snapshot remain durable.
 
+Follow-up: 2026-07-18 — added a professional Stooq historical backfill PDF
+companion after Phase 7 completion, matching the shared Empire letter-format
+branding used by the EODData daily report. The package renderer converts both
+complete and partial schema-version-2 Stooq JSON reports into an executive
+summary, exact run scope, coverage, parser/write results, lineage,
+warning/failure, and native-semantics sections. The runner now stores durable
+`report.json` and `report.pdf` objects, and exposes both IDs in Core summaries
+and successful CLI output. JSON remains authoritative for the complete bounded
+sample. Unit tests cover rendering, metadata, Core storage, success wiring, and
+partial reports; PostgreSQL tests cover successful, failed-chunk, and replay
+storage. The real H7.8 JSON report was rendered to
+`output/pdf/stooq-history-backfill-report.pdf` and all four pages passed visual
+inspection after Poppler rendering.
+
 ## Phase 8: Yahoo Daily End-To-End Vertical Slice
 
 Goal: add Yahoo acquisition, persistence, reporting, and the intentionally

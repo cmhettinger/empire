@@ -10,7 +10,9 @@ from empire_stonks_ohlcv import (
     AcquiredObject,
     ImportIssue,
     OHLCVConfig,
+    PDF_REPORT_OBJECT_KIND,
     PersistenceCounts,
+    STOOQ_HISTORY_PDF_REPORT_ID,
     SourceSnapshotRegistration,
     StooqHistoryMarketParseCounts,
     StooqHistoryParseProgress,
@@ -18,7 +20,9 @@ from empire_stonks_ohlcv import (
     StooqHistoryScope,
     StooqHistoryWriteSummary,
     build_stooq_history_report,
+    render_stooq_history_pdf,
     stooq_history_report_to_json,
+    store_stooq_history_pdf_report,
     store_stooq_history_report,
 )
 
@@ -110,6 +114,19 @@ def _snapshot() -> SourceSnapshotRegistration:
         content_sha256="ab" * 32,
         snapshot_inserted=True,
         object_link_inserted=True,
+    )
+
+
+def _run_context() -> RunContext:
+    return RunContext(
+        run_id=RUN_ID,
+        domain="stonks",
+        job_name="stonks_ohlcv_stooq_backfill",
+        subject_key="us_stocks",
+        effective_date=EFFECTIVE_DATE,
+        run_type="cli",
+        status="started",
+        runner="pytest",
     )
 
 
@@ -341,16 +358,7 @@ def test_stores_report_as_durable_core_provider_report(tmp_path: Path) -> None:
     report = _complete_report(_coverage_cursor())
     repository = FakeObjectRepository(tmp_path)
     object_store = ObjectStore(repository)
-    run_context = RunContext(
-        run_id=RUN_ID,
-        domain="stonks",
-        job_name="stonks_ohlcv_stooq_backfill",
-        subject_key="us_stocks",
-        effective_date=EFFECTIVE_DATE,
-        run_type="cli",
-        status="started",
-        runner="pytest",
-    )
+    run_context = _run_context()
 
     stored = store_stooq_history_report(
         object_store=object_store,
@@ -375,3 +383,50 @@ def test_stores_report_as_durable_core_provider_report(tmp_path: Path) -> None:
         "run_status": "complete",
     }
     assert json.loads(object_store.get_bytes(stored.object_id)) == report
+
+
+def test_renders_human_readable_stooq_pdf(tmp_path: Path) -> None:
+    report = _complete_report(_coverage_cursor())
+
+    result = render_stooq_history_pdf(
+        report=report,
+        output_dir=tmp_path,
+    )
+
+    pdf_path = result.primary_artifact.path
+    assert result.report.report_id == STOOQ_HISTORY_PDF_REPORT_ID
+    assert pdf_path.name == "report.pdf"
+    assert pdf_path.read_bytes().startswith(b"%PDF-")
+    assert pdf_path.stat().st_size > 10_000
+
+
+def test_stores_stooq_pdf_beside_json_report(tmp_path: Path) -> None:
+    report = _complete_report(_coverage_cursor())
+    repository = FakeObjectRepository(tmp_path / "objects")
+    object_store = ObjectStore(repository)
+
+    stored = store_stooq_history_pdf_report(
+        object_store=object_store,
+        run_context=_run_context(),
+        config=OHLCVConfig(),
+        report=report,
+        output_dir=tmp_path / "render",
+    )
+
+    assert stored.filename == "report.pdf"
+    assert stored.logical_name == "stooq_history_pdf_report"
+    assert stored.object_kind == PDF_REPORT_OBJECT_KIND
+    assert stored.content_type == "application/pdf"
+    assert stored.object_key.endswith(f"/{RUN_ID}/reports")
+    assert stored.metadata == {
+        "schema_version": 2,
+        "report_id": STOOQ_HISTORY_PDF_REPORT_ID,
+        "report_type": "stooq_history_backfill",
+        "provider_code": "STOOQ",
+        "source_code": "stooq_history",
+        "effective_date": "2026-07-18",
+        "generated_at": "2026-07-18T20:30:00+00:00",
+        "outcome": "WARN",
+        "run_status": "complete",
+    }
+    assert object_store.get_bytes(stored.object_id).startswith(b"%PDF-")

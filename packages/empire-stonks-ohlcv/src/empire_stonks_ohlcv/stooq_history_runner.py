@@ -36,6 +36,7 @@ from empire_stonks_ohlcv.stooq_history_writer import (
 )
 from empire_stonks_ohlcv.stooq_history_reporting import (
     build_stooq_history_report,
+    store_stooq_history_pdf_report,
     store_stooq_history_report,
 )
 
@@ -63,6 +64,7 @@ class StooqHistoryRunResult:
     parse_summary: StooqHistoryParseSummary
     write_summary: StooqHistoryWriteSummary
     report_object_id: UUID
+    pdf_report_object_id: UUID
     report_outcome: str
 
     def __post_init__(self) -> None:
@@ -85,6 +87,8 @@ class StooqHistoryRunResult:
             raise TypeError("write_summary must be a StooqHistoryWriteSummary.")
         if not isinstance(self.report_object_id, UUID):
             raise TypeError("report_object_id must be a UUID.")
+        if not isinstance(self.pdf_report_object_id, UUID):
+            raise TypeError("pdf_report_object_id must be a UUID.")
         if self.report_outcome not in {"PASS", "WARN"}:
             raise ValueError("report_outcome must be PASS or WARN.")
 
@@ -101,6 +105,7 @@ class StooqHistoryRunResult:
             "parse_summary": self.parse_summary.to_dict(),
             "write_summary": self.write_summary.to_dict(),
             "report_object_id": str(self.report_object_id),
+            "pdf_report_object_id": str(self.pdf_report_object_id),
             "report_outcome": self.report_outcome,
         }
 
@@ -151,6 +156,7 @@ def run_stooq_history_backfill(
     registration: SourceSnapshotRegistration | None = None
     parser: StooqHistoryParser | None = None
     report_object: StoredObject | None = None
+    pdf_report_object: StoredObject | None = None
     writer = StooqHistoryChunkWriter(connection)
     try:
         acquired = _store_archive(
@@ -227,7 +233,7 @@ def run_stooq_history_backfill(
             )
 
         parse_summary = parser.summary
-        report, report_object = _build_and_store_report(
+        report, report_object, pdf_report_object = _build_and_store_report(
             connection=connection,
             object_store=object_store,
             run_context=run_context,
@@ -252,6 +258,7 @@ def run_stooq_history_backfill(
             write_summary=writer.summary,
             elapsed_seconds=monotonic() - started_at,
             report_object=report_object,
+            pdf_report_object=pdf_report_object,
             report_outcome=report["outcome"],
         )
         completed = run_service.complete_run(run_context.run_id, summary=summary)
@@ -265,6 +272,7 @@ def run_stooq_history_backfill(
             parse_summary=parse_summary,
             write_summary=writer.summary,
             report_object_id=report_object.object_id,
+            pdf_report_object_id=pdf_report_object.object_id,
             report_outcome=report["outcome"],
         )
     except Exception as exc:
@@ -273,7 +281,7 @@ def run_stooq_history_backfill(
             exc.stage if isinstance(exc, OHLCVWorkflowError) else "reporting"
         )
         if acquired is not None and failed_stage != "reporting":
-            report_object = _try_store_partial_report(
+            report_object, pdf_report_object = _try_store_partial_report(
                 connection=connection,
                 object_store=object_store,
                 run_context=run_context,
@@ -305,6 +313,7 @@ def run_stooq_history_backfill(
                 failed_stage=failed_stage,
                 elapsed_seconds=monotonic() - started_at,
                 report_object=report_object,
+                pdf_report_object=pdf_report_object,
             ),
         )
         raise
@@ -449,6 +458,7 @@ def _run_summary(
     write_summary: StooqHistoryWriteSummary,
     elapsed_seconds: float,
     report_object: StoredObject,
+    pdf_report_object: StoredObject,
     report_outcome: str,
 ) -> dict[str, Any]:
     return {
@@ -463,6 +473,7 @@ def _run_summary(
         "parse_summary": parse_summary.to_dict(),
         "write_summary": write_summary.to_dict(),
         "report_object_id": str(report_object.object_id),
+        "pdf_report_object_id": str(pdf_report_object.object_id),
         "report_outcome": report_outcome,
     }
 
@@ -478,6 +489,7 @@ def _failure_summary(
     failed_stage: str | None,
     elapsed_seconds: float,
     report_object: StoredObject | None,
+    pdf_report_object: StoredObject | None,
 ) -> dict[str, Any]:
     return {
         "provider_code": STOOQ_HISTORY_PROVIDER_CODE,
@@ -500,6 +512,11 @@ def _failure_summary(
         "report_object_id": (
             str(report_object.object_id) if report_object is not None else None
         ),
+        "pdf_report_object_id": (
+            str(pdf_report_object.object_id)
+            if pdf_report_object is not None
+            else None
+        ),
         "report_outcome": "FAIL" if report_object is not None else None,
     }
 
@@ -520,7 +537,7 @@ def _build_and_store_report(
     run_status: str,
     failed_stage: str | None,
     elapsed_seconds: float,
-) -> tuple[dict[str, Any], StoredObject]:
+) -> tuple[dict[str, Any], StoredObject, StoredObject]:
     try:
         with connection.cursor() as cursor:
             report = build_stooq_history_report(
@@ -542,9 +559,20 @@ def _build_and_store_report(
             config=config,
             report=report,
         )
-        if not isinstance(stored, StoredObject) or stored.run_id != run_context.run_id:
+        stored_pdf = store_stooq_history_pdf_report(
+            object_store=object_store,
+            run_context=run_context,
+            config=config,
+            report=report,
+        )
+        if (
+            not isinstance(stored, StoredObject)
+            or stored.run_id != run_context.run_id
+            or not isinstance(stored_pdf, StoredObject)
+            or stored_pdf.run_id != run_context.run_id
+        ):
             raise TypeError("report storage returned an invalid Core object.")
-        return report, stored
+        return report, stored, stored_pdf
     except Exception as exc:
         raise OHLCVWorkflowError(
             "reporting",
@@ -554,16 +582,16 @@ def _build_and_store_report(
 
 def _try_store_partial_report(
     **values: Any,
-) -> StoredObject | None:
+) -> tuple[StoredObject | None, StoredObject | None]:
     try:
-        _report, stored = _build_and_store_report(
+        _report, stored, stored_pdf = _build_and_store_report(
             run_status="partial",
             **values,
         )
-        return stored
+        return stored, stored_pdf
     except Exception:
         logger.warning("Stooq partial report could not be stored.")
-        return None
+        return None, None
 
 
 def _validate_inputs(

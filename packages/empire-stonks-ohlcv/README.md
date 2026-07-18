@@ -78,15 +78,17 @@ members, and every committed chunk. Success and failure Core summaries retain
 the checksum, source-snapshot identity when registered, parser position, write
 counts, and last committed chunk needed for an idempotent new-run replay.
 
-Every completed run stores a durable JSON provider report at the shared Core
-`reports/report.json` path. The report distinguishes complete from partial
-runs, repeats the exact input bounds and native-semantics limitations, combines
-parser and writer progress, and queries resulting coverage only for the selected
-Stooq markets and optional tickers. Market totals include persisted and
-requested-date bar coverage; provider-series samples are bounded. A failed
-chunk receives a best-effort partial FAIL report before the Core run closes,
-while successful runs are PASS or WARN according to parser rejections,
-collapsed duplicates, and inactive-series skips.
+Every completed run stores a durable JSON provider report and branded PDF
+companion at the shared Core `reports/report.json` and `reports/report.pdf`
+paths. Both distinguish complete from partial runs, repeat the exact input
+bounds and native-semantics limitations, combine parser and writer progress,
+and present resulting coverage only for the selected Stooq markets and optional
+tickers. The PDF uses the shared Empire report theme and keeps large ticker and
+provider-series samples bounded for readability; JSON remains authoritative for
+the complete structured sample. A failed chunk receives best-effort partial
+FAIL reports before the Core run closes, while successful reports are PASS or
+WARN according to parser rejections, collapsed duplicates, and inactive-series
+skips. Core summaries and successful CLI results expose both report object IDs.
 
 Credentials are excluded from config and credential representations. Use
 `OHLCVConfig.to_safe_dict()` when placing configuration details in Core run
@@ -262,7 +264,8 @@ at 100,000 bars per transaction. The wrapper validates the local
 `d_us_txt.zip`, sources `bin/env-load`, and invokes the package command; it does
 not download from Stooq or add a DAG. Progress is emitted as JSON lines on
 stderr, while successful stdout contains only the compact final JSON result.
-Runtime failures return nonzero with a fixed safe message.
+That result includes the stored JSON and PDF report object IDs. Runtime failures
+return nonzero with a fixed safe message.
 
 ## EODData acquisition
 

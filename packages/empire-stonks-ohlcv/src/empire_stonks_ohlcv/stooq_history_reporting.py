@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import Any, Literal
 from uuid import UUID
 
@@ -13,10 +15,16 @@ from empire_core import ObjectStore, RunContext, StoredObject
 from empire_stonks_ohlcv.config import OHLCVConfig
 from empire_stonks_ohlcv.object_store import DEFAULT_STORAGE_ROOT
 from empire_stonks_ohlcv.reporting import (
+    PDF_REPORT_CONTENT_TYPE,
+    PDF_REPORT_OBJECT_KIND,
     REPORT_CONTENT_TYPE,
     REPORT_OBJECT_KIND,
     REPORT_SCHEMA_VERSION,
     build_report_object_key,
+)
+from empire_stonks_ohlcv.reports.stooq_history_pdf import (
+    STOOQ_HISTORY_PDF_REPORT_ID,
+    render_stooq_history_pdf,
 )
 from empire_stonks_ohlcv.results import AcquiredObject
 from empire_stonks_ohlcv.source_conventions import STOOQ_HISTORY_SOURCE
@@ -36,6 +44,8 @@ from empire_stonks_ohlcv.validation import MAX_ISSUE_SAMPLES
 STOOQ_HISTORY_REPORT_TYPE = "stooq_history_backfill"
 STOOQ_HISTORY_REPORT_LOGICAL_NAME = "stooq_history_report"
 STOOQ_HISTORY_REPORT_FILENAME = "report.json"
+STOOQ_HISTORY_PDF_REPORT_LOGICAL_NAME = "stooq_history_pdf_report"
+STOOQ_HISTORY_PDF_REPORT_FILENAME = "report.pdf"
 
 StooqHistoryReportStatus = Literal["complete", "partial"]
 
@@ -396,6 +406,71 @@ def store_stooq_history_report(
         object_kind=REPORT_OBJECT_KIND,
         metadata={
             "schema_version": REPORT_SCHEMA_VERSION,
+            "report_type": STOOQ_HISTORY_REPORT_TYPE,
+            "provider_code": STOOQ_HISTORY_PROVIDER_CODE,
+            "source_code": STOOQ_HISTORY_SOURCE.source_code,
+            "effective_date": report["effective_date"],
+            "generated_at": report["generated_at"],
+            "outcome": report["outcome"],
+            "run_status": report["run_status"],
+        },
+    )
+
+
+def store_stooq_history_pdf_report(
+    *,
+    object_store: ObjectStore,
+    run_context: RunContext,
+    config: OHLCVConfig,
+    report: dict[str, Any],
+    storage_root: str = DEFAULT_STORAGE_ROOT,
+    output_dir: str | Path | None = None,
+) -> StoredObject:
+    """Render and store the human-readable companion to a Stooq report."""
+
+    if not isinstance(object_store, ObjectStore):
+        raise TypeError("object_store must be a Core ObjectStore.")
+    if not isinstance(config, OHLCVConfig):
+        raise TypeError("config must be an OHLCVConfig.")
+    _validate_run_context(run_context)
+    _validate_report(report)
+    if report["provider_code"] != STOOQ_HISTORY_PROVIDER_CODE:
+        raise ValueError("report provider_code must be STOOQ.")
+    if report["effective_date"] != run_context.effective_date.isoformat():
+        raise ValueError("report effective_date must match the Core run.")
+
+    render_root = Path(output_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp"))
+    render_dir = (
+        render_root
+        / "empire"
+        / "stonks-ohlcv"
+        / str(run_context.run_id)
+        / "reports"
+    )
+    result = render_stooq_history_pdf(
+        report=report,
+        output_dir=render_dir,
+        filename=STOOQ_HISTORY_PDF_REPORT_FILENAME,
+    )
+    return object_store.put_file(
+        run_context=run_context,
+        object_scope="run",
+        domain="stonks",
+        logical_name=STOOQ_HISTORY_PDF_REPORT_LOGICAL_NAME,
+        storage_root=storage_root,
+        object_key=build_report_object_key(
+            storage_key=config.storage_key,
+            run_context=run_context,
+            provider_code=STOOQ_HISTORY_PROVIDER_CODE,
+        ),
+        filename=STOOQ_HISTORY_PDF_REPORT_FILENAME,
+        source_path=result.primary_artifact.path,
+        move=False,
+        content_type=PDF_REPORT_CONTENT_TYPE,
+        object_kind=PDF_REPORT_OBJECT_KIND,
+        metadata={
+            "schema_version": REPORT_SCHEMA_VERSION,
+            "report_id": STOOQ_HISTORY_PDF_REPORT_ID,
             "report_type": STOOQ_HISTORY_REPORT_TYPE,
             "provider_code": STOOQ_HISTORY_PROVIDER_CODE,
             "source_code": STOOQ_HISTORY_SOURCE.source_code,

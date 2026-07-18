@@ -248,6 +248,7 @@ def test_stooq_history_fixture_vertical_is_stable_and_bounded(
         assert first.run_id != second.run_id
         assert first.acquired_object.object_id != second.acquired_object.object_id
         assert first.report_object_id != second.report_object_id
+        assert first.pdf_report_object_id != second.pdf_report_object_id
         assert first.source_snapshot.source_snapshot_id == (
             second.source_snapshot.source_snapshot_id
         )
@@ -298,11 +299,15 @@ def test_stooq_history_fixture_vertical_is_stable_and_bounded(
             (second, (0, 0, 6)),
         ):
             objects = object_store.find_objects_by_run_id(result.run_id)
-            assert len(objects) == 2
+            assert len(objects) == 3
             assert {item.object_kind for item in objects} == {
                 "stonks_ohlcv_raw_source",
                 "stonks_ohlcv_provider_report",
+                "stonks_ohlcv_provider_pdf_report",
             }
+            assert object_store.get_bytes(
+                result.pdf_report_object_id
+            ).startswith(b"%PDF-")
             report = json.loads(object_store.get_bytes(result.report_object_id))
             inserted_listings, inserted_bars, unchanged_bars = expected_counts
             assert report["run_status"] == "complete"

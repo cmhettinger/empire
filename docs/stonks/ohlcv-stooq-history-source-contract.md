@@ -319,15 +319,19 @@ parse totals, cumulative write/failure counts, elapsed time, and last committed
 chunk. Core stores only the shared safe failure message, never an underlying
 database, filesystem, ZIP, or callback exception string.
 
-## Historical Backfill Report
+## Historical Backfill Reports
 
-The runner stores one durable schema-version-2 JSON provider report beneath the
-active run's shared `reports/report.json` path. It uses
+The runner stores a durable schema-version-2 JSON provider report and a branded
+human-readable PDF companion beneath the active run's shared
+`reports/report.json` and `reports/report.pdf` paths. The JSON uses
 `object_kind=stonks_ohlcv_provider_report` and
-`logical_name=stooq_history_report`; unlike the raw ZIP, the report has no
-retention expiration. The final Core summary records its object ID and outcome.
+`logical_name=stooq_history_report`; the PDF uses
+`object_kind=stonks_ohlcv_provider_pdf_report` and
+`logical_name=stooq_history_pdf_report`. Unlike the raw ZIP, neither report has
+a retention expiration. The final Core summary and successful CLI result record
+both object IDs and their shared outcome.
 
-The report contains:
+The reports contain:
 
 - Exact effective date, trading-date bounds, markets, ticker filter, chunk size,
   raw object identity/checksum, and registered source snapshot.
@@ -343,9 +347,17 @@ The report contains:
 
 A complete report is `PASS` when it has no warnings and `WARN` otherwise. A run
 that fails after the archive has been retained receives a best-effort partial
-`FAIL` report before Core closes the run. Partial-report construction never
-replaces or exposes the original safe workflow failure; if reporting itself is
-unavailable, Core still closes the run with its H7.4 restart summary.
+`FAIL` JSON/PDF pair before Core closes the run. Partial-report construction
+never replaces or exposes the original safe workflow failure; if reporting
+itself is unavailable, Core still closes the run with its H7.4 restart summary.
+
+The PDF uses the same Empire letter-format title page, headers, footers,
+typography, and table theme as the EODData daily report. It presents an
+executive summary, run facts, exact scope, market and provider-series coverage,
+parser/write outcomes, stored-input lineage, warnings/failures, and native value
+semantics. Ticker filters and provider-series samples are bounded for
+legibility; the JSON report remains authoritative for the complete structured
+sample.
 
 ## Runtime Settings
 

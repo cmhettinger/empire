@@ -48,11 +48,13 @@ def database_connection() -> Iterator[object]:
 
 
 def _archive(tmp_path: Path, marker: str) -> tuple[Path, tuple[str, ...]]:
-    tickers = tuple(f"H74{market[0].upper()}{marker}.US" for market in (
-        "nasdaq",
-        "nyse",
-        "nysemkt",
-    ))
+    tickers = tuple(
+        f"H74{index}{marker}.US"
+        for index, _market in enumerate(
+            ("nasdaq", "nyse", "nysemkt"),
+            start=1,
+        )
+    )
     output = io.BytesIO()
     with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
         for index, (market, ticker) in enumerate(
@@ -167,7 +169,10 @@ def test_tracked_backfill_persists_core_lineage_and_safe_summary(
                 raw_retention_days=3,
             ),
             input_path=input_path,
-            scope=StooqHistoryScope(effective_date=EFFECTIVE_DATE),
+            scope=StooqHistoryScope(
+                effective_date=EFFECTIVE_DATE,
+                tickers=tickers,
+            ),
             chunk_size=2,
             run_type="manual",
             runner=runner,
@@ -182,6 +187,9 @@ def test_tracked_backfill_persists_core_lineage_and_safe_summary(
         assert result.write_summary.bar_counts.inserted == 3
         assert result.report_outcome == "PASS"
         assert object_store.get_path(result.acquired_object.object_id).is_file()
+        assert object_store.get_bytes(result.pdf_report_object_id).startswith(
+            b"%PDF-"
+        )
         report = json.loads(object_store.get_bytes(result.report_object_id))
         assert report["run_status"] == "complete"
         assert report["coverage"]["series_count"] == 3
@@ -207,6 +215,9 @@ def test_tracked_backfill_persists_core_lineage_and_safe_summary(
             assert summary["acquired_object"]["checksum_sha256"] == checksum
             assert summary["write_summary"]["last_completed_chunk"] == 2
             assert summary["report_object_id"] == str(result.report_object_id)
+            assert summary["pdf_report_object_id"] == str(
+                result.pdf_report_object_id
+            )
             assert summary["report_outcome"] == "PASS"
             assert error is None
             assert heartbeat is True
@@ -281,7 +292,10 @@ def test_failed_chunk_stores_partial_report_with_durable_progress(
                     raw_retention_days=3,
                 ),
                 input_path=input_path,
-                scope=StooqHistoryScope(effective_date=EFFECTIVE_DATE),
+                scope=StooqHistoryScope(
+                    effective_date=EFFECTIVE_DATE,
+                    tickers=tickers,
+                ),
                 chunk_size=2,
                 run_type="manual",
                 runner=runner,
@@ -301,9 +315,13 @@ def test_failed_chunk_stores_partial_report_with_durable_progress(
         assert summary["failed_stage"] == "persistence"
         assert summary["write_summary"]["last_completed_chunk"] == 1
         assert summary["report_outcome"] == "FAIL"
+        assert summary["pdf_report_object_id"] is not None
         assert error_message == "OHLCV provider run failed."
 
         report_id = UUID(summary["report_object_id"])
+        assert object_store.get_bytes(
+            UUID(summary["pdf_report_object_id"])
+        ).startswith(b"%PDF-")
         report = json.loads(object_store.get_bytes(report_id))
         checksum = report["input"]["archive"]["checksum_sha256"]
         assert report["run_status"] == "partial"

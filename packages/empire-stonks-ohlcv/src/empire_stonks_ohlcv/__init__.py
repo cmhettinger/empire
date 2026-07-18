@@ -81,7 +81,9 @@ from empire_stonks_ohlcv.reporting import (
 )
 from empire_stonks_ohlcv.reports import (
     EODDATA_DAILY_PDF_REPORT_ID,
+    STOOQ_HISTORY_PDF_REPORT_ID,
     render_eoddata_daily_pdf,
+    render_stooq_history_pdf,
 )
 from empire_stonks_ohlcv.results import (
     AcquiredObject,
@@ -135,6 +137,8 @@ from empire_stonks_ohlcv.stooq_history_runner import (
     run_stooq_history_backfill,
 )
 from empire_stonks_ohlcv.stooq_history_reporting import (
+    STOOQ_HISTORY_PDF_REPORT_FILENAME,
+    STOOQ_HISTORY_PDF_REPORT_LOGICAL_NAME,
     STOOQ_HISTORY_REPORT_FILENAME,
     STOOQ_HISTORY_REPORT_LOGICAL_NAME,
     STOOQ_HISTORY_REPORT_TYPE,
@@ -144,6 +148,7 @@ from empire_stonks_ohlcv.stooq_history_reporting import (
     build_stooq_history_report,
     select_stooq_history_coverage,
     stooq_history_report_to_json,
+    store_stooq_history_pdf_report,
     store_stooq_history_report,
 )
 from empire_stonks_ohlcv.stooq_history_writer import (
@@ -224,6 +229,9 @@ __all__ = [
     "STOOQ_HISTORY_HEARTBEAT_TIMEOUT_SECONDS",
     "STOOQ_HISTORY_JOB_NAME",
     "STOOQ_HISTORY_MARKETS",
+    "STOOQ_HISTORY_PDF_REPORT_FILENAME",
+    "STOOQ_HISTORY_PDF_REPORT_ID",
+    "STOOQ_HISTORY_PDF_REPORT_LOGICAL_NAME",
     "STOOQ_HISTORY_PROVIDER_CODE",
     "STOOQ_HISTORY_REPORT_FILENAME",
     "STOOQ_HISTORY_REPORT_LOGICAL_NAME",
@@ -275,10 +283,12 @@ __all__ = [
     "run_eoddata_daily",
     "run_stooq_history_backfill",
     "render_eoddata_daily_pdf",
+    "render_stooq_history_pdf",
     "store_raw_bytes",
     "stooq_history_report_to_json",
     "store_eoddata_report",
     "store_eoddata_pdf_report",
     "store_raw_file",
     "store_stooq_history_report",
+    "store_stooq_history_pdf_report",
 ]
