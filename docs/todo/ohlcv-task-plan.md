@@ -170,75 +170,90 @@ Fully completed phases and their `Done:` notes are moved to the
 active checklist focused. Phases 0-6 are currently archived there;
 their task IDs remain valid dependencies for active work.
 
-## Phase 7: Stooq Daily End-To-End Vertical Slice
+## Phase 7: Historical Stooq Import
 
-Goal: add Stooq acquisition, persistence, provider-scoped reporting, and its
-nightly DAG using the proven EODData contracts without changing the schema.
+Goal: provide a safe operator-run historical import from an operator-supplied
+Stooq source file, with its own progress and coverage reporting, without adding
+canonical identity assumptions or automating Stooq's browser-verification
+challenge.
 
-| ID | Status | Goal | Complete When | Depends On |
-|----|--------|------|---------------|------------|
-| T7.1 | [ ] | Document Stooq daily source and config contract | Record the chosen daily source, `EMPIRE_STONKS_OHLCV_STOOQ_*` settings, file/response format, market/ticker fields, native value semantics, and source availability expectations. Runtime values come from `deploy/env/local.env`. | E6.13, A5.1-A5.2 |
-| T7.2 | [ ] | Implement Stooq daily acquisition | Acquire the chosen daily source and store it through the same Core object/snapshot flow. Tests cover success, retryable failure, invalid content, and secret-safe diagnostics. | T7.1, C4.2, A5.5 |
-| T7.3 | [ ] | Implement Stooq daily parser | Parse Stooq fixtures into shared records without EODData-specific persistence branches. Shared parser-contract tests pass. | T7.1-T7.2, A5.3-A5.4 |
-| T7.4 | [ ] | Implement Stooq daily import service | Compose validation, snapshot registration, provider-listing writes, bar upserts, and import summaries. Reruns are idempotent. | T7.2-T7.3, E6.5-E6.6 |
-| T7.5 | [ ] | Build and store Stooq report | Reuse the shared health/report contract for Stooq-scoped freshness, coverage, stale series, gap warnings, failures, and native-semantics notes. Tests prove provider scoping and stored report paths. | T7.4, E6.7-E6.8 |
-| T7.6 | [ ] | Add Stooq daily CLI | Add an operator CLI and `bin` wrapper using `bin/env-load`; it runs Stooq daily import plus reporting and emits a secret-safe JSON summary. | T7.5, B1.8 |
-| T7.7 | [ ] | Add Stooq daily runner | Add package-owned nightly Stooq sequencing with Core run lifecycle and reporting. Tests cover success, failure, and reruns. | T7.5-T7.6 |
-| T7.8 | [ ] | Add Stooq nightly DAG | Add one thin scheduled DAG calling the Stooq runner. Tests cover schedule, catchup, overlap, context, small task payloads, and import safety. | T7.7, B1.5-B1.7 |
-| T7.9 | [ ] | Verify Stooq vertical workflow | Verify Airflow discovery and run the full Stooq fixture path through reporting. Confirm all lineage and report rows, then prove EODData and Stooq overlapping histories remain isolated. | T7.8, M3.7 |
-
-## Phase 8: Historical Stooq Import
-
-Goal: provide a safe operator-run historical import with its own progress and
-coverage reporting, without adding canonical identity assumptions.
+Stooq currently requires an API key obtained through an interactive CAPTCHA,
+and its download pages may require JavaScript to verify the browser. That is
+acceptable for obtaining a one-time historical source file manually, but it is
+not a suitable dependency for an unattended job. Automated Stooq daily access
+is therefore deferred to Phase 10 and must pass an explicit sustainability gate.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| H8.1 | [ ] | Define historical import inputs and bounds | Document supported Stooq historical source files, environment settings, date bounds, symbol/market filters, expected volume, restart behavior, and explicit exclusions. | T7.9 |
-| H8.2 | [ ] | Add streaming/chunked historical parser | Parse historical input without loading the entire dataset into memory. Tests prove stable chunk boundaries and equivalent results across chunk sizes. | H8.1, T7.3 |
-| H8.3 | [ ] | Add chunked database writer | Write provider listings and bars in bounded transactions with cumulative inserted/updated/unchanged/derived-updated/failure counts. A failed chunk can be rerun safely. | H8.2, M3.4-M3.5 |
-| H8.4 | [ ] | Add historical import run tracking | Start one Core run with explicit non-secret parameters and progress summaries; retain source snapshots and raw input according to the same retention policy. Failure leaves enough context for an operator rerun. | H8.3, C4.3-C4.6 |
-| H8.5 | [ ] | Add historical import report | Build and store a Stooq backfill report with input bounds, chunk progress, write counts, resulting coverage, failures, and warnings. Tests cover partial and successful runs. | H8.4, T7.5 |
-| H8.6 | [ ] | Add historical Stooq CLI | Add `stonks-ohlcv-stooq-backfill` using `bin/env-load`, with explicit input/date/filter/chunk options and a secret-safe JSON summary. It does not mutate canonical tables. | H8.5, B1.8 |
-| H8.7 | [ ] | Add historical fixture vertical test | Import a multi-symbol, multi-date fixture twice, store its report, and prove stable provider-listing IDs, unchanged second-run counts, correct date ranges, and bounded transactions. | H8.6 |
-| H8.8 | [ ] | Run bounded development backfill | Run a deliberately small local/dev date-and-symbol range using `deploy/env/local.env`, inspect performance/counts/reporting, and record the command/result before any broad import. | H8.7 |
+| H7.1 | [ ] | Define historical import inputs and bounds | Document supported operator-supplied Stooq historical source files, manual acquisition boundary, environment settings, date bounds, symbol/market filters, expected volume, restart behavior, and explicit exclusions. The package does not automate CAPTCHA or browser verification. | E6.13, A5.1-A5.2 |
+| H7.2 | [ ] | Add streaming/chunked historical parser | Parse historical input without loading the entire dataset into memory. Tests prove the documented Stooq format, stable chunk boundaries, and equivalent results across chunk sizes. | H7.1, A5.3-A5.4 |
+| H7.3 | [ ] | Add chunked database writer | Write provider listings and bars in bounded transactions with cumulative inserted/updated/unchanged/derived-updated/failure counts. A failed chunk can be rerun safely. | H7.2, M3.4-M3.5 |
+| H7.4 | [ ] | Add historical import run tracking | Start one Core run with explicit non-secret parameters and progress summaries; retain the operator-supplied input through the normal source-snapshot and raw-object policy. Failure leaves enough context for an operator rerun. | H7.3, C4.3-C4.6 |
+| H7.5 | [ ] | Add historical import report | Build and store a Stooq backfill report with input bounds, chunk progress, write counts, resulting coverage, failures, warnings, and native-semantics notes. Tests cover partial and successful runs. | H7.4, E6.7-E6.8 |
+| H7.6 | [ ] | Add historical Stooq CLI | Add `stonks-ohlcv-stooq-backfill` using `bin/env-load`, with an explicit local input path plus date/filter/chunk options and a secret-safe JSON summary. It does not download from Stooq or mutate canonical tables. | H7.5, B1.8 |
+| H7.7 | [ ] | Add historical fixture vertical test | Import a multi-symbol, multi-date fixture twice, store its report, and prove stable provider-listing IDs, unchanged second-run counts, correct date ranges, and bounded transactions. | H7.6 |
+| H7.8 | [ ] | Run bounded development backfill | Manually obtain a source file, run a deliberately small local/dev date-and-symbol range using `deploy/env/local.env`, inspect performance/counts/reporting, and record the acquisition date, command, and result before any broad import. | H7.7 |
 
-## Phase 9: Yahoo Daily End-To-End Vertical Slice
+## Phase 8: Yahoo Daily End-To-End Vertical Slice
 
 Goal: add Yahoo acquisition, persistence, reporting, and the intentionally
 selected scheduling mode while keeping non-OHLCV Yahoo data out of the package.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| Y9.1 | [ ] | Document Yahoo source and config contract | Record the chosen OHLCV endpoint/source, `EMPIRE_STONKS_OHLCV_YAHOO_*` settings, request inputs, market/ticker fields, native daily/adjusted semantics, rate/error behavior, and explicit exclusion of enrichment. Runtime values come from `deploy/env/local.env`. | T7.9, A5.1-A5.2 |
-| Y9.2 | [ ] | Implement Yahoo acquisition | Acquire Yahoo OHLCV responses with injected HTTP dependencies, timeouts, bounded retries, provider-appropriate request pacing, Core raw storage, and secret-safe errors/metadata. | Y9.1, C4.2, A5.5 |
-| Y9.3 | [ ] | Implement Yahoo parser | Parse Yahoo fixtures into the selected provider-native OHLCV series without adding adjusted-close or provider-specific columns to the shared tables. | Y9.1-Y9.2, A5.3-A5.4 |
-| Y9.4 | [ ] | Implement Yahoo import service | Compose validation, snapshot registration, provider-series resolution, bar writes, and import summaries. Rerun tests pass. | Y9.2-Y9.3, E6.5-E6.6 |
-| Y9.5 | [ ] | Build and store Yahoo report | Reuse the shared report contract for Yahoo-scoped import health, freshness, coverage, stale series, gap warnings, failures, and native adjustment notes. | Y9.4, E6.7-E6.8 |
-| Y9.6 | [ ] | Add Yahoo CLI | Add an operator CLI and `bin` wrapper using `bin/env-load`; it runs controlled Yahoo import plus reporting and emits a secret-safe summary. | Y9.5, B1.8 |
-| Y9.7 | [ ] | Add Yahoo daily runner | Add package-owned Yahoo sequencing with configured request bounds, Core run lifecycle, and reporting. Tests cover success, failure, and reruns. | Y9.5-Y9.6 |
-| Y9.8 | [ ] | Decide and implement Yahoo DAG mode | Record whether Yahoo is scheduled, manual-only, or limited to selected symbols based on the implemented source constraints. Add the matching thin DAG and tests only when operationally justified. | Y9.7, B1.5-B1.7 |
-| Y9.9 | [ ] | Verify Yahoo vertical workflow | Verify enabled DAG discovery and run the full Yahoo fixture path through reporting. Confirm lineage, secret safety, rerun behavior, and coexistence with overlapping EODData/Stooq histories. | Y9.8, M3.7 |
+| Y8.1 | [ ] | Document Yahoo source and config contract | Record the chosen OHLCV endpoint/source, `EMPIRE_STONKS_OHLCV_YAHOO_*` settings, request inputs, market/ticker fields, native daily/adjusted semantics, rate/error behavior, and explicit exclusion of enrichment. Runtime values come from `deploy/env/local.env`. | H7.8, A5.1-A5.2 |
+| Y8.2 | [ ] | Implement Yahoo acquisition | Acquire Yahoo OHLCV responses with injected HTTP dependencies, timeouts, bounded retries, provider-appropriate request pacing, Core raw storage, and secret-safe errors/metadata. | Y8.1, C4.2, A5.5 |
+| Y8.3 | [ ] | Implement Yahoo parser | Parse Yahoo fixtures into the selected provider-native OHLCV series without adding adjusted-close or provider-specific columns to the shared tables. | Y8.1-Y8.2, A5.3-A5.4 |
+| Y8.4 | [ ] | Implement Yahoo import service | Compose validation, snapshot registration, provider-series resolution, bar writes, and import summaries. Rerun tests pass. | Y8.2-Y8.3, E6.5-E6.6 |
+| Y8.5 | [ ] | Build and store Yahoo report | Reuse the shared report contract for Yahoo-scoped import health, freshness, coverage, stale series, gap warnings, failures, and native adjustment notes. | Y8.4, E6.7-E6.8 |
+| Y8.6 | [ ] | Add Yahoo CLI | Add an operator CLI and `bin` wrapper using `bin/env-load`; it runs controlled Yahoo import plus reporting and emits a secret-safe summary. | Y8.5, B1.8 |
+| Y8.7 | [ ] | Add Yahoo daily runner | Add package-owned Yahoo sequencing with configured request bounds, Core run lifecycle, and reporting. Tests cover success, failure, and reruns. | Y8.5-Y8.6 |
+| Y8.8 | [ ] | Decide and implement Yahoo DAG mode | Record whether Yahoo is scheduled, manual-only, or limited to selected symbols based on the implemented source constraints. Add the matching thin DAG and tests only when operationally justified. | Y8.7, B1.5-B1.7 |
+| Y8.9 | [ ] | Verify Yahoo vertical workflow | Verify enabled DAG discovery and run the full Yahoo fixture path through reporting. Confirm lineage, secret safety, rerun behavior, and coexistence with overlapping EODData and historical Stooq data. | Y8.8, M3.7 |
 
-## Phase 10: Documentation, Verification, And Incremental Rollout
+## Phase 9: Documentation, Verification, And Incremental Rollout
 
-Goal: verify the complete package and move from fixture workflows to normal
-provider operation one proven vertical slice at a time.
+Goal: verify the package without scheduled Stooq acquisition and move from
+fixture workflows to normal provider operation one proven path at a time.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| V10.1 | [ ] | Complete package README | Document scope, provider-native semantics, `deploy/env/local.env` runtime loading, `os.environ` package boundary, secret handling, CLIs, raw retention, source snapshots, tables, DAGs/reports, and deferred bridge/enrichment work. | Y9.9, H8.8 |
-| V10.2 | [ ] | Add operator runbook | Document local secret/config setup, manual runs, each provider DAG, historical Stooq import, report interpretation, raw-object inspection, reruns, and failure recovery without printing credentials. | V10.1 |
-| V10.3 | [ ] | Run formatting and full package tests | Configured formatting/linting and the full `empire-stonks-ohlcv` test suite pass from the repository root. | V10.2 |
-| V10.4 | [ ] | Run DB validation and regenerate docs | Repo-standard DB validation and Stonks schema documentation generation pass with no drift. | V10.2 |
-| V10.5 | [ ] | Verify package, CLI, and DAG imports | Package, all CLI modules, and all enabled provider DAGs import cleanly in their actual runtime environments. | V10.3-V10.4 |
-| V10.6 | [ ] | Verify raw-object cleanup | Expire and clean a test raw object and prove stored-object/membership rows are removed while source snapshot, provider listing, bars, and report remain queryable. | V10.4-V10.5 |
-| V10.7 | [ ] | Run combined fixture regression | Run all three vertical slices from fixture acquisition through provider reports and prove reruns, provider isolation, secret safety, and report scoping. | V10.3-V10.6 |
-| V10.8 | [ ] | Run and enable bounded EODData | Run a bounded live EODData import, inspect lineage/bars/report, then enable its nightly DAG only after results are healthy. Record the decision. | V10.7, E6.13 |
-| V10.9 | [ ] | Run and enable bounded Stooq daily | Run a bounded live Stooq daily import, inspect its report and overlap with EODData, then enable its nightly DAG only after results are healthy. | V10.8, T7.9 |
-| V10.10 | [ ] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V10.9, H8.8 |
-| V10.11 | [ ] | Run and enable selected Yahoo mode | Run a bounded live Yahoo import, inspect lineage/native semantics/reporting, and enable only the scheduling mode selected in Y9.8. Record the decision. | V10.10, Y9.9 |
-| V10.12 | [ ] | Audit derived daily-bar consistency | Recompute expected `change` and `changepct` from each provider listing's nearest preceding stored bar and compare them with every `ohlcv_daily` row, covering first rows, zero predecessor closes, gaps, corrections, and out-of-order imports. Report bounded discrepancy counts and samples by provider and market. If discrepancies exist, identify the cause and add a tested, bounded, idempotent repair command or workflow; if none exist, record the evidence and do not add a scheduled mutation task. | V10.11, H8.8 |
+| V9.1 | [ ] | Complete package README | Document scope, provider-native semantics, `deploy/env/local.env` runtime loading, `os.environ` package boundary, secret handling, CLIs, raw retention, source snapshots, tables, enabled DAGs/reports, the manual Stooq backfill boundary, and deferred bridge/enrichment work. | Y8.9, H7.8 |
+| V9.2 | [ ] | Add operator runbook | Document local secret/config setup, manual runs, each enabled provider DAG, historical Stooq file acquisition/import, report interpretation, raw-object inspection, reruns, and failure recovery without printing credentials. | V9.1 |
+| V9.3 | [ ] | Run formatting and full package tests | Configured formatting/linting and the full `empire-stonks-ohlcv` test suite pass from the repository root. | V9.2 |
+| V9.4 | [ ] | Run DB validation and regenerate docs | Repo-standard DB validation and Stonks schema documentation generation pass with no drift. | V9.2 |
+| V9.5 | [ ] | Verify package, CLI, and DAG imports | Package, all CLI modules, and all enabled provider DAGs import cleanly in their actual runtime environments. | V9.3-V9.4 |
+| V9.6 | [ ] | Verify raw-object cleanup | Expire and clean a test raw object and prove stored-object/membership rows are removed while source snapshot, provider listing, bars, and report remain queryable. | V9.4-V9.5 |
+| V9.7 | [ ] | Run combined fixture regression | Run EODData, operator-supplied historical Stooq, and Yahoo fixture paths through provider reports and prove reruns, provider isolation, secret safety, and report scoping. | V9.3-V9.6 |
+| V9.8 | [ ] | Run and enable bounded EODData | Run a bounded live EODData import, inspect lineage/bars/report, then enable its nightly DAG only after results are healthy. Record the decision. | V9.7, E6.13 |
+| V9.9 | [ ] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V9.8, H7.8 |
+| V9.10 | [ ] | Run and enable selected Yahoo mode | Run a bounded live Yahoo import, inspect lineage/native semantics/reporting, and enable only the scheduling mode selected in Y8.8. Record the decision. | V9.9, Y8.9 |
+| V9.11 | [ ] | Audit derived daily-bar consistency | Recompute expected `change` and `changepct` from each provider listing's nearest preceding stored bar and compare them with every `ohlcv_daily` row, covering first rows, zero predecessor closes, gaps, corrections, and out-of-order imports. Report bounded discrepancy counts and samples by provider and market. If discrepancies exist, identify the cause and add a tested, bounded, idempotent repair command or workflow; if none exist, record the evidence and do not add a scheduled mutation task. | V9.10, H7.8 |
+
+## Phase 10: Stooq Daily End-To-End Vertical Slice
+
+Goal: revisit Stooq daily acquisition only after the rest of the package is
+operational, and add unattended ingestion only if Stooq provides a stable,
+authorized machine-download path that does not depend on browser-challenge
+automation.
+
+T10.1 is a decision gate. A documented manual-only or defer decision completes
+this phase without starting T10.2-T10.10; those implementation tasks remain
+deferred until the source conditions change. A go decision continues through
+T10.10.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| T10.1 | [ ] | Gate Stooq daily automation | Document current Stooq API-key enrollment, terms and rate expectations, secret handling, CSV format, and browser-verification behavior. Manually enroll if appropriate, then prove whether a key-authenticated endpoint works from a clean non-browser HTTP client without cookies or challenge circumvention. Record a go, manual-only, or defer decision. | V9.11, H7.1 |
+| T10.2 | [ ] | Implement Stooq daily acquisition when approved | If T10.1 approves unattended use, acquire the selected daily source through the documented interface and store it through the Core object/snapshot flow. Tests cover success, retryable failure, challenge/error content, and secret-safe diagnostics. Do not add headless-browser, CAPTCHA-solving, or challenge-bypass code. | T10.1, C4.2, A5.5 |
+| T10.3 | [ ] | Implement Stooq daily parser | Parse documented Stooq daily fixtures into shared records without EODData-specific persistence branches. Shared parser-contract tests pass. Reuse historical parsing only where the evidenced formats genuinely match. | T10.1-T10.2, H7.2, A5.3-A5.4 |
+| T10.4 | [ ] | Implement Stooq daily import service | Compose validation, snapshot registration, provider-listing writes, bar upserts, and import summaries. Reruns are idempotent. | T10.2-T10.3, E6.5-E6.6 |
+| T10.5 | [ ] | Build and store Stooq daily report | Reuse the shared health/report contract for Stooq-scoped freshness, coverage, stale series, gap warnings, failures, and native-semantics notes. Tests prove provider scoping and stored report paths. | T10.4, H7.5 |
+| T10.6 | [ ] | Add Stooq daily CLI | Add an operator CLI and `bin` wrapper using `bin/env-load`; it runs Stooq daily import plus reporting and emits a secret-safe JSON summary. | T10.5, B1.8 |
+| T10.7 | [ ] | Add Stooq daily runner | Add package-owned Stooq sequencing with Core run lifecycle and reporting. Tests cover success, failure, challenge responses, and reruns. | T10.5-T10.6 |
+| T10.8 | [ ] | Decide and implement Stooq DAG mode | Select scheduled, manual-only, or limited-symbol operation based on the approved interface and implemented source constraints. Add a thin scheduled DAG only when operationally justified; never add a browser-dependent DAG. Tests cover whichever go-path mode is selected. | T10.7, B1.5-B1.7 |
+| T10.9 | [ ] | Verify Stooq daily vertical workflow | Verify any enabled DAG discovery and run the full Stooq daily fixture path through reporting. Confirm lineage, report rows, secret safety, rerun behavior, and isolation from EODData, Yahoo, and historical Stooq imports. | T10.8, M3.7 |
+| T10.10 | [ ] | Run bounded Stooq daily and finalize docs | Run a bounded live import and enable any selected DAG only after healthy results. Update the README and runbook with the decision and exact operational boundary. | T10.9 |
 
 ---
 
@@ -250,7 +265,7 @@ security-master contracts are stable enough to support temporal mappings.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| X11.1 | [ ] | Confirm bridge readiness | Record the concrete consumers and stable OHLCV/security-master contracts that require provider-to-canonical mapping. | V10.12 plus future securities readiness |
+| X11.1 | [ ] | Confirm bridge readiness | Record the concrete consumers and stable OHLCV/security-master contracts that require provider-to-canonical mapping. | V9.11, completed T10.1 gate decision, plus future securities readiness |
 | X11.2 | [ ] | Review provider-series identity evidence | Evaluate what market, ticker, date-range, identifier, and provider metadata is actually available after live ingestion. Do not assume ticker reuse can be detected automatically. | X11.1 |
 | X11.3 | [ ] | Design temporal mapping storage | Design mappings that can attach different date ranges of one provider series to different canonical listings and multiple provider series to one listing. Preserve candidate/decision evidence and ambiguity. | X11.2 |
 | X11.4 | [ ] | Decide bridge package creation | Create `empire-stonks-ohlcv-bridge` only when implemented mapping or canonical-series logic justifies a separate Python package. | X11.3 |
@@ -264,13 +279,16 @@ When phases 0-10 are complete, Empire should have a reusable
 `empire-stonks-ohlcv` package with:
 
 - Provider-neutral listing and daily-bar dataclasses.
-- Provider-specific EODData, Stooq, and Yahoo acquisition/parsing modules.
+- Provider-specific EODData and Yahoo daily acquisition/parsing modules, a
+  Stooq historical-file parser, and Stooq daily acquisition only if T10.1
+  approves a sustainable machine-download path.
 - Provider-native daily histories stored independently in
   `stonks.ohlcv_daily`.
 - Idempotent current-state imports and update counts.
 - Durable provider-source content identity after short-lived raw objects expire.
 - One controlled historical Stooq import path.
-- Thin nightly Airflow DAGs for the providers that are operationally enabled.
+- Thin Airflow DAGs for the provider modes that are operationally enabled;
+  Stooq daily may remain manual-only or deferred if its automation gate fails.
 - JSON health reports for ingestion counts, freshness, stale series, coverage,
   and non-calendar-aware gap warnings.
 - Tests proving provider isolation, rerun safety, cleanup-safe Core object and

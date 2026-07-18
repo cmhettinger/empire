@@ -941,7 +941,9 @@ initial EODData NASDAQ daily fixture is constructed from the bounded live-format
 evidence in `docs/stonks/ohlcv-eoddata-daily-format.md` and is interpreted by
 the production contract in
 `docs/stonks/ohlcv-eoddata-source-contract.md`. Stooq and Yahoo fixtures remain
-deferred until T7.1/H8.1 and Y9.1 provide equivalent format evidence.
+deferred until H7.1 and Y8.1 provide equivalent format evidence. Stooq daily
+fixtures remain deferred until the T10.1 automation gate documents a sustainable
+daily source.
 
 ### Shared parser test contract
 
