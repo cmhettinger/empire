@@ -912,6 +912,25 @@ so the initial Airflow schedule should run no earlier than 8 p.m.
 or volume adjustment basis. Reports must label both as unspecified and must not
 use listing currency metadata to infer or convert bar currency.
 
+### Stooq selected historical contract
+
+The authoritative Stooq historical production contract is
+`docs/stonks/ohlcv-stooq-history-source-contract.md`. The operator manually
+places `d_us_txt.zip` under `EMPIRE_TEMP_DIR` or supplies an equivalent explicit
+local path. Empire creates one `stonks_ohlcv_stooq_backfill` Core run, copies the
+archive into the global object store as the short-lived `stooq_history` raw
+object, and streams selected ZIP members without downloading from Stooq or
+retaining a fully extracted tree.
+
+Only the `nasdaq stocks`, `nyse stocks`, and `nysemkt stocks` partitions are in
+scope. They preserve exact provider market values `nasdaq`, `nyse`, and
+`nysemkt`; row tickers such as `AACB.US` remain exact provider identities. ETFs,
+world data, canonical exchange mapping, and Stooq browser-challenge automation
+are excluded. An explicit run effective date records archive acquisition, while
+optional inclusive trading-date and exact market/ticker filters bound parsed
+bars. Prices and fractional volume remain provider-native, and adjustment,
+currency, and corporate-action semantics are reported as unspecified.
+
 ### Provider fixture policy
 
 Provider parser fixtures live under
@@ -940,10 +959,12 @@ No raw provider fixture is committed before its source format is evidenced. The
 initial EODData NASDAQ daily fixture is constructed from the bounded live-format
 evidence in `docs/stonks/ohlcv-eoddata-daily-format.md` and is interpreted by
 the production contract in
-`docs/stonks/ohlcv-eoddata-source-contract.md`. Stooq and Yahoo fixtures remain
-deferred until H7.1 and Y8.1 provide equivalent format evidence. Stooq daily
-fixtures remain deferred until the T10.1 automation gate documents a sustainable
-daily source.
+`docs/stonks/ohlcv-eoddata-source-contract.md`. Stooq historical fixtures may
+now be derived from the bounded local-archive evidence in
+`docs/stonks/ohlcv-stooq-history-source-contract.md`. Yahoo fixtures remain
+deferred until Y8.1 provides equivalent format evidence, and Stooq daily
+fixtures remain deferred until the T10.1 automation gate documents a
+sustainable daily source.
 
 ### Shared parser test contract
 

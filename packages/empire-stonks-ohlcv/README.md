@@ -45,6 +45,13 @@ semantics.
 
 Stooq and Yahoo do not require credentials in the current package contract.
 
+The Stooq historical backfill accepts one operator-supplied
+`d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
+archive into Core, streams only the Nasdaq, NYSE, and NYSE MKT stock partitions,
+and never automates Stooq download or browser verification. See
+[`docs/stonks/ohlcv-stooq-history-source-contract.md`](../../docs/stonks/ohlcv-stooq-history-source-contract.md)
+for archive layout, filters, native semantics, progress, and restart rules.
+
 Credentials are excluded from config and credential representations. Use
 `OHLCVConfig.to_safe_dict()` when placing configuration details in Core run
 parameters, object metadata, reports, logs, or serialized results. Pass the

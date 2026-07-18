@@ -175,17 +175,14 @@ their task IDs remain valid dependencies for active work.
 Goal: provide a safe operator-run historical import from an operator-supplied
 Stooq source file, with its own progress and coverage reporting, without adding
 canonical identity assumptions or automating Stooq's browser-verification
-challenge.
-
-Stooq currently requires an API key obtained through an interactive CAPTCHA,
-and its download pages may require JavaScript to verify the browser. That is
-acceptable for obtaining a one-time historical source file manually, but it is
-not a suitable dependency for an unattended job. Automated Stooq daily access
-is therefore deferred to Phase 10 and must pass an explicit sustainability gate.
+challenge. Stooq currently requires an API key obtained through an interactive
+CAPTCHA, and its download pages may require JavaScript to verify the browser.
+Automated Stooq daily access is therefore deferred to Phase 10 and may in fact
+never be built.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| H7.1 | [ ] | Define historical import inputs and bounds | Document supported operator-supplied Stooq historical source files, manual acquisition boundary, environment settings, date bounds, symbol/market filters, expected volume, restart behavior, and explicit exclusions. The package does not automate CAPTCHA or browser verification. | E6.13, A5.1-A5.2 |
+| H7.1 | [x] | Define historical import inputs and bounds | Document supported operator-supplied Stooq historical source files, manual acquisition boundary, environment settings, date bounds, symbol/market filters, expected volume, restart behavior, and explicit exclusions. The package does not automate CAPTCHA or browser verification. | E6.13, A5.1-A5.2 |
 | H7.2 | [ ] | Add streaming/chunked historical parser | Parse historical input without loading the entire dataset into memory. Tests prove the documented Stooq format, stable chunk boundaries, and equivalent results across chunk sizes. | H7.1, A5.3-A5.4 |
 | H7.3 | [ ] | Add chunked database writer | Write provider listings and bars in bounded transactions with cumulative inserted/updated/unchanged/derived-updated/failure counts. A failed chunk can be rerun safely. | H7.2, M3.4-M3.5 |
 | H7.4 | [ ] | Add historical import run tracking | Start one Core run with explicit non-secret parameters and progress summaries; retain the operator-supplied input through the normal source-snapshot and raw-object policy. Failure leaves enough context for an operator rerun. | H7.3, C4.3-C4.6 |
@@ -193,6 +190,16 @@ is therefore deferred to Phase 10 and must pass an explicit sustainability gate.
 | H7.6 | [ ] | Add historical Stooq CLI | Add `stonks-ohlcv-stooq-backfill` using `bin/env-load`, with an explicit local input path plus date/filter/chunk options and a secret-safe JSON summary. It does not download from Stooq or mutate canonical tables. | H7.5, B1.8 |
 | H7.7 | [ ] | Add historical fixture vertical test | Import a multi-symbol, multi-date fixture twice, store its report, and prove stable provider-listing IDs, unchanged second-run counts, correct date ranges, and bounded transactions. | H7.6 |
 | H7.8 | [ ] | Run bounded development backfill | Manually obtain a source file, run a deliberately small local/dev date-and-symbol range using `deploy/env/local.env`, inspect performance/counts/reporting, and record the acquisition date, command, and result before any broad import. | H7.7 |
+
+Done: 2026-07-18 — added
+`docs/stonks/ohlcv-stooq-history-source-contract.md` with the manual
+`d_us_txt.zip`/Core boundary, exact US stock layout and identities, date and
+market/ticker filters, decimal OHLCV semantics, observed 9,598-file/1.36 GB
+selected volume, streaming/progress/restart rules, and explicit exclusions;
+aligned the architecture and package README. The supplied 537,380,289-byte ZIP
+passed integrity validation; focused source/fixture policy tests passed (6), and
+counts, representative rows, SHA-256, documentation links/consistency, Markdown
+fences, and `git diff --check` passed.
 
 ## Phase 8: Yahoo Daily End-To-End Vertical Slice
 
