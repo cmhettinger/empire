@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 from collections.abc import Iterator
 from datetime import date
@@ -10,9 +11,11 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
 
+import empire_stonks_ohlcv.stooq_history_writer as stooq_writer
 from empire_core import EmpireDatabase, ObjectStore, RunService
 from empire_stonks_ohlcv import (
     OHLCVConfig,
+    OHLCVWorkflowError,
     StooqHistoryScope,
     run_stooq_history_backfill,
 )
@@ -177,7 +180,13 @@ def test_tracked_backfill_persists_core_lineage_and_safe_summary(
         assert result.parse_summary.files_completed == 3
         assert result.write_summary.chunks_completed == 2
         assert result.write_summary.bar_counts.inserted == 3
+        assert result.report_outcome == "PASS"
         assert object_store.get_path(result.acquired_object.object_id).is_file()
+        report = json.loads(object_store.get_bytes(result.report_object_id))
+        assert report["run_status"] == "complete"
+        assert report["coverage"]["series_count"] == 3
+        assert report["warnings"]["total_count"] == 0
+        assert report["native_value_semantics"]["currency"] == "unspecified"
 
         with connection.cursor() as cursor:  # type: ignore[union-attr]
             cursor.execute(
@@ -197,6 +206,8 @@ def test_tracked_backfill_persists_core_lineage_and_safe_summary(
             assert "input_path" not in params
             assert summary["acquired_object"]["checksum_sha256"] == checksum
             assert summary["write_summary"]["last_completed_chunk"] == 2
+            assert summary["report_object_id"] == str(result.report_object_id)
+            assert summary["report_outcome"] == "PASS"
             assert error is None
             assert heartbeat is True
 
@@ -225,6 +236,83 @@ def test_tracked_backfill_persists_core_lineage_and_safe_summary(
                 (list(tickers),),
             )
             assert cursor.fetchone()[0] == 3
+    finally:
+        _cleanup(
+            connection=connection,
+            object_store=object_store,
+            run_id=run_id,
+            runner=runner,
+            tickers=tickers,
+            checksum=checksum,
+        )
+
+
+def test_failed_chunk_stores_partial_report_with_durable_progress(
+    database_connection: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = database_connection
+    marker = uuid4().hex[:8].upper()
+    runner = f"pytest:h75-partial:{marker}"
+    input_path, tickers = _archive(tmp_path, marker)
+    object_store = ObjectStore.from_connection(connection)
+    run_id: UUID | None = None
+    checksum: str | None = None
+    original_bar_writer = stooq_writer.upsert_daily_bars
+    bar_calls = 0
+
+    def fail_second_chunk(**values: object):
+        nonlocal bar_calls
+        bar_calls += 1
+        if bar_calls == 2:
+            raise RuntimeError("forced partial report integration failure")
+        return original_bar_writer(**values)
+
+    monkeypatch.setattr(stooq_writer, "upsert_daily_bars", fail_second_chunk)
+    try:
+        with pytest.raises(OHLCVWorkflowError):
+            run_stooq_history_backfill(
+                run_service=RunService.from_connection(connection),
+                connection=connection,
+                object_store=object_store,
+                config=OHLCVConfig(
+                    storage_key=f"stonks/ohlcv/h75/{marker.lower()}",
+                    raw_retention_days=3,
+                ),
+                input_path=input_path,
+                scope=StooqHistoryScope(effective_date=EFFECTIVE_DATE),
+                chunk_size=2,
+                run_type="manual",
+                runner=runner,
+            )
+
+        with connection.cursor() as cursor:  # type: ignore[union-attr]
+            cursor.execute(
+                """
+                SELECT run_id, status, summary, error_message
+                FROM core.core_run
+                WHERE runner = %s
+                """,
+                (runner,),
+            )
+            run_id, status, summary, error_message = cursor.fetchone()
+        assert status == "failed"
+        assert summary["failed_stage"] == "persistence"
+        assert summary["write_summary"]["last_completed_chunk"] == 1
+        assert summary["report_outcome"] == "FAIL"
+        assert error_message == "OHLCV provider run failed."
+
+        report_id = UUID(summary["report_object_id"])
+        report = json.loads(object_store.get_bytes(report_id))
+        checksum = report["input"]["archive"]["checksum_sha256"]
+        assert report["run_status"] == "partial"
+        assert report["outcome"] == "FAIL"
+        assert report["hard_failures"]["failed_stage"] == "persistence"
+        assert report["progress"]["write"]["chunks_completed"] == 1
+        assert report["progress"]["write"]["chunks_failed"] == 1
+        assert report["coverage"]["series_count"] == 2
+        assert "forced partial report" not in repr(report)
     finally:
         _cleanup(
             connection=connection,

@@ -11,6 +11,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import pytest
 
 import empire_stonks_ohlcv.stooq_history_runner as stooq_runner
+import empire_stonks_ohlcv.stooq_history_reporting as stooq_reporting
 import empire_stonks_ohlcv.stooq_history_writer as stooq_writer
 from empire_core import ObjectStore, RunContext, RunService, StorageRoot, StoredObject
 from empire_stonks_ohlcv import (
@@ -20,6 +21,8 @@ from empire_stonks_ohlcv import (
     ProviderListingWriteResult,
     ResolvedProviderListing,
     SourceSnapshotRegistration,
+    StooqHistoryCoverage,
+    StooqHistoryMarketCoverage,
     StooqHistoryScope,
     run_stooq_history_backfill,
 )
@@ -222,6 +225,22 @@ def _install_persistence(
     monkeypatch.setattr(stooq_writer, "upsert_provider_listings", listings)
     monkeypatch.setattr(stooq_writer, "upsert_daily_bars", bars)
 
+    def coverage(**values: object) -> StooqHistoryCoverage:
+        scope = values["scope"]
+        return StooqHistoryCoverage(
+            markets=tuple(
+                StooqHistoryMarketCoverage(market=market)
+                for market in scope.markets  # type: ignore[union-attr]
+            ),
+            series_samples=(),
+        )
+
+    monkeypatch.setattr(
+        stooq_reporting,
+        "select_stooq_history_coverage",
+        coverage,
+    )
+
 
 def _services(tmp_path: Path) -> tuple[
     FakeRunRepository,
@@ -276,6 +295,8 @@ def test_runner_tracks_stored_archive_snapshot_chunks_and_safe_progress(
     assert result.parse_summary.accepted_records == 4
     assert result.write_summary.chunks_completed == 2
     assert result.write_summary.bar_counts.inserted == 4
+    assert result.report_outcome == "PASS"
+    assert object_repo.objects[result.report_object_id].filename == "report.json"
     assert [item["stage"] for item in progress] == [
         "acquisition",
         "parsing",
@@ -299,6 +320,7 @@ def test_runner_tracks_stored_archive_snapshot_chunks_and_safe_progress(
     assert run.summary["acquired_object"]["checksum_sha256"] == (
         result.acquired_object.checksum_sha256
     )
+    assert run.summary["report_object_id"] == str(result.report_object_id)
     json.dumps(result.to_dict())
     json.dumps(run.summary)
 
@@ -308,7 +330,7 @@ def test_failure_summary_preserves_exact_rerun_scope_and_committed_boundary(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _install_persistence(monkeypatch, fail_bar_call=2)
-    run_repo, run_service, _object_repo, object_store = _services(tmp_path)
+    run_repo, run_service, object_repo, object_store = _services(tmp_path)
     connection = FakeConnection()
     scope = StooqHistoryScope(
         effective_date=EFFECTIVE_DATE,
@@ -343,6 +365,14 @@ def test_failure_summary_preserves_exact_rerun_scope_and_committed_boundary(
     assert run.summary["write_summary"]["chunks_completed"] == 1
     assert run.summary["write_summary"]["chunks_failed"] == 1
     assert run.summary["write_summary"]["last_completed_chunk"] == 1
+    assert run.summary["report_outcome"] == "FAIL"
+    assert run.summary["report_object_id"] is not None
+    report_id = UUID(run.summary["report_object_id"])
+    assert object_repo.objects[report_id].filename == "report.json"
+    report = json.loads(object_store.get_bytes(report_id))
+    assert report["run_status"] == "partial"
+    assert report["hard_failures"]["failed_stage"] == "persistence"
+    assert report["progress"]["write"]["last_completed_chunk"] == 1
     assert connection.commit_calls == 2
     assert connection.rollback_calls >= 2
     assert "forced persistence detail" not in repr(run.summary)

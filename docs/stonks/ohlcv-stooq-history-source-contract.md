@@ -307,12 +307,40 @@ records the exact safe input scope and last committed boundary. The operator
 must use the same scope when relying on idempotent restart behavior; changing
 filters or bounds is a new import scope rather than a continuation.
 
-Before report construction is added, the Core success/failure summary already
-records that restart context: archive object ID/key/size/checksum, registered
-source-snapshot identity when available, exact scope and chunk size, current
+The Core success/failure summary also records the restart context: archive
+object ID/key/size/checksum, registered source-snapshot identity when available,
+exact scope and chunk size, current
 parse totals, cumulative write/failure counts, elapsed time, and last committed
 chunk. Core stores only the shared safe failure message, never an underlying
 database, filesystem, ZIP, or callback exception string.
+
+## Historical Backfill Report
+
+The runner stores one durable schema-version-2 JSON provider report beneath the
+active run's shared `reports/report.json` path. It uses
+`object_kind=stonks_ohlcv_provider_report` and
+`logical_name=stooq_history_report`; unlike the raw ZIP, the report has no
+retention expiration. The final Core summary records its object ID and outcome.
+
+The report contains:
+
+- Exact effective date, trading-date bounds, markets, ticker filter, chunk size,
+  raw object identity/checksum, and registered source snapshot.
+- Complete parser counts or the current partial parser position, cumulative
+  writer counts, elapsed time, failed chunks, and last committed chunk.
+- Resulting listing and bar coverage for only the selected Stooq markets and
+  optional ticker identities. It distinguishes all persisted dates from bars
+  inside the requested date bounds and keeps series samples bounded.
+- Safe hard-failure stage, rejected/conflicting record counts, collapsed exact
+  duplicates, inactive-series skips, and bounded parser issue samples.
+- Explicit notes that adjustment basis, currency, volume basis, and corporate
+  action interpretation are unspecified and canonical identity is untouched.
+
+A complete report is `PASS` when it has no warnings and `WARN` otherwise. A run
+that fails after the archive has been retained receives a best-effort partial
+`FAIL` report before Core closes the run. Partial-report construction never
+replaces or exposes the original safe workflow failure; if reporting itself is
+unavailable, Core still closes the run with its H7.4 restart summary.
 
 ## Runtime Settings
 

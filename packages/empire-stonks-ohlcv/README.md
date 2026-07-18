@@ -58,8 +58,7 @@ recursive stock members using `StooqHistoryScope`, and yields one-shot
 only one ticker member plus the current output chunk in memory. After complete
 consumption, `parser.summary` exposes per-market input, filtered, accepted,
 rejected, and duplicate counts with bounded safe issue samples. Core run
-orchestration is described below; report storage remains the next Phase 7
-boundary.
+orchestration and report storage are described below.
 
 `StooqHistoryChunkWriter` writes parser chunks in strict numeric order. Each
 chunk independently resolves its distinct provider listings, skips bars for
@@ -78,6 +77,16 @@ the writer. Progress payloads are emitted after discovery, every 100 completed
 members, and every committed chunk. Success and failure Core summaries retain
 the checksum, source-snapshot identity when registered, parser position, write
 counts, and last committed chunk needed for an idempotent new-run replay.
+
+Every completed run stores a durable JSON provider report at the shared Core
+`reports/report.json` path. The report distinguishes complete from partial
+runs, repeats the exact input bounds and native-semantics limitations, combines
+parser and writer progress, and queries resulting coverage only for the selected
+Stooq markets and optional tickers. Market totals include persisted and
+requested-date bar coverage; provider-series samples are bounded. A failed
+chunk receives a best-effort partial FAIL report before the Core run closes,
+while successful runs are PASS or WARN according to parser rejections,
+collapsed duplicates, and inactive-series skips.
 
 Credentials are excluded from config and credential representations. Use
 `OHLCVConfig.to_safe_dict()` when placing configuration details in Core run

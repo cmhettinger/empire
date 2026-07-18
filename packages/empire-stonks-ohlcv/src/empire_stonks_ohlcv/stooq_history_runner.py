@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from empire_core import ObjectStore, RunContext, RunService
+from empire_core import ObjectStore, RunContext, RunService, StoredObject
 
 from empire_stonks_ohlcv.config import OHLCVConfig
 from empire_stonks_ohlcv.exceptions import OHLCVConfigError, OHLCVWorkflowError
@@ -33,6 +33,10 @@ from empire_stonks_ohlcv.stooq_history import (
 from empire_stonks_ohlcv.stooq_history_writer import (
     StooqHistoryChunkWriter,
     StooqHistoryWriteSummary,
+)
+from empire_stonks_ohlcv.stooq_history_reporting import (
+    build_stooq_history_report,
+    store_stooq_history_report,
 )
 
 
@@ -58,6 +62,8 @@ class StooqHistoryRunResult:
     source_snapshot: SourceSnapshotRegistration
     parse_summary: StooqHistoryParseSummary
     write_summary: StooqHistoryWriteSummary
+    report_object_id: UUID
+    report_outcome: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.run_id, UUID):
@@ -77,6 +83,10 @@ class StooqHistoryRunResult:
             raise TypeError("parse_summary must be a StooqHistoryParseSummary.")
         if not isinstance(self.write_summary, StooqHistoryWriteSummary):
             raise TypeError("write_summary must be a StooqHistoryWriteSummary.")
+        if not isinstance(self.report_object_id, UUID):
+            raise TypeError("report_object_id must be a UUID.")
+        if self.report_outcome not in {"PASS", "WARN"}:
+            raise ValueError("report_outcome must be PASS or WARN.")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -90,6 +100,8 @@ class StooqHistoryRunResult:
             "source_snapshot": self.source_snapshot.to_dict(),
             "parse_summary": self.parse_summary.to_dict(),
             "write_summary": self.write_summary.to_dict(),
+            "report_object_id": str(self.report_object_id),
+            "report_outcome": self.report_outcome,
         }
 
 
@@ -138,6 +150,7 @@ def run_stooq_history_backfill(
     acquired: AcquiredObject | None = None
     registration: SourceSnapshotRegistration | None = None
     parser: StooqHistoryParser | None = None
+    report_object: StoredObject | None = None
     writer = StooqHistoryChunkWriter(connection)
     try:
         acquired = _store_archive(
@@ -214,6 +227,22 @@ def run_stooq_history_backfill(
             )
 
         parse_summary = parser.summary
+        report, report_object = _build_and_store_report(
+            connection=connection,
+            object_store=object_store,
+            run_context=run_context,
+            config=config,
+            scope=scope,
+            chunk_size=chunk_size,
+            acquired_object=acquired,
+            source_snapshot=registration,
+            parse_summary=parse_summary,
+            parse_progress=parser.progress,
+            write_summary=writer.summary,
+            run_status="complete",
+            failed_stage=None,
+            elapsed_seconds=monotonic() - started_at,
+        )
         summary = _run_summary(
             scope=scope,
             chunk_size=chunk_size,
@@ -222,6 +251,8 @@ def run_stooq_history_backfill(
             parse_summary=parse_summary,
             write_summary=writer.summary,
             elapsed_seconds=monotonic() - started_at,
+            report_object=report_object,
+            report_outcome=report["outcome"],
         )
         completed = run_service.complete_run(run_context.run_id, summary=summary)
         return StooqHistoryRunResult(
@@ -233,10 +264,34 @@ def run_stooq_history_backfill(
             source_snapshot=registration,
             parse_summary=parse_summary,
             write_summary=writer.summary,
+            report_object_id=report_object.object_id,
+            report_outcome=report["outcome"],
         )
     except Exception as exc:
         _rollback_quietly(connection)
-        failed_stage = exc.stage if isinstance(exc, OHLCVWorkflowError) else None
+        failed_stage = (
+            exc.stage if isinstance(exc, OHLCVWorkflowError) else "reporting"
+        )
+        if acquired is not None and failed_stage != "reporting":
+            report_object = _try_store_partial_report(
+                connection=connection,
+                object_store=object_store,
+                run_context=run_context,
+                config=config,
+                scope=scope,
+                chunk_size=chunk_size,
+                acquired_object=acquired,
+                source_snapshot=registration,
+                parse_summary=None,
+                parse_progress=(
+                    parser.progress
+                    if parser is not None
+                    else StooqHistoryParseProgress(files_discovered=0)
+                ),
+                write_summary=writer.summary,
+                failed_stage=failed_stage,
+                elapsed_seconds=monotonic() - started_at,
+            )
         run_service.fail_run(
             run_context.run_id,
             SAFE_FAILURE_MESSAGE,
@@ -249,6 +304,7 @@ def run_stooq_history_backfill(
                 write_summary=writer.summary,
                 failed_stage=failed_stage,
                 elapsed_seconds=monotonic() - started_at,
+                report_object=report_object,
             ),
         )
         raise
@@ -392,6 +448,8 @@ def _run_summary(
     parse_summary: StooqHistoryParseSummary,
     write_summary: StooqHistoryWriteSummary,
     elapsed_seconds: float,
+    report_object: StoredObject,
+    report_outcome: str,
 ) -> dict[str, Any]:
     return {
         "provider_code": STOOQ_HISTORY_PROVIDER_CODE,
@@ -404,6 +462,8 @@ def _run_summary(
         "source_snapshot": source_snapshot.to_dict(),
         "parse_summary": parse_summary.to_dict(),
         "write_summary": write_summary.to_dict(),
+        "report_object_id": str(report_object.object_id),
+        "report_outcome": report_outcome,
     }
 
 
@@ -417,6 +477,7 @@ def _failure_summary(
     write_summary: StooqHistoryWriteSummary,
     failed_stage: str | None,
     elapsed_seconds: float,
+    report_object: StoredObject | None,
 ) -> dict[str, Any]:
     return {
         "provider_code": STOOQ_HISTORY_PROVIDER_CODE,
@@ -436,7 +497,73 @@ def _failure_summary(
             parse_progress.to_dict() if parse_progress is not None else None
         ),
         "write_summary": write_summary.to_dict(),
+        "report_object_id": (
+            str(report_object.object_id) if report_object is not None else None
+        ),
+        "report_outcome": "FAIL" if report_object is not None else None,
     }
+
+
+def _build_and_store_report(
+    *,
+    connection: Any,
+    object_store: ObjectStore,
+    run_context: RunContext,
+    config: OHLCVConfig,
+    scope: StooqHistoryScope,
+    chunk_size: int,
+    acquired_object: AcquiredObject | None,
+    source_snapshot: SourceSnapshotRegistration | None,
+    parse_summary: StooqHistoryParseSummary | None,
+    parse_progress: StooqHistoryParseProgress,
+    write_summary: StooqHistoryWriteSummary,
+    run_status: str,
+    failed_stage: str | None,
+    elapsed_seconds: float,
+) -> tuple[dict[str, Any], StoredObject]:
+    try:
+        with connection.cursor() as cursor:
+            report = build_stooq_history_report(
+                cursor=cursor,
+                scope=scope,
+                chunk_size=chunk_size,
+                acquired_object=acquired_object,
+                source_snapshot=source_snapshot,
+                parse_summary=parse_summary,
+                parse_progress=parse_progress,
+                write_summary=write_summary,
+                run_status=run_status,  # type: ignore[arg-type]
+                failed_stage=failed_stage,
+                elapsed_seconds=elapsed_seconds,
+            )
+        stored = store_stooq_history_report(
+            object_store=object_store,
+            run_context=run_context,
+            config=config,
+            report=report,
+        )
+        if not isinstance(stored, StoredObject) or stored.run_id != run_context.run_id:
+            raise TypeError("report storage returned an invalid Core object.")
+        return report, stored
+    except Exception as exc:
+        raise OHLCVWorkflowError(
+            "reporting",
+            source_code=STOOQ_HISTORY_SOURCE.source_code,
+        ) from exc
+
+
+def _try_store_partial_report(
+    **values: Any,
+) -> StoredObject | None:
+    try:
+        _report, stored = _build_and_store_report(
+            run_status="partial",
+            **values,
+        )
+        return stored
+    except Exception:
+        logger.warning("Stooq partial report could not be stored.")
+        return None
 
 
 def _validate_inputs(
