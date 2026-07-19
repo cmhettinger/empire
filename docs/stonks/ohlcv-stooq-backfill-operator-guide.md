@@ -71,7 +71,9 @@ bin/stonks-ohlcv-stooq-backfill --help
 Market and ticker filters are independent. Repeating `--market` broadens the
 market set; repeating `--ticker` broadens the exact ticker set inside the
 selected markets. Date bounds apply to every selected series. At least one
-selected archive member and one eligible bar must remain after filtering.
+non-empty selected archive member and one eligible bar must remain after
+filtering. Stooq zero-byte stock files are counted as provider placeholders,
+skipped, and reported as warnings.
 
 ## Run A Bounded Rehearsal
 
@@ -139,9 +141,14 @@ bounds selects every supported date in the archive. Stooq ETFs and other
 partitions are always excluded.
 
 The inspected 2026-07-18 archive contained 9,598 selected stock files and about
-1.36 GB of selected uncompressed data. That is planning evidence, not a fixed
-requirement for later archives. Monitor the JSON progress stream during the
-broad run rather than assuming the rehearsal runtime predicts it.
+1.36 GB of selected uncompressed data. Of those files, 36 are zero-byte
+placeholders and 9,562 are parseable series. A complete read-only parse found
+20,475,807 input rows, of which 20,475,736 were accepted and 71 invalid OHLCV
+rows were rejected. The expected report is therefore `WARN`, with at least 107
+warnings from the 36 placeholders and 71 rejected rows. Additional inactive
+listing skips would increase that total. These values are planning evidence,
+not fixed requirements for later archives. Monitor the JSON progress stream
+during the broad run rather than assuming the rehearsal runtime predicts it.
 
 ## Success, Failure, And Reruns
 
@@ -156,8 +163,8 @@ to stdout. Important fields include:
 - `report_object_id`, `pdf_report_object_id`, and `report_outcome`
 
 `report_outcome` is `PASS` when there are no report warnings and `WARN` when the
-run succeeds with rejected records, collapsed exact duplicates, or skipped
-inactive-series bars.
+run succeeds with rejected records, collapsed exact duplicates, skipped
+zero-byte provider placeholders, or skipped inactive-series bars.
 
 A failed command exits nonzero and prints only:
 
@@ -193,14 +200,21 @@ Every current successful run produces:
    date. A same-key rerun can insert, update, repair derived fields, or leave a
    row unchanged.
 6. A durable structured JSON report named `report.json`, with
-   `object_kind=stonks_ohlcv_provider_report`.
+   `object_kind=stonks_ohlcv_provider_report`. Its input lineage records the
+   operator filename as `d_us_txt.zip` and Core's normalized stored filename as
+   `raw.zip`.
 7. A durable human-readable PDF report named `report.pdf`, with
-   `object_kind=stonks_ohlcv_provider_pdf_report`.
+   `object_kind=stonks_ohlcv_provider_pdf_report`. It displays those two names
+   separately so `raw.zip` is not mistaken for the downloaded archive name.
 
 The JSON and PDF reports have the same `PASS`, `WARN`, or `FAIL` outcome and do
 not have a retention expiration. A failure after raw acquisition receives a
 best-effort partial `FAIL` report pair. If reporting itself fails, Core still
 records the run failure even though one or both reports may be absent.
+
+For readability, the PDF displays at most 18 provider-series samples and 10
+parser issue samples per warning section. Use `report.json` when the complete
+bounded sample is required.
 
 Older Stooq runs created before PDF persistence was added can legitimately have
 only `raw.zip` and `report.json`. A successful run made with the current CLI
@@ -287,6 +301,7 @@ SELECT
     summary->'parse_summary'->>'rejected_records' AS rejected_records,
     summary->'parse_summary'->>'duplicate_rows_collapsed'
         AS duplicate_rows_collapsed,
+    summary->'parse_summary'->>'empty_files_skipped' AS empty_files_skipped,
     summary->'write_summary'->>'chunks_completed' AS chunks_completed,
     summary->'write_summary'->>'chunks_failed' AS chunks_failed,
     summary->'write_summary'->'listing_counts' AS listing_counts,
@@ -298,9 +313,12 @@ WHERE run_id = :'run_id'::uuid;
 ```
 
 For a clean first import, expect zero rejected records, zero collapsed
-duplicates, zero failed chunks, and accepted records accounted for by inserted,
-updated, or unchanged bar counts plus any inactive-series skips. On an
-idempotent rerun, a large or complete `unchanged` count is expected.
+duplicates, and zero failed chunks. `empty_files_skipped` may be nonzero when
+Stooq included placeholder series with no observations; those skips make the
+report outcome `WARN` but do not invalidate the import. Accepted records should
+be accounted for by inserted, updated, or unchanged bar counts plus any
+inactive-series skips. On an idempotent rerun, a large or complete `unchanged`
+count is expected.
 
 ### Verify Raw, JSON, And PDF Objects
 

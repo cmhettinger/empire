@@ -147,6 +147,7 @@ class StooqHistoryDiscovery:
     archive_member_count: int
     selected_uncompressed_bytes: int
     members: tuple[StooqHistoryMember, ...]
+    empty_files_skipped: int = 0
 
     def __post_init__(self) -> None:
         _nonnegative_int("archive_size_bytes", self.archive_size_bytes)
@@ -155,6 +156,7 @@ class StooqHistoryDiscovery:
             "selected_uncompressed_bytes",
             self.selected_uncompressed_bytes,
         )
+        _nonnegative_int("empty_files_skipped", self.empty_files_skipped)
         if not isinstance(self.members, tuple) or any(
             not isinstance(member, StooqHistoryMember) for member in self.members
         ):
@@ -229,6 +231,7 @@ class StooqHistoryParseProgress:
     rejected_rows: int = 0
     duplicate_rows_collapsed: int = 0
     current_member: str | None = None
+    empty_files_skipped: int = 0
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -241,6 +244,7 @@ class StooqHistoryParseProgress:
             "rejected_records",
             "rejected_rows",
             "duplicate_rows_collapsed",
+            "empty_files_skipped",
         ):
             _nonnegative_int(field_name, getattr(self, field_name))
         if self.files_completed > self.files_discovered:
@@ -262,6 +266,7 @@ class StooqHistoryParseProgress:
             "rejected_rows": self.rejected_rows,
             "duplicate_rows_collapsed": self.duplicate_rows_collapsed,
             "current_member": self.current_member,
+            "empty_files_skipped": self.empty_files_skipped,
         }
 
 
@@ -273,10 +278,12 @@ class StooqHistoryParseSummary:
     chunks_emitted: int
     market_counts: tuple[StooqHistoryMarketParseCounts, ...]
     issue_samples: tuple[ImportIssue, ...] = ()
+    empty_files_skipped: int = 0
 
     def __post_init__(self) -> None:
         _nonnegative_int("files_discovered", self.files_discovered)
         _nonnegative_int("chunks_emitted", self.chunks_emitted)
+        _nonnegative_int("empty_files_skipped", self.empty_files_skipped)
         if not isinstance(self.market_counts, tuple) or any(
             not isinstance(item, StooqHistoryMarketParseCounts)
             for item in self.market_counts
@@ -336,6 +343,7 @@ class StooqHistoryParseSummary:
             "rejected_records": self.rejected_records,
             "rejected_rows": self.rejected_rows,
             "duplicate_rows_collapsed": self.duplicate_rows_collapsed,
+            "empty_files_skipped": self.empty_files_skipped,
             "market_counts": [item.to_dict() for item in self.market_counts],
             "issue_samples": [item.to_dict() for item in self.issue_samples],
         }
@@ -416,6 +424,7 @@ class StooqHistoryParser:
         self._summary: StooqHistoryParseSummary | None = None
         self._progress = StooqHistoryParseProgress(
             files_discovered=self.discovery.selected_member_count,
+            empty_files_skipped=self.discovery.empty_files_skipped,
         )
 
     @property
@@ -461,6 +470,9 @@ class StooqHistoryParser:
                         counts=counts,
                         chunks_emitted=chunk_number,
                         current_member=member.member_path,
+                        empty_files_skipped=(
+                            self.discovery.empty_files_skipped
+                        ),
                     )
                     if (
                         self.progress_callback is not None
@@ -491,6 +503,9 @@ class StooqHistoryParser:
                                 counts=counts,
                                 chunks_emitted=chunk_number,
                                 current_member=member.member_path,
+                                empty_files_skipped=(
+                                    self.discovery.empty_files_skipped
+                                ),
                             )
                             yield StooqHistoryChunk(
                                 chunk_number=chunk_number,
@@ -507,6 +522,9 @@ class StooqHistoryParser:
                         chunks_emitted=chunk_number,
                         current_member=(
                             self.discovery.members[-1].member_path
+                        ),
+                        empty_files_skipped=(
+                            self.discovery.empty_files_skipped
                         ),
                     )
                     yield StooqHistoryChunk(
@@ -539,6 +557,7 @@ class StooqHistoryParser:
             chunks_emitted=chunk_number,
             market_counts=market_counts,
             issue_samples=tuple(issues),
+            empty_files_skipped=self.discovery.empty_files_skipped,
         )
         if summary.accepted_records == 0:
             raise OHLCVParseError(
@@ -556,6 +575,7 @@ class StooqHistoryParser:
             rejected_rows=summary.rejected_rows,
             duplicate_rows_collapsed=summary.duplicate_rows_collapsed,
             current_member=self.discovery.members[-1].member_path,
+            empty_files_skipped=summary.empty_files_skipped,
         )
 
 
@@ -565,6 +585,7 @@ def _parse_progress(
     counts: dict[str, _MutableMarketCounts],
     chunks_emitted: int,
     current_member: str,
+    empty_files_skipped: int,
 ) -> StooqHistoryParseProgress:
     values = tuple(counts.values())
     return StooqHistoryParseProgress(
@@ -580,6 +601,7 @@ def _parse_progress(
             item.duplicate_rows_collapsed for item in values
         ),
         current_member=current_member,
+        empty_files_skipped=empty_files_skipped,
     )
 
 
@@ -604,7 +626,7 @@ def inspect_stooq_history_archive(
                 raise OHLCVParseError(
                     "Stooq history archive exceeds the member limit."
                 )
-            selected = _select_members(infos, scope=scope)
+            selected, empty_files_skipped = _select_members(infos, scope=scope)
     except OHLCVParseError:
         raise
     except (BadZipFile, OSError, RuntimeError) as exc:
@@ -630,6 +652,7 @@ def inspect_stooq_history_archive(
         archive_member_count=len(infos),
         selected_uncompressed_bytes=selected_bytes,
         members=tuple(selected),
+        empty_files_skipped=empty_files_skipped,
     )
 
 
@@ -656,10 +679,11 @@ def _select_members(
     infos: list[ZipInfo],
     *,
     scope: StooqHistoryScope,
-) -> list[StooqHistoryMember]:
+) -> tuple[list[StooqHistoryMember], int]:
     seen_paths: set[str] = set()
     seen_identities: set[tuple[str, str]] = set()
     selected: list[StooqHistoryMember] = []
+    empty_files_skipped = 0
     selected_markets = set(scope.markets)
     selected_tickers = set(scope.tickers)
     stock_members_by_market = {
@@ -684,9 +708,8 @@ def _select_members(
         if selected_tickers and ticker not in selected_tickers:
             continue
         if info.file_size <= 0:
-            raise OHLCVParseError(
-                "Stooq history archive contains an empty selected member."
-            )
+            empty_files_skipped += 1
+            continue
         if info.file_size > MAX_MEMBER_UNCOMPRESSED_BYTES:
             raise OHLCVParseError(
                 "Stooq history archive contains an oversized selected member."
@@ -710,7 +733,10 @@ def _select_members(
         raise OHLCVParseError(
             "Stooq history archive is missing a required stock market directory."
         )
-    return sorted(selected, key=lambda member: member.member_path)
+    return (
+        sorted(selected, key=lambda member: member.member_path),
+        empty_files_skipped,
+    )
 
 
 def _validated_member_path(info: ZipInfo) -> str:

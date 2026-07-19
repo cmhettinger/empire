@@ -159,6 +159,7 @@ def _parse_summary() -> StooqHistoryParseSummary:
                 record_reference="nasdaq:AAA.US:3",
             ),
         ),
+        empty_files_skipped=2,
     )
 
 
@@ -173,6 +174,7 @@ def _progress() -> StooqHistoryParseProgress:
         rejected_rows=1,
         duplicate_rows_collapsed=1,
         current_member="data/daily/us/nyse stocks/bbb.us.txt",
+        empty_files_skipped=2,
     )
 
 
@@ -271,6 +273,7 @@ def test_builds_complete_report_with_scoped_coverage_and_native_notes() -> None:
     assert report["outcome"] == "WARN"
     assert report["run_status"] == "complete"
     assert report["input"]["scope"] == _scope().to_dict()
+    assert report["input"]["operator_filename"] == "d_us_txt.zip"
     assert report["progress"]["write"]["bar_counts"] == {
         "inserted": 3,
         "updated": 0,
@@ -281,7 +284,8 @@ def test_builds_complete_report_with_scoped_coverage_and_native_notes() -> None:
     assert report["coverage"]["truncated"] is False
     assert report["markets"][0]["coverage"]["scoped_bar_count"] == 3
     assert report["markets"][1]["coverage"]["persisted_bar_count"] == 20
-    assert report["warnings"]["total_count"] == 3
+    assert report["warnings"]["total_count"] == 5
+    assert report["warnings"]["empty_files_skipped"] == 2
     assert report["warnings"]["sample_count"] == 1
     assert report["hard_failures"]["total_count"] == 0
     semantics = report["native_value_semantics"]
@@ -398,6 +402,32 @@ def test_renders_human_readable_stooq_pdf(tmp_path: Path) -> None:
     assert pdf_path.name == "report.pdf"
     assert pdf_path.read_bytes().startswith(b"%PDF-")
     assert pdf_path.stat().st_size > 10_000
+
+
+def test_full_scale_pdf_bounds_samples_without_continuation_pages(
+    tmp_path: Path,
+) -> None:
+    report = _complete_report(_coverage_cursor())
+    sample = report["coverage"]["series_samples"][0]
+    report["coverage"]["series_samples"] = [
+        {**sample, "ticker": f"SAMPLE{index:03d}.US"}
+        for index in range(100)
+    ]
+    issue = report["warnings"]["samples"][0]
+    report["warnings"]["samples"] = [
+        {**issue, "record_reference": f"nasdaq:SAMPLE.US:line:{index}"}
+        for index in range(71)
+    ]
+    report["warnings"]["sample_count"] = 71
+    report["warnings"]["total_count"] = 107
+
+    result = render_stooq_history_pdf(
+        report=report,
+        output_dir=tmp_path,
+    )
+
+    pdf_bytes = result.primary_artifact.path.read_bytes()
+    assert pdf_bytes.count(b"/Type /Page") - pdf_bytes.count(b"/Type /Pages") == 5
 
 
 def test_stores_stooq_pdf_beside_json_report(tmp_path: Path) -> None:

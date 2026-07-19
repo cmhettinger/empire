@@ -308,6 +308,36 @@ def test_discovery_is_recursive_filtered_and_deterministic(tmp_path: Path) -> No
     ]
 
 
+def test_empty_provider_placeholders_are_counted_and_skipped(
+    tmp_path: Path,
+) -> None:
+    archive_path = _write_archive(
+        tmp_path,
+        _archive_bytes(
+            nasdaq={
+                "1/empty.us.txt": b"",
+                "1/aaa.us.txt": _member(
+                    "AAA.US",
+                    "AAA.US,D,20260102,000000,10,11,9,10.5,100,0",
+                ),
+            },
+        ),
+    )
+    scope = StooqHistoryScope(effective_date=date(2026, 1, 6))
+
+    discovery = inspect_stooq_history_archive(archive_path, scope=scope)
+    parser = StooqHistoryParser(archive_path, scope=scope, chunk_size=10)
+    chunks, summary = _consume(parser)
+
+    assert discovery.empty_files_skipped == 1
+    assert discovery.selected_member_count == 3
+    assert all(member.ticker != "EMPTY.US" for member in discovery.members)
+    assert summary.empty_files_skipped == 1
+    assert parser.progress.empty_files_skipped == 1
+    assert summary.files_completed == 3
+    assert len(_flatten_batches(chunks)) == 3
+
+
 def test_chunk_boundaries_are_stable_and_sizes_are_equivalent(
     tmp_path: Path,
 ) -> None:

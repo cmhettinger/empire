@@ -30,6 +30,7 @@ from empire_stonks_ohlcv.results import AcquiredObject
 from empire_stonks_ohlcv.source_conventions import STOOQ_HISTORY_SOURCE
 from empire_stonks_ohlcv.source_snapshots import SourceSnapshotRegistration
 from empire_stonks_ohlcv.stooq_history import (
+    STOOQ_HISTORY_ARCHIVE_NAME,
     STOOQ_HISTORY_CORE_ARCHIVE_NAME,
     STOOQ_HISTORY_MARKETS,
     STOOQ_HISTORY_PROVIDER_CODE,
@@ -312,6 +313,7 @@ def build_stooq_history_report(
             "scope": scope.to_dict(),
             "chunk_size": chunk_size,
             "manual_acquisition": True,
+            "operator_filename": STOOQ_HISTORY_ARCHIVE_NAME,
             "archive": (
                 acquired_object.to_dict()
                 if acquired_object is not None
@@ -499,16 +501,22 @@ def _warnings(
         else parse_progress.duplicate_rows_collapsed
     )
     inactive = write_summary.skipped_inactive_bars
+    empty_files = (
+        parse_summary.empty_files_skipped
+        if parse_summary is not None
+        else parse_progress.empty_files_skipped
+    )
     samples = (
         [item.to_dict() for item in parse_summary.issue_samples]
         if parse_summary is not None
         else []
     )
     return {
-        "total_count": rejected + duplicates + inactive,
+        "total_count": rejected + duplicates + inactive + empty_files,
         "rejected_records": rejected,
         "duplicate_rows_collapsed": duplicates,
         "skipped_inactive_bars": inactive,
+        "empty_files_skipped": empty_files,
         "sample_count": len(samples),
         "samples": samples,
     }

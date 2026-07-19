@@ -181,8 +181,10 @@ not depend on archive or member order. Exact duplicate rows for one
 rejected and reported; first-wins and last-wins behavior are prohibited.
 
 An invalid row is rejected with a deterministic reason and contributes to
-bounded issue samples; it is never silently dropped. An unreadable ZIP,
-duplicate or unsafe member path, missing selected directory, invalid selected
+bounded issue samples; it is never silently dropped. A selected zero-byte
+member is treated as a provider placeholder with no observations: it is
+skipped, counted, and reported as a warning. An unreadable ZIP, duplicate or
+unsafe member path, missing selected directory, invalid non-empty selected
 member header, inconsistent member ticker, or truncated member is a hard source
 failure because continuing would make archive coverage unknowable.
 
@@ -215,20 +217,28 @@ The operator-supplied archive inspected for this contract on 2026-07-18 has:
 | Selected NYSE stock files | 4,551 |
 | Selected NYSE MKT stock files | 323 |
 | Selected stock files | 9,598 |
+| Selected zero-byte stock placeholders | 36 |
+| Selected non-empty stock files | 9,562 |
 | Selected uncompressed bytes | 1,361,884,825 |
+| Input data rows | 20,475,807 |
+| Accepted data rows | 20,475,736 |
+| Rejected invalid OHLCV rows | 71 |
 | SHA-256 | `faf932285b47ae216461345e7bac7a1085d210cbddd2f02f8a575ab47ff50435` |
 
-These values are format evidence and planning volume, not invariants for future
-downloads. Before Core storage or database writes, acquisition must inspect the
-central directory and verify at least:
+The row counts come from a complete read-only streaming parse after the
+zero-byte placeholder behavior was established. These values are format
+evidence and planning volume, not invariants for future downloads. Before Core
+storage or database writes, acquisition must inspect the central directory and
+verify at least:
 
 - The archive is a valid, non-encrypted ZIP.
 - Member paths are relative, normalized, unique, and cannot escape the archive
   root; symlinks and other special-file entries are rejected.
 - All three selected market directories exist and each contains at least one
   `.txt` member.
-- Selected members have nonzero declared size and the complete selected totals
-  fit the implementation's documented bounded-resource limits.
+- Selected zero-byte members are counted as provider placeholders and excluded
+  from parsing; non-empty selected totals fit the implementation's documented
+  bounded-resource limits.
 - Requested market and ticker filters resolve to at least one selected member.
 
 The inspected archive passes `unzip -tq`. Later implementation tests use small
@@ -261,6 +271,7 @@ Operational progress includes, at minimum:
 - Selected markets, ticker-filter count, and inclusive date bounds.
 - Files discovered, files completed, and current member.
 - Rows seen, date-filtered, accepted, rejected, and written.
+- Zero-byte provider placeholder files skipped during discovery.
 - Chunk number and cumulative inserted, updated, unchanged,
   `derived_updated`, and failure counts.
 - Elapsed time and the most recent committed member or chunk boundary.
@@ -334,14 +345,17 @@ both object IDs and their shared outcome.
 The reports contain:
 
 - Exact effective date, trading-date bounds, markets, ticker filter, chunk size,
-  raw object identity/checksum, and registered source snapshot.
+  raw object identity/checksum, and registered source snapshot. Input lineage
+  preserves the operator archive name `d_us_txt.zip` separately from Core's
+  normalized stored filename `raw.zip`.
 - Complete parser counts or the current partial parser position, cumulative
   writer counts, elapsed time, failed chunks, and last committed chunk.
 - Resulting listing and bar coverage for only the selected Stooq markets and
   optional ticker identities. It distinguishes all persisted dates from bars
   inside the requested date bounds and keeps series samples bounded.
 - Safe hard-failure stage, rejected/conflicting record counts, collapsed exact
-  duplicates, inactive-series skips, and bounded parser issue samples.
+  duplicates, zero-byte provider placeholder skips, inactive-series skips, and
+  bounded parser issue samples.
 - Explicit notes that adjustment basis, currency, volume basis, and corporate
   action interpretation are unspecified and canonical identity is untouched.
 
@@ -356,8 +370,9 @@ typography, and table theme as the EODData daily report. It presents an
 executive summary, run facts, exact scope, market and provider-series coverage,
 parser/write outcomes, stored-input lineage, warnings/failures, and native value
 semantics. Ticker filters and provider-series samples are bounded for
-legibility; the JSON report remains authoritative for the complete structured
-sample.
+legibility. The PDF shows at most 18 provider-series samples and 10 parser
+issue samples per warning section; the JSON report remains authoritative for
+the complete structured samples retained by the parser and coverage query.
 
 ## Runtime Settings
 

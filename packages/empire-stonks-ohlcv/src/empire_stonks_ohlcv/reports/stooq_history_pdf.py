@@ -36,7 +36,8 @@ HEADER_TEXT = "EMPIRE RESEARCH DIVISION"
 FOOTER_TEXT = "PROPRIETARY / INTERNAL USE ONLY"
 REPORT_TIMEZONE_ENV = "EMPIRE_REPORT_TIMEZONE"
 DEFAULT_REPORT_TIMEZONE = "America/New_York"
-SERIES_DISPLAY_LIMIT = 25
+SERIES_DISPLAY_LIMIT = 18
+WARNING_SAMPLE_DISPLAY_LIMIT = 10
 
 
 def render_stooq_history_pdf(
@@ -389,7 +390,11 @@ def _lineage_table(input_section: dict[str, Any], *, renderer: PdfRenderer) -> T
     return _table(
         [
             ["Lineage Fact", "Value"],
-            ["Archive filename", archive.get("filename") or "Not available"],
+            [
+                "Operator archive filename",
+                input_section.get("operator_filename") or "Not available",
+            ],
+            ["Core stored filename", archive.get("filename") or "Not available"],
             ["Archive bytes", _fmt_int(archive.get("size_bytes"))],
             ["Archive SHA-256", archive.get("checksum_sha256") or "Not available"],
             ["Raw object ID", archive.get("object_id") or "Not available"],
@@ -412,7 +417,9 @@ def _review_summary(report: dict[str, Any]) -> str:
         return "No warnings or hard failures were reported."
     return (
         f"Review {failures:,} hard failures and {warnings:,} warnings below. "
-        "Samples remain bounded exactly as they are in the JSON report."
+        f"The PDF shows up to {WARNING_SAMPLE_DISPLAY_LIMIT:,} samples per "
+        "section; the JSON report remains authoritative for every retained "
+        "sample."
     )
 
 
@@ -427,6 +434,14 @@ def _review_sections(report: dict[str, Any], *, renderer: PdfRenderer) -> list[A
             continue
         heading = Paragraph(escape(title), renderer.styles.subheading)
         heading.keepWithNext = 1
+        samples = section.get("samples") or []
+        shown = min(len(samples), WARNING_SAMPLE_DISPLAY_LIMIT)
+        sample_note = paragraph(
+            f"Showing {shown:,} of {len(samples):,} retained samples. The JSON "
+            "report contains the complete bounded sample.",
+            styles=renderer.styles,
+        )
+        sample_note.keepWithNext = 1
         sections.extend(
             [
                 heading,
@@ -438,7 +453,11 @@ def _review_sections(report: dict[str, Any], *, renderer: PdfRenderer) -> list[A
                     },
                     renderer=renderer,
                 ),
-                _sample_table(section.get("samples") or [], renderer=renderer),
+                sample_note,
+                _sample_table(
+                    samples[:WARNING_SAMPLE_DISPLAY_LIMIT],
+                    renderer=renderer,
+                ),
                 spacer(8),
             ]
         )

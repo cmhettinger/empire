@@ -626,3 +626,181 @@ second run created a new durable run/object/report chain while all five listings
 and three bars were unchanged. The full configured suite passed (337) with no
 skips; Poetry lock/check/build, compileall, pip check, public import,
 88-column scan, and `git diff --check` passed.
+
+## Phase 7: Historical Stooq Import
+
+Goal: provide a safe operator-run historical import from an operator-supplied
+Stooq source file, with its own progress and coverage reporting, without adding
+canonical identity assumptions or automating Stooq's browser-verification
+challenge. Stooq currently requires an API key obtained through an interactive
+CAPTCHA, and its download pages may require JavaScript to verify the browser.
+Automated Stooq daily access is therefore deferred to Phase 10 and may in fact
+never be built.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| H7.1 | [x] | Define historical import inputs and bounds | Document supported operator-supplied Stooq historical source files, manual acquisition boundary, environment settings, date bounds, symbol/market filters, expected volume, restart behavior, and explicit exclusions. The package does not automate CAPTCHA or browser verification. | E6.13, A5.1-A5.2 |
+| H7.2 | [x] | Add streaming/chunked historical parser | Parse historical input without loading the entire dataset into memory. Tests prove the documented Stooq format, stable chunk boundaries, and equivalent results across chunk sizes. | H7.1, A5.3-A5.4 |
+| H7.3 | [x] | Add chunked database writer | Write provider listings and bars in bounded transactions with cumulative inserted/updated/unchanged/derived-updated/failure counts. A failed chunk can be rerun safely. | H7.2, M3.4-M3.5 |
+| H7.4 | [x] | Add historical import run tracking | Start one Core run with explicit non-secret parameters and progress summaries; retain the operator-supplied input through the normal source-snapshot and raw-object policy. Failure leaves enough context for an operator rerun. | H7.3, C4.3-C4.6 |
+| H7.5 | [x] | Add historical import report | Build and store a Stooq backfill report with input bounds, chunk progress, write counts, resulting coverage, failures, warnings, and native-semantics notes. Tests cover partial and successful runs. | H7.4, E6.7-E6.8 |
+| H7.6 | [x] | Add historical Stooq CLI | Add `stonks-ohlcv-stooq-backfill` using `bin/env-load`, with an explicit local input path plus date/filter/chunk options and a secret-safe JSON summary. It does not download from Stooq or mutate canonical tables. | H7.5, B1.8 |
+| H7.7 | [x] | Add historical fixture vertical test | Import a multi-symbol, multi-date fixture twice, store its report, and prove stable provider-listing IDs, unchanged second-run counts, correct date ranges, and bounded transactions. | H7.6 |
+| H7.8 | [x] | Run bounded development backfill | Manually obtain a source file, run a deliberately small local/dev date-and-symbol range using `deploy/env/local.env`, inspect performance/counts/reporting, and record the acquisition date, command, and result before any broad import. | H7.7 |
+
+Done: 2026-07-18 — added
+`docs/stonks/ohlcv-stooq-history-source-contract.md` with the manual
+`d_us_txt.zip`/Core boundary, exact US stock layout and identities, date and
+market/ticker filters, decimal OHLCV semantics, observed 9,598-file/1.36 GB
+selected volume, streaming/progress/restart rules, and explicit exclusions;
+aligned the architecture and package README. The supplied 537,380,289-byte ZIP
+passed integrity validation; focused source/fixture policy tests passed (6), and
+counts, representative rows, SHA-256, documentation links/consistency, Markdown
+fences, and `git diff --check` passed.
+
+Done: 2026-07-18 — added the public one-shot streaming parser and typed scope,
+discovery, chunk, per-market count, and summary records in
+`empire_stonks_ohlcv/stooq_history.py`; added a manifested Stooq member fixture,
+shared parser-contract coverage, deterministic recursive discovery, exact
+market/ticker/date filtering, decimal/fractional-volume parsing, bounded ZIP and
+issue handling, duplicate/rejection accounting, stable chunk-boundary tests,
+and public exports/README guidance. Focused tests passed (20); the full package
+suite passed (340, 12 environment-dependent skips). A bounded live-archive
+smoke test selected `AACB.US`, emitted five bars as `[2, 2, 1]`, filtered 218,
+and rejected zero. Poetry lock/check/build, compileall, pip check, public import,
+88-column scan, secret-pattern scan, and `git diff --check` passed.
+
+Done: 2026-07-18 — added `StooqHistoryChunkWriter` with one independent commit
+per sequential parser chunk, distinct listing resolution across split batches,
+inactive-series skipping, shared daily-bar upserts, rollback-safe failures, and
+bounded typed per-chunk/cumulative JSON-ready counts. Failed chunk numbers stay
+retryable while later chunks cannot leapfrog them. Unit tests cover commits,
+aggregation, inactive bars, safe failure details, rollback accounting, retry,
+ordering, and connection validation. The PostgreSQL integration test proved
+earlier commits survive a failed chunk, failed writes leave no residue,
+derived-only repair is counted, retry succeeds, and a full replay is unchanged.
+Focused tests passed (10, 1 environment skip), the full package suite passed
+(346, 13 environment skips), and the live database integration test passed.
+Poetry check, compileall, pip check, public import, 88-column scan, and
+`git diff --check` passed.
+
+Done: 2026-07-18 — added the public CLI-oriented
+`run_stooq_history_backfill()` lifecycle with one heartbeat-enabled Core run,
+explicit safe scope/chunk/storage parameters, non-moving raw ZIP retention,
+streaming from Core's validated `raw.zip` path, checksum source-snapshot
+registration, sequential chunk persistence, and JSON-ready success/failure
+summaries. Parser progress is now typed and emitted after discovery, every 100
+completed members, and every chunk commit; partial failures retain acquired
+object identity, exact rerun scope, parse position, cumulative write/failure
+counts, and last committed chunk without exception details. Added reusable Core
+`ObjectStore.get_path()` for bounded filesystem-backed streaming. Unit tests
+cover success sequencing, raw-copy ownership, safe parameters/progress,
+heartbeats, failure recovery context, pre-run validation, and 100-file progress.
+PostgreSQL integration proved the Core run, raw object, snapshot membership,
+listing/bar writes, heartbeat, and stored summary. Core tests passed (29); the
+OHLCV suite passed (350, 14 environment skips); live H7.3/H7.4 database tests
+passed (2). Poetry checks, dependency checks, compileall, public import,
+88-column scan, and `git diff --check` passed.
+
+Done: 2026-07-18 — added the public Stooq historical JSON report builder,
+deterministic serializer, scoped coverage query, typed market/series coverage
+records, and durable Core report storage. Reports capture exact input bounds,
+archive/snapshot identity, complete or partial parser state, chunk/write counts,
+elapsed time, last committed chunk, persisted versus requested-date coverage,
+bounded series and issue samples, safe failures/warnings, and native adjustment,
+volume, currency, corporate-action, and canonical-identity notes. The H7.4
+runner now stores PASS/WARN reports before successful completion and
+best-effort partial FAIL reports before failed Core runs close; summaries and
+successful return values include report identity/outcome. Coverage aggregation
+is provider/market/ticker scoped, with only the bounded sample set receiving
+series-level aggregation. Unit tests cover complete, warning, partial failure,
+coverage SQL bounds, deterministic JSON, durable storage, and runner wiring.
+PostgreSQL integration proved both complete and failed-chunk partial reports,
+durable object contents, safe Core summaries, and partial database coverage.
+The OHLCV suite passed (353, 15 environment skips); both live H7.5 database
+paths passed. Poetry checks, dependency checks, compileall, public import,
+88-column scan, and `git diff --check` passed.
+
+Done: 2026-07-18 — added the package and executable
+`stonks-ohlcv-stooq-backfill` operator entry points with `bin/env-load`, a
+required existing local `d_us_txt.zip`, explicit acquisition date, optional
+inclusive trading-date bounds, repeatable exact market/ticker filters, and a
+bounded chunk option. The initial 50,000-bar default follows the supplied prior
+implementation's row batch and is capped at 100,000 pending H7.8 performance
+validation. Arguments and scope are rejected before database connection;
+package progress is emitted as secret-safe JSON lines on stderr while stdout is
+reserved for one final JSON result. Runtime failures expose only a fixed safe
+message. No downloader, browser automation, DAG, or canonical-table path was
+added. CLI tests passed (16); the full package suite passed (369, 15
+environment-dependent skips). Wrapper syntax/help, Poetry check, dependency
+check, compileall, public CLI import, 88-column changed-file scan, and
+`git diff --check` passed.
+
+Done: 2026-07-18 — added manifested NYSE and NYSE MKT historical members and a
+PostgreSQL vertical test that builds one bounded three-market ZIP from those
+members plus the existing Nasdaq fixture. The test imports the same six-bar,
+three-symbol, multi-date scope twice through the complete package runner. It
+proves distinct Core runs/raw objects/reports reuse one checksum snapshot,
+provider-listing UUIDs and per-series date ranges remain stable, and the second
+run records three unchanged listings and six unchanged bars with no inserts,
+updates, or derived repairs. Instrumentation proves six two-row bar writes and,
+per run, exactly one snapshot commit plus three independently committed chunks.
+Both stored PASS reports reproduce the exact scope, write outcomes, and market
+coverage. Fixture-policy tests passed (3); the live H7.7 PostgreSQL test passed
+(1). The full package suite passed (369, 16 environment-dependent skips).
+Poetry check, dependency check, compileall, changed-file line-length scan, and
+`git diff --check` passed.
+
+Done: 2026-07-18 — completed the bounded development rehearsal with the real
+operator-supplied archive and the real CLI. The archive was acquired and
+inspected on 2026-07-18; it was 537,380,289 bytes with SHA-256
+`faf932285b47ae216461345e7bac7a1085d210cbddd2f02f8a575ab47ff50435`.
+The wrapper loaded its default `deploy/env/local.env` and the exact command was:
+
+```bash
+bin/stonks-ohlcv-stooq-backfill \
+  --input-path tmp/d_us_txt.zip \
+  --effective-date 2026-07-18 \
+  --start-date 2025-04-07 \
+  --end-date 2025-04-11 \
+  --market nasdaq \
+  --ticker AACB.US \
+  --chunk-size 50000
+```
+
+The CLI succeeded as Core run
+`1c948ab4-e075-4b75-be96-4fce8f2c2afb`. Archive acquisition progress arrived
+at 0.274 seconds, selected-member discovery at 0.358 seconds, the database run
+completed in 0.406 seconds, and CLI wall time was 0.75 seconds. The parser
+discovered and completed one file, read 223 rows, date-filtered 218, accepted
+five, and rejected none. One actual five-row transaction completed under the
+50,000-row configured maximum; it inserted one provider listing and five bars
+with no updates, unchanged rows, derived repairs, inactive skips, failed
+chunks, duplicates, or warnings. This validates the initial default on the
+bounded path but is not a 50,000-row capacity benchmark; a broad run must still
+be monitored through its per-chunk progress.
+
+The stored source snapshot is
+`9b045178-22e7-4e43-aa45-94a21b71990d`, backed by raw object
+`576ff9c8-ebf1-4d8d-99f0-c30b4088aa66`. Durable PASS report
+`a33a34ce-8775-420a-8ee3-5cb73fc3105d` records complete status, zero warnings
+and hard failures, one active `nasdaq/AACB.US` series, five persisted/scoped
+bars, exact coverage from 2025-04-07 through 2025-04-11, and
+`canonical_identity_mutation=false`. Database inspection matched all five
+provider OHLCV rows and the report's listing UUID
+`7f83335f-6368-4c0e-95bf-7ad6e39b33ab`. The retained raw object remains under
+the normal expiration policy; the report and source snapshot remain durable.
+
+Follow-up: 2026-07-18 — added a professional Stooq historical backfill PDF
+companion after Phase 7 completion, matching the shared Empire letter-format
+branding used by the EODData daily report. The package renderer converts both
+complete and partial schema-version-2 Stooq JSON reports into an executive
+summary, exact run scope, coverage, parser/write results, lineage,
+warning/failure, and native-semantics sections. The runner now stores durable
+`report.json` and `report.pdf` objects, and exposes both IDs in Core summaries
+and successful CLI output. JSON remains authoritative for the complete bounded
+sample. Unit tests cover rendering, metadata, Core storage, success wiring, and
+partial reports; PostgreSQL tests cover successful, failed-chunk, and replay
+storage. The real H7.8 JSON report was rendered to
+`output/pdf/stooq-history-backfill-report.pdf` and all four pages passed visual
+inspection after Poppler rendering.
