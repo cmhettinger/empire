@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date
+from math import ceil
 from pathlib import Path
 
+from reportlab.lib.colors import HexColor
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import stringWidth
@@ -22,6 +26,382 @@ def section_heading(text: str, *, styles: ReportStyles) -> Paragraph:
 
 def spacer(height: float = 12.0) -> Spacer:
     return Spacer(1, height)
+
+
+@dataclass(frozen=True, slots=True)
+class QuoteTileSpec:
+    """Display values for one reusable market-performance tile."""
+
+    ticker: str
+    price: float
+    change: float | None
+    change_pct: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class _QuoteTilePalette:
+    frame: object
+    body: object
+    band: object
+    value: object
+
+
+class QuoteTileGrid(Flowable):
+    """Responsive Empire-branded red, green, and neutral quote tiles."""
+
+    def __init__(
+        self,
+        tiles: Sequence[QuoteTileSpec],
+        *,
+        columns: int = 4,
+        tile_height: float = 82.0,
+        horizontal_gap: float = 7.0,
+        vertical_gap: float = 7.0,
+        theme: ReportTheme | None = None,
+    ) -> None:
+        super().__init__()
+        if columns <= 0:
+            raise ValueError("columns must be positive.")
+        if tile_height <= 0:
+            raise ValueError("tile_height must be positive.")
+        self.tiles = tuple(tiles)
+        self.columns = columns
+        self.tile_height = float(tile_height)
+        self.horizontal_gap = float(horizontal_gap)
+        self.vertical_gap = float(vertical_gap)
+        self.theme = theme or ReportTheme()
+        self._available_width = 0.0
+
+    def wrap(
+        self,
+        available_width: float,
+        available_height: float,
+    ) -> tuple[float, float]:
+        _ = available_height
+        self._available_width = float(available_width)
+        rows = ceil(len(self.tiles) / self.columns) if self.tiles else 0
+        height = (rows * self.tile_height) + (
+            max(0, rows - 1) * self.vertical_gap
+        )
+        return self._available_width, height
+
+    def draw(self) -> None:
+        if not self.tiles:
+            return
+        width = self._available_width or self.width
+        tile_width = (
+            width - ((self.columns - 1) * self.horizontal_gap)
+        ) / self.columns
+        row_count = ceil(len(self.tiles) / self.columns)
+        total_height = (row_count * self.tile_height) + (
+            max(0, row_count - 1) * self.vertical_gap
+        )
+        for index, tile in enumerate(self.tiles):
+            row = index // self.columns
+            column = index % self.columns
+            x = column * (tile_width + self.horizontal_gap)
+            y = total_height - ((row + 1) * self.tile_height) - (
+                row * self.vertical_gap
+            )
+            self._draw_tile(tile=tile, x=x, y=y, width=tile_width)
+
+    def _draw_tile(
+        self,
+        *,
+        tile: QuoteTileSpec,
+        x: float,
+        y: float,
+        width: float,
+    ) -> None:
+        canvas = self.canv
+        theme = self.theme
+        palette = _quote_tile_palette(tile.change_pct, theme=theme)
+        header_height = self.tile_height * 0.23
+        percent_height = self.tile_height * 0.27
+
+        canvas.saveState()
+        canvas.setFillColor(palette.body)
+        canvas.roundRect(x, y, width, self.tile_height, 4, fill=1, stroke=0)
+
+        canvas.setFillColor(palette.frame)
+        canvas.rect(
+            x,
+            y + self.tile_height - header_height,
+            width,
+            header_height,
+            fill=1,
+            stroke=0,
+        )
+        canvas.setFillColor(palette.band)
+        canvas.rect(x, y, width, percent_height, fill=1, stroke=0)
+        canvas.setFillColor(palette.body)
+        canvas.setStrokeColor(palette.frame)
+        canvas.setLineWidth(1.0)
+        canvas.roundRect(x, y, width, self.tile_height, 4, fill=0, stroke=1)
+
+        ticker_size = _fit_font_size(
+            tile.ticker,
+            theme.body_bold_font,
+            10.0,
+            width - 10.0,
+            minimum=6.0,
+        )
+        canvas.setFont(theme.body_bold_font, ticker_size)
+        canvas.setFillColor(theme.white)
+        canvas.drawCentredString(
+            x + (width / 2.0),
+            y + self.tile_height - header_height + 5.0,
+            tile.ticker,
+        )
+
+        price_text = f"{tile.price:,.2f}"
+        price_size = _fit_font_size(
+            price_text,
+            theme.body_bold_font,
+            14.0,
+            width - 10.0,
+            minimum=8.0,
+        )
+        canvas.setFillColor(theme.dark_grey)
+        canvas.setFont(theme.body_bold_font, price_size)
+        canvas.drawCentredString(
+            x + (width / 2.0),
+            y + percent_height + 14.0,
+            price_text,
+        )
+
+        change_text = "-" if tile.change is None else f"{tile.change:+,.2f}"
+        canvas.setFont(theme.body_font, 8.0)
+        canvas.setFillColor(palette.value)
+        canvas.drawCentredString(
+            x + (width / 2.0),
+            y + percent_height + 4.0,
+            change_text,
+        )
+
+        percent_text = (
+            "NO PRIOR CLOSE"
+            if tile.change_pct is None
+            else "UNCHANGED"
+            if abs(tile.change_pct) < 1e-12
+            else f"{tile.change_pct:+.2f}%"
+        )
+        percent_size = _fit_font_size(
+            percent_text,
+            theme.body_semibold_font,
+            9.5,
+            width - 8.0,
+            minimum=5.5,
+        )
+        canvas.setFont(theme.body_semibold_font, percent_size)
+        canvas.setFillColor(palette.value)
+        canvas.drawCentredString(
+            x + (width / 2.0),
+            y + 5.0,
+            percent_text,
+        )
+        canvas.restoreState()
+
+
+def quote_tile_grid(
+    tiles: Sequence[QuoteTileSpec],
+    *,
+    columns: int = 4,
+    tile_height: float = 82.0,
+    horizontal_gap: float = 7.0,
+    vertical_gap: float = 7.0,
+    theme: ReportTheme | None = None,
+) -> QuoteTileGrid:
+    return QuoteTileGrid(
+        tiles,
+        columns=columns,
+        tile_height=tile_height,
+        horizontal_gap=horizontal_gap,
+        vertical_gap=vertical_gap,
+        theme=theme,
+    )
+
+
+def _quote_direction(value: float | None) -> str:
+    if value is None or abs(value) < 1e-12:
+        return "neutral"
+    return "positive" if value > 0 else "negative"
+
+
+def _quote_tile_palette(
+    value: float | None,
+    *,
+    theme: ReportTheme,
+) -> _QuoteTilePalette:
+    direction = _quote_direction(value)
+    return {
+        "positive": _QuoteTilePalette(
+            frame=HexColor("#1F6B45"),
+            body=HexColor("#E4F1E9"),
+            band=HexColor("#CDE5D7"),
+            value=HexColor("#1F6B45"),
+        ),
+        "negative": _QuoteTilePalette(
+            frame=theme.primary,
+            body=HexColor("#F8E5E7"),
+            band=HexColor("#F0CDD1"),
+            value=theme.accent,
+        ),
+        "neutral": _QuoteTilePalette(
+            frame=theme.dark_grey,
+            body=HexColor("#EEEEEE"),
+            band=HexColor("#DCDCDC"),
+            value=theme.dark_grey,
+        ),
+    }[direction]
+
+
+class ProfessionalLetterDisclaimerPage(Flowable):
+    """Reusable Empire-branded disclaimer page for research reports."""
+
+    def __init__(
+        self,
+        *,
+        header_text: str = "EMPIRE RESEARCH DIVISION",
+        footer_text: str = "PROPRIETARY / INTERNAL USE ONLY",
+        warning_text: str = (
+            "This system is currently in development and not intended for live trading"
+        ),
+        branding: BrandingConfig | None = None,
+        theme: ReportTheme | None = None,
+        quote_image_path: Path | None = None,
+    ) -> None:
+        super().__init__()
+        self.header_text = header_text
+        self.footer_text = footer_text
+        self.warning_text = warning_text
+        self.branding = branding or BrandingConfig.discover()
+        self.theme = theme or ReportTheme()
+        self.quote_image_path = quote_image_path or (
+            self.branding.root / "images" / "buffett-no-crying.png"
+        )
+
+    def wrap(
+        self,
+        available_width: float,
+        available_height: float,
+    ) -> tuple[float, float]:
+        return available_width, available_height
+
+    def drawOn(self, canvas, x, y, _sW=0):  # noqa: N802
+        self.canv = canvas
+        self._sW = _sW
+        self.draw()
+
+    def draw(self) -> None:
+        canvas = self.canv
+        page_width, page_height = canvas._pagesize
+        theme = self.theme
+
+        side_margin = 0.5 * inch
+        content_width = page_width - (2.0 * side_margin)
+        top_rule_y = page_height - (0.75 * inch)
+        bottom_rule_y = 0.75 * inch
+        banner_x = 0.56 * inch
+        banner_y = 8.88 * inch
+        banner_width = page_width - (2.0 * banner_x)
+        banner_height = 0.58 * inch
+        quote_width = 6.73 * inch
+        quote_x = (page_width - quote_width) / 2.0
+        quote_y = 6.05 * inch
+
+        canvas.saveState()
+        canvas.setStrokeColor(theme.dark_grey)
+        canvas.setLineWidth(1.7)
+        canvas.line(side_margin, top_rule_y, page_width - side_margin, top_rule_y)
+        canvas.line(side_margin, bottom_rule_y, page_width - side_margin, bottom_rule_y)
+
+        canvas.setFillColor(theme.dark_grey)
+        canvas.setFont(theme.body_font, 11)
+        _draw_centered_text(
+            canvas,
+            self.header_text,
+            theme.body_font,
+            11,
+            side_margin,
+            content_width,
+            top_rule_y + 5.0,
+        )
+        _draw_centered_text(
+            canvas,
+            self.footer_text,
+            theme.body_font,
+            11,
+            side_margin,
+            content_width,
+            bottom_rule_y - 17.0,
+        )
+
+        canvas.setFillColor(theme.primary)
+        canvas.rect(
+            banner_x,
+            banner_y,
+            banner_width,
+            banner_height,
+            fill=1,
+            stroke=0,
+        )
+        canvas.setFillColor(theme.white)
+        canvas.setFont(theme.body_bold_font, 22)
+        canvas.drawCentredString(
+            page_width / 2.0,
+            banner_y + (0.18 * inch),
+            "DISCLAIMER",
+        )
+
+        if self.quote_image_path.exists():
+            reader = ImageReader(str(self.quote_image_path))
+            image_width, image_height = reader.getSize()
+            quote_height = quote_width * (float(image_height) / float(image_width))
+            canvas.drawImage(
+                reader,
+                quote_x,
+                quote_y,
+                width=quote_width,
+                height=quote_height,
+                mask="auto",
+                preserveAspectRatio=True,
+            )
+
+        warning_size = _fit_font_size(
+            self.warning_text,
+            theme.body_semibold_font,
+            14.0,
+            content_width,
+            minimum=10.0,
+        )
+        canvas.setFillColor(theme.dark_grey)
+        canvas.setFont(theme.body_semibold_font, warning_size)
+        canvas.drawCentredString(page_width / 2.0, 3.92 * inch, self.warning_text)
+        canvas.restoreState()
+
+
+def professional_letter_disclaimer_page(
+    *,
+    header_text: str = "EMPIRE RESEARCH DIVISION",
+    footer_text: str = "PROPRIETARY / INTERNAL USE ONLY",
+    warning_text: str = (
+        "This system is currently in development and not intended for live trading"
+    ),
+    branding: BrandingConfig | None = None,
+    theme: ReportTheme | None = None,
+    quote_image_path: Path | None = None,
+) -> list[Flowable]:
+    return [
+        ProfessionalLetterDisclaimerPage(
+            header_text=header_text,
+            footer_text=footer_text,
+            warning_text=warning_text,
+            branding=branding,
+            theme=theme,
+            quote_image_path=quote_image_path,
+        )
+    ]
 
 
 class ProfessionalLetterTitlePage(Flowable):
@@ -156,7 +536,15 @@ class ProfessionalLetterTitlePage(Flowable):
 
         canvas.setFillColor(theme.dark_grey)
         canvas.setFont(theme.body_font, 11)
-        _draw_centered_text(canvas, self.header_text, theme.body_font, 11, side_margin, content_width, top_label_y)
+        _draw_centered_text(
+            canvas,
+            self.header_text,
+            theme.body_font,
+            11,
+            side_margin,
+            content_width,
+            top_label_y,
+        )
         _draw_centered_text(
             canvas,
             self.classification_text,
@@ -202,13 +590,29 @@ class ProfessionalLetterTitlePage(Flowable):
             canvas.setFillColor(theme.dark_grey)
             if self.date_label:
                 canvas.setFont(theme.body_semibold_font, 10)
-                canvas.drawCentredString(date_center_x, date_year_y + 4.0, self.date_label.upper())
+                canvas.drawCentredString(
+                    date_center_x,
+                    date_year_y + 4.0,
+                    self.date_label.upper(),
+                )
                 canvas.setFont(theme.body_bold_font, 16)
-                canvas.drawCentredString(date_center_x, date_month_day_y, self.report_date.isoformat())
+                canvas.drawCentredString(
+                    date_center_x,
+                    date_month_day_y,
+                    self.report_date.isoformat(),
+                )
             else:
                 canvas.setFont(theme.body_bold_font, 21)
-                canvas.drawCentredString(date_center_x, date_year_y, self.report_date.strftime("%Y"))
-                canvas.drawCentredString(date_center_x, date_month_day_y, self.report_date.strftime("%b %d").upper())
+                canvas.drawCentredString(
+                    date_center_x,
+                    date_year_y,
+                    self.report_date.strftime("%Y"),
+                )
+                canvas.drawCentredString(
+                    date_center_x,
+                    date_month_day_y,
+                    self.report_date.strftime("%b %d").upper(),
+                )
 
         canvas.restoreState()
 
@@ -256,7 +660,11 @@ def cover_page(
     logo_path: Path | None = None,
 ) -> list[Flowable]:
     branding_config = branding or BrandingConfig.discover()
-    resolved_logo = logo_path or branding_config.logo_path(color="red", lockup="horizontal", size="256h")
+    resolved_logo = logo_path or branding_config.logo_path(
+        color="red",
+        lockup="horizontal",
+        size="256h",
+    )
 
     flowables: list[Flowable] = [Spacer(1, 1.4 * inch)]
     if resolved_logo.exists():

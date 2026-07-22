@@ -74,11 +74,12 @@ def stonks_ohlcv_eoddata_daily_scrape():
         payload = result.to_dict()
         log.info(
             "Completed EODData daily run %s for %s with JSON report %s, "
-            "PDF report %s (%s)",
+            "run PDF %s, and market PDF %s (%s)",
             payload["run_id"],
             payload["effective_date"],
             payload["report_object_id"],
             payload["pdf_report_object_id"],
+            payload["market_pdf_report_object_id"],
             payload["report_outcome"],
         )
         return payload

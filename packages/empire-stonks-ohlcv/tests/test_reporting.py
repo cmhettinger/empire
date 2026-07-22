@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, date, datetime
 from pathlib import Path
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
@@ -17,6 +18,7 @@ from empire_stonks_ohlcv import (
     EODDATA_SYMBOL_LIST_SOURCE,
     EODDataCredentials,
     EODDataImportResult,
+    MARKET_PDF_REPORT_OBJECT_KIND,
     FeedOutcomeCounts,
     ImportIssue,
     OHLCVConfig,
@@ -35,7 +37,13 @@ from empire_stonks_ohlcv import (
     eoddata_report_to_json,
     render_eoddata_daily_pdf,
     store_eoddata_pdf_report,
+    store_eoddata_daily_market_pdf_report,
     store_eoddata_report,
+)
+from empire_stonks_ohlcv.daily_market_reporting import (
+    DailyMarketUniverse,
+    EODDataDailyMarketReport,
+    MarketBreadth,
 )
 
 
@@ -438,6 +446,53 @@ def test_stores_pdf_report_beside_json_report(
     assert stored.content_type == "application/pdf"
     assert stored.object_key.endswith(f"/{RUN_ID}/reports")
     assert stored.metadata["outcome"] == "WARN"
+    assert ObjectStore(repository).get_bytes(stored.object_id).startswith(b"%PDF-")
+
+
+def test_stores_daily_market_pdf_as_distinct_run_artifact(
+    tmp_path: Path,
+) -> None:
+    market_report = EODDataDailyMarketReport(
+        trading_date=EFFECTIVE_DATE,
+        generated_at=GENERATED_AT,
+        universe=DailyMarketUniverse(3, 3, 0, 0),
+        breadth=tuple(
+            MarketBreadth(
+                market=market,
+                equity_count=1,
+                comparable_count=0,
+                advancers=0,
+                decliners=0,
+                unchanged=0,
+                missing_comparison=1,
+                total_volume=Decimal("100"),
+                average_return=None,
+            )
+            for market in MARKETS
+        ),
+        move_buckets=(),
+        winners=(),
+        losers=(),
+        volume_leaders=(),
+        price_anomalies=(),
+        volume_anomalies=(),
+    )
+    repository = FakeObjectRepository(tmp_path / "objects")
+
+    stored = store_eoddata_daily_market_pdf_report(
+        object_store=ObjectStore(repository),
+        run_context=_run_context(),
+        config=OHLCVConfig(
+            eoddata_credentials=EODDataCredentials(api_key=SECRET),
+        ),
+        report=market_report,
+        output_dir=tmp_path / "render",
+    )
+
+    assert stored.filename == "daily-market-report.pdf"
+    assert stored.logical_name == "eoddata_daily_market_pdf_report"
+    assert stored.object_kind == MARKET_PDF_REPORT_OBJECT_KIND
+    assert stored.metadata["equity_bar_count"] == 3
     assert ObjectStore(repository).get_bytes(stored.object_id).startswith(b"%PDF-")
 
 

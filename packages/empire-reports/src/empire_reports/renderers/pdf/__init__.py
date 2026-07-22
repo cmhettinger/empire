@@ -1,10 +1,15 @@
 """ReportLab-based PDF rendering helpers."""
 
 from empire_reports.renderers.pdf.components import (
+    ProfessionalLetterDisclaimerPage,
     ProfessionalLetterTitlePage,
+    QuoteTileGrid,
+    QuoteTileSpec,
     cover_page,
     paragraph,
+    professional_letter_disclaimer_page,
     professional_letter_title_page,
+    quote_tile_grid,
     section_heading,
     spacer,
 )
@@ -34,7 +39,10 @@ __all__ = [
     "PageSpec",
     "PdfDocument",
     "PdfRenderer",
+    "ProfessionalLetterDisclaimerPage",
     "ProfessionalLetterTitlePage",
+    "QuoteTileGrid",
+    "QuoteTileSpec",
     "TemplateRegistry",
     "TemplateSpec",
     "build_pdf",
@@ -43,7 +51,9 @@ __all__ = [
     "make_doc",
     "make_page_template",
     "paragraph",
+    "professional_letter_disclaimer_page",
     "professional_letter_title_page",
+    "quote_tile_grid",
     "section_heading",
     "spacer",
 ]

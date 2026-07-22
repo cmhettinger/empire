@@ -109,6 +109,7 @@ def test_eoddata_daily_task_delegates_and_returns_compact_result(monkeypatch):
         "effective_date": "2026-07-17",
         "report_object_id": "7a7e188f-272b-4384-a63a-0d6fb3695d5a",
         "pdf_report_object_id": "92d58710-d9f5-4b79-9c76-26348c2733e4",
+        "market_pdf_report_object_id": "aaec1a3e-6934-4ce6-9668-c2de7696c131",
         "report_outcome": "PASS",
         "listing_counts": {"inserted": 3, "updated": 0, "unchanged": 0},
         "bar_counts": {"inserted": 3, "updated": 0, "unchanged": 0},

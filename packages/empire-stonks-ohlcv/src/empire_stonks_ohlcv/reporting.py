@@ -12,6 +12,7 @@ from typing import Any
 from empire_core import ObjectStore, RunContext, StoredObject
 
 from empire_stonks_ohlcv.config import DEFAULT_EODDATA_EXCHANGES, OHLCVConfig
+from empire_stonks_ohlcv.daily_market_reporting import EODDataDailyMarketReport
 from empire_stonks_ohlcv.eoddata import EODDATA_PROVIDER_CODE
 from empire_stonks_ohlcv.eoddata_import import EODDataImportResult
 from empire_stonks_ohlcv.health import (
@@ -26,6 +27,10 @@ from empire_stonks_ohlcv.reports.eoddata_daily_pdf import (
     EODDATA_DAILY_PDF_REPORT_ID,
     render_eoddata_daily_pdf,
 )
+from empire_stonks_ohlcv.reports.eoddata_daily_market_pdf import (
+    EODDATA_DAILY_MARKET_PDF_REPORT_ID,
+    render_eoddata_daily_market_pdf,
+)
 from empire_stonks_ohlcv.source_conventions import (
     EODDATA_DAILY_SOURCE,
     EODDATA_SYMBOL_LIST_SOURCE,
@@ -38,8 +43,10 @@ REPORT_OBJECT_KIND = "stonks_ohlcv_provider_report"
 REPORT_CONTENT_TYPE = "application/json"
 PDF_REPORT_OBJECT_KIND = "stonks_ohlcv_provider_pdf_report"
 PDF_REPORT_CONTENT_TYPE = "application/pdf"
+MARKET_PDF_REPORT_OBJECT_KIND = "stonks_ohlcv_market_pdf_report"
 _REPORT_FILENAME = "report.json"
 _PDF_REPORT_FILENAME = "report.pdf"
+_MARKET_PDF_REPORT_FILENAME = "daily-market-report.pdf"
 _SOURCES = (EODDATA_SYMBOL_LIST_SOURCE, EODDATA_DAILY_SOURCE)
 _PATH_TOKEN_PATTERN = re.compile(r"^[a-z0-9]+(?:[_-][a-z0-9]+)*$")
 
@@ -333,6 +340,67 @@ def store_eoddata_pdf_report(
             "effective_date": report["effective_date"],
             "generated_at": report["generated_at"],
             "outcome": report["outcome"],
+        },
+    )
+
+
+def store_eoddata_daily_market_pdf_report(
+    *,
+    object_store: ObjectStore,
+    run_context: RunContext,
+    config: OHLCVConfig,
+    report: EODDataDailyMarketReport,
+    storage_root: str = DEFAULT_STORAGE_ROOT,
+    output_dir: str | Path | None = None,
+) -> StoredObject:
+    """Render and store the date-scoped EODData equity market report."""
+
+    if not isinstance(object_store, ObjectStore):
+        raise TypeError("object_store must be a Core ObjectStore.")
+    if not isinstance(config, OHLCVConfig):
+        raise TypeError("config must be an OHLCVConfig.")
+    if not isinstance(report, EODDataDailyMarketReport):
+        raise TypeError("report must be an EODDataDailyMarketReport.")
+    _validate_run_context(run_context)
+    if report.trading_date != run_context.effective_date:
+        raise ValueError("report trading_date must match the Core run.")
+
+    render_root = Path(output_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp"))
+    render_dir = (
+        render_root
+        / "empire"
+        / "stonks-ohlcv"
+        / str(run_context.run_id)
+        / "reports"
+    )
+    result = render_eoddata_daily_market_pdf(
+        report=report,
+        output_dir=render_dir,
+        filename=_MARKET_PDF_REPORT_FILENAME,
+    )
+    return object_store.put_file(
+        run_context=run_context,
+        object_scope="run",
+        domain="stonks",
+        logical_name="eoddata_daily_market_pdf_report",
+        storage_root=storage_root,
+        object_key=build_report_object_key(
+            storage_key=config.storage_key,
+            run_context=run_context,
+            provider_code=EODDATA_PROVIDER_CODE,
+        ),
+        filename=_MARKET_PDF_REPORT_FILENAME,
+        source_path=result.primary_artifact.path,
+        move=False,
+        content_type=PDF_REPORT_CONTENT_TYPE,
+        object_kind=MARKET_PDF_REPORT_OBJECT_KIND,
+        metadata={
+            "report_id": EODDATA_DAILY_MARKET_PDF_REPORT_ID,
+            "provider_code": EODDATA_PROVIDER_CODE,
+            "trading_date": report.trading_date.isoformat(),
+            "generated_at": report.generated_at.isoformat(),
+            "source_bar_count": report.universe.source_bar_count,
+            "equity_bar_count": report.universe.equity_bar_count,
         },
     )
 

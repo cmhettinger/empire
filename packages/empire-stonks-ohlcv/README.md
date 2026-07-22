@@ -392,17 +392,45 @@ The object has no expiration and its metadata contains only schema version,
 provider, effective/generated dates, and outcome. Runtime credentials are not
 accepted by the report builder and are never serialized from `OHLCVConfig`.
 
+The same completed run stores two distinct PDFs. `report.pdf` is the
+human-readable run-status companion to `report.json`.
+`daily-market-report.pdf` analyzes all persisted EODData bars for the effective
+date whose retained provider symbol type is `Equity`. It reports exchange
+breadth, close-to-close return distribution, leading advancers and decliners,
+volume leaders, and supported price/volume anomalies. Market highlights and
+exchange movers use reusable Empire red/green/neutral quote tiles. Ranked
+equity sections normally occupy one page each with up to 12 tiles in a 4-by-3
+grid followed by the matching detail table. This pattern covers session
+leaders and laggards, per-exchange advancers and decliners, volume leaders,
+high-volume low-movement names, and smaller configured cohorts when they fit.
+Additional
+tile and detail pages cover the Magnificent Seven plus versioned Dow 30 and
+Nasdaq-100 configured baskets. These basket ticker sets are report-owned
+analytical cohorts, not authoritative or historically effective-dated index
+membership; every section reports available coverage and missing names.
+Up to 12 high-volume, low-movement equities per exchange receive dedicated
+tile and OHLCV detail pages when rows qualify. They require an absolute
+calculated close-to-close return no greater than 0.50% and rank by reported
+share volume, then smallest absolute return.
+The market report uses
+the shared Empire title page, disclaimer, colors, logos, Cinzel cover type, and
+Source Sans 3 document type. It intentionally omits index-level benchmarks,
+sector, industry, commodity, and technical-indicator sections until those
+capabilities exist in the current schema.
+
 ## EODData daily runner
 
 `run_eoddata_daily()` owns the provider's nightly package sequence under one
 Core run: acquire the three Symbol List objects followed by three Quote List
 objects, read and parse/reconcile them in NYSE/NASDAQ/AMEX order, execute the
-atomic import, build and store the detailed report, and complete the Core run.
+atomic import, build and store the run-status and daily-market reports, and
+complete the Core run.
 Callers provide the connection, Core services, explicit effective date, and
 runtime identity; the package neither loads environment files nor depends on
 Airflow.
 
-The returned `EODDataDailyRunResult` contains only the run/report IDs, status,
+The returned `EODDataDailyRunResult` contains only the run and three report
+object IDs, status,
 effective date, aggregate write/issue and rejected-row counts, inactive skip
 count, and report outcome. Core params and summaries use
 `OHLCVConfig.to_safe_dict()` and never
