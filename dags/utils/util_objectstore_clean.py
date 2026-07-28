@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from airflow.sdk import dag, get_current_context, task
-from empire_core import EmpireDatabase, ObjectStore, RunService
+from empire_core import (
+    EmpireDatabase,
+    ObjectStore,
+    RunService,
+    remove_file_and_prune_empty_parents,
+)
 from empire_reports.contracts import RenderContext, RenderResult, ReportMetadata
 from empire_reports.renderers.pdf import (
     HeaderFooterSpec,
@@ -283,7 +288,7 @@ def _write_summary_pdf_to_object_store(
         generated_at=generated_at,
         filename=filename,
     )
-    return object_store.put_file(
+    stored = object_store.put_file(
         run_context=storage_run_context,
         object_scope="run",
         domain="utils",
@@ -301,6 +306,11 @@ def _write_summary_pdf_to_object_store(
             "generated_at": report["generated_at"],
         },
     )
+    remove_file_and_prune_empty_parents(
+        result.primary_artifact.path,
+        stop_at=render_root,
+    )
+    return stored
 
 
 def _render_summary_pdf(
