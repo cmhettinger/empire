@@ -199,9 +199,6 @@ def _body_story(
                 )
             )
 
-    story.extend(_high_volume_low_movement_story(report, renderer=renderer))
-    story.extend(_configured_basket_story(report, renderer=renderer))
-
     for market in DEFAULT_EODDATA_EXCHANGES:
         leaders = tuple(
             row for row in report.volume_leaders if row.market == market
@@ -219,6 +216,29 @@ def _body_story(
                 renderer=renderer,
             )
         )
+
+    for market in DEFAULT_EODDATA_EXCHANGES:
+        low_volume = tuple(
+            row for row in report.low_volume if row.market == market
+        )
+        if not low_volume:
+            continue
+        story.extend(
+            _ranked_equity_page(
+                title=f"Low Volume - {market}",
+                subtitle=(
+                    "The least actively traded EODData equities with positive "
+                    "reported share volume for the day. Zero-volume listings are "
+                    "excluded."
+                ),
+                rows=low_volume,
+                renderer=renderer,
+            )
+        )
+
+    story.extend(_high_volume_low_movement_story(report, renderer=renderer))
+    story.extend(_additional_volume_mover_story(report, renderer=renderer))
+    story.extend(_configured_basket_story(report, renderer=renderer))
 
     if report.price_anomalies:
         story.extend(
@@ -273,6 +293,28 @@ def _body_story(
                 "to 12 equities with an absolute calculated close-to-close return "
                 "no greater than 0.50%, ranked by reported share volume and then "
                 "by smallest absolute return.",
+                styles=renderer.styles,
+            ),
+            paragraph(
+                "<b>Low volume.</b> Each exchange section shows up to 12 equities "
+                "with the lowest positive reported share volume. Listings with "
+                "zero or missing volume are excluded.",
+                styles=renderer.styles,
+            ),
+            paragraph(
+                "<b>Unconfirmed price moves.</b> This section shows up to 12 "
+                "equities with an absolute calculated close-to-close return of at "
+                "least 5.00% whose positive reported share volume is at or below "
+                "the 20th percentile of the eligible report universe. Results are "
+                "ranked by absolute return and then by lowest volume.",
+                styles=renderer.styles,
+            ),
+            paragraph(
+                "<b>High-conviction movers.</b> This section intersects each "
+                "exchange's 12 leading advancers and 12 leading decliners with the "
+                "48 highest-volume equities across the report universe. Up to 12 "
+                "overlapping names are ranked by absolute return multiplied by "
+                "the natural logarithm of one plus reported volume.",
                 styles=renderer.styles,
             ),
             paragraph(
@@ -569,6 +611,39 @@ def _high_volume_low_movement_story(
                 spacer(10),
                 _high_volume_low_movement_table(rows, renderer=renderer),
             ]
+        )
+    return story
+
+
+def _additional_volume_mover_story(
+    report: EODDataDailyMarketReport,
+    *,
+    renderer: PdfRenderer,
+) -> list[Any]:
+    story: list[Any] = []
+    if report.unconfirmed_price_moves:
+        story.extend(
+            _ranked_equity_page(
+                title="Unconfirmed Price Moves",
+                subtitle=(
+                    "Large close-to-close moves on bottom-quintile positive "
+                    "volume may reflect thin liquidity and warrant confirmation."
+                ),
+                rows=report.unconfirmed_price_moves,
+                renderer=renderer,
+            )
+        )
+    if report.high_conviction_movers:
+        story.extend(
+            _ranked_equity_page(
+                title="High-Conviction Movers",
+                subtitle=(
+                    "Names appearing among both the day's strongest price movers "
+                    "and its highest-volume participants."
+                ),
+                rows=report.high_conviction_movers,
+                renderer=renderer,
+            )
         )
     return story
 

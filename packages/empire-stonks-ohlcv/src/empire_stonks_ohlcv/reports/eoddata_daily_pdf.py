@@ -19,7 +19,9 @@ from empire_reports.renderers.pdf import (
     section_heading,
     spacer,
 )
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import (
+    LongTable,
     NextPageTemplate,
     PageBreak,
     Paragraph,
@@ -36,6 +38,8 @@ HEADER_TEXT = "EMPIRE RESEARCH DIVISION"
 FOOTER_TEXT = "PROPRIETARY / INTERNAL USE ONLY"
 REPORT_TIMEZONE_ENV = "EMPIRE_REPORT_TIMEZONE"
 DEFAULT_REPORT_TIMEZONE = "America/New_York"
+PDF_SAMPLE_LIMIT = 10
+PDF_SAMPLE_DETAIL_MAX_CHARACTERS = 750
 
 
 def render_eoddata_daily_pdf(
@@ -356,15 +360,13 @@ def _review_sections(report: dict[str, Any], *, renderer: PdfRenderer) -> list[A
         total = _int(section.get("total_count"))
         if not total:
             continue
+        retained_samples = section.get("samples") or []
         heading = Paragraph(escape(title), renderer.styles.subheading)
         heading.keepWithNext = 1
         summary = paragraph(
-            f"{total:,} total; "
-            f"{_int(section.get('sample_count')):,} samples shown"
-            + (
-                "; sample list truncated."
-                if section.get("truncated")
-                else "."
+            _pdf_sample_summary(
+                total=total,
+                retained_count=len(retained_samples),
             ),
             styles=renderer.styles,
         )
@@ -373,39 +375,202 @@ def _review_sections(report: dict[str, Any], *, renderer: PdfRenderer) -> list[A
             [
                 heading,
                 summary,
-                _sample_table(section.get("samples") or [], renderer=renderer),
+                _sample_table(retained_samples, renderer=renderer),
                 spacer(8),
             ]
         )
     rejections = report.get("row_rejections") or {}
     if _int(rejections.get("rejected_records")):
-        heading = Paragraph(
-            "Row Rejection Reasons", renderer.styles.subheading
+        sections.extend(
+            _row_rejection_sections(rejections, renderer=renderer)
         )
-        heading.keepWithNext = 1
+    return sections
+
+
+def _row_rejection_sections(
+    rejections: dict[str, Any],
+    *,
+    renderer: PdfRenderer,
+) -> list[Any]:
+    reasons = [
+        reason
+        for reason in rejections.get("reasons") or []
+        if _int(reason.get("rejected_records"))
+    ]
+    heading = Paragraph("Row Rejection Reasons", renderer.styles.subheading)
+    heading.keepWithNext = 1
+    sections: list[Any] = [
+        heading,
+        _row_rejection_summary_table(reasons, renderer=renderer),
+        spacer(8),
+    ]
+    for reason in reasons:
+        samples = reason.get("samples") or []
+        reason_heading = Paragraph(
+            escape(
+                f"{reason.get('market') or 'Unknown'} - "
+                f"{_rejection_reason_label(reason.get('code'))}"
+            ),
+            renderer.styles.subheading,
+        )
+        reason_heading.keepWithNext = 1
+        sample_summary = _pdf_sample_summary(
+            total=_int(reason.get("rejected_records")),
+            retained_count=len(samples),
+            include_total=False,
+        )
+        summary = paragraph(
+            (
+                f"{_int(reason.get('rejected_records')):,} rejected records across "
+                f"{_int(reason.get('rejected_rows')):,} source rows. "
+                f"{sample_summary}"
+            ),
+            styles=renderer.styles,
+        )
+        summary.keepWithNext = 1
         sections.extend(
             [
-                heading,
-                _sample_table(
-                    rejections.get("reasons") or [], renderer=renderer
-                ),
+                reason_heading,
+                summary,
+                _sample_table(samples, renderer=renderer),
+                spacer(8),
             ]
         )
     return sections
 
 
+def _row_rejection_summary_table(
+    reasons: list[dict[str, Any]],
+    *,
+    renderer: PdfRenderer,
+) -> Table:
+    rows: list[list[Any]] = [
+        ["Market", "Source", "Reason", "Records", "Rows", "JSON Samples"]
+    ]
+    rows.extend(
+        [
+            reason.get("market") or "",
+            reason.get("source_code") or "",
+            _rejection_reason_label(reason.get("code")),
+            _fmt_int(reason.get("rejected_records")),
+            _fmt_int(reason.get("rejected_rows")),
+            _fmt_int(reason.get("sample_count")),
+        ]
+        for reason in reasons
+    )
+    if len(rows) == 1:
+        rows.append(["-", "-", "No rejection reasons retained.", "-", "-", "-"])
+    return _table(
+        rows,
+        renderer=renderer,
+        col_widths=[52, 88, 174, 58, 50, 82],
+    )
+
+
 def _sample_table(samples: list[Any], *, renderer: PdfRenderer) -> Table:
+    selected = _representative_samples(samples)
     rows: list[list[Any]] = [["#", "Detail"]]
-    for index, sample in enumerate(samples, start=1):
-        detail = (
-            json.dumps(sample, sort_keys=True)
-            if isinstance(sample, (dict, list))
-            else str(sample)
-        )
-        rows.append([index, detail])
+    for index, sample in enumerate(selected, start=1):
+        rows.append([index, _sample_detail(sample)])
     if len(rows) == 1:
         rows.append(["-", "No samples retained."])
-    return _table(rows, renderer=renderer, col_widths=[30, 474])
+    sample_style = ParagraphStyle(
+        "EODDataDailySample",
+        parent=renderer.styles.small,
+        wordWrap="CJK",
+    )
+    return _table(
+        rows,
+        renderer=renderer,
+        col_widths=[30, 474],
+        body_style=sample_style,
+        long=True,
+    )
+
+
+def _representative_samples(
+    samples: list[Any],
+    *,
+    limit: int = PDF_SAMPLE_LIMIT,
+) -> list[Any]:
+    if limit <= 0:
+        raise ValueError("limit must be positive.")
+    if len(samples) <= limit:
+        return list(samples)
+    if limit == 1:
+        return [samples[0]]
+    last_index = len(samples) - 1
+    return [
+        samples[round(position * last_index / (limit - 1))]
+        for position in range(limit)
+    ]
+
+
+def _sample_detail(sample: Any) -> str:
+    if isinstance(sample, dict):
+        preferred_keys = (
+            "code",
+            "market",
+            "ticker",
+            "record_reference",
+            "source_code",
+            "message",
+        )
+        ordered_keys = [
+            *[key for key in preferred_keys if key in sample],
+            *sorted(key for key in sample if key not in preferred_keys),
+        ]
+        detail = "; ".join(
+            f"{_humanize(key)}: {_compact_sample_value(sample[key])}"
+            for key in ordered_keys
+        )
+    elif isinstance(sample, list):
+        detail = json.dumps(sample, sort_keys=True)
+    else:
+        detail = str(sample)
+    if len(detail) <= PDF_SAMPLE_DETAIL_MAX_CHARACTERS:
+        return detail
+    omitted = len(detail) - PDF_SAMPLE_DETAIL_MAX_CHARACTERS
+    return (
+        detail[:PDF_SAMPLE_DETAIL_MAX_CHARACTERS].rstrip()
+        + f"... [{omitted:,} characters omitted]"
+    )
+
+
+def _compact_sample_value(value: Any) -> str:
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, sort_keys=True)
+    return str(value)
+
+
+def _pdf_sample_summary(
+    *,
+    total: int,
+    retained_count: int,
+    include_total: bool = True,
+) -> str:
+    displayed_count = min(retained_count, PDF_SAMPLE_LIMIT)
+    text = (
+        (
+            f"{total:,} total; showing "
+            if include_total
+            else "Showing "
+        )
+        + f"{displayed_count:,} representative "
+        f"{'sample' if displayed_count == 1 else 'samples'} in this PDF. "
+        f"The JSON report retains {retained_count:,} "
+        f"{'sample' if retained_count == 1 else 'samples'}"
+    )
+    if retained_count < total:
+        return text + " and its sample list is truncated."
+    return text + "."
+
+
+def _rejection_reason_label(value: Any) -> str:
+    code = str(value or "unknown")
+    if code.startswith("eoddata_"):
+        code = code.removeprefix("eoddata_")
+    return _humanize(code).replace("ohlcv", "OHLCV")
 
 
 def _key_value_table(values: dict[str, Any], *, renderer: PdfRenderer) -> Table:
@@ -418,16 +583,23 @@ def _table(
     *,
     renderer: PdfRenderer,
     col_widths: list[float],
+    body_style: ParagraphStyle | None = None,
+    long: bool = False,
 ) -> Table:
-    body_style = renderer.styles.small
+    resolved_body_style = body_style or renderer.styles.small
     data = [
         [
-            str(cell) if row_index == 0 else Paragraph(escape(str(cell)), body_style)
+            (
+                str(cell)
+                if row_index == 0
+                else Paragraph(escape(str(cell)), resolved_body_style)
+            )
             for cell in row
         ]
         for row_index, row in enumerate(rows)
     ]
-    table = Table(data, colWidths=col_widths, repeatRows=1)
+    table_class = LongTable if long else Table
+    table = table_class(data, colWidths=col_widths, repeatRows=1)
     table.setStyle(
         TableStyle(
             [

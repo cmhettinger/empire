@@ -45,10 +45,12 @@ class FakeCursor:
     def __init__(self) -> None:
         self.rows: list[tuple[object, ...]] = []
         self.calls: list[tuple[str, tuple[object, ...]]] = []
+        self.queries: dict[str, str] = {}
 
     def execute(self, query: str, params: tuple[object, ...]) -> None:
         marker = query.split("empire_daily_market:", 1)[1].split(" ", 1)[0]
         self.calls.append((marker, params))
+        self.queries[marker] = query
         if marker == "basket":
             configured = tuple(str(value) for value in params[0])
             self.rows = [
@@ -103,6 +105,15 @@ class FakeCursor:
             ],
             "volume_leaders": [
                 ("NASDAQ", "BBB", "Beta", "USD", 21, 1, Decimal("0.05"), 800),
+            ],
+            "low_volume": [
+                ("AMEX", "THIN", "Thin", "USD", 5, 1, Decimal("0.25"), 1),
+            ],
+            "unconfirmed_price_moves": [
+                ("AMEX", "JUMP", "Jump", "USD", 6, 1, Decimal("0.20"), 2),
+            ],
+            "high_conviction_movers": [
+                ("NYSE", "AAA", "Alpha", "USD", 12, 2, Decimal("0.20"), 500),
             ],
             "price_anomalies": [
                 (
@@ -171,6 +182,9 @@ def test_builds_date_scoped_provider_native_market_report() -> None:
     assert report.basket("unknown") is None
     assert report.high_volume_low_movement[0].ticker == "FLAT"
     assert report.high_volume_low_movement[0].changepct == Decimal("0.0025")
+    assert report.low_volume[0].ticker == "THIN"
+    assert report.unconfirmed_price_moves[0].ticker == "JUMP"
+    assert report.high_conviction_movers[0].ticker == "AAA"
     assert [item[0] for item in cursor.calls] == [
         "universe",
         "breadth",
@@ -184,16 +198,28 @@ def test_builds_date_scoped_provider_native_market_report() -> None:
         "basket",
         "basket",
         "high_volume_low_movement",
+        "low_volume",
+        "unconfirmed_price_moves",
+        "high_conviction_movers",
     ]
     assert all(call[1][0] == "EODDATA" for call in cursor.calls[:8])
     assert all(call[1][1] == "EODDATA" for call in cursor.calls[8:11])
     assert cursor.calls[11][1][0] == "EODDATA"
     assert cursor.calls[11][1][2] == Decimal("0.005")
     assert cursor.calls[11][1][3] == 12
+    assert cursor.calls[12][1][3] == 12
+    assert cursor.calls[13][1][3] == Decimal("0.20")
+    assert cursor.calls[13][1][4] == Decimal("0.05")
+    assert cursor.calls[13][1][6] == 12
+    assert cursor.calls[14][1][3:6] == (12, 12, 48)
+    assert cursor.calls[14][1][7] == 12
     assert cursor.calls[3][1][2] == 12
     assert cursor.calls[4][1][2] == 12
     assert cursor.calls[5][1][2] == 12
     assert all(TRADING_DATE in call[1] for call in cursor.calls)
+    assert "daily.volume > 0" in cursor.queries["low_volume"]
+    assert "daily.volume > 0" in cursor.queries["unconfirmed_price_moves"]
+    assert "daily.volume > 0" in cursor.queries["high_conviction_movers"]
 
 
 def test_missing_market_breadth_is_filled_with_zeroes() -> None:
@@ -363,4 +389,7 @@ def _complete_report() -> EODDataDailyMarketReport:
                 volume=Decimal("50000000"),
             ),
         ),
+        low_volume=equities,
+        unconfirmed_price_moves=(equities[0],),
+        high_conviction_movers=(equities[0], equities[1]),
     )

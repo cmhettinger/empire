@@ -26,19 +26,6 @@ These pages should wait for an explicit benchmark/index capability rather than
 using unversioned ticker guesses. That capability needs durable provider
 symbols, benchmark identity, coverage checks, and clear adjustment semantics.
 
-### Additional Volume and Mover Analysis
-
-| Legacy pages | Page or section | Why it is not implemented |
-| --- | --- | --- |
-| 10, 12, 14 | Low Volume - NYSE, NASDAQ, and NYSE American | The current report implements high-volume leaders but not the inverse low-volume ranking. Before adding it, the eligibility rule needs a useful liquidity floor so the pages do not become lists of dormant or immaterial listings. |
-| 24 | Unconfirmed Price Moves | This requires a defined low-volume threshold combined with a large-move threshold. The legacy implementation used a cross-sectional volume percentile; Empire has not yet approved or tested that methodology for the provider-native universe. |
-| 25 | High-Conviction Movers | This requires a documented intersection between outsized returns and high-volume participation. The current report has both mover and volume data, but the overlap rule and ranking have not yet been formalized or tested. |
-
-These pages can be built from current OHLCV data once their eligibility,
-threshold, and ranking contracts are made explicit. They should use the normal
-one-page pattern of up to 12 semantic quote tiles followed by the matching
-detail table.
-
 ### Sector and Industry Analysis
 
 | Legacy pages | Page or section | Why it is not implemented |
@@ -110,9 +97,11 @@ part of this TODO:
 - Executive summary, exchange breadth, and return distribution.
 - Session and per-exchange leaders and laggards.
 - High-volume leaders by exchange.
+- Low-volume equities with positive reported volume by exchange.
 - High-Volume, Low Movement by exchange.
+- Unconfirmed Price Moves using a 5% absolute return and bottom-quintile volume.
+- High-Conviction Movers using price-mover and high-volume overlap.
 - Magnificent Seven performance.
 - Configured Dow 30 and Nasdaq-100 basket performance with coverage disclosure.
 - Price and volume anomalies supported by the current schema.
 - Methodology, scope, and provider-native capability disclosures.
-

@@ -14,6 +14,12 @@ from empire_stonks_ohlcv.eoddata import EODDATA_PROVIDER_CODE
 
 TOP_MOVER_LIMIT = 12
 TOP_VOLUME_LIMIT = 12
+LOW_VOLUME_LIMIT = 12
+UNCONFIRMED_MOVE_LIMIT = 12
+UNCONFIRMED_MOVE_MIN_ABS_RETURN = Decimal("0.05")
+UNCONFIRMED_MOVE_LOW_VOLUME_PERCENTILE = Decimal("0.20")
+HIGH_CONVICTION_LIMIT = 12
+HIGH_CONVICTION_VOLUME_POOL_LIMIT = 48
 PRICE_ANOMALY_LIMIT = 40
 VOLUME_ANOMALY_LIMIT = 40
 HIGH_VOLUME_LOW_MOVEMENT_LIMIT = 12
@@ -153,6 +159,9 @@ class EODDataDailyMarketReport:
     volume_anomalies: tuple[VolumeAnomaly, ...]
     baskets: tuple[DailyMarketBasketSnapshot, ...] = ()
     high_volume_low_movement: tuple[HighVolumeLowMovementRow, ...] = ()
+    low_volume: tuple[DailyEquityRow, ...] = ()
+    unconfirmed_price_moves: tuple[DailyEquityRow, ...] = ()
+    high_conviction_movers: tuple[DailyEquityRow, ...] = ()
 
     def __post_init__(self) -> None:
         if type(self.trading_date) is not date:
@@ -268,6 +277,25 @@ def build_eoddata_daily_market_report(
             limit=HIGH_VOLUME_LOW_MOVEMENT_LIMIT,
             max_abs_return=LOW_MOVEMENT_MAX_ABS_RETURN,
         ),
+        low_volume=_select_low_volume(
+            cursor=cursor,
+            trading_date=trading_date,
+            limit=LOW_VOLUME_LIMIT,
+        ),
+        unconfirmed_price_moves=_select_unconfirmed_price_moves(
+            cursor=cursor,
+            trading_date=trading_date,
+            limit=UNCONFIRMED_MOVE_LIMIT,
+            min_abs_return=UNCONFIRMED_MOVE_MIN_ABS_RETURN,
+            low_volume_percentile=UNCONFIRMED_MOVE_LOW_VOLUME_PERCENTILE,
+        ),
+        high_conviction_movers=_select_high_conviction_movers(
+            cursor=cursor,
+            trading_date=trading_date,
+            mover_limit=TOP_MOVER_LIMIT,
+            volume_pool_limit=HIGH_CONVICTION_VOLUME_POOL_LIMIT,
+            limit=HIGH_CONVICTION_LIMIT,
+        ),
     )
 
 
@@ -352,6 +380,202 @@ def _select_high_volume_low_movement(
         )
         for row in cursor.fetchall()
     )
+
+
+def _select_low_volume(
+    *,
+    cursor: Any,
+    trading_date: date,
+    limit: int,
+) -> tuple[DailyEquityRow, ...]:
+    cursor.execute(
+        """
+        /* empire_daily_market:low_volume */
+        WITH ranked AS (
+            SELECT
+                listing.market,
+                listing.ticker,
+                coalesce(nullif(btrim(listing.name), ''), listing.ticker) AS name,
+                listing.metadata ->> 'currency' AS currency,
+                daily.close,
+                daily.change,
+                daily.changepct,
+                daily.volume,
+                row_number() OVER (
+                    PARTITION BY listing.market
+                    ORDER BY daily.volume, listing.ticker
+                ) AS market_rank
+            FROM stonks.ohlcv_daily AS daily
+            JOIN stonks.provider_listing AS listing
+              USING (provider_listing_id)
+            WHERE listing.provider_code = %s
+              AND daily.trading_date = %s
+              AND listing.market = ANY(%s::text[])
+              AND daily.close > 0
+              AND daily.volume > 0
+              AND upper(coalesce(listing.metadata ->> 'type', '')) = 'EQUITY'
+        )
+        SELECT market, ticker, name, currency, close, change, changepct, volume
+        FROM ranked
+        WHERE market_rank <= %s
+        ORDER BY array_position(%s::text[], market), market_rank
+        """,
+        (
+            EODDATA_PROVIDER_CODE,
+            trading_date,
+            list(DEFAULT_EODDATA_EXCHANGES),
+            limit,
+            list(DEFAULT_EODDATA_EXCHANGES),
+        ),
+    )
+    return tuple(_daily_equity_row(row) for row in cursor.fetchall())
+
+
+def _select_unconfirmed_price_moves(
+    *,
+    cursor: Any,
+    trading_date: date,
+    limit: int,
+    min_abs_return: Decimal,
+    low_volume_percentile: Decimal,
+) -> tuple[DailyEquityRow, ...]:
+    cursor.execute(
+        """
+        /* empire_daily_market:unconfirmed_price_moves */
+        WITH eligible AS (
+            SELECT
+                listing.market,
+                listing.ticker,
+                coalesce(nullif(btrim(listing.name), ''), listing.ticker) AS name,
+                listing.metadata ->> 'currency' AS currency,
+                daily.close,
+                daily.change,
+                daily.changepct,
+                daily.volume
+            FROM stonks.ohlcv_daily AS daily
+            JOIN stonks.provider_listing AS listing
+              USING (provider_listing_id)
+            WHERE listing.provider_code = %s
+              AND daily.trading_date = %s
+              AND listing.market = ANY(%s::text[])
+              AND daily.close > 0
+              AND daily.volume > 0
+              AND upper(coalesce(listing.metadata ->> 'type', '')) = 'EQUITY'
+        ), volume_threshold AS (
+            SELECT
+                percentile_cont(%s::double precision)
+                    WITHIN GROUP (ORDER BY volume)
+                    AS low_volume_threshold
+            FROM eligible
+        )
+        SELECT
+            eligible.market,
+            eligible.ticker,
+            eligible.name,
+            eligible.currency,
+            eligible.close,
+            eligible.change,
+            eligible.changepct,
+            eligible.volume
+        FROM eligible
+        CROSS JOIN volume_threshold
+        WHERE eligible.changepct IS NOT NULL
+          AND abs(eligible.changepct) >= %s
+          AND eligible.volume <= volume_threshold.low_volume_threshold
+        ORDER BY
+            abs(eligible.changepct) DESC,
+            eligible.volume,
+            array_position(%s::text[], eligible.market),
+            eligible.ticker
+        LIMIT %s
+        """,
+        (
+            EODDATA_PROVIDER_CODE,
+            trading_date,
+            list(DEFAULT_EODDATA_EXCHANGES),
+            low_volume_percentile,
+            min_abs_return,
+            list(DEFAULT_EODDATA_EXCHANGES),
+            limit,
+        ),
+    )
+    return tuple(_daily_equity_row(row) for row in cursor.fetchall())
+
+
+def _select_high_conviction_movers(
+    *,
+    cursor: Any,
+    trading_date: date,
+    mover_limit: int,
+    volume_pool_limit: int,
+    limit: int,
+) -> tuple[DailyEquityRow, ...]:
+    cursor.execute(
+        """
+        /* empire_daily_market:high_conviction_movers */
+        WITH eligible AS (
+            SELECT
+                listing.market,
+                listing.ticker,
+                coalesce(nullif(btrim(listing.name), ''), listing.ticker) AS name,
+                listing.metadata ->> 'currency' AS currency,
+                daily.close,
+                daily.change,
+                daily.changepct,
+                daily.volume
+            FROM stonks.ohlcv_daily AS daily
+            JOIN stonks.provider_listing AS listing
+              USING (provider_listing_id)
+            WHERE listing.provider_code = %s
+              AND daily.trading_date = %s
+              AND listing.market = ANY(%s::text[])
+              AND daily.close > 0
+              AND daily.volume > 0
+              AND daily.changepct IS NOT NULL
+              AND upper(coalesce(listing.metadata ->> 'type', '')) = 'EQUITY'
+        ), ranked AS (
+            SELECT
+                *,
+                row_number() OVER (
+                    PARTITION BY market
+                    ORDER BY changepct DESC, ticker
+                ) AS advancer_rank,
+                row_number() OVER (
+                    PARTITION BY market
+                    ORDER BY changepct, ticker
+                ) AS decliner_rank,
+                row_number() OVER (
+                    ORDER BY volume DESC, market, ticker
+                ) AS volume_rank
+            FROM eligible
+        )
+        SELECT market, ticker, name, currency, close, change, changepct, volume
+        FROM ranked
+        WHERE (
+                (changepct > 0 AND advancer_rank <= %s)
+             OR (changepct < 0 AND decliner_rank <= %s)
+        )
+          AND volume_rank <= %s
+        ORDER BY
+            abs(changepct) * ln(1 + volume) DESC,
+            abs(changepct) DESC,
+            volume DESC,
+            array_position(%s::text[], market),
+            ticker
+        LIMIT %s
+        """,
+        (
+            EODDATA_PROVIDER_CODE,
+            trading_date,
+            list(DEFAULT_EODDATA_EXCHANGES),
+            mover_limit,
+            mover_limit,
+            volume_pool_limit,
+            list(DEFAULT_EODDATA_EXCHANGES),
+            limit,
+        ),
+    )
+    return tuple(_daily_equity_row(row) for row in cursor.fetchall())
 
 
 def _select_basket_snapshot(

@@ -143,6 +143,25 @@ def test_daily_market_report_queries_persisted_eoddata_equities(
         (row.market, row.ticker)
         for row in report.high_volume_low_movement
     ) == (("AMEX", equities[2].ticker),)
+    assert {
+        (row.market, row.ticker)
+        for row in report.low_volume
+    } == {
+        ("NYSE", equities[0].ticker),
+        ("NASDAQ", equities[1].ticker),
+        ("AMEX", equities[2].ticker),
+    }
+    assert tuple(
+        (row.market, row.ticker)
+        for row in report.unconfirmed_price_moves
+    ) == (("NASDAQ", equities[1].ticker),)
+    assert {
+        (row.market, row.ticker)
+        for row in report.high_conviction_movers
+    } == {
+        ("NYSE", equities[0].ticker),
+        ("NASDAQ", equities[1].ticker),
+    }
 
 
 def _bar(trading_date: date, *, close: str, volume: str) -> DailyBar:

@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 
 import empire_stonks_ohlcv.reporting as reporting
+import empire_stonks_ohlcv.reports.eoddata_daily_pdf as daily_pdf
 from empire_core import ObjectStore, RunContext, StorageRoot, StoredObject
 from empire_stonks_ohlcv import (
     AcquiredObject,
@@ -416,6 +417,73 @@ def test_renders_human_readable_eoddata_pdf(
     assert pdf_path.name == "report.pdf"
     assert pdf_path.read_bytes().startswith(b"%PDF-")
     assert pdf_path.stat().st_size > 10_000
+
+
+def test_pdf_bounds_large_diagnostic_sections_and_nested_rejection_samples(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_health(monkeypatch)
+    report = build_eoddata_report(
+        cursor=object(),
+        import_result=_import_result(),
+        generated_at=GENERATED_AT,
+    )
+    gap_samples = [
+        {
+            "market": "AMEX",
+            "ticker": f"GAP{index:03d}",
+            "last_trading_date": "2026-07-01",
+            "latest_bar_weekday_age": index,
+        }
+        for index in range(100)
+    ]
+    rejection_samples = [
+        {
+            "code": "eoddata_quote_invalid_ohlcv",
+            "message": "Invalid Quote List OHLCV rows were rejected.",
+            "source_code": "eoddata_daily",
+            "record_reference": f"AMEX:BAD{index:03d}",
+        }
+        for index in range(100)
+    ]
+    report["markets"][2]["weekday_gap_warnings"] = {
+        "total_count": 16_530,
+        "sample_count": 100,
+        "truncated": True,
+        "samples": gap_samples,
+    }
+    report["row_rejections"] = {
+        "rejected_records": 470,
+        "rejected_rows": 470,
+        "reasons": [
+            {
+                "source_code": "eoddata_daily",
+                "market": "AMEX",
+                "code": "eoddata_quote_invalid_ohlcv",
+                "rejected_records": 470,
+                "rejected_rows": 470,
+                "sample_count": 100,
+                "truncated": True,
+                "samples": rejection_samples,
+            }
+        ],
+    }
+
+    result = render_eoddata_daily_pdf(
+        report=report,
+        output_dir=tmp_path,
+    )
+
+    pdf_path = result.primary_artifact.path
+    assert pdf_path.read_bytes().startswith(b"%PDF-")
+    selected = daily_pdf._representative_samples(list(range(100)))
+    assert len(selected) == daily_pdf.PDF_SAMPLE_LIMIT == 10
+    assert selected[0] == 0
+    assert selected[-1] == 99
+    detail = daily_pdf._sample_detail({"message": "X" * 10_000})
+    assert "characters omitted" in detail
+    assert len(detail) < 1_000
 
 
 def test_stores_pdf_report_beside_json_report(
