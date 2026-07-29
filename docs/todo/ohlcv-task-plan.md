@@ -79,7 +79,7 @@ completion criteria.
 The future `empire-stonks-ohlcv-bridge` package is deferred until the OHLCV
 package is stable and the security master is further along. No bridge package,
 mapping table, mapping status, or `listing_id` dependency is part of phases
-0-10 below.
+0-11 below.
 
 ## Initial Data Contract
 
@@ -172,64 +172,194 @@ their task IDs remain valid dependencies for active work.
 
 ## Phase 8: Yahoo Daily End-To-End Vertical Slice
 
-Goal: add Yahoo acquisition, persistence, reporting, and the intentionally
-selected scheduling mode while keeping non-OHLCV Yahoo data out of the package.
+Goal: seed the deliberately bounded Yahoo benchmark universe, backfill its
+provider-native daily bars, and keep every eligible completed market session
+current without using Yahoo for ordinary equities already covered by EODData.
+Calendar-aware eligibility, retries, and reconciliation belong in the package;
+Airflow only invokes that logic.
+
+### Initial Yahoo Seed Universe
+
+Y8.4 must seed the following 93 provider listings. `Yahoo ticker` is the exact
+provider-native symbol used for acquisition. `Empire code` is the proposed
+stable short label from the source inventory; Y8.2/Y8.4 must make an explicit
+schema decision for it rather than placing it in `provider_listing.market`.
+The migration should preserve this reviewed starting universe while allowing a
+later migration to add, correct, deactivate, or remove individual listings.
+
+| Empire code | Yahoo ticker | Name | Instrument type |
+|-------------|--------------|------|-----------------|
+| SPX | ^GSPC | S&P 500 Index | EQUITY_INDEX |
+| DJI | ^DJI | Dow Jones Industrial Average | EQUITY_INDEX |
+| DJT | ^DJT | Dow Jones Transportation Average | EQUITY_INDEX |
+| DJU | ^DJU | Dow Jones Utility Average | EQUITY_INDEX |
+| NDX | ^NDX | Nasdaq-100 Index | EQUITY_INDEX |
+| IXIC | ^IXIC | Nasdaq Composite Index | EQUITY_INDEX |
+| NYA | ^NYA | NYSE Composite Index | EQUITY_INDEX |
+| RUT | ^RUT | Russell 2000 Index | EQUITY_INDEX |
+| RUA | ^RUA | Russell 3000 Index | EQUITY_INDEX |
+| W5000 | ^W5000 | Wilshire 5000 Total Market Index | EQUITY_INDEX |
+| OEX | ^OEX | S&P 100 Index | EQUITY_INDEX |
+| SP400 | ^SP400 | S&P MidCap 400 Index | EQUITY_INDEX |
+| SP600 | ^SP600 | S&P SmallCap 600 Index | EQUITY_INDEX |
+| SOX | ^SOX | PHLX Semiconductor Index | EQUITY_INDEX |
+| NYFANG | ^NYFANG | NYSE FANG+ Index | EQUITY_INDEX |
+| VIX | ^VIX | CBOE Volatility Index | VOLATILITY_INDEX |
+| VXN | ^VXN | CBOE Nasdaq-100 Volatility Index | VOLATILITY_INDEX |
+| RVX | ^RVX | CBOE Russell 2000 Volatility Index | VOLATILITY_INDEX |
+| VVIX | ^VVIX | CBOE VIX Volatility Index | VOLATILITY_INDEX |
+| SKEW | ^SKEW | CBOE SKEW Index | VOLATILITY_INDEX |
+| MOVE | ^MOVE | ICE BofA MOVE Bond Volatility Index | VOLATILITY_INDEX |
+| UST5Y | ^FVX | U.S. Treasury 5-Year Yield Index | YIELD_INDEX |
+| UST10Y | ^TNX | U.S. Treasury 10-Year Yield Index | YIELD_INDEX |
+| UST30Y | ^TYX | U.S. Treasury 30-Year Yield Index | YIELD_INDEX |
+| FTSE | ^FTSE | FTSE 100 Index | EQUITY_INDEX |
+| DAX | ^GDAXI | DAX 40 Index | EQUITY_INDEX |
+| CAC | ^FCHI | CAC 40 Index | EQUITY_INDEX |
+| STOXX50E | ^STOXX50E | EURO STOXX 50 Index | EQUITY_INDEX |
+| STOXX600 | ^STOXX | STOXX Europe 600 Index | EQUITY_INDEX |
+| IBEX | ^IBEX | IBEX 35 Index | EQUITY_INDEX |
+| AEX | ^AEX | AEX Netherlands Index | EQUITY_INDEX |
+| SMI | ^SSMI | Swiss Market Index | EQUITY_INDEX |
+| FTSEMIB | FTSEMIB.MI | FTSE MIB Index | EQUITY_INDEX |
+| OMXSTO30 | ^OMX | OMX Stockholm 30 Index | EQUITY_INDEX |
+| BEL20 | ^BFX | BEL 20 Index | EQUITY_INDEX |
+| PSI20 | PSI20.LS | PSI 20 Index | EQUITY_INDEX |
+| ISEQ | ^ISEQ | ISEQ Overall Index | EQUITY_INDEX |
+| N225 | ^N225 | Nikkei 225 Index | EQUITY_INDEX |
+| HSI | ^HSI | Hang Seng Index | EQUITY_INDEX |
+| HSCEI | ^HSCE | Hang Seng China Enterprises Index | EQUITY_INDEX |
+| KOSPI | ^KS11 | KOSPI Composite Index | EQUITY_INDEX |
+| SHCOMP | 000001.SS | Shanghai Composite Index | EQUITY_INDEX |
+| CSI300 | 000300.SS | CSI 300 Index | EQUITY_INDEX |
+| SZCOMPONENT | 399001.SZ | Shenzhen Component Index | EQUITY_INDEX |
+| TWSE | ^TWII | Taiwan Weighted Index | EQUITY_INDEX |
+| STI | ^STI | Straits Times Index | EQUITY_INDEX |
+| SET | ^SET | Stock Exchange of Thailand SET Index | EQUITY_INDEX |
+| JCI | ^JKSE | Jakarta Composite Index | EQUITY_INDEX |
+| KLCI | ^KLSE | FTSE Bursa Malaysia KLCI Index | EQUITY_INDEX |
+| PSEI | PSEI.PS | Philippine Stock Exchange PSEi Index | EQUITY_INDEX |
+| NIFTY50 | ^NSEI | Nifty 50 Index | EQUITY_INDEX |
+| SENSEX | ^BSESN | BSE Sensex Index | EQUITY_INDEX |
+| ASX200 | ^AXJO | S&P/ASX 200 Index | EQUITY_INDEX |
+| TSXCOMP | ^GSPTSE | S&P/TSX Composite Index | EQUITY_INDEX |
+| BOVESPA | ^BVSP | Bovespa Index | EQUITY_INDEX |
+| MEXIPC | ^MXX | S&P/BMV IPC Index | EQUITY_INDEX |
+| MERVAL | ^MERV | S&P MERVAL Index | EQUITY_INDEX |
+| IPSA | ^IPSA | S&P IPSA Index | EQUITY_INDEX |
+| JTOPI | ^JA0R.JO | FTSE/JSE Top 40 Index | EQUITY_INDEX |
+| XU100 | XU100.IS | BIST 100 Index | EQUITY_INDEX |
+| TA125 | ^TA125.TA | TA-125 Index | EQUITY_INDEX |
+| TASI | ^TASI.SR | Tadawul All Share Index | EQUITY_INDEX |
+| MSCIWORLD | ^990100-USD-STRD | MSCI World Index | EQUITY_INDEX |
+| MSCIEM | ^891800-USD-STRD | MSCI Emerging Markets Index | EQUITY_INDEX |
+| MSCIACWI | ^892400-USD-STRD | MSCI All Country World Index | EQUITY_INDEX |
+| GSCI | ^SPGSCI | S&P GSCI Commodity Index | COMMODITY_INDEX |
+| BCOM | ^BCOM | Bloomberg Commodity Index | COMMODITY_INDEX |
+| DXY | DX-Y.NYB | ICE U.S. Dollar Index | CURRENCY_INDEX |
+| ES | ES=F | E-mini S&P 500 Futures | CONTINUOUS_FUTURE_EQUITY |
+| NQ | NQ=F | E-mini Nasdaq-100 Futures | CONTINUOUS_FUTURE_EQUITY |
+| YM | YM=F | E-mini Dow Jones Industrial Average Futures | CONTINUOUS_FUTURE_EQUITY |
+| RTY | RTY=F | E-mini Russell 2000 Futures | CONTINUOUS_FUTURE_EQUITY |
+| WTI | CL=F | WTI Crude Oil Futures | CONTINUOUS_FUTURE_COMMODITY |
+| BRENT | BZ=F | Brent Crude Oil Futures | CONTINUOUS_FUTURE_COMMODITY |
+| NATGAS | NG=F | Henry Hub Natural Gas Futures | CONTINUOUS_FUTURE_COMMODITY |
+| HEATOIL | HO=F | New York Harbor ULSD Heating Oil Futures | CONTINUOUS_FUTURE_COMMODITY |
+| RBOB | RB=F | RBOB Gasoline Futures | CONTINUOUS_FUTURE_COMMODITY |
+| GOLD | GC=F | Gold Futures | CONTINUOUS_FUTURE_COMMODITY |
+| SILVER | SI=F | Silver Futures | CONTINUOUS_FUTURE_COMMODITY |
+| COPPER | HG=F | Copper Futures | CONTINUOUS_FUTURE_COMMODITY |
+| PLATINUM | PL=F | Platinum Futures | CONTINUOUS_FUTURE_COMMODITY |
+| PALLADIUM | PA=F | Palladium Futures | CONTINUOUS_FUTURE_COMMODITY |
+| CORN | ZC=F | Corn Futures | CONTINUOUS_FUTURE_COMMODITY |
+| WHEAT | ZW=F | Chicago SRW Wheat Futures | CONTINUOUS_FUTURE_COMMODITY |
+| SOYBEANS | ZS=F | Soybean Futures | CONTINUOUS_FUTURE_COMMODITY |
+| SOYMEAL | ZM=F | Soybean Meal Futures | CONTINUOUS_FUTURE_COMMODITY |
+| SOYOIL | ZL=F | Soybean Oil Futures | CONTINUOUS_FUTURE_COMMODITY |
+| COFFEE | KC=F | Coffee C Futures | CONTINUOUS_FUTURE_COMMODITY |
+| SUGAR | SB=F | Sugar No. 11 Futures | CONTINUOUS_FUTURE_COMMODITY |
+| COCOA | CC=F | Cocoa Futures | CONTINUOUS_FUTURE_COMMODITY |
+| COTTON | CT=F | Cotton No. 2 Futures | CONTINUOUS_FUTURE_COMMODITY |
+| LIVECATTLE | LE=F | Live Cattle Futures | CONTINUOUS_FUTURE_COMMODITY |
+| LEANHOGS | HE=F | Lean Hogs Futures | CONTINUOUS_FUTURE_COMMODITY |
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| Y8.1 | [ ] | Document Yahoo source and config contract | Record the chosen OHLCV endpoint/source, `EMPIRE_STONKS_OHLCV_YAHOO_*` settings, request inputs, market/ticker fields, native daily/adjusted semantics, rate/error behavior, and explicit exclusion of enrichment. Runtime values come from `deploy/env/local.env`. | H7.8, A5.1-A5.2 |
-| Y8.2 | [ ] | Implement Yahoo acquisition | Acquire Yahoo OHLCV responses with injected HTTP dependencies, timeouts, bounded retries, provider-appropriate request pacing, Core raw storage, and secret-safe errors/metadata. | Y8.1, C4.2, A5.5 |
-| Y8.3 | [ ] | Implement Yahoo parser | Parse Yahoo fixtures into the selected provider-native OHLCV series without adding adjusted-close or provider-specific columns to the shared tables. | Y8.1-Y8.2, A5.3-A5.4 |
-| Y8.4 | [ ] | Implement Yahoo import service | Compose validation, snapshot registration, provider-series resolution, bar writes, and import summaries. Rerun tests pass. | Y8.2-Y8.3, E6.5-E6.6 |
-| Y8.5 | [ ] | Build and store Yahoo report | Reuse the shared report contract for Yahoo-scoped import health, freshness, coverage, stale series, gap warnings, failures, and native adjustment notes. | Y8.4, E6.7-E6.8 |
-| Y8.6 | [ ] | Add Yahoo CLI | Add an operator CLI and `bin` wrapper using `bin/env-load`; it runs controlled Yahoo import plus reporting and emits a secret-safe summary. | Y8.5, B1.8 |
-| Y8.7 | [ ] | Add Yahoo daily runner | Add package-owned Yahoo sequencing with configured request bounds, Core run lifecycle, and reporting. Tests cover success, failure, and reruns. | Y8.5-Y8.6 |
-| Y8.8 | [ ] | Decide and implement Yahoo DAG mode | Record whether Yahoo is scheduled, manual-only, or limited to selected symbols based on the implemented source constraints. Add the matching thin DAG and tests only when operationally justified. | Y8.7, B1.5-B1.7 |
-| Y8.9 | [ ] | Verify Yahoo vertical workflow | Verify enabled DAG discovery and run the full Yahoo fixture path through reporting. Confirm lineage, secret safety, rerun behavior, and coexistence with overlapping EODData and historical Stooq data. | Y8.8, M3.7 |
+| Y8.1 | [ ] | Document the Yahoo source and bounded-universe contract | Record the chosen daily OHLCV endpoint, `EMPIRE_STONKS_OHLCV_YAHOO_*` settings, request/range limits, ticker and provider-date semantics, time zones, native adjusted-close and volume behavior, rate/error behavior, and Core raw retention. Explicitly limit Yahoo to the seeded indexes, yield and volatility indexes, currency and commodity indexes, and continuous futures; exclude ordinary equities and non-OHLCV enrichment. Runtime values come from `deploy/env/local.env`. | H7.8, A5.1-A5.2 |
+| Y8.2 | [ ] | Design the shared market-session eligibility contract | Define the smallest reusable representation for each provider listing's calendar, local session/time zone, post-close delay, and session-date rule. Cover exchange-traded cash indexes, publisher-calculated indexes, DXY, and Yahoo `=F` provider daily-settlement series. Define `eligible_at`, missing-session detection, no synthetic weekend/holiday bars, retry behavior, and a configurable 5-7-session reconciliation window. Record why the selected market-calendar library is justified and how unsupported calendars or provider-date ambiguity fail safely. | Y8.1, M3.7 |
+| Y8.3 | [ ] | Add Yahoo instrument taxonomy migration | Add an idempotent Flyway migration for `YIELD_INDEX`, `EQUITY_INDEX`, `COMMODITY_INDEX`, `CURRENCY_INDEX`, `CONTINUOUS_FUTURE_COMMODITY`, and `CONTINUOUS_FUTURE_EQUITY`, using existing `INDEX` and `DERIVATIVE` classes and the reference-data upsert convention. Database validation and generated Stonks schema docs pass. | Y8.2 |
+| Y8.4 | [ ] | Add session-policy schema and seed Yahoo provider listings | Implement the Y8.2 persistence design in a Flyway migration and seed the complete reviewed Yahoo catalog supplied for this phase into `stonks.provider_listing` under the existing `YAHOO` provider. Store each Yahoo symbol as the provider-native ticker; explicitly decide whether the accompanying Empire short code warrants a generic alias field/table, and never overload `market` with it. Attach an instrument type and explicit session policy to every row. The migration is deterministic/idempotent, rejects missing provider/type/calendar references, contains no ordinary equities, and has assertions/tests for representative cash indexes, global indexes, yields, volatility, DXY, equity-index futures, and commodity futures. | Y8.2-Y8.3 |
+| Y8.5 | [ ] | Implement calendar and eligibility services | Add package-owned services that resolve expected sessions from the configured market calendar, honor local holidays and early closes, calculate `eligible_at = session_close + availability_delay`, and return only eligible missing sessions. Implement an explicit provider-daily-settlement cutoff for Yahoo continuous futures and safe handling for publisher indexes without an exchange calendar. Tests cross UTC/date boundaries, DST, holidays, early closes, disjoint country holidays, reruns, and unknown calendars. | Y8.4 |
+| Y8.6 | [ ] | Implement Yahoo acquisition | Acquire bounded historical ranges for selected seeded Yahoo listings with injected HTTP dependencies, timeouts, bounded retries, request pacing, and chunking where the source requires it. Store every response through Core with durable snapshot identity and secret-safe errors/metadata. Tests cover rate limiting, empty/malformed/error payloads, partial symbol failures, and request-boundary dates. | Y8.1, Y8.4-Y8.5, C4.2, A5.5 |
+| Y8.7 | [ ] | Implement Yahoo parser | Parse Yahoo fixtures into shared provider-listing and daily-bar records with correct provider session dates, nullable volume where valid, deterministic duplicate handling, and documented adjusted-close treatment consistent with the shared table contract. Do not silently substitute adjusted close for native close or add Yahoo-only columns. | Y8.1, Y8.6, A5.3-A5.4 |
+| Y8.8 | [ ] | Implement Yahoo import service | Compose validation, snapshot registration, seeded provider-listing resolution, daily-bar upserts, and per-listing import summaries. Do not create unseeded Yahoo listings during normal import. Unchanged reruns skip writes, later provider corrections update current rows, and one listing failure does not discard successful listings. | Y8.6-Y8.7, E6.5-E6.6 |
+| Y8.9 | [ ] | Add Yahoo historical backfill runner and CLI | Add a package-owned backfill runner, operator CLI, and `bin` wrapper using `bin/env-load`. It enumerates all active seeded Yahoo listings, accepts explicit bounded date/range controls and safe resume/retry behavior, imports available history in source-safe chunks, records Core lifecycle/lineage, and emits a secret-safe machine-readable summary and report. Tests cover full enumeration, partial restart, unchanged rerun, correction, and partial failure. | Y8.8, B1.8 |
+| Y8.10 | [ ] | Implement Yahoo daily completeness planning | For each active seeded Yahoo listing, determine completed expected sessions, calculate eligibility, compare them with stored `ohlcv_daily` rows, and produce a bounded pull plan containing only eligible missing sessions. A rerun before eligibility or after completion is a no-op; a failed/missing session remains retryable on a later run. Tests prove one record per real market session across U.S., European, Asian, and futures examples. | Y8.5, Y8.8-Y8.9 |
+| Y8.11 | [ ] | Add recent-session reconciliation | Add a daily reconciliation pass that re-pulls the configured recent 5-7 expected sessions, compares provider OHLC, close/adjustment semantics, and volume with current rows, and applies idempotent corrections through the normal upsert path. Surface corrected-row counts and field-level differences in run results/reports without adding a bar-revision table. Tests cover late bars, changed values, null volume, provider-date corrections, and unchanged history. | Y8.7-Y8.10 |
+| Y8.12 | [ ] | Build and store Yahoo reports | Reuse the shared report contract for Yahoo-scoped backfill and daily health, expected-session coverage, ineligible versus missing sessions, stale listings, retries/failures, reconciliation corrections, calendar-policy errors, and native adjustment notes. Reports distinguish initial ingestion from reconciliation and remain queryable after raw-object cleanup. | Y8.9-Y8.11, E6.7-E6.8 |
+| Y8.13 | [ ] | Add Yahoo daily runner and CLI | Add package-owned sequencing and an operator CLI/`bin` wrapper that run eligibility planning, eligible missing-session ingestion, recent-session reconciliation, Core lifecycle, and reporting with configured request bounds. Tests cover no-op, success, partial failure, retry, correction, and idempotent rerun. | Y8.10-Y8.12, B1.8 |
+| Y8.14 | [ ] | Add the initially manual Yahoo DAG | Add `dags/stonks/stonks_ohlcv_yahoo_daily_scrape.py` as a thin manually triggered DAG that invokes the daily runner. Keep schedule selection out of the DAG's business logic; document the intended eventual multi-run cadence (for example 06:00, 10:00, 13:00, 18:00, and 23:00 America/New_York, or hourly if live request volume permits) and leave automatic enablement to the rollout gate. DAG tests prove importability, manual schedule state, parameter forwarding, no-op success, and failure propagation. | Y8.13, B1.5-B1.7 |
+| Y8.15 | [ ] | Verify the Yahoo vertical workflow | Run the complete fixture path from seeded listings through backfill, eligibility-based daily ingestion, reconciliation, stored reports, and raw-object cleanup. Verify lineage, secret safety, request bounds, calendar behavior, provider isolation, reruns, corrections, and coexistence with EODData and historical Stooq data. Verify the manual DAG is discovered in its Airflow runtime. | Y8.14, M3.7 |
 
-## Phase 9: Documentation, Verification, And Incremental Rollout
+## Phase 9: Calendar-Aware EODData Daily Scheduling
+
+Goal: reuse the market-session eligibility capability proven by Yahoo so the
+EODData provider requests each configured exchange only after its completed
+session is expected to be available. Keep EODData's exchange-bulk source
+contract and package-owned business logic intact.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| C9.1 | [ ] | Define EODData exchange session policies | Map every configured EODData exchange to a supported market calendar, local session/time zone, and post-close availability delay using the shared Y8.2 contract. Document fallbacks and fail closed for an exchange without a valid policy rather than assuming U.S. Eastern time. | Y8.15 |
+| C9.2 | [ ] | Persist and resolve EODData policies | Add the minimal configuration or Flyway data required by the Y8.2 design and implement policy resolution for EODData's dynamically discovered provider listings. Tests cover all configured exchanges, holidays, early closes, DST, and unknown or inactive markets. | C9.1, Y8.5 |
+| C9.3 | [ ] | Add exchange-level eligibility and reconciliation planning | Before an exchange-bulk EODData request, determine whether its latest expected session is complete and eligible, whether rows are missing, and whether it falls in the configured recent-session reconciliation window. Skip ineligible/complete work while preserving bounded retry and correction behavior. Tests cover exchanges with different calendars on the same date and idempotent repeated runs. | C9.2, E6.10-E6.12 |
+| C9.4 | [ ] | Integrate calendar planning into the EODData runner and reports | Run only planned exchange work, preserve Core lifecycle and partial-exchange failure handling, and report expected-session coverage, ineligible exchanges, missing rows, retries, and corrected current rows. Existing CLI behavior remains compatible and secret safe. | C9.3, E6.7-E6.10 |
+| C9.5 | [ ] | Convert the EODData DAG to eligibility-driven multi-run operation | Keep the DAG thin and invoke it often enough to cover configured exchange closes; the package planner decides whether work is due. Initially retain a safe manual/disabled state until the rollout gate. DAG tests cover discovery, schedule configuration, no-op runs, and failure propagation. | C9.4, B1.5-B1.7 |
+| C9.6 | [ ] | Verify calendar-aware EODData end to end | Run multi-calendar fixtures through planning, acquisition, persistence, reconciliation, and reports. Prove there are no fabricated weekend/holiday rows, completed rows are skipped, missing rows retry, corrections converge, and Yahoo/EODData policies coexist without provider leakage. | C9.5, Y8.15 |
+
+## Phase 10: Documentation, Verification, And Incremental Rollout
 
 Goal: verify the package without scheduled Stooq acquisition and move from
 fixture workflows to normal provider operation one proven path at a time.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| V9.1 | [ ] | Complete package README | Document scope, provider-native semantics, `deploy/env/local.env` runtime loading, `os.environ` package boundary, secret handling, CLIs, raw retention, source snapshots, tables, enabled DAGs/reports, the manual Stooq backfill boundary, and deferred bridge/enrichment work. | Y8.9, H7.8 |
-| V9.2 | [ ] | Add operator runbook | Document local secret/config setup, manual runs, each enabled provider DAG, historical Stooq file acquisition/import, report interpretation, raw-object inspection, reruns, and failure recovery without printing credentials. | V9.1 |
-| V9.3 | [ ] | Run formatting and full package tests | Configured formatting/linting and the full `empire-stonks-ohlcv` test suite pass from the repository root. | V9.2 |
-| V9.4 | [ ] | Run DB validation and regenerate docs | Repo-standard DB validation and Stonks schema documentation generation pass with no drift. | V9.2 |
-| V9.5 | [ ] | Verify package, CLI, and DAG imports | Package, all CLI modules, and all enabled provider DAGs import cleanly in their actual runtime environments. | V9.3-V9.4 |
-| V9.6 | [ ] | Verify raw-object cleanup | Expire and clean a test raw object and prove stored-object/membership rows are removed while source snapshot, provider listing, bars, and report remain queryable. | V9.4-V9.5 |
-| V9.7 | [ ] | Run combined fixture regression | Run EODData, operator-supplied historical Stooq, and Yahoo fixture paths through provider reports and prove reruns, provider isolation, secret safety, and report scoping. | V9.3-V9.6 |
-| V9.8 | [ ] | Run and enable bounded EODData | Run a bounded live EODData import, inspect lineage/bars/report, then enable its nightly DAG only after results are healthy. Record the decision. | V9.7, E6.13 |
-| V9.9 | [ ] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V9.8, H7.8 |
-| V9.10 | [ ] | Run and enable selected Yahoo mode | Run a bounded live Yahoo import, inspect lineage/native semantics/reporting, and enable only the scheduling mode selected in Y8.8. Record the decision. | V9.9, Y8.9 |
-| V9.11 | [ ] | Audit derived daily-bar consistency | Recompute expected `change` and `changepct` from each provider listing's nearest preceding stored bar and compare them with every `ohlcv_daily` row, covering first rows, zero predecessor closes, gaps, corrections, and out-of-order imports. Report bounded discrepancy counts and samples by provider and market. If discrepancies exist, identify the cause and add a tested, bounded, idempotent repair command or workflow; if none exist, record the evidence and do not add a scheduled mutation task. | V9.10, H7.8 |
+| V10.1 | [ ] | Complete package README | Document scope, provider-native semantics, `deploy/env/local.env` runtime loading, `os.environ` package boundary, secret handling, CLIs, raw retention, source snapshots, tables, calendar/session policies, enabled DAGs/reports, the manual Stooq backfill boundary, and deferred bridge/enrichment work. | C9.6, Y8.15, H7.8 |
+| V10.2 | [ ] | Add operator runbook | Document local secret/config setup, manual runs, each enabled provider DAG, historical Stooq file acquisition/import, Yahoo backfill, eligibility and reconciliation interpretation, report interpretation, raw-object inspection, reruns, and failure recovery without printing credentials. | V10.1 |
+| V10.3 | [ ] | Run formatting and full package tests | Configured formatting/linting and the full `empire-stonks-ohlcv` test suite pass from the repository root. | V10.2 |
+| V10.4 | [ ] | Run DB validation and regenerate docs | Repo-standard DB validation and Stonks schema documentation generation pass with no drift. | V10.2 |
+| V10.5 | [ ] | Verify package, CLI, and DAG imports | Package, all CLI modules, and all enabled provider DAGs import cleanly in their actual runtime environments. | V10.3-V10.4 |
+| V10.6 | [ ] | Verify raw-object cleanup | Expire and clean a test raw object and prove stored-object/membership rows are removed while source snapshot, provider listing, bars, session policy, and report remain queryable. | V10.4-V10.5 |
+| V10.7 | [ ] | Run combined fixture regression | Run EODData, operator-supplied historical Stooq, and Yahoo fixture paths through provider reports and prove reruns, calendar isolation, provider isolation, secret safety, and report scoping. | V10.3-V10.6 |
+| V10.8 | [ ] | Run and enable bounded EODData | Run bounded live EODData imports across representative calendar windows, inspect eligibility, lineage, bars, reconciliation, and reports, then enable its multi-run DAG only after results are healthy. Record the cadence and decision. | V10.7, C9.6, E6.13 |
+| V10.9 | [ ] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V10.8, H7.8 |
+| V10.10 | [ ] | Run Yahoo backfill and enable daily scheduling | Run the bounded live Yahoo backfill for the reviewed seed universe, inspect calendar assignments, lineage, native semantics, bars, reports, and recent-session reconciliation, then enable the Yahoo DAG at a measured multi-run cadence only after results are healthy. Record request volume, cadence, and rollback decision. | V10.9, Y8.15 |
+| V10.11 | [ ] | Audit derived daily-bar consistency | Recompute expected `change` and `changepct` from each provider listing's nearest preceding stored bar and compare them with every `ohlcv_daily` row, covering first rows, zero predecessor closes, market-session gaps, corrections, and out-of-order imports. Report bounded discrepancy counts and samples by provider and market. If discrepancies exist, identify the cause and add a tested, bounded, idempotent repair command or workflow; if none exist, record the evidence and do not add a scheduled mutation task. | V10.10, H7.8 |
 
-## Phase 10: Stooq Daily End-To-End Vertical Slice
+## Phase 11: Stooq Daily End-To-End Vertical Slice
 
 Goal: revisit Stooq daily acquisition only after the rest of the package is
 operational, and add unattended ingestion only if Stooq provides a stable,
 authorized machine-download path that does not depend on browser-challenge
 automation.
 
-T10.1 is a decision gate. A documented manual-only or defer decision completes
-this phase without starting T10.2-T10.10; those implementation tasks remain
+T11.1 is a decision gate. A documented manual-only or defer decision completes
+this phase without starting T11.2-T11.10; those implementation tasks remain
 deferred until the source conditions change. A go decision continues through
-T10.10.
+T11.10.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| T10.1 | [ ] | Gate Stooq daily automation | Document current Stooq API-key enrollment, terms and rate expectations, secret handling, CSV format, and browser-verification behavior. Manually enroll if appropriate, then prove whether a key-authenticated endpoint works from a clean non-browser HTTP client without cookies or challenge circumvention. Record a go, manual-only, or defer decision. | V9.11, H7.1 |
-| T10.2 | [ ] | Implement Stooq daily acquisition when approved | If T10.1 approves unattended use, acquire the selected daily source through the documented interface and store it through the Core object/snapshot flow. Tests cover success, retryable failure, challenge/error content, and secret-safe diagnostics. Do not add headless-browser, CAPTCHA-solving, or challenge-bypass code. | T10.1, C4.2, A5.5 |
-| T10.3 | [ ] | Implement Stooq daily parser | Parse documented Stooq daily fixtures into shared records without EODData-specific persistence branches. Shared parser-contract tests pass. Reuse historical parsing only where the evidenced formats genuinely match. | T10.1-T10.2, H7.2, A5.3-A5.4 |
-| T10.4 | [ ] | Implement Stooq daily import service | Compose validation, snapshot registration, provider-listing writes, bar upserts, and import summaries. Reruns are idempotent. | T10.2-T10.3, E6.5-E6.6 |
-| T10.5 | [ ] | Build and store Stooq daily report | Reuse the shared health/report contract for Stooq-scoped freshness, coverage, stale series, gap warnings, failures, and native-semantics notes. Tests prove provider scoping and stored report paths. | T10.4, H7.5 |
-| T10.6 | [ ] | Add Stooq daily CLI | Add an operator CLI and `bin` wrapper using `bin/env-load`; it runs Stooq daily import plus reporting and emits a secret-safe JSON summary. | T10.5, B1.8 |
-| T10.7 | [ ] | Add Stooq daily runner | Add package-owned Stooq sequencing with Core run lifecycle and reporting. Tests cover success, failure, challenge responses, and reruns. | T10.5-T10.6 |
-| T10.8 | [ ] | Decide and implement Stooq DAG mode | Select scheduled, manual-only, or limited-symbol operation based on the approved interface and implemented source constraints. Add a thin scheduled DAG only when operationally justified; never add a browser-dependent DAG. Tests cover whichever go-path mode is selected. | T10.7, B1.5-B1.7 |
-| T10.9 | [ ] | Verify Stooq daily vertical workflow | Verify any enabled DAG discovery and run the full Stooq daily fixture path through reporting. Confirm lineage, report rows, secret safety, rerun behavior, and isolation from EODData, Yahoo, and historical Stooq imports. | T10.8, M3.7 |
-| T10.10 | [ ] | Run bounded Stooq daily and finalize docs | Run a bounded live import and enable any selected DAG only after healthy results. Update the README and runbook with the decision and exact operational boundary. | T10.9 |
+| T11.1 | [ ] | Gate Stooq daily automation | Document current Stooq API-key enrollment, terms and rate expectations, secret handling, CSV format, and browser-verification behavior. Manually enroll if appropriate, then prove whether a key-authenticated endpoint works from a clean non-browser HTTP client without cookies or challenge circumvention. Record a go, manual-only, or defer decision. | V10.11, H7.1 |
+| T11.2 | [ ] | Implement Stooq daily acquisition when approved | If T11.1 approves unattended use, acquire the selected daily source through the documented interface and store it through the Core object/snapshot flow. Tests cover success, retryable failure, challenge/error content, and secret-safe diagnostics. Do not add headless-browser, CAPTCHA-solving, or challenge-bypass code. | T11.1, C4.2, A5.5 |
+| T11.3 | [ ] | Implement Stooq daily parser | Parse documented Stooq daily fixtures into shared records without EODData-specific persistence branches. Shared parser-contract tests pass. Reuse historical parsing only where the evidenced formats genuinely match. | T11.1-T11.2, H7.2, A5.3-A5.4 |
+| T11.4 | [ ] | Implement Stooq daily import service | Compose validation, snapshot registration, provider-listing writes, bar upserts, and import summaries. Reruns are idempotent. | T11.2-T11.3, E6.5-E6.6 |
+| T11.5 | [ ] | Build and store Stooq daily report | Reuse the shared health/report contract for Stooq-scoped freshness, coverage, stale series, gap warnings, failures, and native-semantics notes. Tests prove provider scoping and stored report paths. | T11.4, H7.5 |
+| T11.6 | [ ] | Add Stooq daily CLI | Add an operator CLI and `bin` wrapper using `bin/env-load`; it runs Stooq daily import plus reporting and emits a secret-safe JSON summary. | T11.5, B1.8 |
+| T11.7 | [ ] | Add Stooq daily runner | Add package-owned Stooq sequencing with Core run lifecycle and reporting. Tests cover success, failure, challenge responses, and reruns. | T11.5-T11.6 |
+| T11.8 | [ ] | Decide and implement Stooq DAG mode | Select scheduled, manual-only, or limited-symbol operation based on the approved interface and implemented source constraints. Add a thin scheduled DAG only when operationally justified; never add a browser-dependent DAG. Tests cover whichever go-path mode is selected. | T11.7, B1.5-B1.7 |
+| T11.9 | [ ] | Verify Stooq daily vertical workflow | Verify any enabled DAG discovery and run the full Stooq daily fixture path through reporting. Confirm lineage, report rows, secret safety, rerun behavior, and isolation from EODData, Yahoo, and historical Stooq imports. | T11.8, M3.7 |
+| T11.10 | [ ] | Run bounded Stooq daily and finalize docs | Run a bounded live import and enable any selected DAG only after healthy results. Update the README and runbook with the decision and exact operational boundary. | T11.9 |
 
 ---
 
@@ -241,22 +371,22 @@ security-master contracts are stable enough to support temporal mappings.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| X11.1 | [ ] | Confirm bridge readiness | Record the concrete consumers and stable OHLCV/security-master contracts that require provider-to-canonical mapping. | V9.11, completed T10.1 gate decision, plus future securities readiness |
-| X11.2 | [ ] | Review provider-series identity evidence | Evaluate what market, ticker, date-range, identifier, and provider metadata is actually available after live ingestion. Do not assume ticker reuse can be detected automatically. | X11.1 |
-| X11.3 | [ ] | Design temporal mapping storage | Design mappings that can attach different date ranges of one provider series to different canonical listings and multiple provider series to one listing. Preserve candidate/decision evidence and ambiguity. | X11.2 |
-| X11.4 | [ ] | Decide bridge package creation | Create `empire-stonks-ohlcv-bridge` only when implemented mapping or canonical-series logic justifies a separate Python package. | X11.3 |
-| X11.5 | [ ] | Design authoritative-series policy | Define explicit provider selection, fallback, validation, gap-fill, adjustment-compatibility, and provenance rules before storing or exposing one canonical OHLCV history. | X11.3-X11.4 |
+| X12.1 | [ ] | Confirm bridge readiness | Record the concrete consumers and stable OHLCV/security-master contracts that require provider-to-canonical mapping. | V10.11, completed T11.1 gate decision, plus future securities readiness |
+| X12.2 | [ ] | Review provider-series identity evidence | Evaluate what market, ticker, date-range, identifier, and provider metadata is actually available after live ingestion. Do not assume ticker reuse can be detected automatically. | X12.1 |
+| X12.3 | [ ] | Design temporal mapping storage | Design mappings that can attach different date ranges of one provider series to different canonical listings and multiple provider series to one listing. Preserve candidate/decision evidence and ambiguity. | X12.2 |
+| X12.4 | [ ] | Decide bridge package creation | Create `empire-stonks-ohlcv-bridge` only when implemented mapping or canonical-series logic justifies a separate Python package. | X12.3 |
+| X12.5 | [ ] | Design authoritative-series policy | Define explicit provider selection, fallback, validation, gap-fill, adjustment-compatibility, and provenance rules before storing or exposing one canonical OHLCV history. | X12.3-X12.4 |
 
 ---
 
-## Expected End State After Phases 0-10
+## Expected End State After Phases 0-11
 
-When phases 0-10 are complete, Empire should have a reusable
+When phases 0-11 are complete, Empire should have a reusable
 `empire-stonks-ohlcv` package with:
 
 - Provider-neutral listing and daily-bar dataclasses.
 - Provider-specific EODData and Yahoo daily acquisition/parsing modules, a
-  Stooq historical-file parser, and Stooq daily acquisition only if T10.1
+  Stooq historical-file parser, and Stooq daily acquisition only if T11.1
   approves a sustainable machine-download path.
 - Provider-native daily histories stored independently in
   `stonks.ohlcv_daily`.
@@ -265,8 +395,8 @@ When phases 0-10 are complete, Empire should have a reusable
 - One controlled historical Stooq import path.
 - Thin Airflow DAGs for the provider modes that are operationally enabled;
   Stooq daily may remain manual-only or deferred if its automation gate fails.
-- JSON health reports for ingestion counts, freshness, stale series, coverage,
-  and non-calendar-aware gap warnings.
+- JSON health reports for ingestion counts, freshness, expected-session
+  coverage, eligibility, reconciliation, stale series, and failures.
 - Tests proving provider isolation, rerun safety, cleanup-safe Core object and
   snapshot integration, and runtime imports.
 
