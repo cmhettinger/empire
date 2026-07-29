@@ -30,4 +30,13 @@ def test_config_script_prints_secret_safe_json(monkeypatch, capsys) -> None:
         "max_retries": 2,
         "raw_retention_days": 5,
         "storage_key": "test/ohlcv",
+        "yahoo_backfill_chunk_days": 3650,
+        "yahoo_backfill_start_date": "1965-01-01",
+        "yahoo_base_url": "https://query2.finance.yahoo.com",
+        "yahoo_failure_cooldown_max_seconds": 18.0,
+        "yahoo_failure_cooldown_min_seconds": 8.0,
+        "yahoo_reconciliation_sessions": 7,
+        "yahoo_request_delay_seconds": 25.0,
+        "yahoo_request_jitter_max_seconds": 10.0,
+        "yahoo_request_jitter_min_seconds": 5.0,
     }

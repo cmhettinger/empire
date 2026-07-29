@@ -45,6 +45,29 @@ semantics.
 
 Stooq and Yahoo do not require credentials in the current package contract.
 
+Yahoo daily and historical Chart acquisition uses:
+
+```text
+EMPIRE_STONKS_OHLCV_YAHOO_BASE_URL=https://query2.finance.yahoo.com
+EMPIRE_STONKS_OHLCV_YAHOO_REQUEST_DELAY_SECONDS=25
+EMPIRE_STONKS_OHLCV_YAHOO_REQUEST_JITTER_MIN_SECONDS=5
+EMPIRE_STONKS_OHLCV_YAHOO_REQUEST_JITTER_MAX_SECONDS=10
+EMPIRE_STONKS_OHLCV_YAHOO_FAILURE_COOLDOWN_MIN_SECONDS=8
+EMPIRE_STONKS_OHLCV_YAHOO_FAILURE_COOLDOWN_MAX_SECONDS=18
+EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_START_DATE=1965-01-01
+EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_CHUNK_DAYS=3650
+EMPIRE_STONKS_OHLCV_YAHOO_RECONCILIATION_SESSIONS=7
+```
+
+The selected source is bounded, single-symbol `1d` JSON from Yahoo's Chart
+resource for the reviewed `XIDX` seed universe. The one-time historical
+backfill and repeated daily/reconciliation workflow share source code
+`yahoo_daily`; adjusted close remains raw/report-only and is never substituted
+for the stored native close. See
+[`docs/stonks/ohlcv-yahoo-source-contract.md`](../../docs/stonks/ohlcv-yahoo-source-contract.md)
+for the request, response, identity, pacing, adjustment, compliance, and raw
+object contract.
+
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
 archive into Core, streams only the Nasdaq, NYSE, and NYSE MKT stock partitions,
@@ -161,9 +184,9 @@ and parsed listings must match the active provider. Provider adapters may use
 functions or bound methods and do not share a downloader base class, registry,
 remote request model, or arbitrary metadata contract.
 
-The EODData endpoints and formats are selected in its source contract. Their
-acquisition, parsing, reporting, and runner implementations remain later Phase
-6 tasks. Stooq and Yahoo endpoints remain later provider-contract tasks.
+The EODData, Stooq historical, and Yahoo Chart endpoints or inputs are selected
+in their source contracts. Provider implementations retain injected
+acquisition/parser seams and the shared persistence boundary.
 
 Production source metadata is exposed as immutable constants:
 
@@ -173,15 +196,14 @@ Production source metadata is exposed as immutable constants:
 | EODData nightly daily | `eoddata_daily` | `1.0.0` |
 | Stooq nightly daily | `stooq_daily` | `1.0.0` |
 | Stooq historical files | `stooq_history` | `1.0.0` |
-| Yahoo controlled-symbol daily | `yahoo_daily` | `1.0.0` |
+| Yahoo controlled-symbol daily and historical Chart | `yahoo_daily` | `1.0.0` |
 
 Source codes identify logical feeds, not endpoints, dates, symbols, or file
 partitions. Parser versions use source-specific `MAJOR.MINOR.PATCH` values and
 change when parsing or interpretation can change shared output. Stooq daily and
-historical records discover their own series; Yahoo has no initial broad symbol
-discovery or historical-file source. EODData's concrete endpoints are selected
-in its source contract; Stooq and Yahoo endpoints remain owned by their later
-provider source-contract tasks.
+historical records discover their own series. Yahoo has no broad symbol
+discovery; its seeded historical and daily modes share the same Chart source
+identity and format.
 
 ## Provider fixtures
 

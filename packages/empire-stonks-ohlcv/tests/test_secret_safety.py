@@ -110,4 +110,13 @@ def test_safe_dict_excludes_secrets_from_operational_surfaces() -> None:
         "eoddata_exchanges",
         "eoddata_request_delay_seconds",
         "eoddata_configured",
+        "yahoo_base_url",
+        "yahoo_request_delay_seconds",
+        "yahoo_request_jitter_min_seconds",
+        "yahoo_request_jitter_max_seconds",
+        "yahoo_failure_cooldown_min_seconds",
+        "yahoo_failure_cooldown_max_seconds",
+        "yahoo_backfill_start_date",
+        "yahoo_backfill_chunk_days",
+        "yahoo_reconciliation_sessions",
     }

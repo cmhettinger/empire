@@ -780,12 +780,30 @@ operational artifact. Exact request, response, filename, delivery, duplicate,
 and native-value rules are defined in
 `docs/stonks/ohlcv-eoddata-source-contract.md`.
 
-Stooq and Yahoo do not have a required secret in the approved architecture.
-If the selected source contract later requires one, it must follow the provider
-prefix, be documented in the provider task, and receive the same redaction
-tests. Source URLs, request bounds, and other provider-specific non-secret
-suffixes are finalized with the provider source contracts rather than guessed
-here.
+The Yahoo daily and historical Chart source contract uses:
+
+```text
+EMPIRE_STONKS_OHLCV_YAHOO_BASE_URL=https://query2.finance.yahoo.com
+EMPIRE_STONKS_OHLCV_YAHOO_REQUEST_DELAY_SECONDS=25
+EMPIRE_STONKS_OHLCV_YAHOO_REQUEST_JITTER_MIN_SECONDS=5
+EMPIRE_STONKS_OHLCV_YAHOO_REQUEST_JITTER_MAX_SECONDS=10
+EMPIRE_STONKS_OHLCV_YAHOO_FAILURE_COOLDOWN_MIN_SECONDS=8
+EMPIRE_STONKS_OHLCV_YAHOO_FAILURE_COOLDOWN_MAX_SECONDS=18
+EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_START_DATE=1965-01-01
+EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_CHUNK_DAYS=3650
+EMPIRE_STONKS_OHLCV_YAHOO_RECONCILIATION_SESSIONS=7
+```
+
+Yahoo has no required secret in the selected contract. It uses bounded,
+single-symbol `1d` Chart JSON requests for the seeded 93-listing `XIDX`
+universe. Historical backfill and daily/reconciliation requests use the same
+`yahoo_daily` source identity and native unadjusted quote OHLC. Exact request,
+raw-object, response, adjustment, pacing, and failure rules are defined in
+`docs/stonks/ohlcv-yahoo-source-contract.md`.
+
+Stooq also has no required secret in the approved architecture. If a selected
+source contract later requires one, it must follow the provider prefix, be
+documented in the provider task, and receive the same redaction tests.
 
 ## Provider Adapter Boundary
 
@@ -840,7 +858,7 @@ Production adapters use these exact initial identities:
 | `EODDATA` | Nightly daily OHLCV | `eoddata_daily` | `1.0.0` |
 | `STOOQ` | Nightly daily OHLCV, including native series discovery | `stooq_daily` | `1.0.0` |
 | `STOOQ` | Operator-supplied historical files | `stooq_history` | `1.0.0` |
-| `YAHOO` | Controlled-symbol daily OHLCV | `yahoo_daily` | `1.0.0` |
+| `YAHOO` | Controlled-symbol daily and historical Chart OHLCV | `yahoo_daily` | `1.0.0` |
 
 Provider codes are the existing uppercase database identifiers. Source codes
 are lowercase, provider-prefixed logical feed identifiers. They do not contain
@@ -867,9 +885,10 @@ first-seen fact.
 
 Stooq does not need a separate listing-discovery identity because its supported
 daily and historical OHLCV records introduce their own provider-native series.
-Yahoo likewise imports an explicitly controlled symbol set and has no broad
-listing-discovery or historical-file workflow in the initial plan. Adding
-identifiers for those unimplemented workflows would not authorize them.
+Yahoo likewise imports an explicitly controlled seeded symbol set and has no
+broad listing-discovery workflow. Its bounded backfill and daily requests use
+the same Chart dataset and JSON shape, so backfill does not receive a second
+source identity.
 
 ### EODData selected nightly contract
 
@@ -962,9 +981,10 @@ the production contract in
 `docs/stonks/ohlcv-eoddata-source-contract.md`. Stooq historical fixtures may
 now be derived from the bounded local-archive evidence in
 `docs/stonks/ohlcv-stooq-history-source-contract.md`. Yahoo fixtures remain
-deferred until Y8.1 provides equivalent format evidence, and Stooq daily
-fixtures remain deferred until the T10.1 automation gate documents a
-sustainable daily source.
+deferred until Y8.6 captures a bounded permitted Chart response under the
+format and safety rules established by
+`docs/stonks/ohlcv-yahoo-source-contract.md`. Stooq daily fixtures remain
+deferred until the T11.1 automation gate documents a sustainable daily source.
 
 ### Shared parser test contract
 

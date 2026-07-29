@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from datetime import date
 from math import isfinite
 from typing import Self
 from urllib.parse import urlsplit
@@ -18,6 +19,17 @@ DEFAULT_MAX_RETRIES = 3
 DEFAULT_EODDATA_BASE_URL = "https://api.eoddata.com"
 DEFAULT_EODDATA_EXCHANGES = ("NYSE", "NASDAQ", "AMEX")
 DEFAULT_EODDATA_REQUEST_DELAY_SECONDS = 2.0
+DEFAULT_YAHOO_BASE_URL = "https://query2.finance.yahoo.com"
+DEFAULT_YAHOO_REQUEST_DELAY_SECONDS = 25.0
+DEFAULT_YAHOO_REQUEST_JITTER_MIN_SECONDS = 5.0
+DEFAULT_YAHOO_REQUEST_JITTER_MAX_SECONDS = 10.0
+DEFAULT_YAHOO_FAILURE_COOLDOWN_MIN_SECONDS = 8.0
+DEFAULT_YAHOO_FAILURE_COOLDOWN_MAX_SECONDS = 18.0
+DEFAULT_YAHOO_BACKFILL_START_DATE = "1965-01-01"
+DEFAULT_YAHOO_BACKFILL_CHUNK_DAYS = 3650
+DEFAULT_YAHOO_RECONCILIATION_SESSIONS = 7
+MAX_YAHOO_BACKFILL_CHUNK_DAYS = 3650
+MAX_YAHOO_RECONCILIATION_SESSIONS = 30
 
 STORAGE_KEY_ENV = "EMPIRE_STORAGE_KEY_STONKS_OHLCV"
 RAW_RETENTION_DAYS_ENV = "EMPIRE_STONKS_OHLCV_RAW_RETENTION_DAYS"
@@ -28,6 +40,31 @@ EODDATA_BASE_URL_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_BASE_URL"
 EODDATA_EXCHANGES_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_EXCHANGES"
 EODDATA_REQUEST_DELAY_SECONDS_ENV = (
     "EMPIRE_STONKS_OHLCV_EODDATA_REQUEST_DELAY_SECONDS"
+)
+YAHOO_BASE_URL_ENV = "EMPIRE_STONKS_OHLCV_YAHOO_BASE_URL"
+YAHOO_REQUEST_DELAY_SECONDS_ENV = (
+    "EMPIRE_STONKS_OHLCV_YAHOO_REQUEST_DELAY_SECONDS"
+)
+YAHOO_REQUEST_JITTER_MIN_SECONDS_ENV = (
+    "EMPIRE_STONKS_OHLCV_YAHOO_REQUEST_JITTER_MIN_SECONDS"
+)
+YAHOO_REQUEST_JITTER_MAX_SECONDS_ENV = (
+    "EMPIRE_STONKS_OHLCV_YAHOO_REQUEST_JITTER_MAX_SECONDS"
+)
+YAHOO_FAILURE_COOLDOWN_MIN_SECONDS_ENV = (
+    "EMPIRE_STONKS_OHLCV_YAHOO_FAILURE_COOLDOWN_MIN_SECONDS"
+)
+YAHOO_FAILURE_COOLDOWN_MAX_SECONDS_ENV = (
+    "EMPIRE_STONKS_OHLCV_YAHOO_FAILURE_COOLDOWN_MAX_SECONDS"
+)
+YAHOO_BACKFILL_START_DATE_ENV = (
+    "EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_START_DATE"
+)
+YAHOO_BACKFILL_CHUNK_DAYS_ENV = (
+    "EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_CHUNK_DAYS"
+)
+YAHOO_RECONCILIATION_SESSIONS_ENV = (
+    "EMPIRE_STONKS_OHLCV_YAHOO_RECONCILIATION_SESSIONS"
 )
 
 
@@ -88,6 +125,63 @@ def _validate_eoddata_base_url(value: object) -> None:
         )
 
 
+def _validate_yahoo_base_url(value: object) -> None:
+    if not isinstance(value, str) or not value:
+        raise OHLCVConfigError(f"{YAHOO_BASE_URL_ENV} is required.")
+    if value != value.strip() or value.endswith("/"):
+        raise OHLCVConfigError(
+            f"{YAHOO_BASE_URL_ENV} must not contain whitespace or a trailing slash."
+        )
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        raise OHLCVConfigError(f"{YAHOO_BASE_URL_ENV} is invalid.") from None
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+        or port is not None and not 1 <= port <= 65535
+    ):
+        raise OHLCVConfigError(
+            f"{YAHOO_BASE_URL_ENV} must be an HTTPS origin without credentials, "
+            "path, query, or fragment."
+        )
+
+
+def _validate_nonnegative_float(name: str, value: float) -> None:
+    if not isfinite(value) or value < 0:
+        raise OHLCVConfigError(f"{name} cannot be negative.")
+
+
+def _validate_ordered_range(
+    *,
+    minimum_name: str,
+    minimum: float,
+    maximum_name: str,
+    maximum: float,
+) -> None:
+    _validate_nonnegative_float(minimum_name, minimum)
+    _validate_nonnegative_float(maximum_name, maximum)
+    if minimum > maximum:
+        raise OHLCVConfigError(
+            f"{minimum_name} cannot be greater than {maximum_name}."
+        )
+
+
+def _validate_iso_date(name: str, value: str) -> None:
+    try:
+        parsed = date.fromisoformat(value)
+    except (TypeError, ValueError):
+        raise OHLCVConfigError(f"{name} must be a YYYY-MM-DD date.") from None
+    if parsed.isoformat() != value:
+        raise OHLCVConfigError(f"{name} must be a YYYY-MM-DD date.")
+
+
 def _validate_eoddata_exchanges(value: object) -> None:
     if value != DEFAULT_EODDATA_EXCHANGES:
         raise OHLCVConfigError(
@@ -144,6 +238,23 @@ class OHLCVConfig:
     eoddata_base_url: str = DEFAULT_EODDATA_BASE_URL
     eoddata_exchanges: tuple[str, ...] = DEFAULT_EODDATA_EXCHANGES
     eoddata_request_delay_seconds: float = DEFAULT_EODDATA_REQUEST_DELAY_SECONDS
+    yahoo_base_url: str = DEFAULT_YAHOO_BASE_URL
+    yahoo_request_delay_seconds: float = DEFAULT_YAHOO_REQUEST_DELAY_SECONDS
+    yahoo_request_jitter_min_seconds: float = (
+        DEFAULT_YAHOO_REQUEST_JITTER_MIN_SECONDS
+    )
+    yahoo_request_jitter_max_seconds: float = (
+        DEFAULT_YAHOO_REQUEST_JITTER_MAX_SECONDS
+    )
+    yahoo_failure_cooldown_min_seconds: float = (
+        DEFAULT_YAHOO_FAILURE_COOLDOWN_MIN_SECONDS
+    )
+    yahoo_failure_cooldown_max_seconds: float = (
+        DEFAULT_YAHOO_FAILURE_COOLDOWN_MAX_SECONDS
+    )
+    yahoo_backfill_start_date: str = DEFAULT_YAHOO_BACKFILL_START_DATE
+    yahoo_backfill_chunk_days: int = DEFAULT_YAHOO_BACKFILL_CHUNK_DAYS
+    yahoo_reconciliation_sessions: int = DEFAULT_YAHOO_RECONCILIATION_SESSIONS
     eoddata_credentials: EODDataCredentials | None = field(
         default=None,
         repr=False,
@@ -174,6 +285,41 @@ class OHLCVConfig:
             raise OHLCVConfigError(
                 f"{EODDATA_REQUEST_DELAY_SECONDS_ENV} cannot be negative."
             )
+        _validate_yahoo_base_url(self.yahoo_base_url)
+        _validate_nonnegative_float(
+            YAHOO_REQUEST_DELAY_SECONDS_ENV,
+            self.yahoo_request_delay_seconds,
+        )
+        _validate_ordered_range(
+            minimum_name=YAHOO_REQUEST_JITTER_MIN_SECONDS_ENV,
+            minimum=self.yahoo_request_jitter_min_seconds,
+            maximum_name=YAHOO_REQUEST_JITTER_MAX_SECONDS_ENV,
+            maximum=self.yahoo_request_jitter_max_seconds,
+        )
+        _validate_ordered_range(
+            minimum_name=YAHOO_FAILURE_COOLDOWN_MIN_SECONDS_ENV,
+            minimum=self.yahoo_failure_cooldown_min_seconds,
+            maximum_name=YAHOO_FAILURE_COOLDOWN_MAX_SECONDS_ENV,
+            maximum=self.yahoo_failure_cooldown_max_seconds,
+        )
+        _validate_iso_date(
+            YAHOO_BACKFILL_START_DATE_ENV,
+            self.yahoo_backfill_start_date,
+        )
+        if not 1 <= self.yahoo_backfill_chunk_days <= MAX_YAHOO_BACKFILL_CHUNK_DAYS:
+            raise OHLCVConfigError(
+                f"{YAHOO_BACKFILL_CHUNK_DAYS_ENV} must be between 1 and "
+                f"{MAX_YAHOO_BACKFILL_CHUNK_DAYS}."
+            )
+        if not (
+            1
+            <= self.yahoo_reconciliation_sessions
+            <= MAX_YAHOO_RECONCILIATION_SESSIONS
+        ):
+            raise OHLCVConfigError(
+                f"{YAHOO_RECONCILIATION_SESSIONS_ENV} must be between 1 and "
+                f"{MAX_YAHOO_RECONCILIATION_SESSIONS}."
+            )
 
     @classmethod
     def from_env(cls) -> "OHLCVConfig":
@@ -184,6 +330,10 @@ class OHLCVConfig:
         eoddata_base_url = os.environ.get(
             EODDATA_BASE_URL_ENV,
             DEFAULT_EODDATA_BASE_URL,
+        ).strip().rstrip("/")
+        yahoo_base_url = os.environ.get(
+            YAHOO_BASE_URL_ENV,
+            DEFAULT_YAHOO_BASE_URL,
         ).strip().rstrip("/")
 
         credentials: EODDataCredentials | None = None
@@ -206,6 +356,39 @@ class OHLCVConfig:
             eoddata_request_delay_seconds=_environment_float(
                 EODDATA_REQUEST_DELAY_SECONDS_ENV,
                 DEFAULT_EODDATA_REQUEST_DELAY_SECONDS,
+            ),
+            yahoo_base_url=yahoo_base_url,
+            yahoo_request_delay_seconds=_environment_float(
+                YAHOO_REQUEST_DELAY_SECONDS_ENV,
+                DEFAULT_YAHOO_REQUEST_DELAY_SECONDS,
+            ),
+            yahoo_request_jitter_min_seconds=_environment_float(
+                YAHOO_REQUEST_JITTER_MIN_SECONDS_ENV,
+                DEFAULT_YAHOO_REQUEST_JITTER_MIN_SECONDS,
+            ),
+            yahoo_request_jitter_max_seconds=_environment_float(
+                YAHOO_REQUEST_JITTER_MAX_SECONDS_ENV,
+                DEFAULT_YAHOO_REQUEST_JITTER_MAX_SECONDS,
+            ),
+            yahoo_failure_cooldown_min_seconds=_environment_float(
+                YAHOO_FAILURE_COOLDOWN_MIN_SECONDS_ENV,
+                DEFAULT_YAHOO_FAILURE_COOLDOWN_MIN_SECONDS,
+            ),
+            yahoo_failure_cooldown_max_seconds=_environment_float(
+                YAHOO_FAILURE_COOLDOWN_MAX_SECONDS_ENV,
+                DEFAULT_YAHOO_FAILURE_COOLDOWN_MAX_SECONDS,
+            ),
+            yahoo_backfill_start_date=os.environ.get(
+                YAHOO_BACKFILL_START_DATE_ENV,
+                DEFAULT_YAHOO_BACKFILL_START_DATE,
+            ).strip(),
+            yahoo_backfill_chunk_days=_environment_int(
+                YAHOO_BACKFILL_CHUNK_DAYS_ENV,
+                DEFAULT_YAHOO_BACKFILL_CHUNK_DAYS,
+            ),
+            yahoo_reconciliation_sessions=_environment_int(
+                YAHOO_RECONCILIATION_SESSIONS_ENV,
+                DEFAULT_YAHOO_RECONCILIATION_SESSIONS,
             ),
             eoddata_credentials=credentials,
         )
@@ -231,4 +414,21 @@ class OHLCVConfig:
             "eoddata_exchanges": ",".join(self.eoddata_exchanges),
             "eoddata_request_delay_seconds": self.eoddata_request_delay_seconds,
             "eoddata_configured": self.eoddata_credentials is not None,
+            "yahoo_base_url": self.yahoo_base_url,
+            "yahoo_request_delay_seconds": self.yahoo_request_delay_seconds,
+            "yahoo_request_jitter_min_seconds": (
+                self.yahoo_request_jitter_min_seconds
+            ),
+            "yahoo_request_jitter_max_seconds": (
+                self.yahoo_request_jitter_max_seconds
+            ),
+            "yahoo_failure_cooldown_min_seconds": (
+                self.yahoo_failure_cooldown_min_seconds
+            ),
+            "yahoo_failure_cooldown_max_seconds": (
+                self.yahoo_failure_cooldown_max_seconds
+            ),
+            "yahoo_backfill_start_date": self.yahoo_backfill_start_date,
+            "yahoo_backfill_chunk_days": self.yahoo_backfill_chunk_days,
+            "yahoo_reconciliation_sessions": self.yahoo_reconciliation_sessions,
         }
