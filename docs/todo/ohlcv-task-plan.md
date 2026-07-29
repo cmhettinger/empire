@@ -287,7 +287,7 @@ later migration to add, correct, deactivate, or remove individual listings.
 |----|--------|------|---------------|------------|
 | Y8.1 | [x] | Document the Yahoo source and bounded-universe contract | Record the chosen daily OHLCV endpoint, `EMPIRE_STONKS_OHLCV_YAHOO_*` settings, request/range limits, ticker and provider-date semantics, time zones, native adjusted-close and volume behavior, rate/error behavior, and Core raw retention. Explicitly limit Yahoo to the seeded indexes, yield and volatility indexes, currency and commodity indexes, and continuous futures; exclude ordinary equities and non-OHLCV enrichment. Runtime values come from `deploy/env/local.env`. | H7.8, A5.1-A5.2 |
 | Y8.2 | [x] | Design the shared market-session eligibility contract | Define the smallest reusable representation for each provider listing's calendar, local session/time zone, post-close delay, and session-date rule. Cover exchange-traded cash indexes, publisher-calculated indexes, DXY, and Yahoo `=F` provider daily-settlement series. Define `eligible_at`, missing-session detection, no synthetic weekend/holiday bars, retry behavior, and a configurable 5-7-session reconciliation window. Record why the selected market-calendar library is justified and how unsupported calendars or provider-date ambiguity fail safely. | Y8.1, M3.7 |
-| Y8.3 | [ ] | Add Yahoo instrument taxonomy migration | Add an idempotent Flyway migration for `YIELD_INDEX`, `EQUITY_INDEX`, `COMMODITY_INDEX`, `CURRENCY_INDEX`, `CONTINUOUS_FUTURE_COMMODITY`, and `CONTINUOUS_FUTURE_EQUITY`, using existing `INDEX` and `DERIVATIVE` classes and the reference-data upsert convention. Database validation and generated Stonks schema docs pass. | Y8.2 |
+| Y8.3 | [x] | Add Yahoo instrument taxonomy migration | Add an idempotent Flyway migration for `YIELD_INDEX`, `EQUITY_INDEX`, `COMMODITY_INDEX`, `CURRENCY_INDEX`, `CONTINUOUS_FUTURE_COMMODITY`, and `CONTINUOUS_FUTURE_EQUITY`, using existing `INDEX` and `DERIVATIVE` classes and the reference-data upsert convention. Database validation and generated Stonks schema docs pass. | Y8.2 |
 | Y8.4 | [ ] | Add session-policy schema and seed Yahoo provider listings | Implement the Y8.2 persistence design in a Flyway migration and seed the complete reviewed Yahoo catalog supplied for this phase into `stonks.provider_listing` under the existing `YAHOO` provider. Store each Yahoo symbol as the provider-native ticker; explicitly decide whether the accompanying Empire short code warrants a generic alias field/table, and never overload `market` with it. Attach an instrument type and explicit session policy to every row. The migration is deterministic/idempotent, rejects missing provider/type/calendar references, contains no ordinary equities, and has assertions/tests for representative cash indexes, global indexes, yields, volatility, DXY, equity-index futures, and commodity futures. | Y8.2-Y8.3 |
 | Y8.5 | [ ] | Implement calendar and eligibility services | Add package-owned services that resolve expected sessions from the configured market calendar, honor local holidays and early closes, calculate `eligible_at = session_close + availability_delay`, and return only eligible missing sessions. Implement an explicit provider-daily-settlement cutoff for Yahoo continuous futures and safe handling for publisher indexes without an exchange calendar. Tests cross UTC/date boundaries, DST, holidays, early closes, disjoint country holidays, reruns, and unknown calendars. | Y8.4 |
 | Y8.6 | [ ] | Implement Yahoo acquisition | Acquire bounded historical ranges for selected seeded Yahoo listings with injected HTTP dependencies, timeouts, bounded retries, request pacing, and chunking where the source requires it. Store every response through Core with durable snapshot identity and secret-safe errors/metadata. Tests cover rate limiting, empty/malformed/error payloads, partial symbol failures, and request-boundary dates. | Y8.1, Y8.4-Y8.5, C4.2, A5.5 |
@@ -318,6 +318,15 @@ calendar-close and local-cutoff eligibility, three provider-date rules,
 authoritative versus observed-only completeness, safe retry/reconciliation,
 no-synthetic-bar invariants, and fail-closed behavior for unsupported or
 ambiguous mappings. Documentation validation and `git diff --check` passed.
+
+Done: 2026-07-29 — added idempotent migration
+`V2026.07.29.0001__stonks_add_yahoo_instrument_taxonomy.sql` with the six
+reviewed Yahoo index and continuous-future types under the existing `INDEX`
+and `DERIVATIVE` classes. Flyway applied and validated all 33 migrations; a
+direct second execution succeeded and retained exactly six active rows with
+the expected classes. The transactional OHLCV schema contract passed, and
+canonical Core/Stonks schema plus all Stonks ERD groups regenerated without
+structural diffs. `git diff --check` passed.
 
 ## Phase 9: Calendar-Aware EODData Daily Scheduling
 
