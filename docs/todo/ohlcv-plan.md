@@ -801,6 +801,14 @@ universe. Historical backfill and daily/reconciliation requests use the same
 raw-object, response, adjustment, pacing, and failure rules are defined in
 `docs/stonks/ohlcv-yahoo-source-contract.md`.
 
+Calendar-aware daily planning uses the normalized provider-listing policy
+designed in `docs/stonks/ohlcv-market-session-contract.md`. Verified exchange
+calendars provide authoritative sessions and close times; explicit local
+cutoffs cover provider publication and daily-settlement behavior. A publisher
+series without a verified calendar is observed-only, so it may be polled and
+reported stale but cannot produce a fabricated holiday or authoritative
+missing-session claim.
+
 Stooq also has no required secret in the approved architecture. If a selected
 source contract later requires one, it must follow the provider prefix, be
 documented in the provider task, and receive the same redaction tests.

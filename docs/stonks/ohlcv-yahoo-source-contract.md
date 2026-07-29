@@ -394,11 +394,13 @@ the short-lived Core object when an HTTP 200 Chart payload was stored but later
 failed structural/provider-error validation; their text is not copied into
 operational summaries.
 
-## Deferred Decisions
+## Implementation Handoff
 
 Y8.1 does not implement acquisition or parsing. The later Phase 8 tasks own:
 
-- Y8.2 calendar, availability, and provider-session rules.
+- The completed Y8.2
+  [market-session contract](ohlcv-market-session-contract.md) defines calendar,
+  availability, provider-session, missing-session, and reconciliation rules.
 - Y8.4 persisted session policy and seed rows.
 - Y8.6 the injected HTTP transport, exact guarded timestamp construction,
   retries, raw storage, and a bounded live-format probe.

@@ -66,7 +66,9 @@ backfill and repeated daily/reconciliation workflow share source code
 for the stored native close. See
 [`docs/stonks/ohlcv-yahoo-source-contract.md`](../../docs/stonks/ohlcv-yahoo-source-contract.md)
 for the request, response, identity, pacing, adjustment, compliance, and raw
-object contract.
+object contract. The shared calendar-close/local-cutoff policy, provider-date
+rules, observed-only fallback, eligibility, and reconciliation design is in
+[`docs/stonks/ohlcv-market-session-contract.md`](../../docs/stonks/ohlcv-market-session-contract.md).
 
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
