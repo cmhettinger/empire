@@ -30,8 +30,13 @@ _SAFE_PROVIDER_METADATA_KEYS = frozenset(
         "http_status",
         "last_modified",
         "market",
+        "provider_listing_id",
         "provider_file_date",
+        "request_end_date_exclusive",
+        "request_mode",
         "request_scope",
+        "request_start_date",
+        "ticker",
     }
 )
 

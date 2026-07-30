@@ -94,6 +94,34 @@ calendars, time zones, unsafe calendar warnings, ambiguous local wall times,
 and mismatched provider dates fail closed with no fallback calendar or
 synthetic bar.
 
+## Yahoo Chart acquisition
+
+`acquire_yahoo_objects()` accepts caller-planned
+`YahooAcquisitionRequest` values for active seeded listings. Each
+`YahooListingTarget` carries the durable provider-listing UUID, stable Empire
+ticker, and exact `metadata.YahooTicker` request symbol. Batch validation
+rejects duplicate ranges, conflicting UUID identities, and a Yahoo symbol
+assigned to multiple listing UUIDs.
+
+The acquisition service percent-encodes one Yahoo symbol as one Chart path
+segment and constructs explicit UTC `period1` inclusive and `period2` exclusive
+bounds. Backfills are split into deterministic ascending chunks no larger than
+`EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_CHUNK_DAYS`; daily ranges must already fit
+that bound. Requests remain serial and use the configured normal delay,
+jitter, bounded retries, `Retry-After`, exponential retry delay, and
+post-failure cooldown. Transport, sleep, random, and clock dependencies are
+injectable.
+
+Every HTTP 200 body is stored through Core before its Chart envelope is
+classified. This preserves short-lived evidence for malformed JSON, provider
+errors, symbol mismatches, and recognized no-data responses without copying
+provider body text into operational results. `YahooAcquisitionResult` retains
+ordered per-chunk `stored`, `missing`, or `failed` outcomes, so one listing
+failure does not discard successful raw objects. Non-200 and transport
+failures are represented only by bounded, secret-safe status and reason codes.
+Parsing the positional Chart arrays and filtering them to planned sessions is
+owned by Y8.7.
+
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
 archive into Core, streams only the Nasdaq, NYSE, and NYSE MKT stock partitions,
