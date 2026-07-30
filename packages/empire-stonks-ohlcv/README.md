@@ -70,6 +70,30 @@ object contract. The shared calendar-close/local-cutoff policy, provider-date
 rules, observed-only fallback, eligibility, and reconciliation design is in
 [`docs/stonks/ohlcv-market-session-contract.md`](../../docs/stonks/ohlcv-market-session-contract.md).
 
+## Market-session eligibility
+
+`MarketSessionService` consumes immutable `SessionPolicy` values loaded by its
+caller from `stonks.ohlcv_session_policy`. Its default
+`PandasMarketCalendarProvider` adapter resolves authoritative exchange
+schedules through `pandas_market_calendars`; callers can inject another adapter
+for deterministic tests.
+
+Calendar-backed close policies derive each `ExpectedSession` from the calendar
+label and exact close, including holidays, early closes, and daylight-saving
+changes. Calendar-backed local-cutoff policies retain the authoritative label
+but use the configured provider settlement cutoff. `eligible_sessions()` and
+`eligible_missing_sessions()` accept an explicit aware clock value and return
+only work whose UTC eligibility time has passed.
+
+Observed-only publisher and DXY policies intentionally return no expected
+sessions. `observed_poll_candidate()` says only when a bounded provider range
+may be polled; it never claims that a weekend, holiday, or weekday bar exists.
+Provider timestamps are converted under the policy's explicit date rule and
+must match a planned calendar label when a calendar is assigned. Unknown
+calendars, time zones, unsafe calendar warnings, ambiguous local wall times,
+and mismatched provider dates fail closed with no fallback calendar or
+synthetic bar.
+
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
 archive into Core, streams only the Nasdaq, NYSE, and NYSE MKT stock partitions,

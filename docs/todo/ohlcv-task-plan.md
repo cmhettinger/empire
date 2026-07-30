@@ -289,7 +289,7 @@ later migration to add, correct, deactivate, or remove individual listings.
 | Y8.2 | [x] | Design the shared market-session eligibility contract | Define the smallest reusable representation for each provider listing's calendar, local session/time zone, post-close delay, and session-date rule. Cover exchange-traded cash indexes, publisher-calculated indexes, DXY, and Yahoo `=F` provider daily-settlement series. Define `eligible_at`, missing-session detection, no synthetic weekend/holiday bars, retry behavior, and a configurable 5-7-session reconciliation window. Record why the selected market-calendar library is justified and how unsupported calendars or provider-date ambiguity fail safely. | Y8.1, M3.7 |
 | Y8.3 | [x] | Add Yahoo instrument taxonomy migration | Add an idempotent Flyway migration for `YIELD_INDEX`, `EQUITY_INDEX`, `COMMODITY_INDEX`, `CURRENCY_INDEX`, `CONTINUOUS_FUTURE_COMMODITY`, and `CONTINUOUS_FUTURE_EQUITY`, using existing `INDEX` and `DERIVATIVE` classes and the reference-data upsert convention. Database validation and generated Stonks schema docs pass. | Y8.2 |
 | Y8.4 | [x] | Add Stonks session-policy table and seed Yahoo provider listings | Implement the Y8.2 persistence design inside the existing `stonks` PostgreSQL schema and seed the complete reviewed Yahoo catalog into `stonks.provider_listing` under the existing `YAHOO` provider. Store the Empire code as `provider_listing.ticker`, store the exact acquisition symbol as metadata key `YahooTicker`, add no Yahoo-specific relational ticker column, and never overload `market`. Attach an instrument type and explicit session policy to every row. The migration is deterministic/idempotent, rejects missing provider/type/calendar references, contains no ordinary equities, and has assertions/tests for representative cash indexes, global indexes, yields, volatility, DXY, equity-index futures, and commodity futures. | Y8.2-Y8.3 |
-| Y8.5 | [ ] | Implement calendar and eligibility services | Add package-owned services that resolve expected sessions from the configured market calendar, honor local holidays and early closes, calculate `eligible_at = session_close + availability_delay`, and return only eligible missing sessions. Implement an explicit provider-daily-settlement cutoff for Yahoo continuous futures and safe handling for publisher indexes without an exchange calendar. Tests cross UTC/date boundaries, DST, holidays, early closes, disjoint country holidays, reruns, and unknown calendars. | Y8.4 |
+| Y8.5 | [x] | Implement calendar and eligibility services | Add package-owned services that resolve expected sessions from the configured market calendar, honor local holidays and early closes, calculate `eligible_at = session_close + availability_delay`, and return only eligible missing sessions. Implement an explicit provider-daily-settlement cutoff for Yahoo continuous futures and safe handling for publisher indexes without an exchange calendar. Tests cross UTC/date boundaries, DST, holidays, early closes, disjoint country holidays, reruns, and unknown calendars. | Y8.4 |
 | Y8.6 | [ ] | Implement Yahoo acquisition | Acquire bounded historical ranges for selected seeded Yahoo listings with injected HTTP dependencies, timeouts, bounded retries, request pacing, and chunking where the source requires it. Store every response through Core with durable snapshot identity and secret-safe errors/metadata. Tests cover rate limiting, empty/malformed/error payloads, partial symbol failures, and request-boundary dates. | Y8.1, Y8.4-Y8.5, C4.2, A5.5 |
 | Y8.7 | [ ] | Implement Yahoo parser | Parse Yahoo fixtures into shared provider-listing and daily-bar records with correct provider session dates, nullable volume where valid, deterministic duplicate handling, and documented adjusted-close treatment consistent with the shared table contract. Do not silently substitute adjusted close for native close or add Yahoo-only columns. | Y8.1, Y8.6, A5.3-A5.4 |
 | Y8.8 | [ ] | Implement Yahoo import service | Compose validation, snapshot registration, seeded provider-listing resolution, daily-bar upserts, and per-listing import summaries. Do not create unseeded Yahoo listings during normal import. Unchanged reruns skip writes, later provider corrections update current rows, and one listing failure does not discard successful listings. | Y8.6-Y8.7, E6.5-E6.6 |
@@ -343,6 +343,18 @@ succeeded, both OHLCV schema and Yahoo seed SQL contracts passed, the full
 package suite passed (397 passed, 17 skipped), and canonical Stonks
 schema/Mermaid/pg-diagram documentation regenerated. `git diff --check`
 passed.
+
+Done: 2026-07-30 — added immutable session-policy, calendar-schedule,
+expected-session, and observed-poll values plus the package-owned
+`MarketSessionService`. The narrow `pandas_market_calendars` adapter resolves
+authoritative closes and fails closed for unknown calendars or unreviewed
+warnings. Eligibility supports exact close delays, provider-local cutoffs,
+Yahoo daily-settlement labels, eligible-missing selection, and explicit
+observed-only polling without synthetic sessions. Tests cover normal and early
+closes, DST, UTC-date crossings, disjoint U.S./European/Asian holidays,
+idempotent reruns, futures ambiguity, unsafe calendars/time zones/warnings, and
+ambiguous or nonexistent local times. The full package suite passed (420
+passed, 17 skipped).
 
 ## Phase 9: Calendar-Aware EODData Daily Scheduling
 

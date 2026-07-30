@@ -9,6 +9,10 @@ class OHLCVConfigError(EmpireStonksOHLCVError):
     """Raised when OHLCV configuration is missing or invalid."""
 
 
+class OHLCVCalendarError(EmpireStonksOHLCVError):
+    """Raised when a session policy or market calendar cannot be used safely."""
+
+
 class OHLCVAcquisitionError(EmpireStonksOHLCVError):
     """Raised when provider source acquisition fails."""
 
