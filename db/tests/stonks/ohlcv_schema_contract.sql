@@ -98,6 +98,53 @@ VALUES (
     'Transaction-scoped schema contract fixture'
 );
 
+INSERT INTO ohlcv_session_policy (
+    session_policy_code,
+    calendar_name,
+    timezone_name,
+    eligibility_rule,
+    cutoff_local_time,
+    availability_delay_minutes,
+    session_date_rule,
+    description
+)
+VALUES (
+    'OHLCV_TEST',
+    'XNYS',
+    'America/New_York',
+    'SESSION_CLOSE',
+    NULL,
+    90,
+    'CALENDAR_SESSION',
+    'Transaction-scoped schema contract fixture'
+);
+
+SELECT pg_temp.expect_failure(
+    $sql$
+        INSERT INTO ohlcv_session_policy (
+            session_policy_code,
+            timezone_name,
+            eligibility_rule,
+            cutoff_local_time,
+            availability_delay_minutes,
+            session_date_rule,
+            description
+        )
+        VALUES (
+            'BAD_SESSION_POLICY',
+            'America/New_York',
+            'SESSION_CLOSE',
+            TIME '16:00',
+            90,
+            'CALENDAR_SESSION',
+            'Invalid transaction-scoped fixture'
+        )
+    $sql$,
+    '23514',
+    'ck_ohlcv_session_policy_shape',
+    'session-close policy requires a calendar and forbids a cutoff'
+);
+
 -- Exact, case-sensitive provider-series identity and default instrument type.
 INSERT INTO provider_listing (
     provider_code,
@@ -173,6 +220,26 @@ SELECT pg_temp.expect_failure(
     '23503',
     'fk_provider_listing_instrument_type',
     'provider listing requires an instrument type'
+);
+
+SELECT pg_temp.expect_failure(
+    $sql$
+        INSERT INTO provider_listing (
+            provider_code,
+            market,
+            ticker,
+            session_policy_code
+        )
+        VALUES (
+            'OHLCV_TEST',
+            'NYSE',
+            'BAD_SESSION_POLICY',
+            'MISSING_SESSION_POLICY'
+        )
+    $sql$,
+    '23503',
+    'fk_provider_listing_session_policy',
+    'provider listing requires an existing session policy when assigned'
 );
 
 SELECT pg_temp.expect_failure(

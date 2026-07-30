@@ -50,11 +50,12 @@ def _validate_decimal(field_name: str, value: object) -> None:
 
 @dataclass(frozen=True)
 class ProviderListing:
-    """One exact provider-native market/ticker series.
+    """One exact provider-scoped market/ticker series.
 
-    This record preserves provider market and ticker case. It identifies a
-    provider series only and makes no claim about canonical listing identity or
-    real-world continuity over time.
+    This record preserves configured market and ticker case. A provider source
+    contract may use native values directly or a stable provider-scoped ticker
+    with the native request symbol in metadata. It makes no claim about
+    canonical listing identity or real-world continuity over time.
     """
 
     provider_code: str

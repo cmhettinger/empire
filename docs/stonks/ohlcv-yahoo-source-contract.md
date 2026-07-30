@@ -173,30 +173,35 @@ an unseeded series.
 |----------------------|----------------|
 | `provider_code` | Constant `YAHOO` |
 | `market` | Constant `XIDX` |
-| `ticker` | Exact Yahoo symbol from the seed inventory |
+| `ticker` | Stable Empire code from the seed inventory |
 | `name` | Reviewed seed name; Yahoo cannot overwrite it with enrichment |
 | `instrument_type_code` | Reviewed seed instrument type |
+| `metadata.YahooTicker` | Exact Yahoo request symbol |
+| `session_policy_code` | Reviewed Y8.4 session-policy assignment |
 
 `XIDX` is a stable Empire feed partition meaning the controlled cross-market
 Yahoo benchmark universe. It is not a MIC, venue, exchange, country, or claim
 that all series share one trading calendar. Per-listing session policies added
 after Y8.2 own those distinctions.
 
-The exact Yahoo symbol, including case and punctuation, is the provider-native
-ticker and request identity. It is percent-encoded as one URL path segment.
-The proposed Empire short code in the seed inventory is not sent to Yahoo and
-must not replace the Yahoo symbol or be stored in `market`. Y8.4 decides
-whether it warrants a generic alias representation.
+The Empire code is a stable provider-scoped identifier, not a canonical
+security-master ticker. The exact Yahoo symbol, including case and punctuation,
+is read only from metadata key `YahooTicker` and percent-encoded as one URL path
+segment. No Yahoo-specific relational ticker column or generic alias table is
+needed. Normal acquisition must fail closed when `YahooTicker` is absent,
+blank, non-string, or does not identify exactly one active seed row.
 
-Yahoo Chart `meta.symbol` must agree with the requested exact symbol. Safe
+Yahoo Chart `meta.symbol` must agree with the requested `YahooTicker`. Safe
 response facts such as `exchangeName`, `exchangeTimezoneName`, `currency`, and
 `instrumentType` may be validated and reported, but they do not rewrite the
-seeded identity, infer a canonical listing, or authorize enrichment storage.
+Empire ticker, `YahooTicker`, seeded identity, or session policy; infer a
+canonical listing; or authorize enrichment storage.
 
 ## Request Contract
 
-Each request addresses exactly one active seeded provider listing. There is no
-multi-symbol request and no broad Yahoo symbol discovery.
+Each request addresses exactly one active seeded provider listing and resolves
+its request path from `metadata.YahooTicker`. There is no multi-symbol request
+and no broad Yahoo symbol discovery.
 
 The fixed query inputs are:
 
@@ -341,7 +346,7 @@ in filenames while retaining deterministic request identity. Dates are
   "parser_version": "1.0.0",
   "provider_listing_id": "lowercase UUID",
   "market": "XIDX",
-  "ticker": "exact Yahoo symbol",
+  "ticker": "stable Empire code",
   "request_start_date": "YYYY-MM-DD",
   "request_end_date_exclusive": "YYYY-MM-DD",
   "request_mode": "daily or backfill",

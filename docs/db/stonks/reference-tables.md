@@ -29,6 +29,7 @@ These tables support historical SEC/EDGAR security-master reconstruction from ap
 | `classification_code` (SIC) | SEC SIC List                        | Seeded             | Rare SEC refresh                        | No                 |
 | `instrument_class`          | Empire Internal                     | Seeded             | Rare                                    | Yes                |
 | `instrument_type`           | Empire Internal                     | Seeded             | As new security types are discovered    | Yes                |
+| `ohlcv_session_policy`      | Empire Internal                     | Seeded             | As provider scheduling policies change  | Yes                |
 | `exchange`                  | Empire Internal                     | Seeded             | Rare                                    | Yes                |
 | `exchange_alias`            | SEC filings and discovered mappings | Seeded             | Incremental additions during ingestion  | Yes                |
 | `confidence_level`          | Empire Internal                     | Seeded             | Rare                                    | Yes                |
@@ -334,6 +335,37 @@ Notes:
 
 * New security structures may appear over time.
 * Add new types when they provide meaningful classification value.
+
+---
+
+## OHLCV Session Policies
+
+Table:
+
+```text
+ohlcv_session_policy
+```
+
+Source:
+
+```text
+Empire Internal
+```
+
+Refresh Frequency:
+
+```text
+As Needed
+```
+
+Notes:
+
+* Policies define provider-listing calendars, local cutoffs, availability
+  delays, and provider session-date rules.
+* Calendar names must be verified against Empire's selected market-calendar
+  library before a migration activates an assignment.
+* Unsupported publisher calendars use explicit observed-only policies rather
+  than inferred weekday or U.S. market calendars.
 
 ---
 

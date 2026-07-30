@@ -83,13 +83,13 @@ mapping table, mapping status, or `listing_id` dependency is part of phases
 
 ## Initial Data Contract
 
-A `provider_listing` is a provider-native market/symbol series. It is not a
+A `provider_listing` is a provider-scoped market/symbol series. It is not a
 claim that the ticker has represented one real-world listing for all time.
-Initial ingestion may identify a series by the provider, provider-native market
-text, and provider-native ticker. If a provider reuses a ticker and the reuse is
-not detectable from its input, ingestion may continue writing the same provider
-series. A future temporal bridge can map different date ranges of that series to
-different canonical listings.
+Initial ingestion may identify a series by provider-native market/ticker text
+or by a provider-contract stable ticker with the native request symbol retained
+in metadata. If provider reuse is not detectable from the input, ingestion may
+continue writing the same provider series. A future temporal bridge can map
+different date ranges of that series to different canonical listings.
 
 `ohlcv_daily` stores values as supplied by each provider. The package does not
 normalize price adjustment bases or reconcile disagreements across providers.
@@ -180,10 +180,10 @@ Airflow only invokes that logic.
 
 ### Initial Yahoo Seed Universe
 
-Y8.4 must seed the following 93 provider listings. `Yahoo ticker` is the exact
-provider-native symbol used for acquisition. `Empire code` is the proposed
-stable short label from the source inventory; Y8.2/Y8.4 must make an explicit
-schema decision for it rather than placing it in `provider_listing.market`.
+Y8.4 must seed the following 93 provider listings. `Empire code` is the stable
+`provider_listing.ticker` inside the provider-scoped `XIDX` market. `Yahoo
+ticker` is the exact acquisition symbol stored as metadata key `YahooTicker`;
+it is not a second relational ticker column and is never stored in `market`.
 The migration should preserve this reviewed starting universe while allowing a
 later migration to add, correct, deactivate, or remove individual listings.
 
@@ -288,7 +288,7 @@ later migration to add, correct, deactivate, or remove individual listings.
 | Y8.1 | [x] | Document the Yahoo source and bounded-universe contract | Record the chosen daily OHLCV endpoint, `EMPIRE_STONKS_OHLCV_YAHOO_*` settings, request/range limits, ticker and provider-date semantics, time zones, native adjusted-close and volume behavior, rate/error behavior, and Core raw retention. Explicitly limit Yahoo to the seeded indexes, yield and volatility indexes, currency and commodity indexes, and continuous futures; exclude ordinary equities and non-OHLCV enrichment. Runtime values come from `deploy/env/local.env`. | H7.8, A5.1-A5.2 |
 | Y8.2 | [x] | Design the shared market-session eligibility contract | Define the smallest reusable representation for each provider listing's calendar, local session/time zone, post-close delay, and session-date rule. Cover exchange-traded cash indexes, publisher-calculated indexes, DXY, and Yahoo `=F` provider daily-settlement series. Define `eligible_at`, missing-session detection, no synthetic weekend/holiday bars, retry behavior, and a configurable 5-7-session reconciliation window. Record why the selected market-calendar library is justified and how unsupported calendars or provider-date ambiguity fail safely. | Y8.1, M3.7 |
 | Y8.3 | [x] | Add Yahoo instrument taxonomy migration | Add an idempotent Flyway migration for `YIELD_INDEX`, `EQUITY_INDEX`, `COMMODITY_INDEX`, `CURRENCY_INDEX`, `CONTINUOUS_FUTURE_COMMODITY`, and `CONTINUOUS_FUTURE_EQUITY`, using existing `INDEX` and `DERIVATIVE` classes and the reference-data upsert convention. Database validation and generated Stonks schema docs pass. | Y8.2 |
-| Y8.4 | [ ] | Add session-policy schema and seed Yahoo provider listings | Implement the Y8.2 persistence design in a Flyway migration and seed the complete reviewed Yahoo catalog supplied for this phase into `stonks.provider_listing` under the existing `YAHOO` provider. Store each Yahoo symbol as the provider-native ticker; explicitly decide whether the accompanying Empire short code warrants a generic alias field/table, and never overload `market` with it. Attach an instrument type and explicit session policy to every row. The migration is deterministic/idempotent, rejects missing provider/type/calendar references, contains no ordinary equities, and has assertions/tests for representative cash indexes, global indexes, yields, volatility, DXY, equity-index futures, and commodity futures. | Y8.2-Y8.3 |
+| Y8.4 | [x] | Add Stonks session-policy table and seed Yahoo provider listings | Implement the Y8.2 persistence design inside the existing `stonks` PostgreSQL schema and seed the complete reviewed Yahoo catalog into `stonks.provider_listing` under the existing `YAHOO` provider. Store the Empire code as `provider_listing.ticker`, store the exact acquisition symbol as metadata key `YahooTicker`, add no Yahoo-specific relational ticker column, and never overload `market`. Attach an instrument type and explicit session policy to every row. The migration is deterministic/idempotent, rejects missing provider/type/calendar references, contains no ordinary equities, and has assertions/tests for representative cash indexes, global indexes, yields, volatility, DXY, equity-index futures, and commodity futures. | Y8.2-Y8.3 |
 | Y8.5 | [ ] | Implement calendar and eligibility services | Add package-owned services that resolve expected sessions from the configured market calendar, honor local holidays and early closes, calculate `eligible_at = session_close + availability_delay`, and return only eligible missing sessions. Implement an explicit provider-daily-settlement cutoff for Yahoo continuous futures and safe handling for publisher indexes without an exchange calendar. Tests cross UTC/date boundaries, DST, holidays, early closes, disjoint country holidays, reruns, and unknown calendars. | Y8.4 |
 | Y8.6 | [ ] | Implement Yahoo acquisition | Acquire bounded historical ranges for selected seeded Yahoo listings with injected HTTP dependencies, timeouts, bounded retries, request pacing, and chunking where the source requires it. Store every response through Core with durable snapshot identity and secret-safe errors/metadata. Tests cover rate limiting, empty/malformed/error payloads, partial symbol failures, and request-boundary dates. | Y8.1, Y8.4-Y8.5, C4.2, A5.5 |
 | Y8.7 | [ ] | Implement Yahoo parser | Parse Yahoo fixtures into shared provider-listing and daily-bar records with correct provider session dates, nullable volume where valid, deterministic duplicate handling, and documented adjusted-close treatment consistent with the shared table contract. Do not silently substitute adjusted close for native close or add Yahoo-only columns. | Y8.1, Y8.6, A5.3-A5.4 |
@@ -327,6 +327,22 @@ direct second execution succeeded and retained exactly six active rows with
 the expected classes. The transactional OHLCV schema contract passed, and
 canonical Core/Stonks schema plus all Stonks ERD groups regenerated without
 structural diffs. `git diff --check` passed.
+
+Done: 2026-07-30 — added
+`V2026.07.30.0001__stonks_add_ohlcv_session_policies_and_yahoo_listings.sql`
+inside the existing `stonks` schema with the normalized session-policy table,
+nullable provider-listing FK, policy-shape constraints, Yahoo metadata
+constraint, and unique `YahooTicker` expression index. Seeded 49 reviewed
+policies and all 93 active `YAHOO`/`XIDX` listings with the Empire code as
+`provider_listing.ticker`, the exact request symbol in `metadata.YahooTicker`,
+and an explicit instrument type and policy. Calendar-backed policy names were
+resolved and year schedules exercised with `pandas_market_calendars` 5.4.0;
+unsupported or provider-calculated cases use explicit observed-only policies.
+Flyway applied and validated all 34 migrations, direct migration replay
+succeeded, both OHLCV schema and Yahoo seed SQL contracts passed, the full
+package suite passed (397 passed, 17 skipped), and canonical Stonks
+schema/Mermaid/pg-diagram documentation regenerated. `git diff --check`
+passed.
 
 ## Phase 9: Calendar-Aware EODData Daily Scheduling
 

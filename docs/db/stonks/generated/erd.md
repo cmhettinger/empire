@@ -199,6 +199,17 @@ erDiagram
     TIMESTAMPTZ updated_at
   }
 
+  ohlcv_session_policy {
+    VARCHAR session_policy_code PK
+    TEXT calendar_name
+    TEXT timezone_name
+    VARCHAR eligibility_rule
+    TIME_WITHOUT_TIME_ZONE cutoff_local_time
+    INT availability_delay_minutes
+    VARCHAR session_date_rule
+    TEXT description
+  }
+
   provider {
     VARCHAR provider_code PK
     TEXT provider_name
@@ -233,6 +244,7 @@ erDiagram
     TIMESTAMPTZ updated_at
     VARCHAR status
     JSONB metadata
+    VARCHAR session_policy_code FK
   }
 
   provider_observation {
@@ -485,6 +497,7 @@ erDiagram
   security ||--o{ provider_evidence : "fk_provider_evidence_security"
   instrument_type ||--o{ provider_listing : "fk_provider_listing_instrument_type"
   provider ||--o{ provider_listing : "fk_provider_listing_provider"
+  ohlcv_session_policy ||--o{ provider_listing : "fk_provider_listing_session_policy"
   provider ||--o{ provider_observation : "fk_provider_observation_provider"
   provider_source_snapshot ||--o{ provider_observation : "provider_observation_source_snapshot_id_fkey"
   provider ||--o{ provider_source_snapshot : "provider_source_snapshot_provider_code_fkey"

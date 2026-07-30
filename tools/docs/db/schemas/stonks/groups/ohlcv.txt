@@ -1,6 +1,7 @@
-# Provider-native OHLCV listing series and daily bars.
+# Provider-scoped OHLCV listing series, session policies, and daily bars.
 
 provider
 instrument_type
+ohlcv_session_policy
 provider_listing
 ohlcv_daily

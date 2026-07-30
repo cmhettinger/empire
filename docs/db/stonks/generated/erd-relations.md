@@ -19,6 +19,7 @@ flowchart LR
   listing["listing"]
   listing_symbol_history["listing_symbol_history"]
   ohlcv_daily["ohlcv_daily"]
+  ohlcv_session_policy["ohlcv_session_policy"]
   provider["provider"]
   provider_evidence["provider_evidence"]
   provider_listing["provider_listing"]
@@ -77,6 +78,7 @@ flowchart LR
   security -->|fk_provider_evidence_security| provider_evidence
   instrument_type -->|fk_provider_listing_instrument_type| provider_listing
   provider -->|fk_provider_listing_provider| provider_listing
+  ohlcv_session_policy -->|fk_provider_listing_session_policy| provider_listing
   provider -->|fk_provider_observation_provider| provider_observation
   provider_source_snapshot -->|provider_observation_source_snapshot_id_fkey| provider_observation
   provider -->|provider_source_snapshot_provider_code_fkey| provider_source_snapshot

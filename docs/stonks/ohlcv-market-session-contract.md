@@ -47,8 +47,11 @@ Empire uses the library through a small package-owned adapter:
 - Request timezone-aware schedules containing `market_close`.
 - Preserve the schedule index as the authoritative session label.
 - Use the schedule's actual close, including early closes.
-- Treat library warnings, unknown names, empty schedules in a range that
-  should contain sessions, and naive or malformed timestamps as errors.
+- Treat warnings that affect requested session labels or closes, unknown
+  names, empty schedules in a range that should contain sessions, and naive or
+  malformed timestamps as errors. Dependency deprecations and warnings about
+  unused intraday break fields must be explicitly tested and narrowly handled,
+  not globally silenced.
 - Convert final eligibility instants to aware UTC `datetime` values.
 
 No library calendar is silently replaced with Monday-through-Friday logic,
@@ -98,11 +101,12 @@ remain unassigned until their calendar mapping phase. An active listing with
 no policy is a configuration error and is excluded from automated planning;
 it is never assigned a default calendar.
 
-The proposed Empire short codes in the Yahoo inventory are review labels only.
-Y8.4 should not persist them or overload `provider_listing.market`. No current
-consumer needs a second identity, so an alias table would be premature. If a
-stable alias becomes necessary, it should be a separately designed generic
-provider-listing alias relation with namespace and uniqueness rules.
+The Empire codes in the Yahoo inventory are the stable
+`provider_listing.ticker` values within the `YAHOO`/`XIDX` scope. The exact
+Yahoo request symbol is retained in provider-listing metadata as
+`YahooTicker`; it does not warrant a Yahoo-specific relational column or a
+generic alias table. Session policies remain normalized and must not be placed
+in metadata.
 
 ## Package-Owned Value Contract
 
@@ -344,7 +348,8 @@ deliberately assigns a verified alternative or an observed-only policy.
 
 Y8.4 must implement the table, constraints, foreign key, policy seeds, and
 Yahoo assignments. Its migration tests must prove every active Yahoo listing
-has one valid policy and that no short review code is stored in `market`.
+has one valid policy, uses the Empire code as its ticker, retains one unique
+non-blank `YahooTicker`, and never stores either identity in `market`.
 
 Y8.5 must implement the typed policy, calendar adapter, UTC eligibility
 calculation, and safe errors. Required tests include:

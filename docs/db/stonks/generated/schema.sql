@@ -258,6 +258,25 @@ CREATE TABLE stonks.ohlcv_daily (
     CONSTRAINT ck_ohlcv_daily_volume_nonnegative CHECK (((volume IS NULL) OR (volume >= (0)::numeric)))
 );
 
+CREATE TABLE stonks.ohlcv_session_policy (
+    session_policy_code character varying(32) NOT NULL,
+    calendar_name text,
+    timezone_name text NOT NULL,
+    eligibility_rule character varying(32) NOT NULL,
+    cutoff_local_time time without time zone,
+    availability_delay_minutes integer NOT NULL,
+    session_date_rule character varying(32) NOT NULL,
+    description text NOT NULL,
+    CONSTRAINT ck_ohlcv_session_policy_calendar CHECK (((calendar_name IS NULL) OR ((calendar_name <> ''::text) AND (calendar_name = btrim(calendar_name))))),
+    CONSTRAINT ck_ohlcv_session_policy_code CHECK ((((session_policy_code)::text <> ''::text) AND ((session_policy_code)::text = btrim((session_policy_code)::text)) AND ((session_policy_code)::text = upper((session_policy_code)::text)))),
+    CONSTRAINT ck_ohlcv_session_policy_delay CHECK (((availability_delay_minutes >= 0) AND (availability_delay_minutes <= 10080))),
+    CONSTRAINT ck_ohlcv_session_policy_description CHECK (((description <> ''::text) AND (description = btrim(description)))),
+    CONSTRAINT ck_ohlcv_session_policy_eligibility_rule CHECK (((eligibility_rule)::text = ANY ((ARRAY['SESSION_CLOSE'::character varying, 'LOCAL_CUTOFF'::character varying])::text[]))),
+    CONSTRAINT ck_ohlcv_session_policy_session_date_rule CHECK (((session_date_rule)::text = ANY ((ARRAY['CALENDAR_SESSION'::character varying, 'PROVIDER_LOCAL_DATE'::character varying, 'PROVIDER_DAILY_SETTLEMENT'::character varying])::text[]))),
+    CONSTRAINT ck_ohlcv_session_policy_shape CHECK (((((eligibility_rule)::text = 'SESSION_CLOSE'::text) AND (calendar_name IS NOT NULL) AND (cutoff_local_time IS NULL) AND ((session_date_rule)::text = 'CALENDAR_SESSION'::text)) OR (((eligibility_rule)::text = 'LOCAL_CUTOFF'::text) AND (cutoff_local_time IS NOT NULL) AND ((session_date_rule)::text = ANY ((ARRAY['PROVIDER_LOCAL_DATE'::character varying, 'PROVIDER_DAILY_SETTLEMENT'::character varying])::text[]))))),
+    CONSTRAINT ck_ohlcv_session_policy_timezone CHECK (((timezone_name <> ''::text) AND (timezone_name = btrim(timezone_name))))
+);
+
 CREATE TABLE stonks.provider (
     provider_code character varying(32) NOT NULL,
     provider_name text NOT NULL,
@@ -296,10 +315,12 @@ CREATE TABLE stonks.provider_listing (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     status character varying(32) DEFAULT 'ACTIVE'::character varying NOT NULL,
     metadata jsonb,
+    session_policy_code character varying(32),
     CONSTRAINT ck_provider_listing_market CHECK (((market <> ''::text) AND (market = btrim(market)))),
     CONSTRAINT ck_provider_listing_seen_dates CHECK ((((first_seen IS NULL) AND (last_seen IS NULL)) OR ((first_seen IS NOT NULL) AND (last_seen IS NOT NULL) AND (last_seen >= first_seen)))),
     CONSTRAINT ck_provider_listing_status CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'INACTIVE'::character varying])::text[]))),
-    CONSTRAINT ck_provider_listing_ticker CHECK (((ticker <> ''::text) AND (ticker = btrim(ticker))))
+    CONSTRAINT ck_provider_listing_ticker CHECK (((ticker <> ''::text) AND (ticker = btrim(ticker)))),
+    CONSTRAINT ck_provider_listing_yahoo_metadata CHECK ((((provider_code)::text <> 'YAHOO'::text) OR ((metadata IS NOT NULL) AND (jsonb_typeof(metadata) = 'object'::text) AND (jsonb_typeof((metadata -> 'YahooTicker'::text)) = 'string'::text) AND ((metadata ->> 'YahooTicker'::text) <> ''::text) AND ((metadata ->> 'YahooTicker'::text) = btrim((metadata ->> 'YahooTicker'::text))))))
 );
 
 CREATE TABLE stonks.provider_observation (
@@ -607,6 +628,9 @@ ALTER TABLE ONLY stonks.listing
 ALTER TABLE ONLY stonks.listing_symbol_history
     ADD CONSTRAINT listing_symbol_history_pkey PRIMARY KEY (listing_symbol_id);
 
+ALTER TABLE ONLY stonks.ohlcv_session_policy
+    ADD CONSTRAINT ohlcv_session_policy_pkey PRIMARY KEY (session_policy_code);
+
 ALTER TABLE ONLY stonks.ohlcv_daily
     ADD CONSTRAINT pk_ohlcv_daily PRIMARY KEY (provider_listing_id, trading_date);
 
@@ -793,6 +817,8 @@ CREATE INDEX ix_provider_evidence_security ON stonks.provider_evidence USING btr
 
 CREATE INDEX ix_provider_listing_provider_last_seen ON stonks.provider_listing USING btree (provider_code, last_seen DESC) WHERE (last_seen IS NOT NULL);
 
+CREATE INDEX ix_provider_listing_session_policy ON stonks.provider_listing USING btree (session_policy_code) WHERE (session_policy_code IS NOT NULL);
+
 CREATE INDEX ix_provider_observation_accession ON stonks.provider_observation USING btree (accession_no);
 
 CREATE INDEX ix_provider_observation_object ON stonks.provider_observation USING btree (object_id);
@@ -868,6 +894,8 @@ CREATE INDEX ix_security_successor_successor_lookup ON stonks.security_successor
 CREATE INDEX ix_security_title ON stonks.security USING btree (security_title);
 
 CREATE INDEX ix_security_type ON stonks.security USING btree (instrument_type_code);
+
+CREATE UNIQUE INDEX uq_provider_listing_yahoo_ticker ON stonks.provider_listing USING btree (((metadata ->> 'YahooTicker'::text))) WHERE (((provider_code)::text = 'YAHOO'::text) AND (metadata ? 'YahooTicker'::text));
 
 CREATE UNIQUE INDEX ux_issuer_cik ON stonks.issuer USING btree (cik) WHERE (cik IS NOT NULL);
 
@@ -990,6 +1018,9 @@ ALTER TABLE ONLY stonks.provider_listing
 
 ALTER TABLE ONLY stonks.provider_listing
     ADD CONSTRAINT fk_provider_listing_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code);
+
+ALTER TABLE ONLY stonks.provider_listing
+    ADD CONSTRAINT fk_provider_listing_session_policy FOREIGN KEY (session_policy_code) REFERENCES stonks.ohlcv_session_policy(session_policy_code);
 
 ALTER TABLE ONLY stonks.provider_observation
     ADD CONSTRAINT fk_provider_observation_provider FOREIGN KEY (provider_code) REFERENCES stonks.provider(provider_code) ON UPDATE CASCADE;

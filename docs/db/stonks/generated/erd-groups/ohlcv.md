@@ -25,6 +25,17 @@ erDiagram
     TIMESTAMPTZ updated_at
   }
 
+  ohlcv_session_policy {
+    VARCHAR session_policy_code PK
+    TEXT calendar_name
+    TEXT timezone_name
+    VARCHAR eligibility_rule
+    TIME_WITHOUT_TIME_ZONE cutoff_local_time
+    INT availability_delay_minutes
+    VARCHAR session_date_rule
+    TEXT description
+  }
+
   provider {
     VARCHAR provider_code PK
     TEXT provider_name
@@ -47,9 +58,11 @@ erDiagram
     TIMESTAMPTZ updated_at
     VARCHAR status
     JSONB metadata
+    VARCHAR session_policy_code FK
   }
 
   provider_listing ||--o{ ohlcv_daily : "fk_ohlcv_daily_provider_listing"
   instrument_type ||--o{ provider_listing : "fk_provider_listing_instrument_type"
   provider ||--o{ provider_listing : "fk_provider_listing_provider"
+  ohlcv_session_policy ||--o{ provider_listing : "fk_provider_listing_session_policy"
 ```
