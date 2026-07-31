@@ -210,6 +210,31 @@ report contains bounded per-listing/chunk acquisition, parse, lineage, and
 write details; the broader Yahoo health and completeness report remains owned
 by Y8.12.
 
+## Yahoo daily completeness planning
+
+`plan_yahoo_daily_completeness()` is the package-owned read/plan boundary for
+the later Yahoo daily runner. Its caller supplies an inclusive date window, an
+aware clock value, the configured maximum Yahoo request length, and optional
+exact Empire ticker filters. The planner enumerates active seeded listings,
+loads only their in-window `ohlcv_daily.trading_date` values, resolves each
+distinct session policy once, and returns deterministic per-listing decisions
+plus tightly bounded `YahooRequestMode.DAILY` pulls.
+
+For calendar-backed policies, pulls contain only eligible expected session
+labels absent from current storage. Stored sessions split pull ranges, future
+or not-yet-eligible sessions create no work, and a completed rerun is a no-op.
+There is no attempted-work state: an eligible date remains in later plans
+until a valid bar exists. Source request bounds are never widened merely to
+combine work, and each pull retains the exact missing labels that justify its
+continuous Yahoo Chart range.
+
+Observed-only policies remain explicitly different. A due unstored date is a
+`DUE_OBSERVED_POLL` candidate, not an authoritative missing session; no
+expected-session or coverage claim is created. Calendar-policy failures are
+isolated to their listing with a stable safe reason while valid listings keep
+their plans. Acquisition, reconciliation, Core run lifecycle, and reporting
+remain owned by Y8.11-Y8.13.
+
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
 archive into Core, streams only the Nasdaq, NYSE, and NYSE MKT stock partitions,
