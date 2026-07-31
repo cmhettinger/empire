@@ -170,6 +170,46 @@ outcomes by durable listing UUID and reports imported, missing, failed,
 snapshot, accepted/rejected-row, and aggregate bar-write counts without
 provider body text or exception details.
 
+## Yahoo historical backfill
+
+`run_yahoo_backfill()` owns the manual historical sequence under one Core run.
+It enumerates every active `YAHOO`/`XIDX` seed with its exact
+`metadata.YahooTicker` and session policy, applies the explicit
+`YahooBackfillScope`, acquires deterministic source-bounded Chart chunks, reads
+the stored Core bodies, resolves calendar labels, parses them, and sends each
+chunk through `import_yahoo_ranges()`. Raw objects, source snapshots, current
+bars, Core lifecycle, and the durable JSON execution report therefore share
+the same lineage without moving business logic into the CLI.
+
+The default scope includes all active Yahoo seeds. Repeated `--ticker` options
+can select a reviewed subset. `--resume-from` is inclusive in stable Empire
+ticker order and, when combined with `--ticker`, must name one of those
+explicit tickers. A resumed listing reacquires its bounded range chunks;
+already committed equal chunks report unchanged, so retrying after a partial
+run is safe without a second checkpoint table. Provider, parse, seed, or
+persistence failures remain per-chunk `WARN` outcomes while successful chunks
+and listings retain their commits. Systemic enumeration, acquisition,
+reporting, or Core failures fail the tracked run with a secret-safe stage.
+
+Run the operator wrapper from the repository root:
+
+```bash
+bin/stonks-ohlcv-yahoo-backfill \
+  --effective-date 2026-07-30 \
+  --start-date 1965-01-01 \
+  --end-date-exclusive 2026-07-31
+```
+
+The start date defaults to
+`EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_START_DATE`; the exclusive end defaults to
+the day after `--effective-date`. The acquisition layer still enforces
+`EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_CHUNK_DAYS`. Progress is emitted as
+secret-safe JSON on stderr and successful stdout is one compact JSON summary
+containing the Core run/report identities and aggregate outcomes. The stored
+report contains bounded per-listing/chunk acquisition, parse, lineage, and
+write details; the broader Yahoo health and completeness report remains owned
+by Y8.12.
+
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
 archive into Core, streams only the Nasdaq, NYSE, and NYSE MKT stock partitions,

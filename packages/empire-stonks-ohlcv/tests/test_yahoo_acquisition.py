@@ -239,6 +239,37 @@ def test_stores_exact_guarded_request_and_safe_identity_metadata(
     assert "^GSPC" not in repr(stored.metadata)
 
 
+def test_emits_each_completed_chunk_to_the_optional_outcome_sink(
+    tmp_path: Path,
+) -> None:
+    object_store, _ = _store(tmp_path)
+    outcomes: list[YahooAcquisitionStatus] = []
+
+    result = acquire_yahoo_objects(
+        object_store=object_store,
+        run_context=_run_context(),
+        config=_config(yahoo_backfill_chunk_days=2),
+        requests=(
+            _request(
+                start_date=date(2026, 7, 1),
+                end_date_exclusive=date(2026, 7, 5),
+                mode=YahooRequestMode.BACKFILL,
+            ),
+        ),
+        transport=lambda **_: _response(),
+        sleep=lambda _: None,
+        random_uniform=lambda minimum, _maximum: minimum,
+        clock=lambda: STORED_AT,
+        outcome_sink=lambda outcome: outcomes.append(outcome.status),
+    )
+
+    assert len(result.outcomes) == 2
+    assert outcomes == [
+        YahooAcquisitionStatus.STORED,
+        YahooAcquisitionStatus.STORED,
+    ]
+
+
 def test_backfill_chunks_are_ascending_bounded_and_paced(tmp_path: Path) -> None:
     object_store, _ = _store(tmp_path)
     calls: list[dict[str, object]] = []

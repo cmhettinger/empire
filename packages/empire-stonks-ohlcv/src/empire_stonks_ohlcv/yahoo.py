@@ -37,6 +37,7 @@ _MAX_TICKER_LENGTH = 64
 
 Sleep = Callable[[float], None]
 RandomUniform = Callable[[float, float], float]
+YahooOutcomeSink = Callable[["YahooAcquisitionOutcome"], None]
 
 
 class YahooRequestMode(StrEnum):
@@ -309,6 +310,7 @@ def acquire_yahoo_objects(
     sleep: Sleep = time.sleep,
     random_uniform: RandomUniform = random.uniform,
     clock: Clock | None = None,
+    outcome_sink: YahooOutcomeSink | None = None,
 ) -> YahooAcquisitionResult:
     """Acquire bounded Yahoo ranges serially while isolating chunk failures."""
 
@@ -320,6 +322,7 @@ def acquire_yahoo_objects(
         random_uniform=random_uniform,
         transport=transport,
         clock=clock,
+        outcome_sink=outcome_sink,
     )
     request_transport = transport or _urllib_transport
     chunks = tuple(
@@ -362,6 +365,8 @@ def acquire_yahoo_objects(
             clock=clock,
         )
         outcomes.append(outcome)
+        if outcome_sink is not None:
+            outcome_sink(outcome)
         previous_failed = outcome.status is YahooAcquisitionStatus.FAILED
 
     return YahooAcquisitionResult(tuple(outcomes))
@@ -710,6 +715,7 @@ def _validate_inputs(
     random_uniform: RandomUniform,
     transport: YahooHTTPTransport | None,
     clock: Clock | None,
+    outcome_sink: YahooOutcomeSink | None,
 ) -> tuple[YahooAcquisitionRequest, ...]:
     if not isinstance(run_context, RunContext):
         raise TypeError("run_context must be a Core RunContext.")
@@ -738,6 +744,8 @@ def _validate_inputs(
         raise TypeError("transport must be callable.")
     if clock is not None and not callable(clock):
         raise TypeError("clock must be callable.")
+    if outcome_sink is not None and not callable(outcome_sink):
+        raise TypeError("outcome_sink must be callable.")
     return prepared
 
 

@@ -410,7 +410,9 @@ Y8.1 does not implement acquisition or parsing. The later Phase 8 tasks own:
 - Y8.6 the injected HTTP transport, exact guarded timestamp construction,
   retries, raw storage, and a bounded live-format probe.
 - Y8.7 fixtures and deterministic parsing against captured Chart JSON.
-- Y8.9 backfill orchestration and resume behavior.
+- Y8.9 implements seeded-universe backfill orchestration, inclusive
+  Empire-ticker resume, per-chunk retry/import isolation, Core lifecycle, and
+  a durable secret-safe execution report.
 - Y8.10-Y8.14 completeness planning, reconciliation, reporting, CLI, and DAG.
 
 The endpoint and response shape must be revalidated with a small permitted live
