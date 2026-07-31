@@ -215,6 +215,15 @@ from empire_stonks_ohlcv.yahoo_parser import (
     YahooChartParseResult,
     parse_yahoo_chart,
 )
+from empire_stonks_ohlcv.yahoo_import import (
+    YahooChunkImportResult,
+    YahooImportFailureCode,
+    YahooImportInput,
+    YahooImportResult,
+    YahooImportStatus,
+    YahooListingImportSummary,
+    import_yahoo_ranges,
+)
 
 __all__ = [
     "AcquiredObject",
@@ -333,10 +342,16 @@ __all__ = [
     "YahooAcquisitionResult",
     "YahooAcquisitionStatus",
     "YahooChartParseResult",
+    "YahooChunkImportResult",
     "YahooFailureReason",
     "YahooHTTPResponse",
     "YahooHTTPTransport",
+    "YahooImportFailureCode",
+    "YahooImportInput",
+    "YahooImportResult",
+    "YahooImportStatus",
     "YahooListingTarget",
+    "YahooListingImportSummary",
     "YahooRequestMode",
     "YahooTransportError",
     "acquire_eoddata_objects",
@@ -351,6 +366,7 @@ __all__ = [
     "build_run_summary",
     "execute_import_boundary",
     "import_eoddata_daily",
+    "import_yahoo_ranges",
     "inspect_stooq_history_archive",
     "parse_eoddata_quote_list",
     "parse_eoddata_symbol_list",

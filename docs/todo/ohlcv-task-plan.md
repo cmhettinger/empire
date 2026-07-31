@@ -292,7 +292,7 @@ later migration to add, correct, deactivate, or remove individual listings.
 | Y8.5 | [x] | Implement calendar and eligibility services | Add package-owned services that resolve expected sessions from the configured market calendar, honor local holidays and early closes, calculate `eligible_at = session_close + availability_delay`, and return only eligible missing sessions. Implement an explicit provider-daily-settlement cutoff for Yahoo continuous futures and safe handling for publisher indexes without an exchange calendar. Tests cross UTC/date boundaries, DST, holidays, early closes, disjoint country holidays, reruns, and unknown calendars. | Y8.4 |
 | Y8.6 | [x] | Implement Yahoo acquisition | Acquire bounded historical ranges for selected seeded Yahoo listings with injected HTTP dependencies, timeouts, bounded retries, request pacing, and chunking where the source requires it. Store every response through Core with durable snapshot identity and secret-safe errors/metadata. Tests cover rate limiting, empty/malformed/error payloads, partial symbol failures, and request-boundary dates. | Y8.1, Y8.4-Y8.5, C4.2, A5.5 |
 | Y8.7 | [x] | Implement Yahoo parser | Parse Yahoo fixtures into shared provider-listing and daily-bar records with correct provider session dates, nullable volume where valid, deterministic duplicate handling, and documented adjusted-close treatment consistent with the shared table contract. Do not silently substitute adjusted close for native close or add Yahoo-only columns. | Y8.1, Y8.6, A5.3-A5.4 |
-| Y8.8 | [ ] | Implement Yahoo import service | Compose validation, snapshot registration, seeded provider-listing resolution, daily-bar upserts, and per-listing import summaries. Do not create unseeded Yahoo listings during normal import. Unchanged reruns skip writes, later provider corrections update current rows, and one listing failure does not discard successful listings. | Y8.6-Y8.7, E6.5-E6.6 |
+| Y8.8 | [x] | Implement Yahoo import service | Compose validation, snapshot registration, seeded provider-listing resolution, daily-bar upserts, and per-listing import summaries. Do not create unseeded Yahoo listings during normal import. Unchanged reruns skip writes, later provider corrections update current rows, and one listing failure does not discard successful listings. | Y8.6-Y8.7, E6.5-E6.6 |
 | Y8.9 | [ ] | Add Yahoo historical backfill runner and CLI | Add a package-owned backfill runner, operator CLI, and `bin` wrapper using `bin/env-load`. It enumerates all active seeded Yahoo listings, accepts explicit bounded date/range controls and safe resume/retry behavior, imports available history in source-safe chunks, records Core lifecycle/lineage, and emits a secret-safe machine-readable summary and report. Tests cover full enumeration, partial restart, unchanged rerun, correction, and partial failure. | Y8.8, B1.8 |
 | Y8.10 | [ ] | Implement Yahoo daily completeness planning | For each active seeded Yahoo listing, determine completed expected sessions, calculate eligibility, compare them with stored `ohlcv_daily` rows, and produce a bounded pull plan containing only eligible missing sessions. A rerun before eligibility or after completion is a no-op; a failed/missing session remains retryable on a later run. Tests prove one record per real market session across U.S., European, Asian, and futures examples. | Y8.5, Y8.8-Y8.9 |
 | Y8.11 | [ ] | Add recent-session reconciliation | Add a daily reconciliation pass that re-pulls the configured recent 5-7 expected sessions, compares provider OHLC, close/adjustment semantics, and volume with current rows, and applies idempotent corrections through the normal upsert path. Surface corrected-row counts and field-level differences in run results/reports without adding a bar-revision table. Tests cover late bars, changed values, null volume, provider-date corrections, and unchanged history. | Y8.7-Y8.10 |
@@ -384,6 +384,20 @@ order. Added a policy-compliant constructed Yahoo fixture plus generated tests
 for futures UTC-date crossing, observed-only bounds, structural failures,
 timezone and symbol mismatches, invalid OHLCV/timestamps/adjusted close, and
 array alignment. The full package suite passed (466 passed, 17 skipped).
+
+Done: 2026-07-30 — implemented `import_yahoo_ranges()` as a package-owned,
+seed-only Yahoo persistence service. Each acquired request chunk resolves and
+locks its durable provider-listing UUID, fails closed on inactive or changed
+seed identity, registers valid stored bodies as provider snapshots, and writes
+matching parsed bars through the shared current-state upsert without calling
+the provider-listing writer. Independent chunk transactions preserve successful
+listings across acquisition, seed-resolution, and persistence failures, while
+ordered per-listing summaries retain only bounded safe diagnostics and counts.
+Unit and PostgreSQL integration coverage proves no unseeded listing creation,
+snapshot lineage, partial-failure isolation, unchanged reruns, later provider
+corrections, and inactive-listing protection. The full database-enabled package
+suite passed (493 passed); `poetry check --lock`, public import and `compileall`
+smokes, the 88-column changed-Python scan, and `git diff --check` passed.
 
 ## Phase 9: Calendar-Aware EODData Daily Scheduling
 

@@ -285,7 +285,7 @@ def test_eoddata_six_object_fixture_vertical_and_unchanged_rerun(
 
         for run_id in run_ids:
             objects = object_store.find_objects_by_run_id(run_id)
-            assert len(objects) == 7
+            assert len(objects) == 9
             raw_objects = tuple(
                 item
                 for item in objects
@@ -302,6 +302,14 @@ def test_eoddata_six_object_fixture_vertical_and_unchanged_rerun(
             ]
             assert sum(
                 item.object_kind == "stonks_ohlcv_provider_report" for item in objects
+            ) == 1
+            assert sum(
+                item.object_kind == "stonks_ohlcv_provider_pdf_report"
+                for item in objects
+            ) == 1
+            assert sum(
+                item.object_kind == "stonks_ohlcv_market_pdf_report"
+                for item in objects
             ) == 1
 
         with connection.cursor() as cursor:  # type: ignore[union-attr]

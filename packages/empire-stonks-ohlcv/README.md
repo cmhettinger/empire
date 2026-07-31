@@ -145,6 +145,31 @@ and tests exact symbol punctuation, session-date handling, Decimal fidelity,
 nullable volume, adjusted-close separation, and event-data exclusion without
 making live requests.
 
+## Yahoo import service
+
+`import_yahoo_ranges()` composes acquired Yahoo outcomes and their matching
+validated parse results into independently committed request chunks. Before
+registering a snapshot or writing bars, each chunk locks and resolves the exact
+seeded `provider_listing_id`. The row must remain active and agree with the
+request's Empire ticker, `metadata.YahooTicker`, provider/market identity,
+instrument details, and parsed session-policy code. The service never calls
+the provider-listing upsert path, so an unknown UUID or changed seed identity
+fails closed instead of creating or silently remapping a Yahoo series.
+
+Every stored HTTP 200 body that belongs to a valid seeded listing receives
+durable source-snapshot identity, including recognized no-data and
+acquisition/parse failures. Bars are written only for matching successful
+parse results through the shared current-state daily-bar writer. Reprocessing
+equal values reports them as unchanged; later native provider corrections
+update the current row.
+
+One transaction is used per acquired request chunk. A seed-resolution or
+persistence failure rolls back only that chunk, while prior and subsequent
+chunks retain their commits. `YahooImportResult` groups the safe chunk
+outcomes by durable listing UUID and reports imported, missing, failed,
+snapshot, accepted/rejected-row, and aggregate bar-write counts without
+provider body text or exception details.
+
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
 archive into Core, streams only the Nasdaq, NYSE, and NYSE MKT stock partitions,

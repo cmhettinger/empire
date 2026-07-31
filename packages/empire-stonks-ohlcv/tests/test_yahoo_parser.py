@@ -159,6 +159,7 @@ def test_fixture_preserves_native_values_filters_plan_and_ignores_events() -> No
     )
 
     assert result.response_timezone_name == "America/New_York"
+    assert result.session_policy_code == "YAHOO_US_CASH"
     assert result.exchange_name == "SNP"
     assert result.input_rows == 3
     assert result.accepted_rows == 2

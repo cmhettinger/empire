@@ -62,6 +62,11 @@ def test_identical_native_series_remain_isolated_by_provider(
             provider_code=provider_code,
             market="M37_SHARED",
             ticker="SAME",
+            metadata=(
+                {"YahooTicker": "SAME"}
+                if provider_code == "YAHOO"
+                else None
+            ),
         )
         for provider_code in ("EODDATA", "STOOQ", "YAHOO")
     )

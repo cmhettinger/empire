@@ -69,6 +69,7 @@ class YahooChartParseResult:
     """One seeded listing's accepted bars and bounded parse diagnostics."""
 
     request: YahooAcquisitionRequest
+    session_policy_code: str
     response_timezone_name: str
     exchange_name: str
     batch: ParsedListingBatch
@@ -88,6 +89,7 @@ class YahooChartParseResult:
     def __post_init__(self) -> None:
         if not isinstance(self.request, YahooAcquisitionRequest):
             raise TypeError("request must be a YahooAcquisitionRequest.")
+        _required_text("session_policy_code", self.session_policy_code)
         _required_text("response_timezone_name", self.response_timezone_name)
         _required_text("exchange_name", self.exchange_name)
         if not isinstance(self.batch, ParsedListingBatch):
@@ -169,6 +171,7 @@ class YahooChartParseResult:
                 self.request.end_date_exclusive.isoformat()
             ),
             "request_mode": self.request.mode.value,
+            "session_policy_code": self.session_policy_code,
             "response_timezone_name": self.response_timezone_name,
             "exchange_name": self.exchange_name,
             "input_rows": self.input_rows,
@@ -394,6 +397,7 @@ def parse_yahoo_chart(
     assert diagnostics.issues is not None
     return YahooChartParseResult(
         request=request,
+        session_policy_code=policy.code,
         response_timezone_name=response_timezone_name,
         exchange_name=exchange_name,
         batch=ParsedListingBatch(
