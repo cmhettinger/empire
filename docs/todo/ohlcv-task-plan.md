@@ -291,7 +291,7 @@ later migration to add, correct, deactivate, or remove individual listings.
 | Y8.4 | [x] | Add Stonks session-policy table and seed Yahoo provider listings | Implement the Y8.2 persistence design inside the existing `stonks` PostgreSQL schema and seed the complete reviewed Yahoo catalog into `stonks.provider_listing` under the existing `YAHOO` provider. Store the Empire code as `provider_listing.ticker`, store the exact acquisition symbol as metadata key `YahooTicker`, add no Yahoo-specific relational ticker column, and never overload `market`. Attach an instrument type and explicit session policy to every row. The migration is deterministic/idempotent, rejects missing provider/type/calendar references, contains no ordinary equities, and has assertions/tests for representative cash indexes, global indexes, yields, volatility, DXY, equity-index futures, and commodity futures. | Y8.2-Y8.3 |
 | Y8.5 | [x] | Implement calendar and eligibility services | Add package-owned services that resolve expected sessions from the configured market calendar, honor local holidays and early closes, calculate `eligible_at = session_close + availability_delay`, and return only eligible missing sessions. Implement an explicit provider-daily-settlement cutoff for Yahoo continuous futures and safe handling for publisher indexes without an exchange calendar. Tests cross UTC/date boundaries, DST, holidays, early closes, disjoint country holidays, reruns, and unknown calendars. | Y8.4 |
 | Y8.6 | [x] | Implement Yahoo acquisition | Acquire bounded historical ranges for selected seeded Yahoo listings with injected HTTP dependencies, timeouts, bounded retries, request pacing, and chunking where the source requires it. Store every response through Core with durable snapshot identity and secret-safe errors/metadata. Tests cover rate limiting, empty/malformed/error payloads, partial symbol failures, and request-boundary dates. | Y8.1, Y8.4-Y8.5, C4.2, A5.5 |
-| Y8.7 | [ ] | Implement Yahoo parser | Parse Yahoo fixtures into shared provider-listing and daily-bar records with correct provider session dates, nullable volume where valid, deterministic duplicate handling, and documented adjusted-close treatment consistent with the shared table contract. Do not silently substitute adjusted close for native close or add Yahoo-only columns. | Y8.1, Y8.6, A5.3-A5.4 |
+| Y8.7 | [x] | Implement Yahoo parser | Parse Yahoo fixtures into shared provider-listing and daily-bar records with correct provider session dates, nullable volume where valid, deterministic duplicate handling, and documented adjusted-close treatment consistent with the shared table contract. Do not silently substitute adjusted close for native close or add Yahoo-only columns. | Y8.1, Y8.6, A5.3-A5.4 |
 | Y8.8 | [ ] | Implement Yahoo import service | Compose validation, snapshot registration, seeded provider-listing resolution, daily-bar upserts, and per-listing import summaries. Do not create unseeded Yahoo listings during normal import. Unchanged reruns skip writes, later provider corrections update current rows, and one listing failure does not discard successful listings. | Y8.6-Y8.7, E6.5-E6.6 |
 | Y8.9 | [ ] | Add Yahoo historical backfill runner and CLI | Add a package-owned backfill runner, operator CLI, and `bin` wrapper using `bin/env-load`. It enumerates all active seeded Yahoo listings, accepts explicit bounded date/range controls and safe resume/retry behavior, imports available history in source-safe chunks, records Core lifecycle/lineage, and emits a secret-safe machine-readable summary and report. Tests cover full enumeration, partial restart, unchanged rerun, correction, and partial failure. | Y8.8, B1.8 |
 | Y8.10 | [ ] | Implement Yahoo daily completeness planning | For each active seeded Yahoo listing, determine completed expected sessions, calculate eligibility, compare them with stored `ohlcv_daily` rows, and produce a bounded pull plan containing only eligible missing sessions. A rerun before eligibility or after completion is a no-op; a failed/missing session remains retryable on a later run. Tests prove one record per real market session across U.S., European, Asian, and futures examples. | Y8.5, Y8.8-Y8.9 |
@@ -369,6 +369,21 @@ and 5xx retries, pre-Unix-epoch boundaries, chunk edges, empty/malformed/error
 payloads, symbol mismatch, missing daily data, empty backfills, raw-storage
 failure, and successful listings around a failed symbol. The full package
 suite passed (446 passed, 17 skipped).
+
+Done: 2026-07-30 — implemented deterministic Yahoo Chart parsing against the
+exact seeded Empire ticker, `metadata.YahooTicker`, acquisition range,
+session policy, response IANA time zone, and caller-planned calendar labels.
+The parser validates the Chart envelope and positional arrays, converts JSON
+numeric text directly to `Decimal`, preserves null and zero volume, derives
+provider-local and daily-settlement dates without UTC truncation, and emits
+shared `ProviderListing`/`DailyBar` output without enrichment. Adjusted close
+is retained only in parse diagnostics and never replaces native close.
+Unplanned and invalid rows receive bounded safe issues; equal duplicates
+collapse and conflicting duplicates reject the date independent of input
+order. Added a policy-compliant constructed Yahoo fixture plus generated tests
+for futures UTC-date crossing, observed-only bounds, structural failures,
+timezone and symbol mismatches, invalid OHLCV/timestamps/adjusted close, and
+array alignment. The full package suite passed (466 passed, 17 skipped).
 
 ## Phase 9: Calendar-Aware EODData Daily Scheduling
 

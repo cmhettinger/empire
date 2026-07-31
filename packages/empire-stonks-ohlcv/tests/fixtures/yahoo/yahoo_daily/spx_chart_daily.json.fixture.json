@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "provider_code": "YAHOO",
+  "source_code": "yahoo_daily",
+  "parser_version": "1.0.0",
+  "format_reference": "docs/stonks/ohlcv-yahoo-source-contract.md#response-and-daily-bar-contract",
+  "provenance": "constructed_from_documented_format",
+  "payload_file": "spx_chart_daily.json",
+  "payload_size_bytes": 1320,
+  "payload_sha256": "a861842a705820cfeec1f3cdd802135e5fb6bb80af9d20bef2bce17e682728df",
+  "sanitization": [
+    "Retained the documented Yahoo Chart field names and nesting with fixed representative values.",
+    "Excluded request URLs, headers, cookies, credentials, and unrelated metadata.",
+    "Used a reviewed public benchmark symbol because exact punctuation is part of parser identity validation."
+  ],
+  "cases": [
+    "valid Yahoo Chart daily response envelope",
+    "exact Yahoo symbol and exchange timezone validation",
+    "decimal OHLC values parsed without a binary-float round trip",
+    "null and zero volume preservation",
+    "adjusted close retained outside shared daily-bar persistence",
+    "unplanned provider date filtering",
+    "corporate-action event data ignored"
+  ]
+}

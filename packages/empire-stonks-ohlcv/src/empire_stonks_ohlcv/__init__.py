@@ -210,6 +210,11 @@ from empire_stonks_ohlcv.yahoo import (
     YahooTransportError,
     acquire_yahoo_objects,
 )
+from empire_stonks_ohlcv.yahoo_parser import (
+    YahooAdjustedClose,
+    YahooChartParseResult,
+    parse_yahoo_chart,
+)
 
 __all__ = [
     "AcquiredObject",
@@ -322,10 +327,12 @@ __all__ = [
     "YAHOO_MARKET",
     "YAHOO_PROVIDER_CODE",
     "WeekdayGapCandidate",
+    "YahooAdjustedClose",
     "YahooAcquisitionOutcome",
     "YahooAcquisitionRequest",
     "YahooAcquisitionResult",
     "YahooAcquisitionStatus",
+    "YahooChartParseResult",
     "YahooFailureReason",
     "YahooHTTPResponse",
     "YahooHTTPTransport",
@@ -347,6 +354,7 @@ __all__ = [
     "inspect_stooq_history_archive",
     "parse_eoddata_quote_list",
     "parse_eoddata_symbol_list",
+    "parse_yahoo_chart",
     "upsert_provider_listings",
     "upsert_daily_bars",
     "upsert_provider_source_snapshot",

@@ -119,8 +119,31 @@ provider body text into operational results. `YahooAcquisitionResult` retains
 ordered per-chunk `stored`, `missing`, or `failed` outcomes, so one listing
 failure does not discard successful raw objects. Non-200 and transport
 failures are represented only by bounded, secret-safe status and reason codes.
-Parsing the positional Chart arrays and filtering them to planned sessions is
-owned by Y8.7.
+
+## Yahoo Chart parsing
+
+`parse_yahoo_chart()` validates one stored Chart body against its
+`YahooAcquisitionRequest`, the exact seeded `ProviderListing`, and its
+`SessionPolicy`. Calendar-backed parsing requires caller-supplied planned
+session labels. Observed-only parsing derives provider-local dates but accepts
+them only inside the bounded acquisition range. The response symbol must match
+`metadata.YahooTicker`, and the validated response time zone must agree with
+the policy at every provider timestamp.
+
+The parser checks the Chart envelope and positional array lengths before
+processing observations. JSON decimals are decoded directly to `Decimal`;
+native unadjusted quote OHLC becomes the shared `DailyBar`, null volume remains
+`None`, and a returned zero remains zero. Optional adjusted close is retained
+only as `YahooAdjustedClose` parse diagnostics and is never substituted for
+native close or added to shared persistence.
+
+Rows with invalid OHLCV, timestamps, or unplanned dates are rejected with
+bounded safe issues. Equal same-date observations collapse deterministically;
+conflicting OHLCV or adjusted-close observations reject that date. The
+manifested repository fixture is constructed from the documented Chart format
+and tests exact symbol punctuation, session-date handling, Decimal fidelity,
+nullable volume, adjusted-close separation, and event-data exclusion without
+making live requests.
 
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
