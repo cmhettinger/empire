@@ -8,8 +8,10 @@ import pytest
 
 from empire_stonks_ohlcv import (
     DailyBar,
+    DailyBarComparisonStatus,
     DailyBarWriteInput,
     OHLCVPersistenceError,
+    compare_daily_bar_sources,
     upsert_daily_bars,
 )
 from empire_stonks_ohlcv.daily_bars import _to_database_scale
@@ -86,3 +88,94 @@ def test_daily_bar_writer_rejects_direct_writes_to_inactive_listing() -> None:
                 ),
             ),
         )
+
+
+class ComparisonCursor:
+    def __init__(self, rows: list[tuple[object, ...]]) -> None:
+        self.rows = rows
+        self.calls: list[tuple[str, tuple[object, ...]]] = []
+
+    def execute(self, query: str, params: tuple[object, ...]) -> None:
+        self.calls.append((query, params))
+
+    def fetchall(self) -> list[tuple[object, ...]]:
+        return self.rows
+
+
+def test_daily_bar_comparison_normalizes_and_reports_field_differences() -> None:
+    provider_listing_id = UUID(int=1)
+    cursor = ComparisonCursor(
+        [
+            (
+                date(2026, 7, 1),
+                Decimal("10.0000000000"),
+                Decimal("12.0000000000"),
+                Decimal("9.0000000000"),
+                Decimal("11.0000000000"),
+                Decimal("100.00000000"),
+            ),
+            (
+                date(2026, 7, 2),
+                Decimal("10.0000000000"),
+                Decimal("12.0000000000"),
+                Decimal("9.0000000000"),
+                Decimal("11.0000000000"),
+                Decimal("100.00000000"),
+            ),
+        ]
+    )
+    bars = (
+        DailyBarWriteInput(
+            provider_listing_id,
+            DailyBar(
+                date(2026, 7, 1),
+                Decimal("10"),
+                Decimal("12"),
+                Decimal("9"),
+                Decimal("11.00000000001"),
+                Decimal("100"),
+            ),
+        ),
+        DailyBarWriteInput(
+            provider_listing_id,
+            DailyBar(
+                date(2026, 7, 2),
+                Decimal("10"),
+                Decimal("12.5"),
+                Decimal("9"),
+                Decimal("11.5"),
+                None,
+            ),
+        ),
+        DailyBarWriteInput(
+            provider_listing_id,
+            DailyBar(
+                date(2026, 7, 3),
+                Decimal("11"),
+                Decimal("13"),
+                Decimal("10"),
+                Decimal("12"),
+                Decimal("200"),
+            ),
+        ),
+    )
+
+    comparisons = compare_daily_bar_sources(cursor=cursor, bars=bars)
+
+    assert [item.status for item in comparisons] == [
+        DailyBarComparisonStatus.UNCHANGED,
+        DailyBarComparisonStatus.CORRECTED,
+        DailyBarComparisonStatus.INSERTED,
+    ]
+    assert [item.field_name for item in comparisons[1].differences] == [
+        "high",
+        "close",
+        "volume",
+    ]
+    assert comparisons[1].differences[-1].to_dict() == {
+        "field_name": "volume",
+        "stored_value": "100.00000000",
+        "incoming_value": None,
+    }
+    assert comparisons[2].differences == ()
+    assert "trading_date = ANY" in cursor.calls[0][0]

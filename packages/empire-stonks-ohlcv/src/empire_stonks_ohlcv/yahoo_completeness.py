@@ -42,6 +42,7 @@ class YahooPullReason(StrEnum):
 
     ELIGIBLE_MISSING_SESSION = "eligible_missing_session"
     DUE_OBSERVED_POLL = "due_observed_poll"
+    RECENT_RECONCILIATION = "recent_reconciliation"
 
 
 class YahooPlanningFailureReason(StrEnum):
@@ -102,6 +103,7 @@ class YahooListingCompletenessPlan:
     listing: YahooListingTarget
     policy_code: str
     status: YahooCompletenessStatus
+    observed_only: bool
     stored_session_dates: tuple[date, ...]
     expected_sessions: tuple[ExpectedSession, ...] = ()
     eligible_sessions: tuple[ExpectedSession, ...] = ()
@@ -116,6 +118,8 @@ class YahooListingCompletenessPlan:
         _required_text("policy_code", self.policy_code)
         if not isinstance(self.status, YahooCompletenessStatus):
             raise TypeError("status must be a YahooCompletenessStatus.")
+        if not isinstance(self.observed_only, bool):
+            raise TypeError("observed_only must be a boolean.")
         _validated_dates("stored_session_dates", self.stored_session_dates)
         _validated_values(
             "expected_sessions",
@@ -157,7 +161,9 @@ class YahooListingCompletenessPlan:
             raise ValueError("eligible_sessions must be expected sessions.")
         if not set(missing_dates) <= set(eligible_dates):
             raise ValueError("missing_sessions must be eligible sessions.")
-        if expected_dates and observed_dates:
+        if expected_dates and self.observed_only:
+            raise ValueError("Observed-only plans cannot contain expected sessions.")
+        if not self.observed_only and observed_dates:
             raise ValueError(
                 "Authoritative sessions and observed candidates cannot mix."
             )
@@ -196,6 +202,7 @@ class YahooListingCompletenessPlan:
             "ticker": self.listing.ticker,
             "policy_code": self.policy_code,
             "status": self.status.value,
+            "observed_only": self.observed_only,
             "stored_session_count": len(self.stored_session_dates),
             "expected_session_count": len(self.expected_sessions),
             "eligible_session_count": len(self.eligible_sessions),
@@ -495,6 +502,7 @@ def _plan_listing(
             listing=seeded.target,
             policy_code=policy.code,
             status=YahooCompletenessStatus.PLANNED,
+            observed_only=True,
             stored_session_dates=stored_dates,
             observed_poll_candidates=due,
             pulls=pulls,
@@ -528,6 +536,7 @@ def _plan_listing(
         listing=seeded.target,
         policy_code=policy.code,
         status=YahooCompletenessStatus.PLANNED,
+        observed_only=False,
         stored_session_dates=stored_dates,
         expected_sessions=expected,
         eligible_sessions=eligible,
@@ -544,6 +553,7 @@ def _failed_plan(
         listing=seeded.target,
         policy_code=seeded.policy.code,
         status=YahooCompletenessStatus.FAILED,
+        observed_only=seeded.policy.is_observed_only,
         stored_session_dates=stored_dates,
         failure_reason=YahooPlanningFailureReason.CALENDAR_POLICY,
     )

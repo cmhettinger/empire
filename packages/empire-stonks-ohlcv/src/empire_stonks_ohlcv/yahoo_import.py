@@ -7,7 +7,11 @@ from enum import StrEnum
 from typing import Any, Iterable
 from uuid import UUID
 
-from empire_stonks_ohlcv.daily_bars import DailyBarWriteInput, upsert_daily_bars
+from empire_stonks_ohlcv.daily_bars import (
+    DailyBarWriteInput,
+    compare_daily_bar_sources,
+    upsert_daily_bars,
+)
 from empire_stonks_ohlcv.results import (
     ImportIssue,
     PersistenceCounts,
@@ -22,8 +26,13 @@ from empire_stonks_ohlcv.yahoo import (
     YAHOO_PROVIDER_CODE,
     YahooAcquisitionOutcome,
     YahooAcquisitionStatus,
+    YahooRequestMode,
 )
 from empire_stonks_ohlcv.yahoo_parser import YahooChartParseResult
+from empire_stonks_ohlcv.yahoo_reconciliation import (
+    YahooReconciliationSummary,
+    build_yahoo_reconciliation_summary,
+)
 
 
 class YahooImportStatus(StrEnum):
@@ -45,12 +54,20 @@ class YahooImportFailureCode(StrEnum):
     PERSISTENCE_FAILED = "persistence_failed"
 
 
+class YahooImportPurpose(StrEnum):
+    """Operational reason for one Yahoo import input."""
+
+    INGESTION = "ingestion"
+    RECONCILIATION = "reconciliation"
+
+
 @dataclass(frozen=True)
 class YahooImportInput:
     """One acquisition outcome and its optional validated parse result."""
 
     acquisition: YahooAcquisitionOutcome
     parse_result: YahooChartParseResult | None = None
+    purpose: YahooImportPurpose = YahooImportPurpose.INGESTION
 
     def __post_init__(self) -> None:
         if not isinstance(self.acquisition, YahooAcquisitionOutcome):
@@ -71,6 +88,13 @@ class YahooImportInput:
                 raise ValueError(
                     "parse_result request must match the acquisition request."
                 )
+        if not isinstance(self.purpose, YahooImportPurpose):
+            raise TypeError("purpose must be a YahooImportPurpose.")
+        if (
+            self.purpose is YahooImportPurpose.RECONCILIATION
+            and self.acquisition.request.mode is not YahooRequestMode.DAILY
+        ):
+            raise ValueError("Yahoo reconciliation requires a DAILY request.")
 
 
 @dataclass(frozen=True)
@@ -85,6 +109,8 @@ class YahooChunkImportResult:
     rejected_rows: int
     parse_issue_count: int
     parse_issues: tuple[ImportIssue, ...]
+    purpose: YahooImportPurpose = YahooImportPurpose.INGESTION
+    reconciliation: YahooReconciliationSummary | None = None
     failure_code: YahooImportFailureCode | None = None
 
     def __post_init__(self) -> None:
@@ -92,6 +118,8 @@ class YahooChunkImportResult:
             raise TypeError("acquisition must be a YahooAcquisitionOutcome.")
         if not isinstance(self.status, YahooImportStatus):
             raise TypeError("status must be a YahooImportStatus.")
+        if not isinstance(self.purpose, YahooImportPurpose):
+            raise TypeError("purpose must be a YahooImportPurpose.")
         if self.source_snapshot is not None and not isinstance(
             self.source_snapshot,
             SourceSnapshotRegistration,
@@ -113,6 +141,32 @@ class YahooChunkImportResult:
             raise TypeError("parse_issues must contain ImportIssue values.")
         if len(self.parse_issues) > self.parse_issue_count:
             raise ValueError("parse_issues cannot exceed parse_issue_count.")
+        if self.reconciliation is not None and not isinstance(
+            self.reconciliation,
+            YahooReconciliationSummary,
+        ):
+            raise TypeError(
+                "reconciliation must be a YahooReconciliationSummary or None."
+            )
+        if self.reconciliation is not None:
+            if (
+                self.purpose is not YahooImportPurpose.RECONCILIATION
+                or self.status is not YahooImportStatus.IMPORTED
+            ):
+                raise ValueError(
+                    "Reconciliation details require an imported reconciliation."
+                )
+            if (
+                self.reconciliation.inserted_bar_count
+                != self.bar_counts.inserted
+                or self.reconciliation.corrected_bar_count
+                != self.bar_counts.updated
+                or self.reconciliation.unchanged_bar_count
+                != self.bar_counts.unchanged
+            ):
+                raise ValueError(
+                    "Reconciliation comparisons must match persistence counts."
+                )
         if self.failure_code is not None and not isinstance(
             self.failure_code,
             YahooImportFailureCode,
@@ -147,6 +201,7 @@ class YahooChunkImportResult:
         return {
             "acquisition": self.acquisition.to_safe_dict(),
             "status": self.status.value,
+            "purpose": self.purpose.value,
             "source_snapshot": (
                 None
                 if self.source_snapshot is None
@@ -157,6 +212,11 @@ class YahooChunkImportResult:
             "rejected_rows": self.rejected_rows,
             "parse_issue_count": self.parse_issue_count,
             "parse_issues": [item.to_dict() for item in self.parse_issues],
+            "reconciliation": (
+                None
+                if self.reconciliation is None
+                else self.reconciliation.to_dict()
+            ),
             "failure_code": (
                 None if self.failure_code is None else self.failure_code.value
             ),
@@ -225,6 +285,30 @@ class YahooListingImportSummary:
     def rejected_rows(self) -> int:
         return sum(item.rejected_rows for item in self.chunks)
 
+    @property
+    def inserted_reconciliation_bars(self) -> int:
+        return sum(
+            item.reconciliation.inserted_bar_count
+            for item in self.chunks
+            if item.reconciliation is not None
+        )
+
+    @property
+    def corrected_reconciliation_bars(self) -> int:
+        return sum(
+            item.reconciliation.corrected_bar_count
+            for item in self.chunks
+            if item.reconciliation is not None
+        )
+
+    @property
+    def unchanged_reconciliation_bars(self) -> int:
+        return sum(
+            item.reconciliation.unchanged_bar_count
+            for item in self.chunks
+            if item.reconciliation is not None
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "provider_listing_id": str(self.provider_listing_id),
@@ -236,6 +320,15 @@ class YahooListingImportSummary:
             "source_snapshot_count": self.source_snapshot_count,
             "accepted_rows": self.accepted_rows,
             "rejected_rows": self.rejected_rows,
+            "inserted_reconciliation_bars": (
+                self.inserted_reconciliation_bars
+            ),
+            "corrected_reconciliation_bars": (
+                self.corrected_reconciliation_bars
+            ),
+            "unchanged_reconciliation_bars": (
+                self.unchanged_reconciliation_bars
+            ),
             "bar_counts": self.bar_counts.to_dict(),
             "chunks": [item.to_dict() for item in self.chunks],
         }
@@ -285,6 +378,18 @@ class YahooImportResult:
     def bar_counts(self) -> PersistenceCounts:
         return _sum_counts(item.bar_counts for item in self.listings)
 
+    @property
+    def inserted_reconciliation_bars(self) -> int:
+        return sum(item.inserted_reconciliation_bars for item in self.listings)
+
+    @property
+    def corrected_reconciliation_bars(self) -> int:
+        return sum(item.corrected_reconciliation_bars for item in self.listings)
+
+    @property
+    def unchanged_reconciliation_bars(self) -> int:
+        return sum(item.unchanged_reconciliation_bars for item in self.listings)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "provider_code": YAHOO_PROVIDER_CODE,
@@ -296,6 +401,15 @@ class YahooImportResult:
             "source_snapshot_count": self.source_snapshot_count,
             "seeded_listing_writes": 0,
             "bar_counts": self.bar_counts.to_dict(),
+            "inserted_reconciliation_bars": (
+                self.inserted_reconciliation_bars
+            ),
+            "corrected_reconciliation_bars": (
+                self.corrected_reconciliation_bars
+            ),
+            "unchanged_reconciliation_bars": (
+                self.unchanged_reconciliation_bars
+            ),
             "listings": [item.to_dict() for item in self.listings],
         }
 
@@ -386,17 +500,26 @@ def _import_chunk(
                     failure_code=YahooImportFailureCode.PARSE_UNAVAILABLE,
                 )
             else:
+                write_inputs = tuple(
+                    DailyBarWriteInput(
+                        provider_listing_id=(
+                            acquisition.request.listing.provider_listing_id
+                        ),
+                        bar=bar,
+                    )
+                    for bar in item.parse_result.batch.bars
+                )
+                comparisons = (
+                    compare_daily_bar_sources(
+                        cursor=cursor,
+                        bars=write_inputs,
+                    )
+                    if item.purpose is YahooImportPurpose.RECONCILIATION
+                    else ()
+                )
                 bar_counts = upsert_daily_bars(
                     cursor=cursor,
-                    bars=(
-                        DailyBarWriteInput(
-                            provider_listing_id=(
-                                acquisition.request.listing.provider_listing_id
-                            ),
-                            bar=bar,
-                        )
-                        for bar in item.parse_result.batch.bars
-                    ),
+                    bars=write_inputs,
                 )
                 if not isinstance(bar_counts, PersistenceCounts):
                     raise TypeError(
@@ -407,6 +530,14 @@ def _import_chunk(
                     status=YahooImportStatus.IMPORTED,
                     source_snapshot=registration,
                     bar_counts=bar_counts,
+                    reconciliation=(
+                        build_yahoo_reconciliation_summary(
+                            parse_result=item.parse_result,
+                            comparisons=comparisons,
+                        )
+                        if item.purpose is YahooImportPurpose.RECONCILIATION
+                        else None
+                    ),
                 )
         connection.commit()
         return result
@@ -501,12 +632,14 @@ def _chunk_result(
     status: YahooImportStatus,
     source_snapshot: SourceSnapshotRegistration | None = None,
     bar_counts: PersistenceCounts | None = None,
+    reconciliation: YahooReconciliationSummary | None = None,
     failure_code: YahooImportFailureCode | None = None,
 ) -> YahooChunkImportResult:
     parsed = item.parse_result
     return YahooChunkImportResult(
         acquisition=item.acquisition,
         status=status,
+        purpose=item.purpose,
         source_snapshot=source_snapshot,
         bar_counts=(
             PersistenceCounts() if bar_counts is None else bar_counts
@@ -515,6 +648,7 @@ def _chunk_result(
         rejected_rows=0 if parsed is None else parsed.rejected_rows,
         parse_issue_count=0 if parsed is None else parsed.issue_count,
         parse_issues=() if parsed is None else parsed.issues,
+        reconciliation=reconciliation,
         failure_code=failure_code,
     )
 

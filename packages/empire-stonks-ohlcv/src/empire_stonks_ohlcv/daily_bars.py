@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
+from enum import StrEnum
 from typing import Any, Iterable
 from uuid import UUID
 
@@ -17,6 +18,7 @@ _PRICE_SCALE = Decimal("0.0000000001")
 _DERIVED_SCALE = Decimal("0.00000001")
 _PRICE_INTEGER_DIGITS = 20
 _VOLUME_INTEGER_DIGITS = 22
+_SOURCE_FIELD_NAMES = ("open", "high", "low", "close", "volume")
 
 
 @dataclass(frozen=True)
@@ -31,6 +33,85 @@ class DailyBarWriteInput:
             raise TypeError("provider_listing_id must be a UUID.")
         if not isinstance(self.bar, DailyBar):
             raise TypeError("bar must be a DailyBar.")
+
+
+class DailyBarComparisonStatus(StrEnum):
+    """Current-state disposition before one normal daily-bar upsert."""
+
+    INSERTED = "inserted"
+    UNCHANGED = "unchanged"
+    CORRECTED = "corrected"
+
+
+@dataclass(frozen=True)
+class DailyBarFieldDifference:
+    """One changed provider-native source field."""
+
+    field_name: str
+    stored_value: Decimal | None
+    incoming_value: Decimal | None
+
+    def __post_init__(self) -> None:
+        if self.field_name not in _SOURCE_FIELD_NAMES:
+            raise ValueError("field_name must be an OHLCV source field.")
+        for field_name in ("stored_value", "incoming_value"):
+            value = getattr(self, field_name)
+            if value is not None and (
+                not isinstance(value, Decimal) or not value.is_finite()
+            ):
+                raise ValueError(f"{field_name} must be finite or None.")
+        if self.stored_value == self.incoming_value:
+            raise ValueError("A field difference requires distinct values.")
+
+    def to_dict(self) -> dict[str, str | None]:
+        return {
+            "field_name": self.field_name,
+            "stored_value": _decimal_text(self.stored_value),
+            "incoming_value": _decimal_text(self.incoming_value),
+        }
+
+
+@dataclass(frozen=True)
+class DailyBarComparison:
+    """Normalized current-versus-incoming comparison for one daily bar."""
+
+    provider_listing_id: UUID
+    trading_date: date
+    status: DailyBarComparisonStatus
+    differences: tuple[DailyBarFieldDifference, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.provider_listing_id, UUID):
+            raise TypeError("provider_listing_id must be a UUID.")
+        if type(self.trading_date) is not date:
+            raise TypeError("trading_date must be a date.")
+        if not isinstance(self.status, DailyBarComparisonStatus):
+            raise TypeError("status must be a DailyBarComparisonStatus.")
+        if not isinstance(self.differences, tuple) or any(
+            not isinstance(item, DailyBarFieldDifference)
+            for item in self.differences
+        ):
+            raise TypeError(
+                "differences must contain DailyBarFieldDifference values."
+            )
+        fields = tuple(item.field_name for item in self.differences)
+        expected_order = tuple(
+            item for item in _SOURCE_FIELD_NAMES if item in fields
+        )
+        if fields != expected_order or len(fields) != len(set(fields)):
+            raise ValueError("differences must have unique OHLCV field order.")
+        if (
+            self.status is DailyBarComparisonStatus.CORRECTED
+        ) != bool(self.differences):
+            raise ValueError("Only CORRECTED comparisons contain differences.")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "provider_listing_id": str(self.provider_listing_id),
+            "trading_date": self.trading_date.isoformat(),
+            "status": self.status.value,
+            "differences": [item.to_dict() for item in self.differences],
+        }
 
 
 @dataclass(frozen=True)
@@ -55,6 +136,76 @@ class _DerivedValues:
 class _StoredDailyBar:
     source: _SourceValues
     derived: _DerivedValues
+
+
+def compare_daily_bar_sources(
+    *,
+    cursor: Any,
+    bars: Iterable[DailyBarWriteInput],
+) -> tuple[DailyBarComparison, ...]:
+    """Compare normalized incoming OHLCV with exact current stored rows."""
+
+    prepared = _prepare_inputs(bars)
+    if not prepared:
+        return ()
+    grouped: dict[UUID, list[DailyBarWriteInput]] = {}
+    for item in prepared:
+        grouped.setdefault(item.provider_listing_id, []).append(item)
+
+    stored: dict[tuple[UUID, date], _SourceValues] = {}
+    for provider_listing_id in sorted(grouped, key=str):
+        dates = [item.bar.trading_date for item in grouped[provider_listing_id]]
+        cursor.execute(
+            """
+            SELECT trading_date, open, high, low, close, volume
+            FROM stonks.ohlcv_daily
+            WHERE provider_listing_id = %s
+              AND trading_date = ANY(%s)
+            ORDER BY trading_date
+            """,
+            (provider_listing_id, dates),
+        )
+        for row in cursor.fetchall():
+            if not isinstance(row, (tuple, list)) or len(row) != 6:
+                raise OHLCVPersistenceError(
+                    "Daily-bar comparison query returned an invalid row."
+                )
+            trading_date = row[0]
+            if type(trading_date) is not date or trading_date not in dates:
+                raise OHLCVPersistenceError(
+                    "Daily-bar comparison query returned an invalid date."
+                )
+            stored[(provider_listing_id, trading_date)] = _SourceValues(
+                open=row[1],
+                high=row[2],
+                low=row[3],
+                close=row[4],
+                volume=row[5],
+            )
+
+    comparisons: list[DailyBarComparison] = []
+    for item in prepared:
+        key = (item.provider_listing_id, item.bar.trading_date)
+        incoming = _stored_source_values(item.bar)
+        current = stored.get(key)
+        differences = (
+            () if current is None else _source_differences(current, incoming)
+        )
+        comparisons.append(
+            DailyBarComparison(
+                provider_listing_id=item.provider_listing_id,
+                trading_date=item.bar.trading_date,
+                status=(
+                    DailyBarComparisonStatus.INSERTED
+                    if current is None
+                    else DailyBarComparisonStatus.CORRECTED
+                    if differences
+                    else DailyBarComparisonStatus.UNCHANGED
+                ),
+                differences=differences,
+            )
+        )
+    return tuple(comparisons)
 
 
 def upsert_daily_bars(
@@ -334,6 +485,25 @@ def _stored_source_values(bar: DailyBar) -> _SourceValues:
             )
         ),
     )
+
+
+def _source_differences(
+    current: _SourceValues,
+    incoming: _SourceValues,
+) -> tuple[DailyBarFieldDifference, ...]:
+    return tuple(
+        DailyBarFieldDifference(
+            field_name=field_name,
+            stored_value=getattr(current, field_name),
+            incoming_value=getattr(incoming, field_name),
+        )
+        for field_name in _SOURCE_FIELD_NAMES
+        if getattr(current, field_name) != getattr(incoming, field_name)
+    )
+
+
+def _decimal_text(value: Decimal | None) -> str | None:
+    return None if value is None else str(value)
 
 
 def _to_database_scale(

@@ -295,7 +295,7 @@ later migration to add, correct, deactivate, or remove individual listings.
 | Y8.8 | [x] | Implement Yahoo import service | Compose validation, snapshot registration, seeded provider-listing resolution, daily-bar upserts, and per-listing import summaries. Do not create unseeded Yahoo listings during normal import. Unchanged reruns skip writes, later provider corrections update current rows, and one listing failure does not discard successful listings. | Y8.6-Y8.7, E6.5-E6.6 |
 | Y8.9 | [x] | Add Yahoo historical backfill runner and CLI | Add a package-owned backfill runner, operator CLI, and `bin` wrapper using `bin/env-load`. It enumerates all active seeded Yahoo listings, accepts explicit bounded date/range controls and safe resume/retry behavior, imports available history in source-safe chunks, records Core lifecycle/lineage, and emits a secret-safe machine-readable summary and report. Tests cover full enumeration, partial restart, unchanged rerun, correction, and partial failure. | Y8.8, B1.8 |
 | Y8.10 | [x] | Implement Yahoo daily completeness planning | For each active seeded Yahoo listing, determine completed expected sessions, calculate eligibility, compare them with stored `ohlcv_daily` rows, and produce a bounded pull plan containing only eligible missing sessions. A rerun before eligibility or after completion is a no-op; a failed/missing session remains retryable on a later run. Tests prove one record per real market session across U.S., European, Asian, and futures examples. | Y8.5, Y8.8-Y8.9 |
-| Y8.11 | [ ] | Add recent-session reconciliation | Add a daily reconciliation pass that re-pulls the configured recent 5-7 expected sessions, compares provider OHLC, close/adjustment semantics, and volume with current rows, and applies idempotent corrections through the normal upsert path. Surface corrected-row counts and field-level differences in run results/reports without adding a bar-revision table. Tests cover late bars, changed values, null volume, provider-date corrections, and unchanged history. | Y8.7-Y8.10 |
+| Y8.11 | [x] | Add recent-session reconciliation | Add a daily reconciliation pass that re-pulls the configured recent 5-7 expected sessions, compares provider OHLC, close/adjustment semantics, and volume with current rows, and applies idempotent corrections through the normal upsert path. Surface corrected-row counts and field-level differences in run results/reports without adding a bar-revision table. Tests cover late bars, changed values, null volume, provider-date corrections, and unchanged history. | Y8.7-Y8.10 |
 | Y8.12 | [ ] | Build and store Yahoo reports | Reuse the shared report contract for Yahoo-scoped backfill and daily health, expected-session coverage, ineligible versus missing sessions, stale listings, retries/failures, reconciliation corrections, calendar-policy errors, and native adjustment notes. Reports distinguish initial ingestion from reconciliation and remain queryable after raw-object cleanup. | Y8.9-Y8.11, E6.7-E6.8 |
 | Y8.13 | [ ] | Add Yahoo daily runner and CLI | Add package-owned sequencing and an operator CLI/`bin` wrapper that run eligibility planning, eligible missing-session ingestion, recent-session reconciliation, Core lifecycle, and reporting with configured request bounds. Tests cover no-op, success, partial failure, retry, correction, and idempotent rerun. | Y8.10-Y8.12, B1.8 |
 | Y8.14 | [ ] | Add the initially manual Yahoo DAG | Add `dags/stonks/stonks_ohlcv_yahoo_daily_scrape.py` as a thin manually triggered DAG that invokes the daily runner. Keep schedule selection out of the DAG's business logic; document the intended eventual multi-run cadence (for example 06:00, 10:00, 13:00, 18:00, and 23:00 America/New_York, or hourly if live request volume permits) and leave automatic enablement to the rollout gate. DAG tests prove importability, manual schedule state, parameter forwarding, no-op success, and failure propagation. | Y8.13, B1.5-B1.7 |
@@ -439,6 +439,29 @@ observed poll rather than an authoritative missing session. The full
 database-enabled package suite passed (521 passed); `poetry check --lock`,
 public import, `compileall`, the 88-column changed-Python scan, and
 `git diff --check` passed.
+
+Done: 2026-07-31 — added bounded recent-session reconciliation planning over
+Y8.10 completeness results. Calendar-backed listings re-pull the latest
+configured eligible expected labels whether stored or missing; observed-only
+listings use recent stored provider dates plus a due poll without manufacturing
+expected sessions. Added reusable database-scale daily-bar comparison and
+reconciliation-aware Yahoo imports that classify inserted, unchanged, and
+corrected rows before applying the normal current-state upsert. Results retain
+ordered old/new OHLCV field differences, including null-volume transitions,
+and require comparison totals to agree with persistence counts. Current raw
+adjusted close is compared with native close and explicitly remains
+non-persisted; valid newly returned provider dates are surfaced as inserts
+without heuristically deleting another stored date. Unit coverage proves
+recent-N selection, ineligible exclusion, source-bound splitting, normalized
+field comparison, and observed-only behavior. PostgreSQL coverage proves
+stored-plus-missing planning, a late/corrected provider-date insert, OHLC and
+null-volume correction, adjusted-close diagnostics, normal upsert persistence,
+and an unchanged idempotent rerun. A read-only smoke over the seven populated
+sample series produced one bounded pull per listing with no policy failures:
+seven recent sessions for each calendar-backed listing and seven recent stored
+dates plus one due poll for observed-only DXY. The full database-enabled
+package suite passed (527 passed); `poetry check --lock`, public import,
+`compileall`, the 88-column changed-Python scan, and `git diff --check` passed.
 
 ## Phase 9: Calendar-Aware EODData Daily Scheduling
 

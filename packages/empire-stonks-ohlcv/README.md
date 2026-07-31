@@ -235,6 +235,37 @@ isolated to their listing with a stable safe reason while valid listings keep
 their plans. Acquisition, reconciliation, Core run lifecycle, and reporting
 remain owned by Y8.11-Y8.13.
 
+## Yahoo recent-session reconciliation
+
+`plan_yahoo_recent_reconciliation()` composes the completeness plan with
+`EMPIRE_STONKS_OHLCV_YAHOO_RECONCILIATION_SESSIONS`. Within the caller's
+explicit bounded lookback, calendar-backed listings select the latest `N`
+eligible expected labels whether each row is stored or missing. Observed-only
+listings select their latest `N` stored provider dates and may add the latest
+due polling candidate; those dates remain observations/candidates rather than
+authoritative expected sessions. Continuous Chart requests are split whenever
+the configured source request bound requires it.
+
+Reconciliation acquisition uses the same parser and
+`import_yahoo_ranges()`/`upsert_daily_bars()` path as ordinary ingestion. A
+`YahooImportInput` marked `RECONCILIATION` first compares incoming OHLCV with
+the exact current rows after applying the writer's database-scale rounding.
+Results distinguish inserted late or newly corrected provider dates,
+unchanged rows, and corrected rows. Corrected rows retain ordered old/new
+differences for `open`, `high`, `low`, `close`, and `volume`, including null
+volume transitions, while persistence counts remain authoritative and must
+agree with those comparisons.
+
+Native Yahoo close remains the persisted close. When the current response
+contains adjusted close, reconciliation reports its value and difference from
+that response's native close and records that adjusted close was not persisted.
+It does not claim a historical adjusted-close correction because no prior
+adjusted-close value exists after raw cleanup. Likewise, a newly returned
+valid planned provider date is inserted through the normal upsert, but Empire
+does not heuristically delete or re-key a different stored date based only on
+provider silence or matching prices. Durable reports consuming these bounded
+results remain Y8.12 work.
+
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
 archive into Core, streams only the Nasdaq, NYSE, and NYSE MKT stock partitions,
