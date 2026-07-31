@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import random
 import time
@@ -20,12 +19,8 @@ from empire_stonks_ohlcv.exceptions import (
     OHLCVWorkflowError,
 )
 from empire_stonks_ohlcv.market_sessions import MarketSessionService
-from empire_stonks_ohlcv.object_store import Clock, DEFAULT_STORAGE_ROOT
-from empire_stonks_ohlcv.reporting import (
-    REPORT_CONTENT_TYPE,
-    REPORT_OBJECT_KIND,
-    build_report_object_key,
-)
+from empire_stonks_ohlcv.object_store import Clock
+from empire_stonks_ohlcv.reporting import REPORT_SCHEMA_VERSION
 from empire_stonks_ohlcv.results import PersistenceCounts
 from empire_stonks_ohlcv.runner import DEFAULT_DOMAIN, SAFE_FAILURE_MESSAGE
 from empire_stonks_ohlcv.source_conventions import YAHOO_DAILY_SOURCE
@@ -53,14 +48,20 @@ from empire_stonks_ohlcv.yahoo_listings import (
     select_active_yahoo_listings,
 )
 from empire_stonks_ohlcv.yahoo_parser import parse_yahoo_chart
+from empire_stonks_ohlcv.yahoo_reporting import (
+    YAHOO_BACKFILL_REPORT_FILENAME,
+    YAHOO_BACKFILL_REPORT_LOGICAL_NAME,
+    YAHOO_BACKFILL_REPORT_TYPE,
+    YahooReportPhase,
+    YahooReportPhaseResult,
+    build_yahoo_backfill_report,
+    store_yahoo_report,
+)
 
 
 YAHOO_BACKFILL_JOB_NAME = "stonks_ohlcv_yahoo_backfill"
 YAHOO_BACKFILL_SUBJECT_KEY = "seeded_universe"
-YAHOO_BACKFILL_REPORT_SCHEMA_VERSION = 1
-YAHOO_BACKFILL_REPORT_TYPE = "yahoo_historical_backfill"
-YAHOO_BACKFILL_REPORT_LOGICAL_NAME = "yahoo_backfill_report"
-YAHOO_BACKFILL_REPORT_FILENAME = "report.json"
+YAHOO_BACKFILL_REPORT_SCHEMA_VERSION = REPORT_SCHEMA_VERSION
 
 ProgressSink = Callable[[dict[str, Any]], None]
 
@@ -308,18 +309,23 @@ def run_yahoo_backfill(
             session_service=session_service or MarketSessionService(),
             progress_sink=progress_sink,
         )
-        report = _build_report(
-            run_context=run_context,
-            scope=scope,
-            enumerated_listing_count=len(enumerated),
-            selected_listing_count=len(selected),
-            acquisition=acquisition,
-            parse_failed_count=parse_failed_count,
-            import_result=import_result,
-            generated_at=clock(),
-        )
+        with connection.cursor() as cursor:
+            report = build_yahoo_backfill_report(
+                cursor=cursor,
+                run_context=run_context,
+                scope=scope.to_dict(),
+                listings=tuple(item.target for item in selected),
+                enumerated_listing_count=len(enumerated),
+                result=YahooReportPhaseResult(
+                    phase=YahooReportPhase.INITIAL_INGESTION,
+                    acquisition=acquisition,
+                    import_result=import_result,
+                    parse_failed_count=parse_failed_count,
+                ),
+                generated_at=clock(),
+            )
         stage = "reporting"
-        stored_report = _store_report(
+        stored_report = store_yahoo_report(
             object_store=object_store,
             run_context=run_context,
             config=config,
@@ -533,100 +539,6 @@ def _select_scope(
     if not selected:
         raise OHLCVConfigError("Yahoo backfill scope selected no listings.")
     return selected
-
-
-def _build_report(
-    *,
-    run_context: RunContext,
-    scope: YahooBackfillScope,
-    enumerated_listing_count: int,
-    selected_listing_count: int,
-    acquisition: YahooAcquisitionResult,
-    parse_failed_count: int,
-    import_result: YahooImportResult,
-    generated_at: datetime,
-) -> dict[str, Any]:
-    generated = _aware_utc(generated_at)
-    outcome = (
-        "WARN"
-        if (
-            acquisition.failed_count
-            or acquisition.missing_count
-            or parse_failed_count
-            or import_result.failed_chunks
-            or import_result.missing_chunks
-        )
-        else "PASS"
-    )
-    return {
-        "schema_version": YAHOO_BACKFILL_REPORT_SCHEMA_VERSION,
-        "report_type": YAHOO_BACKFILL_REPORT_TYPE,
-        "provider_code": YAHOO_PROVIDER_CODE,
-        "source_code": YAHOO_DAILY_SOURCE.source_code,
-        "run_id": str(run_context.run_id),
-        "effective_date": scope.effective_date.isoformat(),
-        "generated_at": generated.isoformat(),
-        "outcome": outcome,
-        "scope": scope.to_dict(),
-        "enumerated_listing_count": enumerated_listing_count,
-        "selected_listing_count": selected_listing_count,
-        "acquisition": acquisition.to_safe_dict(),
-        "parse_failed_count": parse_failed_count,
-        "import": import_result.to_dict(),
-        "native_value_semantics": {
-            "price_basis": "provider_native_unadjusted",
-            "adjusted_close_persisted": False,
-            "volume_nullable": True,
-            "correction_behavior": (
-                "overwrite_same_provider_listing_and_trading_date"
-            ),
-            "seeded_listing_writes": 0,
-            "canonical_identity_mutation": False,
-        },
-    }
-
-
-def _store_report(
-    *,
-    object_store: ObjectStore,
-    run_context: RunContext,
-    config: OHLCVConfig,
-    report: dict[str, Any],
-    storage_root: str = DEFAULT_STORAGE_ROOT,
-) -> StoredObject:
-    return object_store.put_bytes(
-        run_context=run_context,
-        object_scope="run",
-        domain=DEFAULT_DOMAIN,
-        logical_name=YAHOO_BACKFILL_REPORT_LOGICAL_NAME,
-        storage_root=storage_root,
-        object_key=build_report_object_key(
-            storage_key=config.storage_key,
-            run_context=run_context,
-            provider_code=YAHOO_PROVIDER_CODE,
-        ),
-        filename=YAHOO_BACKFILL_REPORT_FILENAME,
-        data=(
-            json.dumps(
-                report,
-                indent=2,
-                sort_keys=True,
-                allow_nan=False,
-            )
-            + "\n"
-        ).encode(),
-        content_type=REPORT_CONTENT_TYPE,
-        object_kind=REPORT_OBJECT_KIND,
-        metadata={
-            "schema_version": YAHOO_BACKFILL_REPORT_SCHEMA_VERSION,
-            "report_type": YAHOO_BACKFILL_REPORT_TYPE,
-            "provider_code": YAHOO_PROVIDER_CODE,
-            "source_code": YAHOO_DAILY_SOURCE.source_code,
-            "effective_date": report["effective_date"],
-            "generated_at": report["generated_at"],
-            "outcome": report["outcome"],
-        },
-    )
 
 
 def _success_summary(

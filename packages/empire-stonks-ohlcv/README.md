@@ -207,8 +207,8 @@ the day after `--effective-date`. The acquisition layer still enforces
 secret-safe JSON on stderr and successful stdout is one compact JSON summary
 containing the Core run/report identities and aggregate outcomes. The stored
 report contains bounded per-listing/chunk acquisition, parse, lineage, and
-write details; the broader Yahoo health and completeness report remains owned
-by Y8.12.
+write details plus persisted in-scope date coverage. It uses the shared
+schema-version-2 provider report contract.
 
 ## Yahoo daily completeness planning
 
@@ -264,7 +264,35 @@ adjusted-close value exists after raw cleanup. Likewise, a newly returned
 valid planned provider date is inserted through the normal upsert, but Empire
 does not heuristically delete or re-key a different stored date based only on
 provider silence or matching prices. Durable reports consuming these bounded
-results remain Y8.12 work.
+results do not require a revision table.
+
+## Yahoo stored reports
+
+`build_yahoo_backfill_report()` and `build_yahoo_daily_report()` use the shared
+provider JSON report schema while keeping Yahoo's calendar semantics explicit.
+Backfill reports label their phase `initial_ingestion` and include exact
+post-import scoped bar coverage. Daily reports keep `daily_ingestion` and
+`reconciliation` as separate phase results, including request attempts and
+retries, secret-safe acquisition/import failures, parse failures, correction
+counts, field-level differences, and adjusted-close diagnostics.
+
+Daily coverage combines the planner's expected/eligible session labels with a
+post-import read of current `ohlcv_daily` dates. Reports separate not-yet-
+eligible sessions from eligible missing sessions and identify a listing as
+stale only when its latest stored date trails its latest eligible calendar
+session. Observed-only policies expose unresolved poll candidates with no
+authoritative coverage percentage or missing-session claim. Per-listing
+calendar-policy errors remain bounded report warnings rather than invalidating
+healthy listings.
+
+`store_yahoo_report()` writes deterministic JSON under
+`<storage_key>/yahoo/runs/YYYY/MM/DD/<run_id>/reports/report.json` with the
+shared `stonks_ohlcv_provider_report` object kind. Report objects have no
+expiration; acquisition objects retain their configured short expiry. The
+stored report contains its safe phase, health, correction, and native-value
+facts directly, so it stays queryable after raw-object cleanup. Yahoo request
+symbols, endpoint URLs, response bodies, credentials, and exception text are
+not report inputs.
 
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the

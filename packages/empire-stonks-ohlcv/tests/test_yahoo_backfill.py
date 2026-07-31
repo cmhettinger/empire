@@ -139,6 +139,12 @@ class FakeObjectRepository:
 
 
 class FakeCursor:
+    def execute(self, *_args: object) -> None:
+        return None
+
+    def fetchall(self) -> list[object]:
+        return []
+
     def __enter__(self) -> FakeCursor:
         return self
 

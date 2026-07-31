@@ -13,6 +13,8 @@ import pytest
 from empire_core import EmpireDatabase, ObjectStore, RunService
 from empire_stonks_ohlcv import (
     OHLCVConfig,
+    RAW_SOURCE_OBJECT_KIND,
+    REPORT_OBJECT_KIND,
     YahooBackfillScope,
     YahooHTTPResponse,
     run_yahoo_backfill,
@@ -290,10 +292,28 @@ def test_backfill_rerun_correction_partial_failure_and_resume(
         ]
         assert succeeded_runs == 5
 
-        report = json.loads(
-            object_store.get_bytes(partial.report_object_id)
+        run_objects = object_store.find_objects_by_run_id(partial.run_id)
+        raw_object_ids = tuple(
+            item.object_id
+            for item in run_objects
+            if item.object_kind == RAW_SOURCE_OBJECT_KIND
         )
+        assert raw_object_ids
+        assert object_store.get_object(
+            partial.report_object_id
+        ).object_kind == REPORT_OBJECT_KIND
+        assert object_store.get_object(partial.report_object_id).expires_at is None
+        for object_id in raw_object_ids:
+            assert object_store.delete_object(object_id)
+        object_store.purge_deleted_objects_by_run_id(
+            partial.run_id,
+            ignore_purge_after=True,
+        )
+
+        report = json.loads(object_store.get_bytes(partial.report_object_id))
         assert report["outcome"] == "WARN"
+        assert report["schema_version"] == 2
+        assert report["workflow"] == "initial_ingestion"
         assert report["acquisition"]["failed"] == 1
         assert report["import"]["failed_chunks"] == 1
         assert report["native_value_semantics"]["seeded_listing_writes"] == 0
