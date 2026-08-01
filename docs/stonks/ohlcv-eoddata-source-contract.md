@@ -160,9 +160,25 @@ produces no work. An exchange with no discovered listings remains due so its
 initial Symbol List request can establish membership. Ineligible sessions,
 complete sessions outside the reconciliation window, and inactive exchanges
 are all explicit no-op outcomes. Repeating planning with the same policy,
-storage state, date range, and clock returns the same ordered plan. C9.4 owns
-runner and report consumption of this plan; the planner itself performs no
-network request, persistence, or Core lifecycle mutation.
+storage state, date range, and clock returns the same ordered plan. The planner
+itself performs no network request, persistence, or Core lifecycle mutation.
+
+The daily runner evaluates that plan after starting one Core run. It requests
+only exchanges with due work, preserving configured exchange order and all
+Symbol List requests before Quote List requests. Scoped acquisition and import
+still use the established source, parser, listing-policy, snapshot, and atomic
+write contracts. A failure in a requested partition keeps earlier raw objects,
+rolls back uncommitted database work, fails the Core run with a fixed safe
+message, and includes only the safe market/source scope when known.
+
+A plan with no work is a successful no-op rather than an acquisition failure.
+It performs no provider request or import, but still stores the durable JSON
+and PDF reports and completes the Core run. Reports contain pre-request work
+reasons and post-import expected/eligible/missing coverage for every configured
+exchange, plus inactive/failed/ineligible exchange counts, recovered request
+retries, and updated current rows attributable to recent-session
+reconciliation. Missing-session ingestion updates are not mislabeled as
+reconciliation corrections.
 
 The initial Airflow DAG remains manual-only (`schedule=None`), with catchup
 disabled and at most one active DAG run. Manual runs and reruns may provide
@@ -173,7 +189,8 @@ is integrated and verified.
 
 ## Ordered Requests
 
-Acquisition completes all Symbol List requests before any Quote List request:
+For the exchanges selected by the planner, acquisition completes every Symbol
+List request before any Quote List request. A full three-exchange plan is:
 
 ```text
 GET <base-url>/Symbol/List/NYSE?apiKey=<secret>

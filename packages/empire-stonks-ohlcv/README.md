@@ -115,8 +115,18 @@ configured reconciliation sessions, where repeat requests allow provider
 corrections to converge. Ineligible sessions and exchanges whose discovered
 listings are all inactive produce no work. A first-discovery exchange with no
 listings remains due so its Symbol List can be acquired. Planning is pure and
-idempotent for the same database state and aware clock value; runner and report
-integration remains a separate orchestration step.
+idempotent for the same database state and aware clock value.
+
+`run_eoddata_daily()` plans inside its Core run and acquires only the ordered
+exchange partitions that have due work. An all-ineligible or inactive result is
+a successful no-op that still stores the normal durable JSON/PDF reports and
+completes Core lifecycle. Requested exchanges retain Symbol-before-Quote
+ordering and one scoped atomic import; a later partition failure retains prior
+raw evidence and fails with only its safe market/source scope. The report and
+compact result include expected/eligible/missing session coverage, ineligible
+and planned exchange counts, recovered HTTP retries, and current rows corrected
+during recent-session reconciliation. The operator CLI remains compatible with
+its explicit `--effective-date YYYY-MM-DD` input.
 
 ## Yahoo Chart acquisition
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -17,6 +17,7 @@ from empire_stonks_ohlcv.daily_market_reporting import (
 from empire_stonks_ohlcv.eoddata import (
     EODDATA_PROVIDER_CODE,
     EODDataHTTPTransport,
+    EODDataRetryEvent,
     Sleep,
     acquire_eoddata_objects,
 )
@@ -26,6 +27,11 @@ from empire_stonks_ohlcv.eoddata_import import (
 )
 from empire_stonks_ohlcv.eoddata_quotes import parse_eoddata_quote_list
 from empire_stonks_ohlcv.eoddata_symbols import parse_eoddata_symbol_list
+from empire_stonks_ohlcv.eoddata_planning import (
+    EODDataDailyPlan,
+    EODDataExchangeWorkReason,
+    plan_eoddata_exchange_work,
+)
 from empire_stonks_ohlcv.exceptions import (
     OHLCVAcquisitionError,
     OHLCVConfigError,
@@ -38,6 +44,8 @@ from empire_stonks_ohlcv.reporting import (
     store_eoddata_report,
 )
 from empire_stonks_ohlcv.results import AcquiredObject, PersistenceCounts
+from empire_stonks_ohlcv.market_sessions import MarketSessionService
+from empire_stonks_ohlcv.object_store import Clock
 from empire_stonks_ohlcv.runner import (
     DEFAULT_DOMAIN,
     DEFAULT_SUBJECT_KEY,
@@ -52,6 +60,10 @@ from empire_stonks_ohlcv.validation import ProviderValidationResult
 
 
 EODDATA_DAILY_JOB_NAME = "stonks_ohlcv_eoddata_daily"
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 @dataclass(frozen=True)
@@ -72,6 +84,13 @@ class EODDataDailyRunResult:
     row_rejection_row_count: int
     failure_count: int
     warning_count: int
+    expected_session_count: int
+    eligible_session_count: int
+    missing_session_count: int
+    ineligible_exchange_count: int
+    planned_exchange_count: int
+    retry_count: int
+    corrected_current_rows: int
 
     def __post_init__(self) -> None:
         if not isinstance(self.run_id, UUID):
@@ -98,12 +117,29 @@ class EODDataDailyRunResult:
             "row_rejection_row_count",
             "failure_count",
             "warning_count",
+            "expected_session_count",
+            "eligible_session_count",
+            "missing_session_count",
+            "ineligible_exchange_count",
+            "planned_exchange_count",
+            "retry_count",
+            "corrected_current_rows",
         ):
             value = getattr(self, field_name)
             if isinstance(value, bool) or not isinstance(value, int):
                 raise TypeError(f"{field_name} must be an integer.")
             if value < 0:
                 raise ValueError(f"{field_name} must be non-negative.")
+        if self.eligible_session_count > self.expected_session_count:
+            raise ValueError("eligible sessions cannot exceed expected sessions.")
+        if self.missing_session_count > self.eligible_session_count:
+            raise ValueError("missing sessions cannot exceed eligible sessions.")
+        if self.ineligible_exchange_count > 3:
+            raise ValueError("ineligible_exchange_count cannot exceed three.")
+        if self.planned_exchange_count > 3:
+            raise ValueError("planned_exchange_count cannot exceed three.")
+        if self.corrected_current_rows > self.bar_counts.updated:
+            raise ValueError("corrected rows cannot exceed updated bars.")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -124,6 +160,13 @@ class EODDataDailyRunResult:
             "row_rejection_row_count": self.row_rejection_row_count,
             "failure_count": self.failure_count,
             "warning_count": self.warning_count,
+            "expected_session_count": self.expected_session_count,
+            "eligible_session_count": self.eligible_session_count,
+            "missing_session_count": self.missing_session_count,
+            "ineligible_exchange_count": self.ineligible_exchange_count,
+            "planned_exchange_count": self.planned_exchange_count,
+            "retry_count": self.retry_count,
+            "corrected_current_rows": self.corrected_current_rows,
         }
 
 
@@ -139,6 +182,8 @@ def run_eoddata_daily(
     runner_ref: dict[str, Any] | None = None,
     transport: EODDataHTTPTransport | None = None,
     sleep: Sleep = time.sleep,
+    clock: Clock = _utc_now,
+    session_service: MarketSessionService | None = None,
 ) -> EODDataDailyRunResult:
     """Run acquisition through report storage under one Core lifecycle."""
 
@@ -150,7 +195,10 @@ def run_eoddata_daily(
         effective_date=effective_date,
         runner=runner,
         sleep=sleep,
+        clock=clock,
+        session_service=session_service,
     )
+    current = _aware_utc(clock())
     run_context = run_service.start_run(
         domain=DEFAULT_DOMAIN,
         job_name=EODDATA_DAILY_JOB_NAME,
@@ -164,26 +212,57 @@ def run_eoddata_daily(
             "configuration": config.to_safe_dict(),
         },
     )
+    stage = "planning"
     try:
-        acquired_objects = _acquire(
-            object_store=object_store,
-            run_context=run_context,
-            config=config,
-            transport=transport,
-            sleep=sleep,
-        )
-        validation_results = _parse(
-            object_store=object_store,
-            acquired_objects=acquired_objects,
-            effective_date=effective_date,
-            markets=config.eoddata_exchanges,
-        )
-        import_result = _persist(
+        service = session_service or MarketSessionService()
+        plan = _plan(
             connection=connection,
             effective_date=effective_date,
-            acquired_objects=acquired_objects,
-            validation_results=validation_results,
+            now=current,
+            reconciliation_sessions=config.eoddata_reconciliation_sessions,
+            session_service=service,
         )
+        planned_exchanges = _planned_exchanges(plan)
+        retry_events: list[EODDataRetryEvent] = []
+        import_result: EODDataImportResult | None = None
+        if planned_exchanges:
+            stage = "acquisition"
+            acquired_objects = _acquire(
+                object_store=object_store,
+                run_context=run_context,
+                config=config,
+                transport=transport,
+                sleep=sleep,
+                exchanges=planned_exchanges,
+                retry_events=retry_events,
+            )
+            validation_results = _parse(
+                object_store=object_store,
+                acquired_objects=acquired_objects,
+                effective_date=effective_date,
+                markets=planned_exchanges,
+            )
+            stage = "persistence"
+            import_result = _persist(
+                connection=connection,
+                effective_date=effective_date,
+                acquired_objects=acquired_objects,
+                validation_results=validation_results,
+                exchanges=planned_exchanges,
+            )
+            stage = "planning"
+            post_import_plan = _plan(
+                connection=connection,
+                effective_date=effective_date,
+                now=current,
+                reconciliation_sessions=(
+                    config.eoddata_reconciliation_sessions
+                ),
+                session_service=service,
+            )
+        else:
+            post_import_plan = plan
+        stage = "reporting"
         (
             report,
             stored_report,
@@ -195,9 +274,15 @@ def run_eoddata_daily(
             run_context=run_context,
             config=config,
             import_result=import_result,
+            plan=plan,
+            post_import_plan=post_import_plan,
+            retry_events=tuple(retry_events),
         )
         summary = _success_summary(
             import_result=import_result,
+            plan=plan,
+            post_import_plan=post_import_plan,
+            retry_events=tuple(retry_events),
             report=report,
             stored_report=stored_report,
             stored_pdf_report=stored_pdf_report,
@@ -212,21 +297,31 @@ def run_eoddata_daily(
             pdf_report_object_id=stored_pdf_report.object_id,
             market_pdf_report_object_id=stored_market_pdf_report.object_id,
             report_outcome=report["outcome"],
-            listing_counts=import_result.listing_counts,
-            bar_counts=import_result.bar_counts,
-            skipped_inactive_bars=import_result.skipped_inactive_bars,
-            row_rejection_count=sum(
-                item.rejected_records for item in import_result.row_rejections
-            ),
-            row_rejection_row_count=sum(
-                item.rejected_rows for item in import_result.row_rejections
-            ),
+            listing_counts=_listing_counts(import_result),
+            bar_counts=_bar_counts(import_result),
+            skipped_inactive_bars=_skipped_inactive_bars(import_result),
+            row_rejection_count=_row_rejection_count(import_result),
+            row_rejection_row_count=_row_rejection_row_count(import_result),
             failure_count=report["hard_failures"]["total_count"],
-            warning_count=import_result.warnings.total_count,
+            warning_count=_warning_count(import_result),
+            expected_session_count=_expected_session_count(post_import_plan),
+            eligible_session_count=_eligible_session_count(post_import_plan),
+            missing_session_count=_missing_session_count(post_import_plan),
+            ineligible_exchange_count=_ineligible_exchange_count(
+                post_import_plan
+            ),
+            planned_exchange_count=len(planned_exchanges),
+            retry_count=len(retry_events),
+            corrected_current_rows=_corrected_current_rows(
+                plan,
+                import_result,
+            ),
         )
     except Exception as exc:
         _rollback_quietly(connection)
-        failed_stage = exc.stage if isinstance(exc, OHLCVWorkflowError) else None
+        failed_stage = (
+            exc.stage if isinstance(exc, OHLCVWorkflowError) else stage
+        )
         run_service.fail_run(
             run_context.run_id,
             SAFE_FAILURE_MESSAGE,
@@ -253,6 +348,8 @@ def _acquire(
     config: OHLCVConfig,
     transport: EODDataHTTPTransport | None,
     sleep: Sleep,
+    exchanges: tuple[str, ...],
+    retry_events: list[EODDataRetryEvent],
 ) -> tuple[AcquiredObject, ...]:
     try:
         acquired = acquire_eoddata_objects(
@@ -261,10 +358,12 @@ def _acquire(
             config=config,
             transport=transport,
             sleep=sleep,
+            exchanges=exchanges,
+            retry_sink=retry_events.append,
         )
         _objects_by_source_market(
             acquired,
-            markets=config.eoddata_exchanges,
+            markets=exchanges,
         )
         return acquired
     except Exception as exc:
@@ -336,6 +435,7 @@ def _persist(
     effective_date: date,
     acquired_objects: tuple[AcquiredObject, ...],
     validation_results: tuple[ProviderValidationResult, ...],
+    exchanges: tuple[str, ...],
 ) -> EODDataImportResult:
     try:
         result = import_eoddata_daily(
@@ -343,6 +443,7 @@ def _persist(
             effective_date=effective_date,
             acquired_objects=acquired_objects,
             validation_results=validation_results,
+            exchanges=exchanges,
         )
         if not isinstance(result, EODDataImportResult):
             raise TypeError("EODData import returned an invalid result.")
@@ -361,17 +462,23 @@ def _report(
     object_store: ObjectStore,
     run_context: RunContext,
     config: OHLCVConfig,
-    import_result: EODDataImportResult,
+    import_result: EODDataImportResult | None,
+    plan: EODDataDailyPlan,
+    post_import_plan: EODDataDailyPlan,
+    retry_events: tuple[EODDataRetryEvent, ...],
 ) -> tuple[dict[str, Any], StoredObject, StoredObject, StoredObject]:
     try:
         with connection.cursor() as cursor:
             report = build_eoddata_report(
                 cursor=cursor,
                 import_result=import_result,
+                plan=plan,
+                post_import_plan=post_import_plan,
+                retry_events=retry_events,
             )
             market_report = build_eoddata_daily_market_report(
                 cursor=cursor,
-                trading_date=import_result.effective_date,
+                trading_date=plan.end_date,
             )
         stored = store_eoddata_report(
             object_store=object_store,
@@ -436,13 +543,18 @@ def _objects_by_source_market(
         for market in markets
     }
     if set(objects) != expected:
-        raise ValueError("EODData acquisition must return all six partitions.")
+        raise ValueError(
+            "EODData acquisition must return both scoped source partitions."
+        )
     return objects
 
 
 def _success_summary(
     *,
-    import_result: EODDataImportResult,
+    import_result: EODDataImportResult | None,
+    plan: EODDataDailyPlan,
+    post_import_plan: EODDataDailyPlan,
+    retry_events: tuple[EODDataRetryEvent, ...],
     report: dict[str, Any],
     stored_report: StoredObject,
     stored_pdf_report: StoredObject,
@@ -450,20 +562,32 @@ def _success_summary(
 ) -> dict[str, Any]:
     return {
         "provider_code": EODDATA_PROVIDER_CODE,
-        "effective_date": import_result.effective_date.isoformat(),
-        "acquired_object_count": len(import_result.acquired_objects),
-        "source_snapshot_count": len(import_result.source_snapshots),
-        "listing_counts": import_result.listing_counts.to_dict(),
-        "bar_counts": import_result.bar_counts.to_dict(),
-        "skipped_inactive_bars": import_result.skipped_inactive_bars,
-        "row_rejection_count": sum(
-            item.rejected_records for item in import_result.row_rejections
+        "effective_date": plan.end_date.isoformat(),
+        "planned_exchange_count": len(_planned_exchanges(plan)),
+        "expected_session_count": _expected_session_count(post_import_plan),
+        "eligible_session_count": _eligible_session_count(post_import_plan),
+        "missing_session_count": _missing_session_count(post_import_plan),
+        "ineligible_exchange_count": _ineligible_exchange_count(
+            post_import_plan
         ),
-        "row_rejection_row_count": sum(
-            item.rejected_rows for item in import_result.row_rejections
+        "retry_count": len(retry_events),
+        "corrected_current_rows": _corrected_current_rows(
+            plan,
+            import_result,
         ),
+        "acquired_object_count": (
+            0 if import_result is None else len(import_result.acquired_objects)
+        ),
+        "source_snapshot_count": (
+            0 if import_result is None else len(import_result.source_snapshots)
+        ),
+        "listing_counts": _listing_counts(import_result).to_dict(),
+        "bar_counts": _bar_counts(import_result).to_dict(),
+        "skipped_inactive_bars": _skipped_inactive_bars(import_result),
+        "row_rejection_count": _row_rejection_count(import_result),
+        "row_rejection_row_count": _row_rejection_row_count(import_result),
         "failure_count": report["hard_failures"]["total_count"],
-        "warning_count": import_result.warnings.total_count,
+        "warning_count": _warning_count(import_result),
         "report_object_id": str(stored_report.object_id),
         "pdf_report_object_id": str(stored_pdf_report.object_id),
         "market_pdf_report_object_id": str(
@@ -482,6 +606,8 @@ def _validate_inputs(
     effective_date: date,
     runner: str,
     sleep: Sleep,
+    clock: Clock,
+    session_service: MarketSessionService | None,
 ) -> None:
     if not isinstance(run_service, RunService):
         raise TypeError("run_service must be a Core RunService.")
@@ -501,6 +627,130 @@ def _validate_inputs(
             )
     if not callable(sleep):
         raise TypeError("sleep must be callable.")
+    if not callable(clock):
+        raise TypeError("clock must be callable.")
+    if session_service is not None and not isinstance(
+        session_service,
+        MarketSessionService,
+    ):
+        raise TypeError("session_service must be a MarketSessionService.")
+
+
+def _plan(
+    *,
+    connection: Any,
+    effective_date: date,
+    now: datetime,
+    reconciliation_sessions: int,
+    session_service: MarketSessionService,
+) -> EODDataDailyPlan:
+    with connection.cursor() as cursor:
+        return plan_eoddata_exchange_work(
+            cursor=cursor,
+            start_date=effective_date,
+            end_date=effective_date,
+            now=now,
+            reconciliation_sessions=reconciliation_sessions,
+            session_service=session_service,
+        )
+
+
+def _planned_exchanges(plan: EODDataDailyPlan) -> tuple[str, ...]:
+    return tuple(
+        exchange.exchange for exchange in plan.exchanges if exchange.work
+    )
+
+
+def _listing_counts(
+    import_result: EODDataImportResult | None,
+) -> PersistenceCounts:
+    return (
+        PersistenceCounts()
+        if import_result is None
+        else import_result.listing_counts
+    )
+
+
+def _bar_counts(
+    import_result: EODDataImportResult | None,
+) -> PersistenceCounts:
+    return (
+        PersistenceCounts()
+        if import_result is None
+        else import_result.bar_counts
+    )
+
+
+def _skipped_inactive_bars(
+    import_result: EODDataImportResult | None,
+) -> int:
+    return 0 if import_result is None else import_result.skipped_inactive_bars
+
+
+def _row_rejection_count(
+    import_result: EODDataImportResult | None,
+) -> int:
+    if import_result is None:
+        return 0
+    return sum(item.rejected_records for item in import_result.row_rejections)
+
+
+def _row_rejection_row_count(
+    import_result: EODDataImportResult | None,
+) -> int:
+    if import_result is None:
+        return 0
+    return sum(item.rejected_rows for item in import_result.row_rejections)
+
+
+def _warning_count(import_result: EODDataImportResult | None) -> int:
+    return 0 if import_result is None else import_result.warnings.total_count
+
+
+def _expected_session_count(plan: EODDataDailyPlan) -> int:
+    return sum(len(item.expected_sessions) for item in plan.exchanges)
+
+
+def _eligible_session_count(plan: EODDataDailyPlan) -> int:
+    return sum(len(item.eligible_sessions) for item in plan.exchanges)
+
+
+def _missing_session_count(plan: EODDataDailyPlan) -> int:
+    return sum(len(item.missing_sessions) for item in plan.exchanges)
+
+
+def _ineligible_exchange_count(plan: EODDataDailyPlan) -> int:
+    return sum(
+        item.status.value == "planned" and not item.eligible_sessions
+        for item in plan.exchanges
+    )
+
+
+def _corrected_current_rows(
+    plan: EODDataDailyPlan,
+    import_result: EODDataImportResult | None,
+) -> int:
+    if import_result is None:
+        return 0
+    reconciliation_exchanges = {
+        item.exchange
+        for item in plan.work
+        if item.reason is EODDataExchangeWorkReason.RECENT_RECONCILIATION
+    }
+    return sum(
+        item.counts.updated
+        for item in import_result.write_counts
+        if item.record_kind == "bar"
+        and item.market in reconciliation_exchanges
+    )
+
+
+def _aware_utc(value: object) -> datetime:
+    if not isinstance(value, datetime):
+        raise TypeError("clock must return a datetime.")
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("clock must return a timezone-aware datetime.")
+    return value.astimezone(UTC)
 
 
 def _rollback_quietly(connection: Any) -> None:

@@ -49,12 +49,19 @@ def _result() -> EODDataDailyRunResult:
         ),
         report_outcome="WARN",
         listing_counts=PersistenceCounts(inserted=3),
-        bar_counts=PersistenceCounts(inserted=2, unchanged=1),
+        bar_counts=PersistenceCounts(inserted=1, updated=1, unchanged=1),
         skipped_inactive_bars=1,
         row_rejection_count=3,
         row_rejection_row_count=4,
         failure_count=0,
         warning_count=2,
+        expected_session_count=3,
+        eligible_session_count=3,
+        missing_session_count=0,
+        ineligible_exchange_count=0,
+        planned_exchange_count=3,
+        retry_count=1,
+        corrected_current_rows=1,
     )
 
 

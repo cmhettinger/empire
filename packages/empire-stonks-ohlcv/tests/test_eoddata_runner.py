@@ -17,7 +17,14 @@ from empire_stonks_ohlcv import (
     EODDATA_DAILY_SOURCE,
     EODDATA_SYMBOL_LIST_SOURCE,
     EODDataCredentials,
+    EODDataDailyPlan,
+    EODDataExchangeDailyPlan,
+    EODDataExchangePlanStatus,
+    EODDataExchangeWork,
+    EODDataExchangeWorkReason,
     EODDataImportResult,
+    EODDataRetryEvent,
+    ExpectedSession,
     FeedOutcomeCounts,
     OHLCVConfig,
     OHLCVConfigError,
@@ -230,6 +237,87 @@ def _import_result() -> EODDataImportResult:
     )
 
 
+def _daily_plan() -> EODDataDailyPlan:
+    session = ExpectedSession(
+        session_date=EFFECTIVE_DATE,
+        eligible_at=datetime(2026, 7, 16, tzinfo=UTC),
+    )
+    return EODDataDailyPlan(
+        start_date=EFFECTIVE_DATE,
+        end_date=EFFECTIVE_DATE,
+        planned_at=datetime(2026, 7, 17, tzinfo=UTC),
+        reconciliation_sessions=7,
+        exchanges=tuple(
+            EODDataExchangeDailyPlan(
+                exchange=market,
+                policy_code=(
+                    "ED_XNAS_1900_60M"
+                    if market == "NASDAQ"
+                    else "ED_XNYS_1900_60M"
+                ),
+                status=EODDataExchangePlanStatus.PLANNED,
+                total_listing_count=1,
+                active_listing_count=1,
+                expected_sessions=(session,),
+                eligible_sessions=(session,),
+                reconciliation_sessions=(session,),
+                work=(
+                    EODDataExchangeWork(
+                        exchange=market,
+                        effective_date=EFFECTIVE_DATE,
+                        reason=(
+                            EODDataExchangeWorkReason.RECENT_RECONCILIATION
+                        ),
+                        stored_bar_count=1,
+                    ),
+                ),
+            )
+            for market in MARKETS
+        ),
+    )
+
+
+def _no_work_plan() -> EODDataDailyPlan:
+    session = ExpectedSession(
+        session_date=EFFECTIVE_DATE,
+        eligible_at=datetime(2026, 7, 18, tzinfo=UTC),
+    )
+    return EODDataDailyPlan(
+        start_date=EFFECTIVE_DATE,
+        end_date=EFFECTIVE_DATE,
+        planned_at=datetime(2026, 7, 17, tzinfo=UTC),
+        reconciliation_sessions=7,
+        exchanges=tuple(
+            EODDataExchangeDailyPlan(
+                exchange=market,
+                policy_code=(
+                    "ED_XNAS_1900_60M"
+                    if market == "NASDAQ"
+                    else "ED_XNYS_1900_60M"
+                ),
+                status=EODDataExchangePlanStatus.PLANNED,
+                total_listing_count=1,
+                active_listing_count=1,
+                expected_sessions=(session,),
+            )
+            for market in MARKETS
+        ),
+    )
+
+
+def _nyse_only_plan() -> EODDataDailyPlan:
+    full = _daily_plan()
+    no_work = _no_work_plan()
+    return replace(
+        full,
+        exchanges=(
+            full.exchanges[0],
+            no_work.exchanges[1],
+            no_work.exchanges[2],
+        ),
+    )
+
+
 def _stored_report(run_id: UUID | None = None) -> StoredObject:
     return StoredObject(
         object_id=uuid4(),
@@ -256,6 +344,11 @@ def _install_success(
     monkeypatch: pytest.MonkeyPatch,
     events: list[str],
 ) -> None:
+    monkeypatch.setattr(
+        eoddata_runner,
+        "_plan",
+        lambda **_values: events.append("plan") or _daily_plan(),
+    )
     monkeypatch.setattr(
         eoddata_runner,
         "acquire_eoddata_objects",
@@ -323,9 +416,11 @@ def test_daily_runner_sequences_and_returns_only_compact_safe_result(
     )
 
     assert events == [
+        "plan",
         "acquire",
         "parse",
         "persist",
+        "plan",
         "build_report",
         "build_market_report",
         "store_report",
@@ -372,6 +467,146 @@ def test_invalid_configuration_does_not_start_core_run(tmp_path: Path) -> None:
         )
 
     assert repository.runs == {}
+
+
+def test_ineligible_noop_preserves_core_and_report_lifecycle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = FakeRunRepository()
+    events: list[str] = []
+    _install_success(monkeypatch, events)
+    monkeypatch.setattr(
+        eoddata_runner,
+        "_plan",
+        lambda **_values: events.append("plan") or _no_work_plan(),
+    )
+
+    result = run_eoddata_daily(
+        run_service=RunService(repository),
+        connection=FakeConnection(),
+        object_store=ObjectStore(FakeObjectRepository(tmp_path)),
+        config=_config(),
+        effective_date=EFFECTIVE_DATE,
+        run_type="cli",
+        runner="pytest",
+        sleep=lambda _delay: None,
+    )
+
+    assert "acquire" not in events
+    assert "parse" not in events
+    assert "persist" not in events
+    assert repository.events == ["start", "complete"]
+    assert result.planned_exchange_count == 0
+    assert result.expected_session_count == 3
+    assert result.eligible_session_count == 0
+    assert result.ineligible_exchange_count == 3
+    assert result.listing_counts == PersistenceCounts()
+    assert result.bar_counts == PersistenceCounts()
+    assert repository.runs[result.run_id].summary["acquired_object_count"] == 0
+
+
+def test_runner_passes_only_planned_exchanges_to_acquisition_and_import(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = FakeRunRepository()
+    events: list[str] = []
+    _install_success(monkeypatch, events)
+    monkeypatch.setattr(
+        eoddata_runner,
+        "_plan",
+        lambda **_values: _nyse_only_plan(),
+    )
+    acquisition_scopes: list[tuple[str, ...]] = []
+    import_scopes: list[tuple[str, ...]] = []
+
+    def acquire(**values: object) -> tuple[AcquiredObject, ...]:
+        acquisition_scopes.append(values["exchanges"])  # type: ignore[arg-type]
+        return tuple(
+            item
+            for item in _acquired_objects()
+            if item.filename == "raw-nyse.json"
+        )
+
+    monkeypatch.setattr(eoddata_runner, "acquire_eoddata_objects", acquire)
+    monkeypatch.setattr(
+        eoddata_runner,
+        "import_eoddata_daily",
+        lambda **values: import_scopes.append(values["exchanges"])
+        or _import_result(),
+    )
+
+    result = run_eoddata_daily(
+        run_service=RunService(repository),
+        connection=FakeConnection(),
+        object_store=ObjectStore(FakeObjectRepository(tmp_path)),
+        config=_config(),
+        effective_date=EFFECTIVE_DATE,
+        run_type="cli",
+        runner="pytest",
+        sleep=lambda _delay: None,
+    )
+
+    assert acquisition_scopes == [("NYSE",)]
+    assert import_scopes == [("NYSE",)]
+    assert result.planned_exchange_count == 1
+
+
+def test_runner_surfaces_retry_and_corrected_current_row_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = FakeRunRepository()
+    events: list[str] = []
+    _install_success(monkeypatch, events)
+    imported = _import_result()
+    imported = replace(
+        imported,
+        write_counts=tuple(
+            replace(item, counts=PersistenceCounts(updated=2))
+            if item.source_code == "eoddata_daily" and item.market == "NYSE"
+            else item
+            for item in imported.write_counts
+        ),
+    )
+
+    def acquire(**values: object) -> tuple[AcquiredObject, ...]:
+        retry_sink = values["retry_sink"]
+        retry_sink(  # type: ignore[operator]
+            EODDataRetryEvent(
+                source_code="eoddata_daily",
+                exchange="NYSE",
+                retry_number=1,
+                delay_seconds=2.0,
+                reason="http_5xx",
+            )
+        )
+        return _acquired_objects()
+
+    monkeypatch.setattr(eoddata_runner, "acquire_eoddata_objects", acquire)
+    monkeypatch.setattr(
+        eoddata_runner,
+        "import_eoddata_daily",
+        lambda **_values: imported,
+    )
+
+    result = run_eoddata_daily(
+        run_service=RunService(repository),
+        connection=FakeConnection(),
+        object_store=ObjectStore(FakeObjectRepository(tmp_path)),
+        config=_config(),
+        effective_date=EFFECTIVE_DATE,
+        run_type="cli",
+        runner="pytest",
+        sleep=lambda _delay: None,
+    )
+
+    assert result.retry_count == 1
+    assert result.corrected_current_rows == 2
+    summary = repository.runs[result.run_id].summary
+    assert summary["retry_count"] == 1
+    assert summary["corrected_current_rows"] == 2
 
 
 @pytest.mark.parametrize(
@@ -445,6 +680,11 @@ def test_acquisition_failure_keeps_partial_raw_evidence(
     run_repository = FakeRunRepository()
     object_repository = FakeObjectRepository(tmp_path)
     object_store = ObjectStore(object_repository)
+    monkeypatch.setattr(
+        eoddata_runner,
+        "_plan",
+        lambda **_values: _daily_plan(),
+    )
 
     def partial_acquisition(**values: object) -> tuple[AcquiredObject, ...]:
         object_store.put_bytes(

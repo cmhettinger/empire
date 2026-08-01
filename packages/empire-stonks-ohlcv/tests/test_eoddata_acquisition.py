@@ -15,6 +15,7 @@ from empire_stonks_ohlcv import (
     EODDATA_SYMBOL_LIST_SOURCE,
     EODDataCredentials,
     EODDataHTTPResponse,
+    EODDataRetryEvent,
     OHLCVAcquisitionError,
     OHLCVConfig,
     acquire_eoddata_objects,
@@ -179,6 +180,40 @@ def test_acquires_six_objects_in_contract_order_with_secret_safe_metadata(
         assert object_store.get_bytes(item.object_id) == expected_body
 
 
+def test_acquires_only_ordered_planned_exchange_subset(tmp_path: Path) -> None:
+    object_store, repository = _store(tmp_path)
+    calls: list[str] = []
+
+    def transport(**request: object) -> EODDataHTTPResponse:
+        url = request["url"]
+        assert isinstance(url, str)
+        calls.append(url)
+        return _json_response(b"[{}]" if "/Symbol/" in url else b"[]")
+
+    acquired = acquire_eoddata_objects(
+        object_store=object_store,
+        run_context=_run_context(),
+        config=_config(),
+        exchanges=("NASDAQ", "AMEX"),
+        transport=transport,
+        sleep=lambda _delay: None,
+    )
+
+    assert calls == [
+        "https://api.eoddata.com/Symbol/List/NASDAQ",
+        "https://api.eoddata.com/Symbol/List/AMEX",
+        "https://api.eoddata.com/Quote/List/NASDAQ",
+        "https://api.eoddata.com/Quote/List/AMEX",
+    ]
+    assert [item.filename for item in acquired] == [
+        "raw-nasdaq.json",
+        "raw-amex.json",
+        "raw-nasdaq.json",
+        "raw-amex.json",
+    ]
+    assert len(repository.objects) == 4
+
+
 @pytest.mark.parametrize(
     ("status_code", "headers", "expected_delay"),
     [
@@ -195,6 +230,7 @@ def test_retries_transient_http_failure_then_succeeds(
     object_store, repository = _store(tmp_path)
     calls = 0
     sleeps: list[float] = []
+    retries: list[EODDataRetryEvent] = []
 
     def transport(**request: object) -> EODDataHTTPResponse:
         nonlocal calls
@@ -215,12 +251,21 @@ def test_retries_transient_http_failure_then_succeeds(
         config=_config(max_retries=1),
         transport=transport,
         sleep=sleeps.append,
+        retry_sink=retries.append,
     )
 
     assert len(acquired) == 6
     assert len(repository.objects) == 6
     assert calls == 7
     assert sleeps == [expected_delay, *([2.0] * 5)]
+    assert len(retries) == 1
+    assert retries[0].exchange == "NYSE"
+    assert retries[0].source_code == "eoddata_symbol_list"
+    assert retries[0].retry_number == 1
+    assert retries[0].delay_seconds == expected_delay
+    assert retries[0].reason == (
+        "http_429" if status_code == 429 else "http_5xx"
+    )
 
 
 def test_non_retryable_failure_retains_prior_raw_objects(tmp_path: Path) -> None:

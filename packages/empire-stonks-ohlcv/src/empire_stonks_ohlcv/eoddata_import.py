@@ -37,11 +37,6 @@ from empire_stonks_ohlcv.validation import (
 
 
 _SOURCES = (EODDATA_SYMBOL_LIST_SOURCE, EODDATA_DAILY_SOURCE)
-_EXPECTED_OBJECT_KEYS = tuple(
-    (source.source_code, market)
-    for source in _SOURCES
-    for market in DEFAULT_EODDATA_EXCHANGES
-)
 
 
 @dataclass(frozen=True)
@@ -67,8 +62,6 @@ class EODDataImportResult:
             raise TypeError(
                 "acquired_objects must contain only AcquiredObject records."
             )
-        if len(self.acquired_objects) != len(_EXPECTED_OBJECT_KEYS):
-            raise ValueError("acquired_objects must contain six records.")
         if not isinstance(self.source_snapshots, tuple) or any(
             not isinstance(item, SourceSnapshotRegistration)
             for item in self.source_snapshots
@@ -76,8 +69,6 @@ class EODDataImportResult:
             raise TypeError(
                 "source_snapshots must contain SourceSnapshotRegistration records."
             )
-        if len(self.source_snapshots) != len(_EXPECTED_OBJECT_KEYS):
-            raise ValueError("source_snapshots must contain six records.")
         if not isinstance(self.feed_counts, tuple) or any(
             not isinstance(item, FeedOutcomeCounts) for item in self.feed_counts
         ):
@@ -91,8 +82,6 @@ class EODDataImportResult:
             raise TypeError(
                 "write_counts must contain SourceMarketWriteCounts records."
             )
-        if len(self.feed_counts) != 6 or len(self.write_counts) != 6:
-            raise ValueError("feed_counts and write_counts must contain six records.")
         if not isinstance(self.failures, BoundedIssueSummary):
             raise TypeError("failures must be a BoundedIssueSummary.")
         if not isinstance(self.row_rejections, tuple) or any(
@@ -101,22 +90,6 @@ class EODDataImportResult:
         ):
             raise TypeError(
                 "row_rejections must contain only RowRejectionSummary records."
-            )
-        rejection_counts = {
-            (source_code, market): sum(
-                item.rejected_records
-                for item in self.row_rejections
-                if item.source_code == source_code and item.market == market
-            )
-            for source_code, market in _EXPECTED_OBJECT_KEYS
-        }
-        if any(
-            item.rejected_records
-            != rejection_counts[(item.source_code, item.market)]
-            for item in self.feed_counts
-        ):
-            raise ValueError(
-                "row_rejections must match feed rejected-record counts."
             )
         if not isinstance(self.warnings, BoundedIssueSummary):
             raise TypeError("warnings must be a BoundedIssueSummary.")
@@ -127,14 +100,49 @@ class EODDataImportResult:
             raise TypeError(
                 "cross_feed_counts must contain CrossFeedOutcomeCounts records."
             )
-        if len(self.cross_feed_counts) != len(DEFAULT_EODDATA_EXCHANGES):
-            raise ValueError("cross_feed_counts must contain three records.")
-        if tuple(item.market for item in self.cross_feed_counts) != (
-            DEFAULT_EODDATA_EXCHANGES
+        exchanges = tuple(item.market for item in self.cross_feed_counts)
+        _validate_exchanges(exchanges)
+        expected_keys = _object_keys(exchanges)
+        expected_count = len(expected_keys)
+        if len(self.acquired_objects) != expected_count:
+            raise ValueError("acquired_objects must match the exchange scope.")
+        if len(self.source_snapshots) != expected_count:
+            raise ValueError("source_snapshots must match the exchange scope.")
+        if (
+            len(self.feed_counts) != expected_count
+            or len(self.write_counts) != expected_count
         ):
             raise ValueError(
-                "cross_feed_counts must use configured EODData market order."
+                "feed_counts and write_counts must match the exchange scope."
             )
+        if {
+            (item.source_code, item.market) for item in self.feed_counts
+        } != set(expected_keys):
+            raise ValueError("feed_counts do not match the exchange scope.")
+        if {
+            (item.source_code, item.market) for item in self.write_counts
+        } != set(expected_keys):
+            raise ValueError("write_counts do not match the exchange scope.")
+        rejection_counts = {
+            (source_code, market): sum(
+                item.rejected_records
+                for item in self.row_rejections
+                if item.source_code == source_code and item.market == market
+            )
+            for source_code, market in expected_keys
+        }
+        if any(
+            item.rejected_records
+            != rejection_counts[(item.source_code, item.market)]
+            for item in self.feed_counts
+        ):
+            raise ValueError(
+                "row_rejections must match feed rejected-record counts."
+            )
+
+    @property
+    def exchanges(self) -> tuple[str, ...]:
+        return tuple(item.market for item in self.cross_feed_counts)
 
     @property
     def listing_counts(self) -> PersistenceCounts:
@@ -160,6 +168,7 @@ class EODDataImportResult:
         return {
             "provider_code": EODDATA_PROVIDER_CODE,
             "effective_date": self.effective_date.isoformat(),
+            "exchanges": list(self.exchanges),
             "acquired_object_count": len(self.acquired_objects),
             "source_snapshot_count": len(self.source_snapshots),
             "feed_counts": [item.to_dict() for item in self.feed_counts],
@@ -184,20 +193,27 @@ def import_eoddata_daily(
     effective_date: date,
     acquired_objects: tuple[AcquiredObject, ...],
     validation_results: tuple[ProviderValidationResult, ...],
+    exchanges: tuple[str, ...] = DEFAULT_EODDATA_EXCHANGES,
 ) -> EODDataImportResult:
-    """Atomically register all six sources, listings, and accepted active bars."""
+    """Atomically register scoped sources, listings, and active daily bars."""
 
     _validate_connection(connection)
-    acquired_by_key = _validate_acquired_objects(acquired_objects)
+    _validate_exchanges(exchanges)
+    expected_object_keys = _object_keys(exchanges)
+    acquired_by_key = _validate_acquired_objects(
+        acquired_objects,
+        expected_object_keys=expected_object_keys,
+    )
     validated_by_market = _validate_results(
         validation_results,
         effective_date=effective_date,
+        exchanges=exchanges,
     )
     ordered_objects = tuple(
-        acquired_by_key[key] for key in _EXPECTED_OBJECT_KEYS
+        acquired_by_key[key] for key in expected_object_keys
     )
     ordered_results = tuple(
-        validated_by_market[market] for market in DEFAULT_EODDATA_EXCHANGES
+        validated_by_market[market] for market in exchanges
     )
 
     try:
@@ -206,7 +222,7 @@ def import_eoddata_daily(
         with connection.cursor() as cursor:
             policies = resolve_eoddata_exchange_policies(
                 cursor=cursor,
-                exchanges=DEFAULT_EODDATA_EXCHANGES,
+                exchanges=exchanges,
             )
             policy_by_exchange = {
                 item.exchange: item for item in policies
@@ -226,7 +242,7 @@ def import_eoddata_daily(
                     )
                 registrations.append(registration)
 
-            for market in DEFAULT_EODDATA_EXCHANGES:
+            for market in exchanges:
                 validation = validated_by_market[market]
                 listing_result = upsert_eoddata_provider_listings(
                     cursor=cursor,
@@ -297,7 +313,7 @@ def import_eoddata_daily(
             if item.source_code == source.source_code
         )
         for source in _SOURCES
-        for market in DEFAULT_EODDATA_EXCHANGES
+        for market in exchanges
     )
     return EODDataImportResult(
         effective_date=effective_date,
@@ -312,7 +328,7 @@ def import_eoddata_daily(
                 and item.market == market
             )
             for source in _SOURCES
-            for market in DEFAULT_EODDATA_EXCHANGES
+            for market in exchanges
         ),
         row_rejections=tuple(
             rejection
@@ -327,7 +343,7 @@ def import_eoddata_daily(
         ),
         cross_feed_counts=tuple(
             validated_by_market[market].cross_feed_counts
-            for market in DEFAULT_EODDATA_EXCHANGES
+            for market in exchanges
             if validated_by_market[market].cross_feed_counts is not None
         ),
     )
@@ -343,6 +359,8 @@ def _validate_connection(connection: Any) -> None:
 
 def _validate_acquired_objects(
     acquired_objects: object,
+    *,
+    expected_object_keys: tuple[tuple[str, str], ...],
 ) -> dict[tuple[str, str], AcquiredObject]:
     if not isinstance(acquired_objects, tuple) or any(
         not isinstance(item, AcquiredObject) for item in acquired_objects
@@ -350,8 +368,8 @@ def _validate_acquired_objects(
         raise TypeError(
             "acquired_objects must contain only AcquiredObject records."
         )
-    if len(acquired_objects) != len(_EXPECTED_OBJECT_KEYS):
-        raise ValueError("EODData import requires exactly six acquired objects.")
+    if len(acquired_objects) != len(expected_object_keys):
+        raise ValueError("EODData import requires two objects per exchange.")
     object_ids = [item.object_id for item in acquired_objects]
     if len(set(object_ids)) != len(object_ids):
         raise ValueError("acquired_objects must contain unique Core object IDs.")
@@ -364,9 +382,9 @@ def _validate_acquired_objects(
                 "acquired_objects must have unique source/market partitions."
             )
         keyed[key] = item
-    if set(keyed) != set(_EXPECTED_OBJECT_KEYS):
+    if set(keyed) != set(expected_object_keys):
         raise ValueError(
-            "acquired_objects must cover both EODData sources for all markets."
+            "acquired_objects must cover both sources for scoped exchanges."
         )
     return keyed
 
@@ -382,6 +400,7 @@ def _validate_results(
     validation_results: object,
     *,
     effective_date: date,
+    exchanges: tuple[str, ...],
 ) -> dict[str, ProviderValidationResult]:
     if type(effective_date) is not date:
         raise TypeError("effective_date must be a date.")
@@ -392,7 +411,7 @@ def _validate_results(
         raise TypeError(
             "validation_results must contain ProviderValidationResult records."
         )
-    if len(validation_results) != len(DEFAULT_EODDATA_EXCHANGES):
+    if len(validation_results) != len(exchanges):
         raise ValueError("EODData import requires one validation result per market.")
 
     by_market: dict[str, ProviderValidationResult] = {}
@@ -413,7 +432,7 @@ def _validate_results(
             raise ValueError(
                 "EODData validation result must contain cross-feed counts."
             )
-        if market not in DEFAULT_EODDATA_EXCHANGES or market in by_market:
+        if market not in exchanges or market in by_market:
             raise ValueError(
                 "validation_results must contain unique supported markets."
             )
@@ -482,11 +501,33 @@ def _validate_results(
                 )
         by_market[market] = result
 
-    if set(by_market) != set(DEFAULT_EODDATA_EXCHANGES):
-        raise ValueError(
-            "validation_results must cover NYSE, NASDAQ, and AMEX."
-        )
+    if set(by_market) != set(exchanges):
+        raise ValueError("validation_results must cover scoped exchanges.")
     return by_market
+
+
+def _validate_exchanges(exchanges: object) -> None:
+    if not isinstance(exchanges, tuple) or not exchanges:
+        raise ValueError("exchanges must be a non-empty tuple.")
+    selected = tuple(
+        market
+        for market in DEFAULT_EODDATA_EXCHANGES
+        if market in exchanges
+    )
+    if selected != exchanges or len(selected) != len(set(selected)):
+        raise ValueError(
+            "exchanges must be an ordered configured EODData subset."
+        )
+
+
+def _object_keys(
+    exchanges: tuple[str, ...],
+) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        (source.source_code, market)
+        for source in _SOURCES
+        for market in exchanges
+    )
 
 
 def _parser_version_for(source_code: str) -> str:

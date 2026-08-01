@@ -271,6 +271,13 @@ def test_eoddata_six_object_fixture_vertical_and_unchanged_rerun(
         assert second.listing_counts.inserted == 0
         assert second.bar_counts.inserted == 0
         assert second.bar_counts.derived_updated == 0
+        assert second.expected_session_count == 3
+        assert second.eligible_session_count == 3
+        assert second.missing_session_count == 0
+        assert second.ineligible_exchange_count == 0
+        assert second.planned_exchange_count == 3
+        assert second.retry_count == 0
+        assert second.corrected_current_rows == 0
         assert second.status == "succeeded"
         assert second.report_outcome == "WARN"
         assert first.run_id != second.run_id
@@ -381,6 +388,11 @@ def test_eoddata_six_object_fixture_vertical_and_unchanged_rerun(
         assert not any(row[1] == f"{marker}.CONFLICT" for row in listing_rows)
 
         report = json.loads(object_store.get_bytes(second.report_object_id))
+        assert report["session_planning"]["expected_session_count"] == 3
+        assert report["session_planning"]["missing_eligible_session_count"] == 0
+        assert report["execution"]["requested_exchange_count"] == 3
+        assert report["execution"]["retry_count"] == 0
+        assert report["execution"]["corrected_current_rows"] == 0
         assert report["row_rejections"]["rejected_records"] == 4
         assert report["row_rejections"]["rejected_rows"] == 6
         assert report["warnings"]["total_count"] == 2

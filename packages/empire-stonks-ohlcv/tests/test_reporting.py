@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from decimal import Decimal
@@ -18,7 +19,14 @@ from empire_stonks_ohlcv import (
     EODDATA_DAILY_SOURCE,
     EODDATA_SYMBOL_LIST_SOURCE,
     EODDataCredentials,
+    EODDataDailyPlan,
+    EODDataExchangeDailyPlan,
+    EODDataExchangePlanStatus,
+    EODDataExchangeWork,
+    EODDataExchangeWorkReason,
     EODDataImportResult,
+    EODDataRetryEvent,
+    ExpectedSession,
     MARKET_PDF_REPORT_OBJECT_KIND,
     FeedOutcomeCounts,
     ImportIssue,
@@ -179,6 +187,74 @@ def _market_health() -> tuple[ProviderMarketHealth, ...]:
     )
 
 
+def _daily_plan() -> EODDataDailyPlan:
+    session = ExpectedSession(
+        session_date=EFFECTIVE_DATE,
+        eligible_at=datetime(2026, 7, 16, tzinfo=UTC),
+    )
+    return EODDataDailyPlan(
+        start_date=EFFECTIVE_DATE,
+        end_date=EFFECTIVE_DATE,
+        planned_at=GENERATED_AT,
+        reconciliation_sessions=7,
+        exchanges=tuple(
+            EODDataExchangeDailyPlan(
+                exchange=market,
+                policy_code=(
+                    "ED_XNAS_1900_60M"
+                    if market == "NASDAQ"
+                    else "ED_XNYS_1900_60M"
+                ),
+                status=EODDataExchangePlanStatus.PLANNED,
+                total_listing_count=2,
+                active_listing_count=2,
+                expected_sessions=(session,),
+                eligible_sessions=(session,),
+                reconciliation_sessions=(session,),
+                work=(
+                    EODDataExchangeWork(
+                        exchange=market,
+                        effective_date=EFFECTIVE_DATE,
+                        reason=(
+                            EODDataExchangeWorkReason.RECENT_RECONCILIATION
+                        ),
+                        stored_bar_count=1,
+                    ),
+                ),
+            )
+            for market in MARKETS
+        ),
+    )
+
+
+def _ineligible_plan() -> EODDataDailyPlan:
+    session = ExpectedSession(
+        session_date=EFFECTIVE_DATE,
+        eligible_at=datetime(2026, 7, 17, tzinfo=UTC),
+    )
+    return EODDataDailyPlan(
+        start_date=EFFECTIVE_DATE,
+        end_date=EFFECTIVE_DATE,
+        planned_at=GENERATED_AT,
+        reconciliation_sessions=7,
+        exchanges=tuple(
+            EODDataExchangeDailyPlan(
+                exchange=market,
+                policy_code=(
+                    "ED_XNAS_1900_60M"
+                    if market == "NASDAQ"
+                    else "ED_XNYS_1900_60M"
+                ),
+                status=EODDataExchangePlanStatus.PLANNED,
+                total_listing_count=2,
+                active_listing_count=2,
+                expected_sessions=(session,),
+            )
+            for market in MARKETS
+        ),
+    )
+
+
 def _series_health() -> tuple[ProviderSeriesHealth, ...]:
     values: list[ProviderSeriesHealth] = []
     identity = 1000
@@ -305,6 +381,8 @@ def test_builds_complete_deterministic_scoped_eoddata_report(
     report = build_eoddata_report(
         cursor=object(),
         import_result=_import_result(),
+        plan=_daily_plan(),
+        post_import_plan=_daily_plan(),
         generated_at=GENERATED_AT,
     )
 
@@ -313,6 +391,24 @@ def test_builds_complete_deterministic_scoped_eoddata_report(
     assert report["effective_date"] == "2026-07-15"
     assert report["generated_at"] == "2026-07-16T02:30:00+00:00"
     assert report["outcome"] == "WARN"
+    assert report["session_planning"] == {
+        "planned_at": GENERATED_AT.isoformat(),
+        "reconciliation_sessions": 7,
+        "expected_session_count": 3,
+        "eligible_session_count": 3,
+        "ineligible_exchange_count": 0,
+        "missing_eligible_session_count": 0,
+        "failed_exchange_count": 0,
+        "inactive_exchange_count": 0,
+        "planned_exchange_count": 3,
+    }
+    assert report["execution"] == {
+        "requested_exchange_count": 3,
+        "acquired_object_count": 6,
+        "source_snapshot_count": 6,
+        "retry_count": 0,
+        "corrected_current_rows": 0,
+    }
     assert [item["market"] for item in report["markets"]] == list(MARKETS)
     assert [item["source_code"] for item in report["sources"]] == [
         "eoddata_symbol_list",
@@ -331,6 +427,10 @@ def test_builds_complete_deterministic_scoped_eoddata_report(
         "listings_without_bars": 1,
         "bars_without_listings": 0,
     }
+    assert nyse["session_coverage"]["latest_expected_is_eligible"] is True
+    assert nyse["session_coverage"]["latest_expected_is_complete"] is True
+    assert nyse["execution"]["requested"] is True
+    assert nyse["execution"]["work_reasons"] == ["recent_reconciliation"]
     assert report["inactive_series"]["total_count"] == 3
     assert report["hard_failures"]["total_count"] == 0
     assert [item["market"] for item in report["hard_failures"]["markets"]] == list(
@@ -348,6 +448,80 @@ def test_builds_complete_deterministic_scoped_eoddata_report(
     assert json.loads(eoddata_report_to_json(report)) == report
 
 
+def test_builds_durable_noop_report_for_ineligible_exchanges(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_health(monkeypatch)
+    plan = _ineligible_plan()
+
+    report = build_eoddata_report(
+        cursor=object(),
+        import_result=None,
+        plan=plan,
+        post_import_plan=plan,
+        generated_at=GENERATED_AT,
+    )
+
+    assert report["session_planning"]["ineligible_exchange_count"] == 3
+    assert report["session_planning"]["planned_exchange_count"] == 0
+    assert report["execution"] == {
+        "requested_exchange_count": 0,
+        "acquired_object_count": 0,
+        "source_snapshot_count": 0,
+        "retry_count": 0,
+        "corrected_current_rows": 0,
+    }
+    assert all(source["acquired_object_count"] == 0 for source in report["sources"])
+    assert all(
+        market["execution"]["requested"] is False
+        for market in report["markets"]
+    )
+    assert all(
+        market["bar_write"]["counts"] == PersistenceCounts().to_dict()
+        for market in report["markets"]
+    )
+    assert json.loads(eoddata_report_to_json(report)) == report
+
+
+def test_report_counts_retries_and_reconciliation_corrections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_health(monkeypatch)
+    imported = _import_result()
+    imported = replace(
+        imported,
+        write_counts=tuple(
+            replace(item, counts=PersistenceCounts(updated=2))
+            if item.source_code == "eoddata_daily" and item.market == "NYSE"
+            else item
+            for item in imported.write_counts
+        ),
+    )
+    retries = (
+        EODDataRetryEvent(
+            source_code="eoddata_daily",
+            exchange="NYSE",
+            retry_number=1,
+            delay_seconds=2.0,
+            reason="http_5xx",
+        ),
+    )
+
+    report = build_eoddata_report(
+        cursor=object(),
+        import_result=imported,
+        plan=_daily_plan(),
+        post_import_plan=_daily_plan(),
+        retry_events=retries,
+        generated_at=GENERATED_AT,
+    )
+
+    assert report["execution"]["retry_count"] == 1
+    assert report["execution"]["corrected_current_rows"] == 2
+    assert report["markets"][0]["execution"]["retry_count"] == 1
+    assert report["markets"][0]["execution"]["corrected_current_rows"] == 2
+
+
 def test_stores_secret_safe_report_under_active_core_run(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -356,6 +530,8 @@ def test_stores_secret_safe_report_under_active_core_run(
     report = build_eoddata_report(
         cursor=object(),
         import_result=_import_result(),
+        plan=_daily_plan(),
+        post_import_plan=_daily_plan(),
         generated_at=GENERATED_AT,
     )
     repository = FakeObjectRepository(tmp_path)
@@ -404,6 +580,8 @@ def test_renders_human_readable_eoddata_pdf(
     report = build_eoddata_report(
         cursor=object(),
         import_result=_import_result(),
+        plan=_daily_plan(),
+        post_import_plan=_daily_plan(),
         generated_at=GENERATED_AT,
     )
 
@@ -427,6 +605,8 @@ def test_pdf_bounds_large_diagnostic_sections_and_nested_rejection_samples(
     report = build_eoddata_report(
         cursor=object(),
         import_result=_import_result(),
+        plan=_daily_plan(),
+        post_import_plan=_daily_plan(),
         generated_at=GENERATED_AT,
     )
     gap_samples = [
@@ -494,6 +674,8 @@ def test_stores_pdf_report_beside_json_report(
     report = build_eoddata_report(
         cursor=object(),
         import_result=_import_result(),
+        plan=_daily_plan(),
+        post_import_plan=_daily_plan(),
         generated_at=GENERATED_AT,
     )
     repository = FakeObjectRepository(tmp_path / "objects")

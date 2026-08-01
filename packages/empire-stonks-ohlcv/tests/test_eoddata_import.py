@@ -263,6 +263,42 @@ def test_atomic_service_registers_all_sources_then_writes_listings_and_bars(
     json.dumps(result.to_dict())
 
 
+def test_atomic_service_persists_only_ordered_planned_exchange_subset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = FakeConnection()
+    events: list[str] = []
+    _install_success_writers(monkeypatch, events=events)
+    exchanges = ("NASDAQ", "AMEX")
+    objects = tuple(
+        item
+        for item in _acquired_objects()
+        if item.filename in {"raw-nasdaq.json", "raw-amex.json"}
+    )
+    validations = tuple(
+        item
+        for item in _validation_results()
+        if item.cross_feed_counts is not None
+        and item.cross_feed_counts.market in exchanges
+    )
+
+    result = import_eoddata_daily(
+        connection=connection,
+        effective_date=EFFECTIVE_DATE,
+        acquired_objects=objects,
+        validation_results=validations,
+        exchanges=exchanges,
+    )
+
+    assert result.exchanges == exchanges
+    assert len(result.acquired_objects) == 4
+    assert len(result.source_snapshots) == 4
+    assert tuple(item.market for item in result.cross_feed_counts) == exchanges
+    assert all(item.market in exchanges for item in result.feed_counts)
+    assert all(item.market in exchanges for item in result.write_counts)
+    assert connection.commit_calls == 1
+
+
 def test_inactive_listing_is_upserted_but_its_bar_is_skipped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -79,6 +79,7 @@ def test_public_exports_are_explicit() -> None:
         "EODDataHTTPTransport",
         "EODDataImportResult",
         "EODDataQuoteListParseResult",
+        "EODDataRetryEvent",
         "EODDataPlanningFailureReason",
         "EODDataStoredSessionCount",
         "EODDataSymbolListParseResult",

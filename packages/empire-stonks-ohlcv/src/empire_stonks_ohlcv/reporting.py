@@ -13,8 +13,16 @@ from empire_core import ObjectStore, RunContext, StoredObject
 
 from empire_stonks_ohlcv.config import DEFAULT_EODDATA_EXCHANGES, OHLCVConfig
 from empire_stonks_ohlcv.daily_market_reporting import EODDataDailyMarketReport
-from empire_stonks_ohlcv.eoddata import EODDATA_PROVIDER_CODE
+from empire_stonks_ohlcv.eoddata import (
+    EODDATA_PROVIDER_CODE,
+    EODDataRetryEvent,
+)
 from empire_stonks_ohlcv.eoddata_import import EODDataImportResult
+from empire_stonks_ohlcv.eoddata_planning import (
+    EODDataDailyPlan,
+    EODDataExchangeDailyPlan,
+    EODDataExchangeWorkReason,
+)
 from empire_stonks_ohlcv.health import (
     ProviderMarketHealth,
     ProviderSeriesHealth,
@@ -23,6 +31,7 @@ from empire_stonks_ohlcv.health import (
     select_provider_weekday_gaps,
 )
 from empire_stonks_ohlcv.object_store import DEFAULT_STORAGE_ROOT
+from empire_stonks_ohlcv.results import PersistenceCounts
 from empire_stonks_ohlcv.reports.eoddata_daily_pdf import (
     EODDATA_DAILY_PDF_REPORT_ID,
     render_eoddata_daily_pdf,
@@ -35,7 +44,13 @@ from empire_stonks_ohlcv.source_conventions import (
     EODDATA_DAILY_SOURCE,
     EODDATA_SYMBOL_LIST_SOURCE,
 )
-from empire_stonks_ohlcv.validation import MAX_ISSUE_SAMPLES, BoundedIssueSummary
+from empire_stonks_ohlcv.validation import (
+    MAX_ISSUE_SAMPLES,
+    BoundedIssueSummary,
+    CrossFeedOutcomeCounts,
+    FeedOutcomeCounts,
+    SourceMarketWriteCounts,
+)
 
 
 REPORT_SCHEMA_VERSION = 2
@@ -54,16 +69,27 @@ _PATH_TOKEN_PATTERN = re.compile(r"^[a-z0-9]+(?:[_-][a-z0-9]+)*$")
 def build_eoddata_report(
     *,
     cursor: Any,
-    import_result: EODDataImportResult,
+    import_result: EODDataImportResult | None,
+    plan: EODDataDailyPlan,
+    post_import_plan: EODDataDailyPlan,
+    retry_events: tuple[EODDataRetryEvent, ...] = (),
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
     """Build the schema-version-2 EODData report from persisted state."""
 
-    if not isinstance(import_result, EODDataImportResult):
-        raise TypeError("import_result must be an EODDataImportResult.")
-    _validate_import_scope(import_result)
+    if import_result is not None and not isinstance(
+        import_result,
+        EODDataImportResult,
+    ):
+        raise TypeError("import_result must be an EODDataImportResult or None.")
+    _validate_plans(plan, post_import_plan)
+    _validate_retry_events(retry_events)
+    if import_result is not None:
+        _validate_import_scope(import_result)
+        if import_result.effective_date != plan.end_date:
+            raise ValueError("import_result must match the planning date.")
     generated = _generated_at(generated_at)
-    as_of_date = import_result.effective_date
+    as_of_date = plan.end_date
     market_health = {
         item.market: item
         for item in select_provider_market_health(
@@ -79,16 +105,19 @@ def build_eoddata_report(
     )
     _validate_health_scope(market_health, series)
 
-    feed_counts = {
+    feed_counts: dict[tuple[str, str], FeedOutcomeCounts] = {
         (item.source_code, item.market): item
-        for item in import_result.feed_counts
+        for item in (() if import_result is None else import_result.feed_counts)
     }
-    write_counts = {
+    write_counts: dict[tuple[str, str], SourceMarketWriteCounts] = {
         (item.source_code, item.market): item
-        for item in import_result.write_counts
+        for item in (() if import_result is None else import_result.write_counts)
     }
-    cross_feed_counts = {
-        item.market: item for item in import_result.cross_feed_counts
+    cross_feed_counts: dict[str, CrossFeedOutcomeCounts] = {
+        item.market: item
+        for item in (
+            () if import_result is None else import_result.cross_feed_counts
+        )
     }
     series_by_market = {
         market: tuple(item for item in series if item.market == market)
@@ -98,6 +127,8 @@ def build_eoddata_report(
     market_sections: list[dict[str, Any]] = []
     health_warning_count = 0
     for market in DEFAULT_EODDATA_EXCHANGES:
+        initial_exchange_plan = _exchange_plan(plan, market)
+        final_exchange_plan = _exchange_plan(post_import_plan, market)
         health = market_health[market]
         market_series = series_by_market[market]
         active_series = tuple(item for item in market_series if item.is_active)
@@ -127,27 +158,50 @@ def build_eoddata_report(
                     import_result,
                     market=market,
                 ),
-                "listing_feed": feed_counts[
-                    (EODDATA_SYMBOL_LIST_SOURCE.source_code, market)
-                ].to_dict(),
-                "quote_or_bar_feed": feed_counts[
-                    (EODDATA_DAILY_SOURCE.source_code, market)
-                ].to_dict(),
-                "listing_write": write_counts[
-                    (EODDATA_SYMBOL_LIST_SOURCE.source_code, market)
-                ].to_dict(),
-                "bar_write": write_counts[
-                    (EODDATA_DAILY_SOURCE.source_code, market)
-                ].to_dict(),
+                "listing_feed": _feed_count(
+                    feed_counts,
+                    source_code=EODDATA_SYMBOL_LIST_SOURCE.source_code,
+                    market=market,
+                ).to_dict(),
+                "quote_or_bar_feed": _feed_count(
+                    feed_counts,
+                    source_code=EODDATA_DAILY_SOURCE.source_code,
+                    market=market,
+                ).to_dict(),
+                "listing_write": _write_count(
+                    write_counts,
+                    source_code=EODDATA_SYMBOL_LIST_SOURCE.source_code,
+                    market=market,
+                    record_kind="listing",
+                ).to_dict(),
+                "bar_write": _write_count(
+                    write_counts,
+                    source_code=EODDATA_DAILY_SOURCE.source_code,
+                    market=market,
+                    record_kind="bar",
+                ).to_dict(),
                 "duplicate_outcomes": {
-                    "listing_rows_collapsed": feed_counts[
-                        (EODDATA_SYMBOL_LIST_SOURCE.source_code, market)
-                    ].duplicate_rows_collapsed,
-                    "bar_rows_collapsed": feed_counts[
-                        (EODDATA_DAILY_SOURCE.source_code, market)
-                    ].duplicate_rows_collapsed,
+                    "listing_rows_collapsed": _feed_count(
+                        feed_counts,
+                        source_code=EODDATA_SYMBOL_LIST_SOURCE.source_code,
+                        market=market,
+                    ).duplicate_rows_collapsed,
+                    "bar_rows_collapsed": _feed_count(
+                        feed_counts,
+                        source_code=EODDATA_DAILY_SOURCE.source_code,
+                        market=market,
+                    ).duplicate_rows_collapsed,
                 },
-                "cross_feed_outcomes": cross_feed_counts[market].to_dict(),
+                "cross_feed_outcomes": cross_feed_counts.get(
+                    market,
+                    CrossFeedOutcomeCounts(market=market),
+                ).to_dict(),
+                "session_coverage": _session_coverage(final_exchange_plan),
+                "execution": _market_execution(
+                    initial_exchange_plan,
+                    retry_events=retry_events,
+                    write_counts=write_counts,
+                ),
                 "coverage": _coverage(health),
                 "freshness": _freshness(health, as_of_date),
                 "stale_candidates": _bounded_candidates(stale),
@@ -156,7 +210,7 @@ def build_eoddata_report(
             }
         )
 
-    if import_result.failures.total_count:
+    if import_result is not None and import_result.failures.total_count:
         raise ValueError(
             "EODData import hard failures must abort before report generation."
         )
@@ -165,9 +219,11 @@ def build_eoddata_report(
     outcome = _outcome(
         failure_count=hard_failures["total_count"],
         warning_count=(
-            import_result.warnings.total_count
+            (0 if import_result is None else import_result.warnings.total_count)
             + health_warning_count
             + row_rejections["rejected_records"]
+            + post_import_plan.failed_exchange_count
+            + _missing_session_count(post_import_plan)
         ),
     )
     return {
@@ -176,12 +232,22 @@ def build_eoddata_report(
         "effective_date": as_of_date.isoformat(),
         "generated_at": generated.isoformat(),
         "outcome": outcome,
+        "session_planning": _session_planning(plan, post_import_plan),
+        "execution": _execution(
+            plan,
+            import_result=import_result,
+            retry_events=retry_events,
+        ),
         "sources": _source_sections(import_result),
         "markets": market_sections,
         "inactive_series": _inactive_series(market_health),
         "hard_failures": hard_failures,
         "row_rejections": row_rejections,
-        "warnings": import_result.warnings.to_dict(),
+        "warnings": (
+            BoundedIssueSummary().to_dict()
+            if import_result is None
+            else import_result.warnings.to_dict()
+        ),
         "native_value_semantics": {
             "interval": "daily",
             "adjustment_basis": "unspecified_by_eoddata_quote_list",
@@ -405,18 +471,22 @@ def store_eoddata_daily_market_pdf_report(
     )
 
 
-def _source_sections(import_result: EODDataImportResult) -> list[dict[str, Any]]:
+def _source_sections(
+    import_result: EODDataImportResult | None,
+) -> list[dict[str, Any]]:
     sections: list[dict[str, Any]] = []
     for source in _SOURCES:
-        objects = []
-        for market in DEFAULT_EODDATA_EXCHANGES:
-            acquired = next(
-                item
-                for item in import_result.acquired_objects
-                if item.source_code == source.source_code
-                and item.filename == f"raw-{market.lower()}.json"
+        objects = [
+            {"market": market, **acquired.to_dict()}
+            for market in DEFAULT_EODDATA_EXCHANGES
+            for acquired in (
+                ()
+                if import_result is None
+                else import_result.acquired_objects
             )
-            objects.append({"market": market, **acquired.to_dict()})
+            if acquired.source_code == source.source_code
+            and acquired.filename == f"raw-{market.lower()}.json"
+        ]
         sections.append(
             {
                 "source_code": source.source_code,
@@ -426,6 +496,172 @@ def _source_sections(import_result: EODDataImportResult) -> list[dict[str, Any]]
             }
         )
     return sections
+
+
+def _feed_count(
+    counts: dict[tuple[str, str], FeedOutcomeCounts],
+    *,
+    source_code: str,
+    market: str,
+) -> FeedOutcomeCounts:
+    return counts.get(
+        (source_code, market),
+        FeedOutcomeCounts(source_code=source_code, market=market),
+    )
+
+
+def _write_count(
+    counts: dict[tuple[str, str], SourceMarketWriteCounts],
+    *,
+    source_code: str,
+    market: str,
+    record_kind: str,
+) -> SourceMarketWriteCounts:
+    return counts.get(
+        (source_code, market),
+        SourceMarketWriteCounts(
+            source_code=source_code,
+            market=market,
+            record_kind=record_kind,
+            counts=PersistenceCounts(),
+        ),
+    )
+
+
+def _exchange_plan(
+    plan: EODDataDailyPlan,
+    market: str,
+) -> EODDataExchangeDailyPlan:
+    return next(item for item in plan.exchanges if item.exchange == market)
+
+
+def _session_coverage(
+    plan: EODDataExchangeDailyPlan,
+) -> dict[str, Any]:
+    return {
+        "status": plan.status.value,
+        "policy_code": plan.policy_code,
+        "expected_session_count": len(plan.expected_sessions),
+        "eligible_session_count": len(plan.eligible_sessions),
+        "ineligible_session_count": plan.ineligible_session_count,
+        "missing_eligible_session_count": len(plan.missing_sessions),
+        "missing_eligible_dates": [
+            item.session_date.isoformat() for item in plan.missing_sessions
+        ],
+        "latest_expected_session": (
+            None
+            if plan.latest_expected_session is None
+            else plan.latest_expected_session.session_date.isoformat()
+        ),
+        "latest_expected_is_eligible": plan.latest_expected_is_eligible,
+        "latest_expected_is_complete": plan.latest_expected_is_complete,
+        "failure_reason": (
+            None
+            if plan.failure_reason is None
+            else plan.failure_reason.value
+        ),
+    }
+
+
+def _market_execution(
+    plan: EODDataExchangeDailyPlan,
+    *,
+    retry_events: tuple[EODDataRetryEvent, ...],
+    write_counts: dict[tuple[str, str], SourceMarketWriteCounts],
+) -> dict[str, Any]:
+    bar_write = _write_count(
+        write_counts,
+        source_code=EODDATA_DAILY_SOURCE.source_code,
+        market=plan.exchange,
+        record_kind="bar",
+    )
+    reconciliation = any(
+        item.reason is EODDataExchangeWorkReason.RECENT_RECONCILIATION
+        for item in plan.work
+    )
+    return {
+        "requested": bool(plan.work),
+        "work_reasons": [item.reason.value for item in plan.work],
+        "retry_count": sum(
+            item.exchange == plan.exchange for item in retry_events
+        ),
+        "corrected_current_rows": (
+            bar_write.counts.updated if reconciliation else 0
+        ),
+    }
+
+
+def _session_planning(
+    plan: EODDataDailyPlan,
+    post_import_plan: EODDataDailyPlan,
+) -> dict[str, Any]:
+    return {
+        "planned_at": plan.planned_at.isoformat(),
+        "reconciliation_sessions": plan.reconciliation_sessions,
+        "expected_session_count": sum(
+            len(item.expected_sessions) for item in post_import_plan.exchanges
+        ),
+        "eligible_session_count": sum(
+            len(item.eligible_sessions) for item in post_import_plan.exchanges
+        ),
+        "ineligible_exchange_count": sum(
+            item.status.value == "planned" and not item.eligible_sessions
+            for item in post_import_plan.exchanges
+        ),
+        "missing_eligible_session_count": _missing_session_count(
+            post_import_plan
+        ),
+        "failed_exchange_count": post_import_plan.failed_exchange_count,
+        "inactive_exchange_count": post_import_plan.inactive_exchange_count,
+        "planned_exchange_count": sum(bool(item.work) for item in plan.exchanges),
+    }
+
+
+def _execution(
+    plan: EODDataDailyPlan,
+    *,
+    import_result: EODDataImportResult | None,
+    retry_events: tuple[EODDataRetryEvent, ...],
+) -> dict[str, Any]:
+    return {
+        "requested_exchange_count": sum(
+            bool(item.work) for item in plan.exchanges
+        ),
+        "acquired_object_count": (
+            0 if import_result is None else len(import_result.acquired_objects)
+        ),
+        "source_snapshot_count": (
+            0 if import_result is None else len(import_result.source_snapshots)
+        ),
+        "retry_count": len(retry_events),
+        "corrected_current_rows": _corrected_current_rows(
+            plan,
+            import_result,
+        ),
+    }
+
+
+def _corrected_current_rows(
+    plan: EODDataDailyPlan,
+    import_result: EODDataImportResult | None,
+) -> int:
+    if import_result is None:
+        return 0
+    reconciliation_exchanges = {
+        item.exchange
+        for item in plan.work
+        if item.reason is EODDataExchangeWorkReason.RECENT_RECONCILIATION
+    }
+    return sum(
+        item.counts.updated
+        for item in import_result.write_counts
+        if item.record_kind == "bar"
+        and item.market in reconciliation_exchanges
+    )
+
+
+def _missing_session_count(plan: EODDataDailyPlan) -> int:
+    return sum(len(item.missing_sessions) for item in plan.exchanges)
 
 
 def _coverage(health: ProviderMarketHealth) -> dict[str, Any]:
@@ -542,13 +778,13 @@ def _weekday_age(last_date: date, as_of_date: date) -> int:
 
 
 def _row_rejections(
-    import_result: EODDataImportResult,
+    import_result: EODDataImportResult | None,
     *,
     market: str | None = None,
 ) -> dict[str, Any]:
     reasons = tuple(
         item
-        for item in import_result.row_rejections
+        for item in (() if import_result is None else import_result.row_rejections)
         if market is None or item.market == market
     )
     return {
@@ -595,7 +831,7 @@ def _validate_import_scope(import_result: EODDataImportResult) -> None:
     expected_feed_keys = {
         (source.source_code, market)
         for source in _SOURCES
-        for market in DEFAULT_EODDATA_EXCHANGES
+        for market in import_result.exchanges
     }
     if {
         (item.source_code, item.market) for item in import_result.feed_counts
@@ -608,13 +844,39 @@ def _validate_import_scope(import_result: EODDataImportResult) -> None:
     expected_objects = {
         (source.source_code, f"raw-{market.lower()}.json")
         for source in _SOURCES
-        for market in DEFAULT_EODDATA_EXCHANGES
+        for market in import_result.exchanges
     }
     if {
         (item.source_code, item.filename)
         for item in import_result.acquired_objects
     } != expected_objects:
         raise ValueError("EODData report acquired objects have an invalid scope.")
+
+
+def _validate_plans(
+    plan: object,
+    post_import_plan: object,
+) -> None:
+    if not isinstance(plan, EODDataDailyPlan):
+        raise TypeError("plan must be an EODDataDailyPlan.")
+    if not isinstance(post_import_plan, EODDataDailyPlan):
+        raise TypeError("post_import_plan must be an EODDataDailyPlan.")
+    if (
+        plan.start_date != plan.end_date
+        or post_import_plan.start_date != plan.start_date
+        or post_import_plan.end_date != plan.end_date
+        or post_import_plan.planned_at != plan.planned_at
+        or post_import_plan.reconciliation_sessions
+        != plan.reconciliation_sessions
+    ):
+        raise ValueError("EODData report plans must share one daily scope.")
+
+
+def _validate_retry_events(events: object) -> None:
+    if not isinstance(events, tuple) or any(
+        not isinstance(item, EODDataRetryEvent) for item in events
+    ):
+        raise TypeError("retry_events must contain EODDataRetryEvent records.")
 
 
 def _generated_at(value: datetime | None) -> datetime:
@@ -642,6 +904,8 @@ def _validate_report(report: object) -> None:
         "effective_date",
         "generated_at",
         "outcome",
+        "session_planning",
+        "execution",
         "sources",
         "markets",
         "inactive_series",

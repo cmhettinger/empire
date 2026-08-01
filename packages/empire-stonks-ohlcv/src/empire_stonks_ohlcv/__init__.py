@@ -6,6 +6,7 @@ from empire_stonks_ohlcv.eoddata import (
     EODDATA_PROVIDER_CODE,
     EODDataHTTPResponse,
     EODDataHTTPTransport,
+    EODDataRetryEvent,
     acquire_eoddata_objects,
 )
 from empire_stonks_ohlcv.eoddata_symbols import (
@@ -350,6 +351,7 @@ __all__ = [
     "EODDataHTTPTransport",
     "EODDataImportResult",
     "EODDataQuoteListParseResult",
+    "EODDataRetryEvent",
     "EODDataPlanningFailureReason",
     "EODDataStoredSessionCount",
     "EODDataSymbolListParseResult",

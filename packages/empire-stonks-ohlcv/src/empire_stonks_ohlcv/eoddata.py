@@ -15,7 +15,7 @@ from urllib.request import Request, urlopen
 
 from empire_core import ObjectStore, RunContext
 
-from empire_stonks_ohlcv.config import OHLCVConfig
+from empire_stonks_ohlcv.config import DEFAULT_EODDATA_EXCHANGES, OHLCVConfig
 from empire_stonks_ohlcv.exceptions import OHLCVAcquisitionError
 from empire_stonks_ohlcv.object_store import store_raw_bytes
 from empire_stonks_ohlcv.results import AcquiredObject
@@ -34,6 +34,42 @@ _DEFAULT_RETRY_BACKOFF_SECONDS = 2.0
 _MAX_RETRY_DELAY_SECONDS = 60.0
 
 Sleep = Callable[[float], None]
+RetrySink = Callable[["EODDataRetryEvent"], None]
+
+
+@dataclass(frozen=True)
+class EODDataRetryEvent:
+    """One secret-safe retry performed for an exchange partition."""
+
+    source_code: str
+    exchange: str
+    retry_number: int
+    delay_seconds: float
+    reason: str
+
+    def __post_init__(self) -> None:
+        if self.source_code not in {
+            EODDATA_SYMBOL_LIST_SOURCE.source_code,
+            EODDATA_DAILY_SOURCE.source_code,
+        }:
+            raise ValueError("source_code is not an EODData source.")
+        if self.exchange not in DEFAULT_EODDATA_EXCHANGES:
+            raise ValueError("exchange is not a configured EODData exchange.")
+        if (
+            isinstance(self.retry_number, bool)
+            or not isinstance(self.retry_number, int)
+            or self.retry_number < 1
+        ):
+            raise ValueError("retry_number must be a positive integer.")
+        if (
+            isinstance(self.delay_seconds, bool)
+            or not isinstance(self.delay_seconds, (int, float))
+            or not isfinite(self.delay_seconds)
+            or self.delay_seconds < 0
+        ):
+            raise ValueError("delay_seconds must be finite and non-negative.")
+        if self.reason not in {"transport", "http_429", "http_5xx"}:
+            raise ValueError("reason is not a supported retry reason.")
 
 
 @dataclass(frozen=True)
@@ -97,17 +133,24 @@ def acquire_eoddata_objects(
     config: OHLCVConfig,
     transport: EODDataHTTPTransport | None = None,
     sleep: Sleep = time.sleep,
+    exchanges: tuple[str, ...] | None = None,
+    retry_sink: RetrySink | None = None,
 ) -> tuple[AcquiredObject, ...]:
-    """Acquire and durably store all three listing then daily partitions."""
+    """Acquire and store an ordered exchange subset, listing source first."""
 
     _validate_inputs(run_context=run_context, config=config, sleep=sleep)
+    selected_exchanges = _selected_exchanges(exchanges)
+    if retry_sink is not None and not callable(retry_sink):
+        raise TypeError("retry_sink must be callable.")
     credentials = config.require_eoddata_credentials()
     request_transport = transport or _urllib_transport
     if not callable(request_transport):
         raise TypeError("transport must be callable.")
 
     acquired: list[AcquiredObject] = []
-    for request_index, spec in enumerate(_request_specs(config)):
+    for request_index, spec in enumerate(
+        _request_specs(exchanges=selected_exchanges)
+    ):
         if request_index:
             sleep(config.eoddata_request_delay_seconds)
         query = {"apiKey": credentials.api_key}
@@ -124,6 +167,7 @@ def acquire_eoddata_objects(
             max_retries=config.max_retries,
             sleep=sleep,
             spec=spec,
+            retry_sink=retry_sink,
         )
         _validate_json_array(response=response, spec=spec)
         try:
@@ -149,7 +193,10 @@ def acquire_eoddata_objects(
     return tuple(acquired)
 
 
-def _request_specs(config: OHLCVConfig) -> tuple[_RequestSpec, ...]:
+def _request_specs(
+    *,
+    exchanges: tuple[str, ...],
+) -> tuple[_RequestSpec, ...]:
     symbols = tuple(
         _RequestSpec(
             source_code=EODDATA_SYMBOL_LIST_SOURCE.source_code,
@@ -159,7 +206,7 @@ def _request_specs(config: OHLCVConfig) -> tuple[_RequestSpec, ...]:
             path=f"/Symbol/List/{exchange}",
             allow_empty=False,
         )
-        for exchange in config.eoddata_exchanges
+        for exchange in exchanges
     )
     quotes = tuple(
         _RequestSpec(
@@ -170,7 +217,7 @@ def _request_specs(config: OHLCVConfig) -> tuple[_RequestSpec, ...]:
             path=f"/Quote/List/{exchange}",
             allow_empty=True,
         )
-        for exchange in config.eoddata_exchanges
+        for exchange in exchanges
     )
     return symbols + quotes
 
@@ -184,6 +231,7 @@ def _request_with_retries(
     max_retries: int,
     sleep: Sleep,
     spec: _RequestSpec,
+    retry_sink: RetrySink | None,
 ) -> EODDataHTTPResponse:
     attempts = max_retries + 1
     for attempt in range(attempts):
@@ -197,7 +245,15 @@ def _request_with_retries(
                 raise TypeError("transport returned an unsupported response")
         except Exception:
             if attempt < max_retries:
-                sleep(_retry_delay(attempt=attempt, headers={}))
+                delay = _retry_delay(attempt=attempt, headers={})
+                _emit_retry(
+                    retry_sink,
+                    spec=spec,
+                    retry_number=attempt + 1,
+                    delay_seconds=delay,
+                    reason="transport",
+                )
+                sleep(delay)
                 continue
             raise _acquisition_error(
                 spec, f"transport failed after {attempts} attempts"
@@ -206,7 +262,19 @@ def _request_with_retries(
         if response.status_code == 200:
             return response
         if response.status_code in _RETRYABLE_HTTP_STATUSES and attempt < max_retries:
-            sleep(_retry_delay(attempt=attempt, headers=response.headers))
+            delay = _retry_delay(attempt=attempt, headers=response.headers)
+            _emit_retry(
+                retry_sink,
+                spec=spec,
+                retry_number=attempt + 1,
+                delay_seconds=delay,
+                reason=(
+                    "http_429"
+                    if response.status_code == 429
+                    else "http_5xx"
+                ),
+            )
+            sleep(delay)
             continue
         qualifier = " after retries" if attempt else ""
         raise _acquisition_error(
@@ -227,6 +295,43 @@ def _retry_delay(*, attempt: int, headers: Mapping[str, str]) -> float:
             return min(delay, _MAX_RETRY_DELAY_SECONDS)
     exponential = _DEFAULT_RETRY_BACKOFF_SECONDS * (2**attempt)
     return min(exponential, _MAX_RETRY_DELAY_SECONDS)
+
+
+def _emit_retry(
+    retry_sink: RetrySink | None,
+    *,
+    spec: _RequestSpec,
+    retry_number: int,
+    delay_seconds: float,
+    reason: str,
+) -> None:
+    if retry_sink is None:
+        return
+    retry_sink(
+        EODDataRetryEvent(
+            source_code=spec.source_code,
+            exchange=spec.exchange,
+            retry_number=retry_number,
+            delay_seconds=delay_seconds,
+            reason=reason,
+        )
+    )
+
+
+def _selected_exchanges(values: tuple[str, ...] | None) -> tuple[str, ...]:
+    exchanges = DEFAULT_EODDATA_EXCHANGES if values is None else values
+    if not isinstance(exchanges, tuple) or not exchanges:
+        raise ValueError("exchanges must be a non-empty tuple.")
+    selected = tuple(
+        exchange
+        for exchange in DEFAULT_EODDATA_EXCHANGES
+        if exchange in exchanges
+    )
+    if selected != exchanges or len(selected) != len(set(selected)):
+        raise ValueError(
+            "exchanges must be an ordered configured EODData subset."
+        )
+    return selected
 
 
 def _validate_json_array(

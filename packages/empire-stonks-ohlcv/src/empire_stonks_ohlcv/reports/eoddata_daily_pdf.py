@@ -118,9 +118,16 @@ def _body_story(
             col_widths=[150, 354],
         ),
         spacer(12),
+        section_heading(
+            "Session Eligibility and Execution",
+            styles=renderer.styles,
+        ),
+        _planning_table(report, renderer=renderer),
+        spacer(12),
         section_heading("Market Overview", styles=renderer.styles),
         paragraph(
-            "Coverage and freshness reflect active EODData listings at the report effective date.",
+            "Coverage and freshness reflect active EODData listings at the "
+            "report effective date.",
             styles=renderer.styles,
         ),
         _market_overview_table(markets, renderer=renderer),
@@ -164,10 +171,16 @@ def _executive_summary(report: dict[str, Any]) -> str:
     warnings = _int((report.get("warnings") or {}).get("total_count"))
     rejections = _int((report.get("row_rejections") or {}).get("rejected_records"))
     failures = _int((report.get("hard_failures") or {}).get("total_count"))
+    planning = report.get("session_planning") or {}
+    execution = report.get("execution") or {}
     return (
         f"The EODData daily OHLCV run completed with outcome <b>{outcome}</b> across "
-        f"{len(markets)} markets. It recorded {warnings:,} import warnings, "
-        f"{rejections:,} rejected records, and {failures:,} hard failures."
+        f"{len(markets)} markets and requested "
+        f"{_int(execution.get('requested_exchange_count')):,} eligible exchanges. "
+        f"Post-run coverage retains "
+        f"{_int(planning.get('missing_eligible_session_count')):,} missing eligible "
+        f"sessions. It recorded {warnings:,} import warnings, {rejections:,} "
+        f"rejected records, and {failures:,} hard failures."
     )
 
 
@@ -191,7 +204,11 @@ def _overview_table(report: dict[str, Any], *, renderer: PdfRenderer) -> Table:
     )
 
 
-def _market_overview_table(markets: list[dict[str, Any]], *, renderer: PdfRenderer) -> Table:
+def _market_overview_table(
+    markets: list[dict[str, Any]],
+    *,
+    renderer: PdfRenderer,
+) -> Table:
     rows: list[list[Any]] = [
         [
             "Market",
@@ -220,6 +237,35 @@ def _market_overview_table(markets: list[dict[str, Any]], *, renderer: PdfRender
     return _table(rows, renderer=renderer, col_widths=[56, 70, 66, 66, 60, 82, 104])
 
 
+def _planning_table(report: dict[str, Any], *, renderer: PdfRenderer) -> Table:
+    planning = report.get("session_planning") or {}
+    execution = report.get("execution") or {}
+    return _table(
+        [
+            [
+                "Expected",
+                "Eligible",
+                "Ineligible",
+                "Missing",
+                "Requested",
+                "Retries",
+                "Corrected",
+            ],
+            [
+                _fmt_int(planning.get("expected_session_count")),
+                _fmt_int(planning.get("eligible_session_count")),
+                _fmt_int(planning.get("ineligible_exchange_count")),
+                _fmt_int(planning.get("missing_eligible_session_count")),
+                _fmt_int(execution.get("requested_exchange_count")),
+                _fmt_int(execution.get("retry_count")),
+                _fmt_int(execution.get("corrected_current_rows")),
+            ],
+        ],
+        renderer=renderer,
+        col_widths=[72] * 7,
+    )
+
+
 def _market_detail(market: dict[str, Any], *, renderer: PdfRenderer) -> list[Any]:
     coverage = market.get("coverage") or {}
     freshness = market.get("freshness") or {}
@@ -231,6 +277,8 @@ def _market_detail(market: dict[str, Any], *, renderer: PdfRenderer) -> list[Any
     bar_counts = bar_write.get("counts") or {}
     cross_feed = market.get("cross_feed_outcomes") or {}
     duplicate = market.get("duplicate_outcomes") or {}
+    session = market.get("session_coverage") or {}
+    execution = market.get("execution") or {}
     rows = [
         ["Metric", "Listings", "Daily Bars"],
         [
@@ -248,7 +296,11 @@ def _market_detail(market: dict[str, Any], *, renderer: PdfRenderer) -> list[Any
             _fmt_int(listing_counts.get("inserted")),
             _fmt_int(bar_counts.get("inserted")),
         ],
-        ["Updated", _fmt_int(listing_counts.get("updated")), _fmt_int(bar_counts.get("updated"))],
+        [
+            "Updated",
+            _fmt_int(listing_counts.get("updated")),
+            _fmt_int(bar_counts.get("updated")),
+        ],
         [
             "Unchanged",
             _fmt_int(listing_counts.get("unchanged")),
@@ -263,6 +315,20 @@ def _market_detail(market: dict[str, Any], *, renderer: PdfRenderer) -> list[Any
     ]
     facts = [
         ["Health Fact", "Value"],
+        ["Session policy", session.get("policy_code") or "Not available"],
+        ["Latest expected session", session.get("latest_expected_session") or "None"],
+        ["Latest expected eligible", session.get("latest_expected_is_eligible")],
+        ["Latest expected complete", session.get("latest_expected_is_complete")],
+        [
+            "Missing eligible sessions",
+            _fmt_int(session.get("missing_eligible_session_count")),
+        ],
+        [
+            "Request reasons",
+            ", ".join(execution.get("work_reasons") or []) or "No request",
+        ],
+        ["Retries", _fmt_int(execution.get("retry_count"))],
+        ["Corrected current rows", _fmt_int(execution.get("corrected_current_rows"))],
         ["Freshness", freshness.get("status") or "unknown"],
         ["Latest bar weekday age", _display(freshness.get("latest_bar_weekday_age"))],
         [
@@ -272,15 +338,26 @@ def _market_detail(market: dict[str, Any], *, renderer: PdfRenderer) -> list[Any
         ],
         ["Listings without bars", _fmt_int(cross_feed.get("listings_without_bars"))],
         ["Bars without listings", _fmt_int(cross_feed.get("bars_without_listings"))],
-        ["Stale candidates", _fmt_int((market.get("stale_candidates") or {}).get("total_count"))],
+        [
+            "Stale candidates",
+            _fmt_int(
+                (market.get("stale_candidates") or {}).get("total_count")
+            ),
+        ],
         [
             "No-data candidates",
             _fmt_int((market.get("no_data_candidates") or {}).get("total_count")),
         ],
-        ["Weekday gaps", _fmt_int((market.get("weekday_gap_warnings") or {}).get("total_count"))],
+        [
+            "Weekday gaps",
+            _fmt_int(
+                (market.get("weekday_gap_warnings") or {}).get("total_count")
+            ),
+        ],
         [
             "Rejected records / rows",
-            f"{_fmt_int((market.get('row_rejections') or {}).get('rejected_records'))} / "
+            f"{_fmt_int((market.get('row_rejections') or {}).get('rejected_records'))} "
+            "/ "
             f"{_fmt_int((market.get('row_rejections') or {}).get('rejected_rows'))}",
         ],
     ]
@@ -296,7 +373,9 @@ def _market_detail(market: dict[str, Any], *, renderer: PdfRenderer) -> list[Any
 
 
 def _sources_table(sources: list[dict[str, Any]], *, renderer: PdfRenderer) -> Table:
-    rows: list[list[Any]] = [["Source", "Parser", "Market", "Filename", "Bytes", "Object ID"]]
+    rows: list[list[Any]] = [
+        ["Source", "Parser", "Market", "Filename", "Bytes", "Object ID"]
+    ]
     for source in sources:
         for item in source.get("acquired_objects") or []:
             rows.append(
@@ -313,7 +392,9 @@ def _sources_table(sources: list[dict[str, Any]], *, renderer: PdfRenderer) -> T
 
 
 def _inactive_table(section: dict[str, Any], *, renderer: PdfRenderer) -> Table:
-    rows: list[list[Any]] = [["Market", "Listings", "With Bars", "Without Bars", "Bars"]]
+    rows: list[list[Any]] = [
+        ["Market", "Listings", "With Bars", "Without Bars", "Bars"]
+    ]
     for market in section.get("markets") or []:
         rows.append(
             [
@@ -353,7 +434,10 @@ def _review_sections(report: dict[str, Any], *, renderer: PdfRenderer) -> list[A
             [
                 (f"{label} Stale Candidates", market.get("stale_candidates") or {}),
                 (f"{label} No-data Candidates", market.get("no_data_candidates") or {}),
-                (f"{label} Weekday Gap Warnings", market.get("weekday_gap_warnings") or {}),
+                (
+                    f"{label} Weekday Gap Warnings",
+                    market.get("weekday_gap_warnings") or {},
+                ),
             ]
         )
     for title, section in summary_sections:
@@ -574,7 +658,10 @@ def _rejection_reason_label(value: Any) -> str:
 
 
 def _key_value_table(values: dict[str, Any], *, renderer: PdfRenderer) -> Table:
-    rows = [["Property", "Value"], *[[_humanize(key), value] for key, value in values.items()]]
+    rows = [
+        ["Property", "Value"],
+        *[[_humanize(key), value] for key, value in values.items()],
+    ]
     return _table(rows, renderer=renderer, col_widths=[180, 324])
 
 
