@@ -291,7 +291,9 @@ marked `IPSA`, `MSCIEM`, and `RVX` inactive with a documented
 mappings for `BCOM`, `CSI300`, `MOVE`, `PSEI`, `TASI`, and `W5000`, but marked
 the listings inactive with an `UNAVAILABLE_STALE_HISTORY` disposition after
 Yahoo returned only empty OHLC placeholders beyond July 16/17 and no exact
-continuous alternative was found. The controlled active universe is now 84
+continuous alternative was found. Y8.13.4's targeted retry then proved that
+corrected `SET` (`^SET.BK`) also stopped after July 17, so it is retained with
+the same inactive disposition. The controlled active universe is now 83
 listings.
 
 | ID | Status | Goal | Complete When | Depends On |
@@ -312,7 +314,7 @@ listings.
 | Y8.13.1 | [x] | Separate Yahoo response time zone from session-policy time zone | Review the parser's assumption that Yahoo `exchangeTimezoneName` must equal the listing's eligibility-policy time zone. Model and validate provider response/session-date interpretation separately from exchange calendar or cutoff eligibility without weakening symbol, date, or calendar checks. Preserve the intended policies for `SKEW`, `VVIX`, `VXN`, `UST5Y`, `UST10Y`, and `UST30Y`, and prove their stored fixtures parse into the correct provider dates across DST boundaries. | Y8.7, Y8.11-Y8.13 |
 | Y8.13.2 | [x] | Correct Yahoo empty-history classification and remediate unusable seed mappings | Treat a structurally valid Chart result with metadata/indicators but `timestamp=null` as an explicit no-history/no-data outcome rather than a generic malformed-chart failure when safe. Review current Yahoo availability and exact `metadata.YahooTicker` values for `IPSA`, `JTOPI`, `MSCIEM`, `SET`, and the HTTP-404 `RVX`; correct mappings through an idempotent Flyway migration when a valid replacement exists, otherwise explicitly deactivate or document the unsupported seed instead of allowing permanent daily warnings. Tests distinguish malformed payloads, empty history, provider errors, symbol mismatch, and unavailable/deactivated seeds. | Y8.4, Y8.6-Y8.8, Y8.13 |
 | Y8.13.3 | [x] | Investigate and classify stale Yahoo series | Determine why `BCOM`, `CSI300`, `MOVE`, `PSEI`, and `W5000` stopped at 2026-07-17 and `TASI` stopped at 2026-07-16 while peer series reached 2026-07-30. Check current Yahoo symbol availability, response contents, provider-date behavior, and session-policy expectations. Correct ticker/policy metadata or deactivate genuinely discontinued/unavailable seeds through Flyway; do not suppress real eligible-session gaps or manufacture bars. Add report/planner tests for the selected disposition. | Y8.10, Y8.12-Y8.13 |
-| Y8.13.4 | [ ] | Run targeted Yahoo remediation verification | Retry only the affected tickers after Y8.13.1-Y8.13.3, not the healthy 82-listing universe. Verify correct acquisition classifications, provider dates, session eligibility, database coverage, reconciliation behavior, reports, and rerun idempotency. Record any intentionally unsupported/deactivated listings and require no unexplained persistent warnings before proceeding to the DAG. | Y8.13.1-Y8.13.3 |
+| Y8.13.4 | [x] | Run targeted Yahoo remediation verification | Retry only the affected tickers after Y8.13.1-Y8.13.3, not the healthy 82-listing universe. Verify correct acquisition classifications, provider dates, session eligibility, database coverage, reconciliation behavior, reports, and rerun idempotency. Record any intentionally unsupported/deactivated listings and require no unexplained persistent warnings before proceeding to the DAG. | Y8.13.1-Y8.13.3 |
 | Y8.14 | [ ] | Add the initially manual Yahoo DAG | Add `dags/stonks/stonks_ohlcv_yahoo_daily_scrape.py` as a thin manually triggered DAG that invokes the daily runner. Keep schedule selection out of the DAG's business logic; document the intended eventual multi-run cadence (for example 06:00, 10:00, 13:00, 18:00, and 23:00 America/New_York, or hourly if live request volume permits) and leave automatic enablement to the rollout gate. DAG tests prove importability, manual schedule state, parameter forwarding, no-op success, and failure propagation. | Y8.13.4, B1.5-B1.7 |
 | Y8.15 | [ ] | Verify the Yahoo vertical workflow | Run the complete fixture path from seeded listings through backfill, eligibility-based daily ingestion, reconciliation, stored reports, and raw-object cleanup. Verify lineage, secret safety, request bounds, calendar behavior, provider isolation, reruns, corrections, and coexistence with EODData and historical Stooq data. Verify the manual DAG is discovered in its Airflow runtime. | Y8.14, M3.7 |
 
@@ -516,6 +518,37 @@ final database values. The full database-enabled package suite passed (546
 passed); `poetry check`, public import, `compileall`, shell syntax/help, the
 88-column changed-Python scan, environment-key parity, and `git diff --check`
 passed.
+
+Done: 2026-08-01 — ran the Y8.13.1-Y8.13.3 remediation scope without touching
+the healthy universe. Backfill run
+`fcf7e037-34c2-4784-b2b4-60e0db9ba8ec` selected eight active listings, stored
+and imported all eight requests, inserted 3,131 bars, had no missing, failed,
+or parse-failed chunks, and stored PASS report
+`4fc4b170-3d07-4e20-a404-5ddaccec1f06`. `JTOPI`, `SKEW`, `UST5Y`, `UST10Y`,
+`UST30Y`, `VVIX`, and `VXN` cover 2025-01-02 through 2026-07-30 with the
+expected provider symbols and provider dates. The retry also proved that
+corrected `SET` (`^SET.BK`) returns a valid empty-history response for every
+Bangkok session after its last complete bar on 2026-07-17; migration
+`V2026.08.01.0003__stonks_deactivate_stale_yahoo_set.sql` therefore preserves
+its 372 accepted bars and corrected-symbol audit trail while marking it
+`UNAVAILABLE_STALE_HISTORY` and inactive.
+
+The resulting inactive review set is `IPSA`, `MSCIEM`, and `RVX` as
+`UNSUPPORTED`, plus `BCOM`, `CSI300`, `MOVE`, `PSEI`, `SET`, `TASI`, and
+`W5000` as `UNAVAILABLE_STALE_HISTORY`; active enumeration is 83. Diagnostic
+daily run `e9b43551-44f8-409c-a15b-ab339e1e5b12` explained its WARN entirely
+as the newly confirmed SET gap and July 25-26 weekend probes from the explicit
+observed-only Treasury-yield policy. After SET deactivation, bounded weekday
+runs `f80a03f9-a4d3-49a1-9136-8fae7af05a13` and
+`20ef2f87-5453-44bf-b687-b604a17a7262` each performed zero ingestion requests,
+reconciled the same 21 bars unchanged across seven listings, had zero missing,
+failed, retry, parse, correction, or calendar-policy counts, and stored PASS
+reports `9daf78a4-fc28-4ecc-8dd0-3ae1c121c049` and
+`c0988359-242d-4a1f-b265-1466e00ae79b`. This proves report persistence,
+reconciliation, and idempotent rerun behavior with no unexplained warning.
+Flyway validated all 37 migrations, the transactional Yahoo seed contract
+passed, the focused remediation suite passed (21 tests), and the full
+database-enabled package suite passed (561 tests).
 
 ## Phase 9: Calendar-Aware EODData Daily Scheduling
 

@@ -125,7 +125,7 @@ def test_database_plan_is_noop_after_completion_and_missing_is_retryable(
 
 @pytest.mark.parametrize(
     "ticker",
-    ("BCOM", "CSI300", "MOVE", "PSEI", "TASI", "W5000"),
+    ("BCOM", "CSI300", "MOVE", "PSEI", "SET", "TASI", "W5000"),
 )
 def test_database_plan_excludes_reviewed_stale_inactive_seed(
     database_connection: object,

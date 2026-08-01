@@ -62,13 +62,13 @@ $function$;
 
 SELECT pg_temp.assert_true(
     (
-        SELECT count(*) = 84
+        SELECT count(*) = 83
         FROM provider_listing
         WHERE provider_code = 'YAHOO'
           AND market = 'XIDX'
           AND status = 'ACTIVE'
     ),
-    'Yahoo seed contains exactly 84 active XIDX listings after review'
+    'Yahoo seed contains exactly 83 active XIDX listings after review'
 );
 
 SELECT pg_temp.assert_true(
@@ -233,14 +233,18 @@ SELECT pg_temp.assert_true(
     AND (
         SELECT metadata ->> 'YahooTicker' = '^SET.BK'
            AND metadata #>> '{YahooSeedReview,disposition}'
+               = 'UNAVAILABLE_STALE_HISTORY'
+           AND metadata #>> '{YahooSeedReview,previous_disposition}'
                = 'CORRECTED_TICKER'
-           AND status = 'ACTIVE'
+           AND metadata #>> '{YahooSeedReview,last_complete_provider_date}'
+               = '2026-07-17'
+           AND status = 'INACTIVE'
         FROM provider_listing
         WHERE provider_code = 'YAHOO'
           AND market = 'XIDX'
           AND ticker = 'SET'
     ),
-    'reviewed JTOPI and SET Yahoo symbols are active and corrected'
+    'reviewed JTOPI and SET Yahoo symbol dispositions are preserved'
 );
 
 SELECT pg_temp.assert_true(
@@ -260,7 +264,7 @@ SELECT pg_temp.assert_true(
 
 SELECT pg_temp.assert_true(
     (
-        SELECT count(*) = 6
+        SELECT count(*) = 7
            AND bool_and(status = 'INACTIVE')
            AND bool_and(
                metadata #>> '{YahooSeedReview,disposition}'
@@ -269,7 +273,15 @@ SELECT pg_temp.assert_true(
         FROM provider_listing
         WHERE provider_code = 'YAHOO'
           AND market = 'XIDX'
-          AND ticker IN ('BCOM', 'CSI300', 'MOVE', 'PSEI', 'TASI', 'W5000')
+          AND ticker IN (
+              'BCOM',
+              'CSI300',
+              'MOVE',
+              'PSEI',
+              'SET',
+              'TASI',
+              'W5000'
+          )
     ),
     'reviewed stale Yahoo seeds are explicitly inactive'
 );

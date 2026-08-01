@@ -319,7 +319,7 @@ explaining the unsupported Chart disposition. Active listing enumeration
 therefore excludes them without deleting their reviewed identities.
 
 The same review found that exact mappings for `BCOM`, `CSI300`, `MOVE`,
-`PSEI`, `TASI`, and `W5000` returned empty OHLC placeholders for every
+`PSEI`, `SET`, `TASI`, and `W5000` returned empty OHLC placeholders for every
 eligible session after July 16/17, 2026. Provider symbol search produced no
 exact replacement with continuous completed history. These rows and their
 previously accepted bars remain durable, but the listings are inactive with
