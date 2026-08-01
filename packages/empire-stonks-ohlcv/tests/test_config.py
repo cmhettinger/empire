@@ -9,6 +9,7 @@ from empire_stonks_ohlcv.config import (
     EODDATA_API_KEY_ENV,
     EODDATA_BASE_URL_ENV,
     EODDATA_EXCHANGES_ENV,
+    EODDATA_RECONCILIATION_SESSIONS_ENV,
     EODDATA_REQUEST_DELAY_SECONDS_ENV,
     HTTP_TIMEOUT_SECONDS_ENV,
     MAX_RETRIES_ENV,
@@ -36,6 +37,7 @@ OHLCV_ENV_VARS = (
     EODDATA_API_KEY_ENV,
     EODDATA_BASE_URL_ENV,
     EODDATA_EXCHANGES_ENV,
+    EODDATA_RECONCILIATION_SESSIONS_ENV,
     EODDATA_REQUEST_DELAY_SECONDS_ENV,
     YAHOO_BASE_URL_ENV,
     YAHOO_REQUEST_DELAY_SECONDS_ENV,
@@ -67,6 +69,7 @@ def test_config_uses_defaults() -> None:
     assert config.eoddata_base_url == "https://api.eoddata.com"
     assert config.eoddata_exchanges == ("NYSE", "NASDAQ", "AMEX")
     assert config.eoddata_request_delay_seconds == 2.0
+    assert config.eoddata_reconciliation_sessions == 7
     assert config.eoddata_credentials is None
     assert config.yahoo_base_url == "https://query2.finance.yahoo.com"
     assert config.yahoo_request_delay_seconds == 25.0
@@ -121,12 +124,14 @@ def test_config_loads_eoddata_source_settings(
     monkeypatch.setenv(EODDATA_BASE_URL_ENV, "https://market.example.test/")
     monkeypatch.setenv(EODDATA_EXCHANGES_ENV, "NYSE, NASDAQ, AMEX")
     monkeypatch.setenv(EODDATA_REQUEST_DELAY_SECONDS_ENV, "3.5")
+    monkeypatch.setenv(EODDATA_RECONCILIATION_SESSIONS_ENV, "5")
 
     config = OHLCVConfig.from_env()
 
     assert config.eoddata_base_url == "https://market.example.test"
     assert config.eoddata_exchanges == ("NYSE", "NASDAQ", "AMEX")
     assert config.eoddata_request_delay_seconds == 3.5
+    assert config.eoddata_reconciliation_sessions == 5
 
 
 def test_config_loads_yahoo_source_settings(
@@ -179,6 +184,8 @@ def test_config_loads_yahoo_source_settings(
         (EODDATA_REQUEST_DELAY_SECONDS_ENV, "-1", "cannot be negative"),
         (EODDATA_REQUEST_DELAY_SECONDS_ENV, "nan", "cannot be negative"),
         (EODDATA_REQUEST_DELAY_SECONDS_ENV, "slow", "number"),
+        (EODDATA_RECONCILIATION_SESSIONS_ENV, "0", "between 1 and 30"),
+        (EODDATA_RECONCILIATION_SESSIONS_ENV, "31", "between 1 and 30"),
         (YAHOO_BASE_URL_ENV, "http://query2.finance.yahoo.com", "HTTPS origin"),
         (YAHOO_BASE_URL_ENV, "https://user@example.test", "without credentials"),
         (YAHOO_BASE_URL_ENV, "https://example.test/api", "without credentials"),

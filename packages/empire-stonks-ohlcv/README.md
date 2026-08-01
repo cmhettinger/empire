@@ -33,6 +33,7 @@ EMPIRE_STONKS_OHLCV_EODDATA_API_KEY=<required secret>
 EMPIRE_STONKS_OHLCV_EODDATA_BASE_URL=https://api.eoddata.com
 EMPIRE_STONKS_OHLCV_EODDATA_EXCHANGES=NYSE,NASDAQ,AMEX
 EMPIRE_STONKS_OHLCV_EODDATA_REQUEST_DELAY_SECONDS=2
+EMPIRE_STONKS_OHLCV_EODDATA_RECONCILIATION_SESSIONS=7
 ```
 
 The initial source contract makes Symbol List requests for all three exchanges
@@ -105,6 +106,17 @@ each newly discovered NYSE, NASDAQ, or AMEX series to that resolved policy in
 the same import transaction without changing operator-owned active/inactive
 status. Existing missing or mismatched assignments, unknown exchanges, and
 drifted policy rows fail closed; no market inherits an Eastern or NYSE default.
+
+`plan_eoddata_exchange_work()` resolves those policies and compares each
+exchange's authoritative eligible sessions with stored bars for active EODData
+listings. An eligible date with no active-listing bars is retryable until it is
+filled. Complete dates are skipped unless they are among the most recent
+configured reconciliation sessions, where repeat requests allow provider
+corrections to converge. Ineligible sessions and exchanges whose discovered
+listings are all inactive produce no work. A first-discovery exchange with no
+listings remains due so its Symbol List can be acquired. Planning is pure and
+idempotent for the same database state and aware clock value; runner and report
+integration remains a separate orchestration step.
 
 ## Yahoo Chart acquisition
 

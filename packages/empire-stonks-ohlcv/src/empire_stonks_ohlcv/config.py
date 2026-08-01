@@ -19,6 +19,7 @@ DEFAULT_MAX_RETRIES = 3
 DEFAULT_EODDATA_BASE_URL = "https://api.eoddata.com"
 DEFAULT_EODDATA_EXCHANGES = ("NYSE", "NASDAQ", "AMEX")
 DEFAULT_EODDATA_REQUEST_DELAY_SECONDS = 2.0
+DEFAULT_EODDATA_RECONCILIATION_SESSIONS = 7
 DEFAULT_YAHOO_BASE_URL = "https://query2.finance.yahoo.com"
 DEFAULT_YAHOO_REQUEST_DELAY_SECONDS = 25.0
 DEFAULT_YAHOO_REQUEST_JITTER_MIN_SECONDS = 5.0
@@ -34,6 +35,7 @@ MAX_YAHOO_BACKFILL_CHUNK_DAYS = 3650
 MAX_YAHOO_DAILY_LOOKBACK_DAYS = 365
 MAX_YAHOO_DAILY_REQUEST_DAYS = 90
 MAX_YAHOO_RECONCILIATION_SESSIONS = 30
+MAX_EODDATA_RECONCILIATION_SESSIONS = 30
 
 STORAGE_KEY_ENV = "EMPIRE_STORAGE_KEY_STONKS_OHLCV"
 RAW_RETENTION_DAYS_ENV = "EMPIRE_STONKS_OHLCV_RAW_RETENTION_DAYS"
@@ -44,6 +46,9 @@ EODDATA_BASE_URL_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_BASE_URL"
 EODDATA_EXCHANGES_ENV = "EMPIRE_STONKS_OHLCV_EODDATA_EXCHANGES"
 EODDATA_REQUEST_DELAY_SECONDS_ENV = (
     "EMPIRE_STONKS_OHLCV_EODDATA_REQUEST_DELAY_SECONDS"
+)
+EODDATA_RECONCILIATION_SESSIONS_ENV = (
+    "EMPIRE_STONKS_OHLCV_EODDATA_RECONCILIATION_SESSIONS"
 )
 YAHOO_BASE_URL_ENV = "EMPIRE_STONKS_OHLCV_YAHOO_BASE_URL"
 YAHOO_REQUEST_DELAY_SECONDS_ENV = (
@@ -248,6 +253,9 @@ class OHLCVConfig:
     eoddata_base_url: str = DEFAULT_EODDATA_BASE_URL
     eoddata_exchanges: tuple[str, ...] = DEFAULT_EODDATA_EXCHANGES
     eoddata_request_delay_seconds: float = DEFAULT_EODDATA_REQUEST_DELAY_SECONDS
+    eoddata_reconciliation_sessions: int = (
+        DEFAULT_EODDATA_RECONCILIATION_SESSIONS
+    )
     yahoo_base_url: str = DEFAULT_YAHOO_BASE_URL
     yahoo_request_delay_seconds: float = DEFAULT_YAHOO_REQUEST_DELAY_SECONDS
     yahoo_request_jitter_min_seconds: float = (
@@ -296,6 +304,15 @@ class OHLCVConfig:
         ):
             raise OHLCVConfigError(
                 f"{EODDATA_REQUEST_DELAY_SECONDS_ENV} cannot be negative."
+            )
+        if not (
+            1
+            <= self.eoddata_reconciliation_sessions
+            <= MAX_EODDATA_RECONCILIATION_SESSIONS
+        ):
+            raise OHLCVConfigError(
+                f"{EODDATA_RECONCILIATION_SESSIONS_ENV} must be between 1 "
+                f"and {MAX_EODDATA_RECONCILIATION_SESSIONS}."
             )
         _validate_yahoo_base_url(self.yahoo_base_url)
         _validate_nonnegative_float(
@@ -383,6 +400,10 @@ class OHLCVConfig:
                 EODDATA_REQUEST_DELAY_SECONDS_ENV,
                 DEFAULT_EODDATA_REQUEST_DELAY_SECONDS,
             ),
+            eoddata_reconciliation_sessions=_environment_int(
+                EODDATA_RECONCILIATION_SESSIONS_ENV,
+                DEFAULT_EODDATA_RECONCILIATION_SESSIONS,
+            ),
             yahoo_base_url=yahoo_base_url,
             yahoo_request_delay_seconds=_environment_float(
                 YAHOO_REQUEST_DELAY_SECONDS_ENV,
@@ -447,6 +468,9 @@ class OHLCVConfig:
             "eoddata_base_url": self.eoddata_base_url,
             "eoddata_exchanges": ",".join(self.eoddata_exchanges),
             "eoddata_request_delay_seconds": self.eoddata_request_delay_seconds,
+            "eoddata_reconciliation_sessions": (
+                self.eoddata_reconciliation_sessions
+            ),
             "eoddata_configured": self.eoddata_credentials is not None,
             "yahoo_base_url": self.yahoo_base_url,
             "yahoo_request_delay_seconds": self.yahoo_request_delay_seconds,

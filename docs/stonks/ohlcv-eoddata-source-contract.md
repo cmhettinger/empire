@@ -79,6 +79,7 @@ also apply:
 EMPIRE_STONKS_OHLCV_HTTP_TIMEOUT_SECONDS=30
 EMPIRE_STONKS_OHLCV_MAX_RETRIES=3
 EMPIRE_STONKS_OHLCV_EODDATA_REQUEST_DELAY_SECONDS=2
+EMPIRE_STONKS_OHLCV_EODDATA_RECONCILIATION_SESSIONS=7
 EMPIRE_STONKS_OHLCV_RAW_RETENTION_DAYS=7
 EMPIRE_STORAGE_KEY_STONKS_OHLCV=stonks/ohlcv
 ```
@@ -133,8 +134,35 @@ must have passed. EODData's explicit `dateStamp` remains the provider-local
 date and must match that requested label. An unknown exchange, missing policy,
 unresolvable calendar, calendar time-zone mismatch, or off-calendar effective
 date fails closed for that exchange and is reported safely. Persistence and
-resolution of these policies belong to C9.2; exchange-level work planning
-belongs to C9.3.
+resolution of these policies is package-owned.
+
+## Exchange-Level Work Planning
+
+Before acquisition, `plan_eoddata_exchange_work()` resolves the reviewed
+policy for every configured exchange and enumerates authoritative sessions in
+the requested date range. The caller supplies an explicit timezone-aware clock;
+only sessions whose exchange-local cutoff plus availability delay has passed
+are eligible. Calendar failures are isolated and fail closed for the affected
+exchange without changing another exchange's result.
+
+Completeness is intentionally exchange-level because Symbol List membership
+and Quote List coverage are not identical. An eligible exchange/date is
+missing only when no bar exists for any active EODData listing in that exchange.
+Any active-listing bar is evidence that the bulk response was imported. Missing
+eligible dates remain planned on every unchanged run, providing stateless,
+bounded retry behavior. Complete dates are skipped except for the latest
+`EMPIRE_STONKS_OHLCV_EODDATA_RECONCILIATION_SESSIONS` eligible dates, which are
+re-requested so provider corrections can update current rows. The window must
+be between 1 and 30 sessions and defaults to 7.
+
+An exchange with discovered listings but no active listings is inactive and
+produces no work. An exchange with no discovered listings remains due so its
+initial Symbol List request can establish membership. Ineligible sessions,
+complete sessions outside the reconciliation window, and inactive exchanges
+are all explicit no-op outcomes. Repeating planning with the same policy,
+storage state, date range, and clock returns the same ordered plan. C9.4 owns
+runner and report consumption of this plan; the planner itself performs no
+network request, persistence, or Core lifecycle mutation.
 
 The initial Airflow DAG remains manual-only (`schedule=None`), with catchup
 disabled and at most one active DAG run. Manual runs and reruns may provide

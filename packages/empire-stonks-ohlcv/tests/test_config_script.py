@@ -24,8 +24,9 @@ def test_config_script_prints_secret_safe_json(monkeypatch, capsys) -> None:
     assert json.loads(output) == {
         "eoddata_base_url": "https://api.eoddata.com",
         "eoddata_configured": True,
-        "eoddata_exchanges": "NYSE,NASDAQ,AMEX",
-        "eoddata_request_delay_seconds": 3.5,
+            "eoddata_exchanges": "NYSE,NASDAQ,AMEX",
+            "eoddata_reconciliation_sessions": 7,
+            "eoddata_request_delay_seconds": 3.5,
         "http_timeout_seconds": 12.5,
         "max_retries": 2,
         "raw_retention_days": 5,
