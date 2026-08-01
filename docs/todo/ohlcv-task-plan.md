@@ -167,80 +167,8 @@ so this remains useful as a working reference.
 
 Fully completed phases and their `Done:` notes are moved to the
 [OHLCV package action plan archive](ohlcv-task-plan-archive.md) to keep this
-active checklist focused. Phases 0-8 are currently archived there;
+active checklist focused. Phases 0-9 are currently archived there;
 their task IDs remain valid dependencies for active work.
-
-
-## Phase 9: Calendar-Aware EODData Daily Scheduling
-
-Goal: reuse the market-session eligibility capability proven by Yahoo so the
-EODData provider requests each configured exchange only after its completed
-session is expected to be available. Keep EODData's exchange-bulk source
-contract and package-owned business logic intact.
-
-| ID | Status | Goal | Complete When | Depends On |
-|----|--------|------|---------------|------------|
-| C9.1 | [x] | Define EODData exchange session policies | Map every configured EODData exchange to a supported market calendar, local session/time zone, and post-close availability delay using the shared Y8.2 contract. Document fallbacks and fail closed for an exchange without a valid policy rather than assuming U.S. Eastern time. | Y8.15 |
-| C9.2 | [x] | Persist and resolve EODData policies | Add the minimal configuration or Flyway data required by the Y8.2 design and implement policy resolution for EODData's dynamically discovered provider listings. Tests cover all configured exchanges, holidays, early closes, DST, and unknown or inactive markets. | C9.1, Y8.5 |
-| C9.3 | [x] | Add exchange-level eligibility and reconciliation planning | Before an exchange-bulk EODData request, determine whether its latest expected session is complete and eligible, whether rows are missing, and whether it falls in the configured recent-session reconciliation window. Skip ineligible/complete work while preserving bounded retry and correction behavior. Tests cover exchanges with different calendars on the same date and idempotent repeated runs. | C9.2, E6.10-E6.12 |
-| C9.4 | [x] | Integrate calendar planning into the EODData runner and reports | Run only planned exchange work, preserve Core lifecycle and partial-exchange failure handling, and report expected-session coverage, ineligible exchanges, missing rows, retries, and corrected current rows. Existing CLI behavior remains compatible and secret safe. | C9.3, E6.7-E6.10 |
-| C9.5 | [x] | Convert the EODData DAG to eligibility-driven multi-run operation | Keep the DAG thin and invoke it often enough to cover configured exchange closes; the package planner decides whether work is due. Initially retain a safe manual/disabled state until the rollout gate. DAG tests cover discovery, schedule configuration, no-op runs, and failure propagation. | C9.4, B1.5-B1.7 |
-| C9.6 | [x] | Verify calendar-aware EODData end to end | Run multi-calendar fixtures through planning, acquisition, persistence, reconciliation, and reports. Prove there are no fabricated weekend/holiday rows, completed rows are skipped, missing rows retry, corrections converge, and Yahoo/EODData policies coexist without provider leakage. | C9.5, Y8.15 |
-
-Done: 2026-08-01 — defined the complete NYSE/NASDAQ/AMEX policy mapping,
-reviewed AMEX-to-XNYS fallback, 8-p.m. local eligibility, and fail-closed rules
-in `docs/stonks/ohlcv-{market-session,eoddata-source}-contract.md` and aligned
-`docs/todo/ohlcv-plan.md`; 68 focused tests passed, 3/3 exchange calendar
-assertions passed across DST/holiday/early-close cases, and Poetry lock check,
-compileall, public imports, and `git diff --check` passed.
-
-Done: 2026-08-01 — added Flyway migration
-`V2026.08.01.0004__stonks_add_eoddata_session_policies.sql`, package resolver
-and first-discovery assignment in `empire_stonks_ohlcv/eoddata_policies.py`,
-EODData import integration, and focused unit/PostgreSQL/SQL contract coverage;
-all 13,672 live configured EODData listings resolved exact policies, the full
-package suite passed 582 tests, Flyway validated 38 migrations, all three DB
-contracts passed, and Poetry check/build, compileall, public imports, pip check,
-88-column scan, and `git diff --check` passed.
-
-Done: 2026-08-01 — added exchange eligibility, completeness, retry, and bounded
-reconciliation planning in `empire_stonks_ohlcv/eoddata_planning.py`, wired its
-configuration through package/env/Compose surfaces, and added unit/PostgreSQL
-coverage plus source-contract docs; the full package suite passed 594 tests,
-the focused PostgreSQL planner test passed, Flyway validated 38 migrations,
-and Compose config, Poetry check/build, compileall, public imports, pip check,
-88-column scan, and `git diff --check` passed.
-
-Done: 2026-08-01 — integrated scoped calendar plans, no-op Core lifecycles,
-retry/correction telemetry, and session coverage into `eoddata.py`,
-`eoddata_import.py`, `eoddata_runner.py`, `reporting.py`, and the EODData PDF;
-the full database-backed package suite passed 601 tests, 4 focused PostgreSQL
-integration tests and 25 DAG/CLI/report tests passed, Flyway validated 38
-migrations, and Compose config, Poetry check/build, compileall, workspace
-imports, pip check, changed-file 88-column scan, and `git diff --check` passed.
-
-Done: 2026-08-01 — kept
-`dags/stonks/stonks_ohlcv_eoddata_daily_scrape.py` manual while exposing
-planner telemetry and documenting the gated production schedule
-`15 20-23 * * 1-5` America/New_York; updated DAG tests, README, and source
-contract. Forty focused DAG/runner/CLI tests and the full database-backed suite
-of 602 tests passed; Compose config, Poetry check, compileall, imports, pip
-check, changed-file 88-column scan, and `git diff --check` passed. The rebuilt
-Airflow 3.2.1 runtime discovered the external-trigger-only DAG with one active
-run, current worker imports, and no DAG import errors.
-
-Done: 2026-08-01 — added the PostgreSQL/Core multi-calendar gate in
-`tests/test_eoddata_calendar_vertical_integration.py` and made reconciliation
-recency clock-relative in `eoddata_planning.py`. The gate proved XNYS/NASDAQ
-calendar use, holiday/weekend no-ops without fabricated rows, retry of a
-missing AMEX session, NYSE correction then unchanged convergence, completed
-historical-session skipping, JSON/PDF/report lineage, and isolated EODData and
-Yahoo policies. Twelve focused EODData/Yahoo/isolation integrations and the
-full database-backed suite of 604 tests passed; Flyway validated 38 migrations,
-and Compose config, Poetry check/build, compileall, imports, pip check,
-changed-file 88-column scan, and `git diff --check` passed. The rebuilt Airflow
-3.2.1 worker imported the final package and the manual DAG remained
-external-trigger-only with no import errors.
 
 ## Phase 10: Documentation, Verification, And Incremental Rollout
 
