@@ -245,6 +245,9 @@ def test_daily_runner_partial_retry_rerun_correction_and_noop(
         assert partial.bar_counts.inserted == 2
         assert partial.bar_counts.unchanged == 0
         assert partial.report_outcome == "WARN"
+        assert object_store.get_bytes(partial.pdf_report_object_id).startswith(
+            b"%PDF-"
+        )
 
         failing.clear()
         retry = run(selected_tickers=(tickers[1],))

@@ -394,6 +394,26 @@ For a daily run, `effective_date` is the explicit run date used by the planner
 and Core partition. For a historical backfill, it is the operator-supplied
 backfill execution/evidence date, not the first or last bar date.
 
+## Durable JSON And PDF Reports
+
+Every completed backfill and daily workflow stores a durable report pair below
+the Core run's shared `reports` key: machine-readable `report.json` and
+professional human-readable `report.pdf`. The JSON object kind is
+`stonks_ohlcv_provider_report`; the PDF object kind is
+`stonks_ohlcv_provider_pdf_report`. Neither expires with the raw provider
+responses.
+
+The PDF uses Empire's shared letter-format branding, title page, headers,
+footers, and internal-use classification. It presents an executive summary,
+run facts and scope, per-phase acquisition/parser/persistence counts,
+provider-series coverage, health and bounded review samples, reconciliation
+results, and native-value semantics. Backfill and daily reports use distinct
+report identities while sharing this presentation contract. Large listing and
+issue sections are deliberately bounded for readability; `report.json`
+remains authoritative for the full structured evidence. Successful CLI,
+Airflow, and Core summaries expose both `report_object_id` and
+`pdf_report_object_id`.
+
 ## Rate, Retry, Empty, And Error Behavior
 
 Yahoo publishes no quota or completion SLA for this selected interface. Empire

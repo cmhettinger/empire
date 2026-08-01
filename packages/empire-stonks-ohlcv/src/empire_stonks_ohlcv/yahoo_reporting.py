@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, Mapping
 
 from empire_core import ObjectStore, RunContext, StoredObject
@@ -13,10 +15,17 @@ from empire_core import ObjectStore, RunContext, StoredObject
 from empire_stonks_ohlcv.config import OHLCVConfig
 from empire_stonks_ohlcv.object_store import DEFAULT_STORAGE_ROOT
 from empire_stonks_ohlcv.reporting import (
+    PDF_REPORT_CONTENT_TYPE,
+    PDF_REPORT_OBJECT_KIND,
     REPORT_CONTENT_TYPE,
     REPORT_OBJECT_KIND,
     REPORT_SCHEMA_VERSION,
     build_report_object_key,
+)
+from empire_stonks_ohlcv.reports.yahoo_pdf import (
+    YAHOO_BACKFILL_PDF_REPORT_ID,
+    YAHOO_DAILY_PDF_REPORT_ID,
+    render_yahoo_pdf,
 )
 from empire_stonks_ohlcv.source_conventions import YAHOO_DAILY_SOURCE
 from empire_stonks_ohlcv.validation import MAX_ISSUE_SAMPLES
@@ -45,6 +54,9 @@ YAHOO_DAILY_REPORT_LOGICAL_NAME = "yahoo_daily_report"
 YAHOO_REPORT_FILENAME = "report.json"
 YAHOO_BACKFILL_REPORT_FILENAME = YAHOO_REPORT_FILENAME
 YAHOO_DAILY_REPORT_FILENAME = YAHOO_REPORT_FILENAME
+YAHOO_PDF_REPORT_FILENAME = "report.pdf"
+YAHOO_BACKFILL_PDF_REPORT_LOGICAL_NAME = "yahoo_backfill_pdf_report"
+YAHOO_DAILY_PDF_REPORT_LOGICAL_NAME = "yahoo_daily_pdf_report"
 
 
 class YahooReportPhase(StrEnum):
@@ -319,6 +331,80 @@ def store_yahoo_report(
         object_kind=REPORT_OBJECT_KIND,
         metadata={
             "schema_version": REPORT_SCHEMA_VERSION,
+            "report_type": report_type,
+            "provider_code": YAHOO_PROVIDER_CODE,
+            "source_code": YAHOO_DAILY_SOURCE.source_code,
+            "effective_date": report["effective_date"],
+            "generated_at": report["generated_at"],
+            "outcome": report["outcome"],
+            "workflow": report["workflow"],
+        },
+    )
+
+
+def store_yahoo_pdf_report(
+    *,
+    object_store: ObjectStore,
+    run_context: RunContext,
+    config: OHLCVConfig,
+    report: dict[str, Any],
+    storage_root: str = DEFAULT_STORAGE_ROOT,
+    output_dir: str | Path | None = None,
+) -> StoredObject:
+    """Render and store the human-readable companion to a Yahoo report."""
+
+    if not isinstance(object_store, ObjectStore):
+        raise TypeError("object_store must be a Core ObjectStore.")
+    if not isinstance(config, OHLCVConfig):
+        raise TypeError("config must be an OHLCVConfig.")
+    _validate_run_context(run_context)
+    _validate_report(report)
+    if report["effective_date"] != run_context.effective_date.isoformat():
+        raise ValueError("report effective_date must match the Core run.")
+
+    report_type = report["report_type"]
+    logical_name, report_id = {
+        YAHOO_BACKFILL_REPORT_TYPE: (
+            YAHOO_BACKFILL_PDF_REPORT_LOGICAL_NAME,
+            YAHOO_BACKFILL_PDF_REPORT_ID,
+        ),
+        YAHOO_DAILY_REPORT_TYPE: (
+            YAHOO_DAILY_PDF_REPORT_LOGICAL_NAME,
+            YAHOO_DAILY_PDF_REPORT_ID,
+        ),
+    }[report_type]
+    render_root = Path(output_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp"))
+    render_dir = (
+        render_root
+        / "empire"
+        / "stonks-ohlcv"
+        / str(run_context.run_id)
+        / "reports"
+    )
+    result = render_yahoo_pdf(
+        report=report,
+        output_dir=render_dir,
+        filename=YAHOO_PDF_REPORT_FILENAME,
+    )
+    return object_store.put_file(
+        run_context=run_context,
+        object_scope="run",
+        domain="stonks",
+        logical_name=logical_name,
+        storage_root=storage_root,
+        object_key=build_report_object_key(
+            storage_key=config.storage_key,
+            run_context=run_context,
+            provider_code=YAHOO_PROVIDER_CODE,
+        ),
+        filename=YAHOO_PDF_REPORT_FILENAME,
+        source_path=result.primary_artifact.path,
+        move=False,
+        content_type=PDF_REPORT_CONTENT_TYPE,
+        object_kind=PDF_REPORT_OBJECT_KIND,
+        metadata={
+            "schema_version": REPORT_SCHEMA_VERSION,
+            "report_id": report_id,
             "report_type": report_type,
             "provider_code": YAHOO_PROVIDER_CODE,
             "source_code": YAHOO_DAILY_SOURCE.source_code,

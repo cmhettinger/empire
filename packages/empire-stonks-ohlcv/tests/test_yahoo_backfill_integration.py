@@ -241,6 +241,9 @@ def test_backfill_rerun_correction_partial_failure_and_resume(
         assert first.bar_counts.inserted == 2
         assert rerun.bar_counts.unchanged == 2
         assert first.report_outcome == "PASS"
+        assert object_store.get_bytes(first.pdf_report_object_id).startswith(
+            b"%PDF-"
+        )
         assert rerun.report_outcome == "PASS"
 
         closes[yahoo_tickers[tickers[0]]] = 11.50
@@ -303,6 +306,7 @@ def test_backfill_rerun_correction_partial_failure_and_resume(
             partial.report_object_id
         ).object_kind == REPORT_OBJECT_KIND
         assert object_store.get_object(partial.report_object_id).expires_at is None
+        assert object_store.get_object(partial.pdf_report_object_id).expires_at is None
         for object_id in raw_object_ids:
             assert object_store.delete_object(object_id)
         object_store.purge_deleted_objects_by_run_id(

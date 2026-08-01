@@ -55,6 +55,7 @@ from empire_stonks_ohlcv.yahoo_reporting import (
     YahooReportPhase,
     YahooReportPhaseResult,
     build_yahoo_backfill_report,
+    store_yahoo_pdf_report,
     store_yahoo_report,
 )
 
@@ -142,6 +143,7 @@ class YahooBackfillRunResult:
     parse_failed_count: int
     import_result: YahooImportResult
     report_object_id: UUID
+    pdf_report_object_id: UUID
     report_outcome: str
 
     def __post_init__(self) -> None:
@@ -173,6 +175,8 @@ class YahooBackfillRunResult:
             )
         if not isinstance(self.report_object_id, UUID):
             raise TypeError("report_object_id must be a UUID.")
+        if not isinstance(self.pdf_report_object_id, UUID):
+            raise TypeError("pdf_report_object_id must be a UUID.")
         if self.report_outcome not in {"PASS", "WARN"}:
             raise ValueError("report_outcome must be PASS or WARN.")
 
@@ -204,6 +208,7 @@ class YahooBackfillRunResult:
             ),
             "bar_counts": self.bar_counts.to_dict(),
             "report_object_id": str(self.report_object_id),
+            "pdf_report_object_id": str(self.pdf_report_object_id),
             "report_outcome": self.report_outcome,
         }
 
@@ -331,6 +336,12 @@ def run_yahoo_backfill(
             config=config,
             report=report,
         )
+        stored_pdf_report = store_yahoo_pdf_report(
+            object_store=object_store,
+            run_context=run_context,
+            config=config,
+            report=report,
+        )
         summary = _success_summary(
             scope=scope,
             enumerated_listing_count=len(enumerated),
@@ -339,6 +350,7 @@ def run_yahoo_backfill(
             parse_failed_count=parse_failed_count,
             import_result=import_result,
             stored_report=stored_report,
+            stored_pdf_report=stored_pdf_report,
             report_outcome=report["outcome"],
         )
         completed = run_service.complete_run(
@@ -358,6 +370,7 @@ def run_yahoo_backfill(
             parse_failed_count=parse_failed_count,
             import_result=import_result,
             report_object_id=stored_report.object_id,
+            pdf_report_object_id=stored_pdf_report.object_id,
             report_outcome=report["outcome"],
         )
     except Exception as exc:
@@ -550,6 +563,7 @@ def _success_summary(
     parse_failed_count: int,
     import_result: YahooImportResult,
     stored_report: StoredObject,
+    stored_pdf_report: StoredObject,
     report_outcome: str,
 ) -> dict[str, Any]:
     return {
@@ -572,6 +586,7 @@ def _success_summary(
         "source_snapshot_count": import_result.source_snapshot_count,
         "bar_counts": import_result.bar_counts.to_dict(),
         "report_object_id": str(stored_report.object_id),
+        "pdf_report_object_id": str(stored_pdf_report.object_id),
         "report_outcome": report_outcome,
     }
 

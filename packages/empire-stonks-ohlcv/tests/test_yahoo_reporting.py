@@ -40,18 +40,25 @@ from empire_stonks_ohlcv import (
     build_yahoo_recent_reconciliation_plan,
 )
 from empire_stonks_ohlcv.reporting import (
+    PDF_REPORT_OBJECT_KIND,
     REPORT_OBJECT_KIND,
     REPORT_SCHEMA_VERSION,
 )
 from empire_stonks_ohlcv.yahoo_reporting import (
+    YAHOO_DAILY_PDF_REPORT_LOGICAL_NAME,
     YAHOO_DAILY_REPORT_LOGICAL_NAME,
     YAHOO_DAILY_REPORT_TYPE,
     YahooReportPhase,
     YahooReportPhaseResult,
     build_yahoo_daily_report,
     empty_yahoo_report_phase,
+    store_yahoo_pdf_report,
     store_yahoo_report,
     yahoo_report_to_json,
+)
+from empire_stonks_ohlcv.reports.yahoo_pdf import (
+    YAHOO_DAILY_PDF_REPORT_ID,
+    render_yahoo_pdf,
 )
 
 
@@ -297,6 +304,57 @@ def test_stored_report_is_durable_and_secret_safe(tmp_path: Path) -> None:
     assert loaded == json.loads(yahoo_report_to_json(report))
     assert "YahooTicker" not in repr(loaded)
     assert "secret" not in repr(loaded).lower()
+
+
+def test_renders_and_stores_professional_yahoo_daily_pdf(tmp_path: Path) -> None:
+    plan = _plan()
+    report = build_yahoo_daily_report(
+        cursor=_StoredDateCursor(
+            [
+                (UUID(int=1), date(2026, 7, day))
+                for day in range(1, 5)
+            ]
+            + [
+                (UUID(int=2), date(2026, 7, day))
+                for day in range(1, 4)
+            ]
+        ),
+        run_context=_run_context(),
+        completeness_plan=plan,
+        reconciliation_plan=build_yahoo_recent_reconciliation_plan(
+            completeness_plan=plan,
+            session_count=2,
+            max_request_days=10,
+        ),
+        ingestion_result=empty_yahoo_report_phase(
+            YahooReportPhase.DAILY_INGESTION
+        ),
+        reconciliation_result=empty_yahoo_report_phase(
+            YahooReportPhase.RECONCILIATION
+        ),
+        generated_at=datetime(2026, 7, 4, 20, 1, tzinfo=UTC),
+    )
+
+    rendered = render_yahoo_pdf(report=report, output_dir=tmp_path)
+    assert rendered.report.report_id == YAHOO_DAILY_PDF_REPORT_ID
+    assert rendered.primary_artifact.path.read_bytes().startswith(b"%PDF-")
+
+    object_store = ObjectStore(_ObjectRepository(tmp_path / "objects"))
+    stored = store_yahoo_pdf_report(
+        object_store=object_store,
+        run_context=_run_context(),
+        config=OHLCVConfig(storage_key="stonks/ohlcv/test"),
+        report=report,
+        output_dir=tmp_path / "render",
+    )
+
+    assert stored.filename == "report.pdf"
+    assert stored.logical_name == YAHOO_DAILY_PDF_REPORT_LOGICAL_NAME
+    assert stored.object_kind == PDF_REPORT_OBJECT_KIND
+    assert stored.content_type == "application/pdf"
+    assert stored.expires_at is None
+    assert stored.metadata["report_id"] == YAHOO_DAILY_PDF_REPORT_ID
+    assert object_store.get_bytes(stored.object_id).startswith(b"%PDF-")
 
 
 def test_report_surfaces_retries_failures_corrections_and_adjustments() -> None:

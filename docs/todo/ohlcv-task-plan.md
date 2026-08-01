@@ -315,8 +315,9 @@ listings.
 | Y8.13.2 | [x] | Correct Yahoo empty-history classification and remediate unusable seed mappings | Treat a structurally valid Chart result with metadata/indicators but `timestamp=null` as an explicit no-history/no-data outcome rather than a generic malformed-chart failure when safe. Review current Yahoo availability and exact `metadata.YahooTicker` values for `IPSA`, `JTOPI`, `MSCIEM`, `SET`, and the HTTP-404 `RVX`; correct mappings through an idempotent Flyway migration when a valid replacement exists, otherwise explicitly deactivate or document the unsupported seed instead of allowing permanent daily warnings. Tests distinguish malformed payloads, empty history, provider errors, symbol mismatch, and unavailable/deactivated seeds. | Y8.4, Y8.6-Y8.8, Y8.13 |
 | Y8.13.3 | [x] | Investigate and classify stale Yahoo series | Determine why `BCOM`, `CSI300`, `MOVE`, `PSEI`, and `W5000` stopped at 2026-07-17 and `TASI` stopped at 2026-07-16 while peer series reached 2026-07-30. Check current Yahoo symbol availability, response contents, provider-date behavior, and session-policy expectations. Correct ticker/policy metadata or deactivate genuinely discontinued/unavailable seeds through Flyway; do not suppress real eligible-session gaps or manufacture bars. Add report/planner tests for the selected disposition. | Y8.10, Y8.12-Y8.13 |
 | Y8.13.4 | [x] | Run targeted Yahoo remediation verification | Retry only the affected tickers after Y8.13.1-Y8.13.3, not the healthy 82-listing universe. Verify correct acquisition classifications, provider dates, session eligibility, database coverage, reconciliation behavior, reports, and rerun idempotency. Record any intentionally unsupported/deactivated listings and require no unexplained persistent warnings before proceeding to the DAG. | Y8.13.1-Y8.13.3 |
-| Y8.14 | [ ] | Add the initially manual Yahoo DAG | Add `dags/stonks/stonks_ohlcv_yahoo_daily_scrape.py` as a thin manually triggered DAG that invokes the daily runner. Keep schedule selection out of the DAG's business logic; document the intended eventual multi-run cadence (for example 06:00, 10:00, 13:00, 18:00, and 23:00 America/New_York, or hourly if live request volume permits) and leave automatic enablement to the rollout gate. DAG tests prove importability, manual schedule state, parameter forwarding, no-op success, and failure propagation. | Y8.13.4, B1.5-B1.7 |
-| Y8.15 | [ ] | Verify the Yahoo vertical workflow | Run the complete fixture path from seeded listings through backfill, eligibility-based daily ingestion, reconciliation, stored reports, and raw-object cleanup. Verify lineage, secret safety, request bounds, calendar behavior, provider isolation, reruns, corrections, and coexistence with EODData and historical Stooq data. Verify the manual DAG is discovered in its Airflow runtime. | Y8.14, M3.7 |
+| Y8.14 | [x] | Add the initially manual Yahoo DAG | Add `dags/stonks/stonks_ohlcv_yahoo_daily_scrape.py` as a thin manually triggered DAG that invokes the daily runner. Keep schedule selection out of the DAG's business logic; document the intended eventual multi-run cadence (for example 06:00, 10:00, 13:00, 18:00, and 23:00 America/New_York, or hourly if live request volume permits) and leave automatic enablement to the rollout gate. DAG tests prove importability, manual schedule state, parameter forwarding, no-op success, and failure propagation. | Y8.13.4, B1.5-B1.7 |
+| Y8.14.1 | [x] | Add professional Yahoo PDF reports | Render and durably store a branded human-readable `report.pdf` beside `report.json` for every successful Yahoo backfill and daily run. Cover executive status, run scope, acquisition and persistence, provider-series coverage, daily health and reconciliation, native-value semantics, and bounded warning samples. Return both object IDs through Core, CLI, and Airflow summaries and prove both report modes render and persist valid PDFs. | Y8.12-Y8.14, E6.7-E6.8 |
+| Y8.15 | [ ] | Verify the Yahoo vertical workflow | Run the complete fixture path from seeded listings through backfill, eligibility-based daily ingestion, reconciliation, stored reports, and raw-object cleanup. Verify lineage, secret safety, request bounds, calendar behavior, provider isolation, reruns, corrections, and coexistence with EODData and historical Stooq data. Verify the manual DAG is discovered in its Airflow runtime. | Y8.14.1, M3.7 |
 
 Done: 2026-07-29 — selected bounded single-symbol Yahoo Chart `1d` JSON for
 both seeded-universe backfill and daily/reconciliation in
@@ -549,6 +550,39 @@ reconciliation, and idempotent rerun behavior with no unexplained warning.
 Flyway validated all 37 migrations, the transactional Yahoo seed contract
 passed, the focused remediation suite passed (21 tests), and the full
 database-enabled package suite passed (561 tests).
+
+Done: 2026-08-01 — added the thin
+`dags/stonks/stonks_ohlcv_yahoo_daily_scrape.py` Airflow DAG around the
+package-owned Yahoo daily runner. Local/development operation is deliberately
+manual (`schedule=None`, `catchup=False`, `max_active_runs=1`); comments beside
+the schedule record that production should use deployment-specific
+America/New_York runs at 06:00, 10:00, 13:00, 18:00, and 23:00 only after the
+Y8.15/V10.10 rollout gates. Manual JSON configuration can narrowly override
+`effective_date`, `start_date`, `end_date`, and an exact uppercase `tickers`
+array, while omitted values retain the configured package lookback and full
+active universe. Airflow Compose now forwards the complete Yahoo OHLCV
+environment contract to every runtime component. Ten focused DAG tests cover
+manual metadata, the in-source production guidance, New York date handling,
+default and overridden scope forwarding, invalid inputs, no-op success, and
+failure propagation. The Compose model rendered successfully; the running
+Airflow 3.2.1 processor discovered the DAG as paused and reported no import
+errors; and the full database-enabled package suite passed (571 tests).
+
+Done: 2026-08-01 — added a shared Empire-branded Yahoo PDF renderer for both
+historical backfill and daily session-health models. Every successful Yahoo run
+now renders and durably stores `reports/report.pdf` beside `report.json` using
+the shared `stonks_ohlcv_provider_pdf_report` object kind and returns
+`pdf_report_object_id` through the Core summary, CLI result, and Airflow task
+payload. The bounded letter-format report covers executive status, run facts
+and scope, per-phase acquisition/parser/persistence counts, provider-series
+coverage, daily health and reconciliation evidence, and provider-native value
+semantics; JSON remains authoritative for complete samples. Unit and
+PostgreSQL vertical tests verify valid non-expiring PDF objects for both
+workflows. Representative live PASS reports were rendered with Poppler and all
+seven pages were visually inspected; a title-width collision and an orphaned
+final table row found during review were corrected. The full database-enabled
+package suite passed (572 tests), `poetry check`, public imports, compilation,
+the changed-Python line-length scan, and `git diff --check` passed.
 
 ## Phase 9: Calendar-Aware EODData Daily Scheduling
 

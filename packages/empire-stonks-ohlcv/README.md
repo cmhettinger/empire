@@ -290,14 +290,22 @@ authoritative coverage percentage or missing-session claim. Per-listing
 calendar-policy errors remain bounded report warnings rather than invalidating
 healthy listings.
 
-`store_yahoo_report()` writes deterministic JSON under
-`<storage_key>/yahoo/runs/YYYY/MM/DD/<run_id>/reports/report.json` with the
-shared `stonks_ohlcv_provider_report` object kind. Report objects have no
-expiration; acquisition objects retain their configured short expiry. The
-stored report contains its safe phase, health, correction, and native-value
-facts directly, so it stays queryable after raw-object cleanup. Yahoo request
-symbols, endpoint URLs, response bodies, credentials, and exception text are
-not report inputs.
+Every completed Yahoo backfill and daily run stores a deterministic JSON report
+and a professional human-readable PDF companion under
+`<storage_key>/yahoo/runs/YYYY/MM/DD/<run_id>/reports/` as `report.json` and
+`report.pdf`. JSON uses the shared `stonks_ohlcv_provider_report` object kind;
+PDF uses `stonks_ohlcv_provider_pdf_report` and the shared Empire letter-format
+title page, branding, headers, footers, tables, and internal-use marking. The
+PDF presents executive, scope, acquisition/persistence, coverage, health, and
+native-value sections with bounded listing and issue samples. JSON remains
+authoritative for the complete structured evidence.
+
+Both report objects are durable and have no expiration; acquisition objects
+retain their configured short expiry. The reports contain safe phase, health,
+correction, and native-value facts directly, so they stay readable after raw-
+object cleanup. Yahoo request symbols, endpoint URLs, response bodies,
+credentials, and exception text are not report inputs. CLI and Airflow results
+return both `report_object_id` and `pdf_report_object_id`.
 
 ## Yahoo daily runner
 

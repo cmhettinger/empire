@@ -330,6 +330,9 @@ def test_full_enumeration_completes_warn_and_stores_safe_report(
     assert len(progress) == 2
 
     report = json.loads(object_store.get_bytes(result.report_object_id))
+    assert object_store.get_bytes(result.pdf_report_object_id).startswith(
+        b"%PDF-"
+    )
     assert report["scope"]["tickers"] == []
     assert report["enumerated_listing_count"] == 2
     assert report["selected_listing_count"] == 2
@@ -339,6 +342,9 @@ def test_full_enumeration_completes_warn_and_stores_safe_report(
     completed = repository.runs[result.run_id]
     assert completed.summary["report_object_id"] == str(
         result.report_object_id
+    )
+    assert completed.summary["pdf_report_object_id"] == str(
+        result.pdf_report_object_id
     )
 
 

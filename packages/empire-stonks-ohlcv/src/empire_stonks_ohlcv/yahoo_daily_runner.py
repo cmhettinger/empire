@@ -60,6 +60,7 @@ from empire_stonks_ohlcv.yahoo_reporting import (
     YahooReportPhase,
     YahooReportPhaseResult,
     build_yahoo_daily_report,
+    store_yahoo_pdf_report,
     store_yahoo_report,
 )
 
@@ -123,6 +124,7 @@ class YahooDailyRunResult:
     ingestion: YahooReportPhaseResult
     reconciliation: YahooReportPhaseResult
     report_object_id: UUID
+    pdf_report_object_id: UUID
     report_outcome: str
 
     def __post_init__(self) -> None:
@@ -148,6 +150,8 @@ class YahooDailyRunResult:
             raise ValueError("reconciliation must be a reconciliation phase.")
         if not isinstance(self.report_object_id, UUID):
             raise TypeError("report_object_id must be a UUID.")
+        if not isinstance(self.pdf_report_object_id, UUID):
+            raise TypeError("pdf_report_object_id must be a UUID.")
         if self.report_outcome not in {"PASS", "WARN"}:
             raise ValueError("report_outcome must be PASS or WARN.")
 
@@ -179,6 +183,7 @@ class YahooDailyRunResult:
                 self.corrected_reconciliation_bars
             ),
             "report_object_id": str(self.report_object_id),
+            "pdf_report_object_id": str(self.pdf_report_object_id),
             "report_outcome": self.report_outcome,
         }
 
@@ -314,6 +319,12 @@ def run_yahoo_daily(
             config=config,
             report=report,
         )
+        stored_pdf_report = store_yahoo_pdf_report(
+            object_store=object_store,
+            run_context=run_context,
+            config=config,
+            report=report,
+        )
         summary = _success_summary(
             scope=scope,
             completeness=completeness,
@@ -321,6 +332,7 @@ def run_yahoo_daily(
             reconciliation=reconciliation,
             report=report,
             report_object_id=stored_report.object_id,
+            pdf_report_object_id=stored_pdf_report.object_id,
         )
         completed = run_service.complete_run(
             run_context.run_id,
@@ -336,6 +348,7 @@ def run_yahoo_daily(
             ingestion=ingestion,
             reconciliation=reconciliation,
             report_object_id=stored_report.object_id,
+            pdf_report_object_id=stored_pdf_report.object_id,
             report_outcome=report["outcome"],
         )
     except Exception as exc:
@@ -598,6 +611,7 @@ def _success_summary(
     reconciliation: YahooReportPhaseResult,
     report: dict[str, Any],
     report_object_id: UUID,
+    pdf_report_object_id: UUID,
 ) -> dict[str, Any]:
     counts = _sum_counts(
         ingestion.import_result.bar_counts,
@@ -618,6 +632,7 @@ def _success_summary(
             reconciliation.import_result.corrected_reconciliation_bars
         ),
         "report_object_id": str(report_object_id),
+        "pdf_report_object_id": str(pdf_report_object_id),
         "report_outcome": report["outcome"],
     }
 
