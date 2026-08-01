@@ -31,6 +31,10 @@ The provider documentation used for this contract is:
   updates and corrections until 7 p.m. market time.
 - [EODData membership information](https://www.eoddata.com/products/), which
   describes exchange-local timing and plan-dependent API rate limits.
+- [NYSE holidays and trading hours](https://www.nyse.com/trade/hours-calendars),
+  including the common NYSE/NYSE American U.S. holiday and early-close dates.
+- [Nasdaq market holiday schedule](https://www.nasdaq.com/market-activity/stock-market-holiday-schedule),
+  including Nasdaq U.S. equity holidays and early closes.
 
 The sanitized daily-format evidence in
 [`ohlcv-eoddata-daily-format.md`](ohlcv-eoddata-daily-format.md) remains the
@@ -101,17 +105,43 @@ is provider observation data and does not define listing validity, activity,
 `first_seen`, or `last_seen`.
 
 EODData says end-of-day data may be corrected until 7 p.m. market time. Any
-future nightly schedule should therefore run no earlier than 8 p.m. in the
-`America/New_York` timezone, leaving a one-hour operational buffer for NYSE,
-NASDAQ, and AMEX. The initial Airflow DAG is manual-only (`schedule=None`), with
-catchup disabled and at most one active DAG run. Manual runs and reruns may
-provide `dag_run.conf.effective_date` as an explicit `YYYY-MM-DD` override; if
-omitted, the DAG derives the New York date from `data_interval_end`.
+automated request may be eligible only at 8 p.m. in the exchange's local time,
+leaving a one-hour operational buffer. The shared market-session contract
+models this as a calendar-backed `LOCAL_CUTOFF` at `19:00` plus a 60-minute
+availability delay. It therefore retains the fixed provider publication
+buffer on normal and early-close sessions instead of treating an early close
+as an earlier publication promise.
 
-Empire does not yet own an exchange calendar. A weekday may be a market
-holiday, and a provider may publish late. Consequently, response dates and
-freshness are validated and reported, but the ingestion contract does not
-claim that every weekday must contain bars.
+The exact exchange mapping is:
+
+| EODData exchange | Policy code | Calendar | Time zone |
+|------------------|-------------|----------|-----------|
+| `NYSE` | `ED_XNYS_1900_60M` | `XNYS` | `America/New_York` |
+| `NASDAQ` | `ED_XNAS_1900_60M` | `NASDAQ` | `America/New_York` |
+| `AMEX` | `ED_XNYS_1900_60M` | `XNYS` | `America/New_York` |
+
+The installed calendar library has no registered AMEX calendar. `XNYS` is the
+reviewed AMEX fallback because NYSE American uses the common published U.S.
+equity holiday and core-session early-close schedule. This exact fallback is
+part of the configured policy, not a runtime guess. No exchange may inherit
+U.S. Eastern time, `XNYS`, weekday-only behavior, or an observed-only policy
+merely because its policy is missing or invalid.
+
+For each exchange partition, the requested effective date must be an
+authoritative label from its mapped calendar and its 8-p.m. eligibility instant
+must have passed. EODData's explicit `dateStamp` remains the provider-local
+date and must match that requested label. An unknown exchange, missing policy,
+unresolvable calendar, calendar time-zone mismatch, or off-calendar effective
+date fails closed for that exchange and is reported safely. Persistence and
+resolution of these policies belong to C9.2; exchange-level work planning
+belongs to C9.3.
+
+The initial Airflow DAG remains manual-only (`schedule=None`), with catchup
+disabled and at most one active DAG run. Manual runs and reruns may provide
+`dag_run.conf.effective_date` as an explicit `YYYY-MM-DD` override; if omitted,
+the current DAG derives the New York date from `data_interval_end`. C9.5 will
+replace that single-date behavior only after package-owned eligibility planning
+is integrated and verified.
 
 ## Ordered Requests
 

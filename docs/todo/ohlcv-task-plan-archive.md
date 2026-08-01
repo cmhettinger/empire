@@ -804,3 +804,434 @@ partial reports; PostgreSQL tests cover successful, failed-chunk, and replay
 storage. The real H7.8 JSON report was rendered to
 `output/pdf/stooq-history-backfill-report.pdf` and all four pages passed visual
 inspection after Poppler rendering.
+
+## Phase 8: Yahoo Daily End-To-End Vertical Slice
+
+Goal: seed the deliberately bounded Yahoo benchmark universe, backfill its
+provider-native daily bars, and keep every eligible completed market session
+current without using Yahoo for ordinary equities already covered by EODData.
+Calendar-aware eligibility, retries, and reconciliation belong in the package;
+Airflow only invokes that logic.
+
+### Initial Yahoo Seed Universe
+
+Y8.4 must seed the following 93 provider listings. `Empire code` is the stable
+`provider_listing.ticker` inside the provider-scoped `XIDX` market. `Yahoo
+ticker` is the exact acquisition symbol stored as metadata key `YahooTicker`;
+it is not a second relational ticker column and is never stored in `market`.
+The migration should preserve this reviewed starting universe while allowing a
+later migration to add, correct, deactivate, or remove individual listings.
+
+| Empire code | Yahoo ticker | Name | Instrument type |
+|-------------|--------------|------|-----------------|
+| SPX | ^GSPC | S&P 500 Index | EQUITY_INDEX |
+| DJI | ^DJI | Dow Jones Industrial Average | EQUITY_INDEX |
+| DJT | ^DJT | Dow Jones Transportation Average | EQUITY_INDEX |
+| DJU | ^DJU | Dow Jones Utility Average | EQUITY_INDEX |
+| NDX | ^NDX | Nasdaq-100 Index | EQUITY_INDEX |
+| IXIC | ^IXIC | Nasdaq Composite Index | EQUITY_INDEX |
+| NYA | ^NYA | NYSE Composite Index | EQUITY_INDEX |
+| RUT | ^RUT | Russell 2000 Index | EQUITY_INDEX |
+| RUA | ^RUA | Russell 3000 Index | EQUITY_INDEX |
+| W5000 | ^W5000 | Wilshire 5000 Total Market Index | EQUITY_INDEX |
+| OEX | ^OEX | S&P 100 Index | EQUITY_INDEX |
+| SP400 | ^SP400 | S&P MidCap 400 Index | EQUITY_INDEX |
+| SP600 | ^SP600 | S&P SmallCap 600 Index | EQUITY_INDEX |
+| SOX | ^SOX | PHLX Semiconductor Index | EQUITY_INDEX |
+| NYFANG | ^NYFANG | NYSE FANG+ Index | EQUITY_INDEX |
+| VIX | ^VIX | CBOE Volatility Index | VOLATILITY_INDEX |
+| VXN | ^VXN | CBOE Nasdaq-100 Volatility Index | VOLATILITY_INDEX |
+| RVX | ^RVX | CBOE Russell 2000 Volatility Index | VOLATILITY_INDEX |
+| VVIX | ^VVIX | CBOE VIX Volatility Index | VOLATILITY_INDEX |
+| SKEW | ^SKEW | CBOE SKEW Index | VOLATILITY_INDEX |
+| MOVE | ^MOVE | ICE BofA MOVE Bond Volatility Index | VOLATILITY_INDEX |
+| UST5Y | ^FVX | U.S. Treasury 5-Year Yield Index | YIELD_INDEX |
+| UST10Y | ^TNX | U.S. Treasury 10-Year Yield Index | YIELD_INDEX |
+| UST30Y | ^TYX | U.S. Treasury 30-Year Yield Index | YIELD_INDEX |
+| FTSE | ^FTSE | FTSE 100 Index | EQUITY_INDEX |
+| DAX | ^GDAXI | DAX 40 Index | EQUITY_INDEX |
+| CAC | ^FCHI | CAC 40 Index | EQUITY_INDEX |
+| STOXX50E | ^STOXX50E | EURO STOXX 50 Index | EQUITY_INDEX |
+| STOXX600 | ^STOXX | STOXX Europe 600 Index | EQUITY_INDEX |
+| IBEX | ^IBEX | IBEX 35 Index | EQUITY_INDEX |
+| AEX | ^AEX | AEX Netherlands Index | EQUITY_INDEX |
+| SMI | ^SSMI | Swiss Market Index | EQUITY_INDEX |
+| FTSEMIB | FTSEMIB.MI | FTSE MIB Index | EQUITY_INDEX |
+| OMXSTO30 | ^OMX | OMX Stockholm 30 Index | EQUITY_INDEX |
+| BEL20 | ^BFX | BEL 20 Index | EQUITY_INDEX |
+| PSI20 | PSI20.LS | PSI 20 Index | EQUITY_INDEX |
+| ISEQ | ^ISEQ | ISEQ Overall Index | EQUITY_INDEX |
+| N225 | ^N225 | Nikkei 225 Index | EQUITY_INDEX |
+| HSI | ^HSI | Hang Seng Index | EQUITY_INDEX |
+| HSCEI | ^HSCE | Hang Seng China Enterprises Index | EQUITY_INDEX |
+| KOSPI | ^KS11 | KOSPI Composite Index | EQUITY_INDEX |
+| SHCOMP | 000001.SS | Shanghai Composite Index | EQUITY_INDEX |
+| CSI300 | 000300.SS | CSI 300 Index | EQUITY_INDEX |
+| SZCOMPONENT | 399001.SZ | Shenzhen Component Index | EQUITY_INDEX |
+| TWSE | ^TWII | Taiwan Weighted Index | EQUITY_INDEX |
+| STI | ^STI | Straits Times Index | EQUITY_INDEX |
+| SET | ^SET | Stock Exchange of Thailand SET Index | EQUITY_INDEX |
+| JCI | ^JKSE | Jakarta Composite Index | EQUITY_INDEX |
+| KLCI | ^KLSE | FTSE Bursa Malaysia KLCI Index | EQUITY_INDEX |
+| PSEI | PSEI.PS | Philippine Stock Exchange PSEi Index | EQUITY_INDEX |
+| NIFTY50 | ^NSEI | Nifty 50 Index | EQUITY_INDEX |
+| SENSEX | ^BSESN | BSE Sensex Index | EQUITY_INDEX |
+| ASX200 | ^AXJO | S&P/ASX 200 Index | EQUITY_INDEX |
+| TSXCOMP | ^GSPTSE | S&P/TSX Composite Index | EQUITY_INDEX |
+| BOVESPA | ^BVSP | Bovespa Index | EQUITY_INDEX |
+| MEXIPC | ^MXX | S&P/BMV IPC Index | EQUITY_INDEX |
+| MERVAL | ^MERV | S&P MERVAL Index | EQUITY_INDEX |
+| IPSA | ^IPSA | S&P IPSA Index | EQUITY_INDEX |
+| JTOPI | ^JA0R.JO | FTSE/JSE Top 40 Index | EQUITY_INDEX |
+| XU100 | XU100.IS | BIST 100 Index | EQUITY_INDEX |
+| TA125 | ^TA125.TA | TA-125 Index | EQUITY_INDEX |
+| TASI | ^TASI.SR | Tadawul All Share Index | EQUITY_INDEX |
+| MSCIWORLD | ^990100-USD-STRD | MSCI World Index | EQUITY_INDEX |
+| MSCIEM | ^891800-USD-STRD | MSCI Emerging Markets Index | EQUITY_INDEX |
+| MSCIACWI | ^892400-USD-STRD | MSCI All Country World Index | EQUITY_INDEX |
+| GSCI | ^SPGSCI | S&P GSCI Commodity Index | COMMODITY_INDEX |
+| BCOM | ^BCOM | Bloomberg Commodity Index | COMMODITY_INDEX |
+| DXY | DX-Y.NYB | ICE U.S. Dollar Index | CURRENCY_INDEX |
+| ES | ES=F | E-mini S&P 500 Futures | CONTINUOUS_FUTURE_EQUITY |
+| NQ | NQ=F | E-mini Nasdaq-100 Futures | CONTINUOUS_FUTURE_EQUITY |
+| YM | YM=F | E-mini Dow Jones Industrial Average Futures | CONTINUOUS_FUTURE_EQUITY |
+| RTY | RTY=F | E-mini Russell 2000 Futures | CONTINUOUS_FUTURE_EQUITY |
+| WTI | CL=F | WTI Crude Oil Futures | CONTINUOUS_FUTURE_COMMODITY |
+| BRENT | BZ=F | Brent Crude Oil Futures | CONTINUOUS_FUTURE_COMMODITY |
+| NATGAS | NG=F | Henry Hub Natural Gas Futures | CONTINUOUS_FUTURE_COMMODITY |
+| HEATOIL | HO=F | New York Harbor ULSD Heating Oil Futures | CONTINUOUS_FUTURE_COMMODITY |
+| RBOB | RB=F | RBOB Gasoline Futures | CONTINUOUS_FUTURE_COMMODITY |
+| GOLD | GC=F | Gold Futures | CONTINUOUS_FUTURE_COMMODITY |
+| SILVER | SI=F | Silver Futures | CONTINUOUS_FUTURE_COMMODITY |
+| COPPER | HG=F | Copper Futures | CONTINUOUS_FUTURE_COMMODITY |
+| PLATINUM | PL=F | Platinum Futures | CONTINUOUS_FUTURE_COMMODITY |
+| PALLADIUM | PA=F | Palladium Futures | CONTINUOUS_FUTURE_COMMODITY |
+| CORN | ZC=F | Corn Futures | CONTINUOUS_FUTURE_COMMODITY |
+| WHEAT | ZW=F | Chicago SRW Wheat Futures | CONTINUOUS_FUTURE_COMMODITY |
+| SOYBEANS | ZS=F | Soybean Futures | CONTINUOUS_FUTURE_COMMODITY |
+| SOYMEAL | ZM=F | Soybean Meal Futures | CONTINUOUS_FUTURE_COMMODITY |
+| SOYOIL | ZL=F | Soybean Oil Futures | CONTINUOUS_FUTURE_COMMODITY |
+| COFFEE | KC=F | Coffee C Futures | CONTINUOUS_FUTURE_COMMODITY |
+| SUGAR | SB=F | Sugar No. 11 Futures | CONTINUOUS_FUTURE_COMMODITY |
+| COCOA | CC=F | Cocoa Futures | CONTINUOUS_FUTURE_COMMODITY |
+| COTTON | CT=F | Cotton No. 2 Futures | CONTINUOUS_FUTURE_COMMODITY |
+| LIVECATTLE | LE=F | Live Cattle Futures | CONTINUOUS_FUTURE_COMMODITY |
+| LEANHOGS | HE=F | Lean Hogs Futures | CONTINUOUS_FUTURE_COMMODITY |
+
+Y8.13.2 retained these 93 rows as the starting-universe audit trail, corrected
+the active `JTOPI` and `SET` request symbols to `^J200.JO` and `^SET.BK`, and
+marked `IPSA`, `MSCIEM`, and `RVX` inactive with a documented
+`metadata.YahooSeedReview` disposition. The controlled active universe is now
+90 listings. Y8.13.3 subsequently retained the historical bars and exact
+mappings for `BCOM`, `CSI300`, `MOVE`, `PSEI`, `TASI`, and `W5000`, but marked
+the listings inactive with an `UNAVAILABLE_STALE_HISTORY` disposition after
+Yahoo returned only empty OHLC placeholders beyond July 16/17 and no exact
+continuous alternative was found. Y8.13.4's targeted retry then proved that
+corrected `SET` (`^SET.BK`) also stopped after July 17, so it is retained with
+the same inactive disposition. The controlled active universe is now 83
+listings.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| Y8.1 | [x] | Document the Yahoo source and bounded-universe contract | Record the chosen daily OHLCV endpoint, `EMPIRE_STONKS_OHLCV_YAHOO_*` settings, request/range limits, ticker and provider-date semantics, time zones, native adjusted-close and volume behavior, rate/error behavior, and Core raw retention. Explicitly limit Yahoo to the seeded indexes, yield and volatility indexes, currency and commodity indexes, and continuous futures; exclude ordinary equities and non-OHLCV enrichment. Runtime values come from `deploy/env/local.env`. | H7.8, A5.1-A5.2 |
+| Y8.2 | [x] | Design the shared market-session eligibility contract | Define the smallest reusable representation for each provider listing's calendar, local session/time zone, post-close delay, and session-date rule. Cover exchange-traded cash indexes, publisher-calculated indexes, DXY, and Yahoo `=F` provider daily-settlement series. Define `eligible_at`, missing-session detection, no synthetic weekend/holiday bars, retry behavior, and a configurable 5-7-session reconciliation window. Record why the selected market-calendar library is justified and how unsupported calendars or provider-date ambiguity fail safely. | Y8.1, M3.7 |
+| Y8.3 | [x] | Add Yahoo instrument taxonomy migration | Add an idempotent Flyway migration for `YIELD_INDEX`, `EQUITY_INDEX`, `COMMODITY_INDEX`, `CURRENCY_INDEX`, `CONTINUOUS_FUTURE_COMMODITY`, and `CONTINUOUS_FUTURE_EQUITY`, using existing `INDEX` and `DERIVATIVE` classes and the reference-data upsert convention. Database validation and generated Stonks schema docs pass. | Y8.2 |
+| Y8.4 | [x] | Add Stonks session-policy table and seed Yahoo provider listings | Implement the Y8.2 persistence design inside the existing `stonks` PostgreSQL schema and seed the complete reviewed Yahoo catalog into `stonks.provider_listing` under the existing `YAHOO` provider. Store the Empire code as `provider_listing.ticker`, store the exact acquisition symbol as metadata key `YahooTicker`, add no Yahoo-specific relational ticker column, and never overload `market`. Attach an instrument type and explicit session policy to every row. The migration is deterministic/idempotent, rejects missing provider/type/calendar references, contains no ordinary equities, and has assertions/tests for representative cash indexes, global indexes, yields, volatility, DXY, equity-index futures, and commodity futures. | Y8.2-Y8.3 |
+| Y8.5 | [x] | Implement calendar and eligibility services | Add package-owned services that resolve expected sessions from the configured market calendar, honor local holidays and early closes, calculate `eligible_at = session_close + availability_delay`, and return only eligible missing sessions. Implement an explicit provider-daily-settlement cutoff for Yahoo continuous futures and safe handling for publisher indexes without an exchange calendar. Tests cross UTC/date boundaries, DST, holidays, early closes, disjoint country holidays, reruns, and unknown calendars. | Y8.4 |
+| Y8.6 | [x] | Implement Yahoo acquisition | Acquire bounded historical ranges for selected seeded Yahoo listings with injected HTTP dependencies, timeouts, bounded retries, request pacing, and chunking where the source requires it. Store every response through Core with durable snapshot identity and secret-safe errors/metadata. Tests cover rate limiting, empty/malformed/error payloads, partial symbol failures, and request-boundary dates. | Y8.1, Y8.4-Y8.5, C4.2, A5.5 |
+| Y8.7 | [x] | Implement Yahoo parser | Parse Yahoo fixtures into shared provider-listing and daily-bar records with correct provider session dates, nullable volume where valid, deterministic duplicate handling, and documented adjusted-close treatment consistent with the shared table contract. Do not silently substitute adjusted close for native close or add Yahoo-only columns. | Y8.1, Y8.6, A5.3-A5.4 |
+| Y8.8 | [x] | Implement Yahoo import service | Compose validation, snapshot registration, seeded provider-listing resolution, daily-bar upserts, and per-listing import summaries. Do not create unseeded Yahoo listings during normal import. Unchanged reruns skip writes, later provider corrections update current rows, and one listing failure does not discard successful listings. | Y8.6-Y8.7, E6.5-E6.6 |
+| Y8.9 | [x] | Add Yahoo historical backfill runner and CLI | Add a package-owned backfill runner, operator CLI, and `bin` wrapper using `bin/env-load`. It enumerates all active seeded Yahoo listings, accepts explicit bounded date/range controls and safe resume/retry behavior, imports available history in source-safe chunks, records Core lifecycle/lineage, and emits a secret-safe machine-readable summary and report. Tests cover full enumeration, partial restart, unchanged rerun, correction, and partial failure. | Y8.8, B1.8 |
+| Y8.10 | [x] | Implement Yahoo daily completeness planning | For each active seeded Yahoo listing, determine completed expected sessions, calculate eligibility, compare them with stored `ohlcv_daily` rows, and produce a bounded pull plan containing only eligible missing sessions. A rerun before eligibility or after completion is a no-op; a failed/missing session remains retryable on a later run. Tests prove one record per real market session across U.S., European, Asian, and futures examples. | Y8.5, Y8.8-Y8.9 |
+| Y8.11 | [x] | Add recent-session reconciliation | Add a daily reconciliation pass that re-pulls the configured recent 5-7 expected sessions, compares provider OHLC, close/adjustment semantics, and volume with current rows, and applies idempotent corrections through the normal upsert path. Surface corrected-row counts and field-level differences in run results/reports without adding a bar-revision table. Tests cover late bars, changed values, null volume, provider-date corrections, and unchanged history. | Y8.7-Y8.10 |
+| Y8.12 | [x] | Build and store Yahoo reports | Reuse the shared report contract for Yahoo-scoped backfill and daily health, expected-session coverage, ineligible versus missing sessions, stale listings, retries/failures, reconciliation corrections, calendar-policy errors, and native adjustment notes. Reports distinguish initial ingestion from reconciliation and remain queryable after raw-object cleanup. | Y8.9-Y8.11, E6.7-E6.8 |
+| Y8.13 | [x] | Add Yahoo daily runner and CLI | Add package-owned sequencing and an operator CLI/`bin` wrapper that run eligibility planning, eligible missing-session ingestion, recent-session reconciliation, Core lifecycle, and reporting with configured request bounds. Tests cover no-op, success, partial failure, retry, correction, and idempotent rerun. | Y8.10-Y8.12, B1.8 |
+| Y8.13.1 | [x] | Separate Yahoo response time zone from session-policy time zone | Review the parser's assumption that Yahoo `exchangeTimezoneName` must equal the listing's eligibility-policy time zone. Model and validate provider response/session-date interpretation separately from exchange calendar or cutoff eligibility without weakening symbol, date, or calendar checks. Preserve the intended policies for `SKEW`, `VVIX`, `VXN`, `UST5Y`, `UST10Y`, and `UST30Y`, and prove their stored fixtures parse into the correct provider dates across DST boundaries. | Y8.7, Y8.11-Y8.13 |
+| Y8.13.2 | [x] | Correct Yahoo empty-history classification and remediate unusable seed mappings | Treat a structurally valid Chart result with metadata/indicators but `timestamp=null` as an explicit no-history/no-data outcome rather than a generic malformed-chart failure when safe. Review current Yahoo availability and exact `metadata.YahooTicker` values for `IPSA`, `JTOPI`, `MSCIEM`, `SET`, and the HTTP-404 `RVX`; correct mappings through an idempotent Flyway migration when a valid replacement exists, otherwise explicitly deactivate or document the unsupported seed instead of allowing permanent daily warnings. Tests distinguish malformed payloads, empty history, provider errors, symbol mismatch, and unavailable/deactivated seeds. | Y8.4, Y8.6-Y8.8, Y8.13 |
+| Y8.13.3 | [x] | Investigate and classify stale Yahoo series | Determine why `BCOM`, `CSI300`, `MOVE`, `PSEI`, and `W5000` stopped at 2026-07-17 and `TASI` stopped at 2026-07-16 while peer series reached 2026-07-30. Check current Yahoo symbol availability, response contents, provider-date behavior, and session-policy expectations. Correct ticker/policy metadata or deactivate genuinely discontinued/unavailable seeds through Flyway; do not suppress real eligible-session gaps or manufacture bars. Add report/planner tests for the selected disposition. | Y8.10, Y8.12-Y8.13 |
+| Y8.13.4 | [x] | Run targeted Yahoo remediation verification | Retry only the affected tickers after Y8.13.1-Y8.13.3, not the healthy 82-listing universe. Verify correct acquisition classifications, provider dates, session eligibility, database coverage, reconciliation behavior, reports, and rerun idempotency. Record any intentionally unsupported/deactivated listings and require no unexplained persistent warnings before proceeding to the DAG. | Y8.13.1-Y8.13.3 |
+| Y8.14 | [x] | Add the initially manual Yahoo DAG | Add `dags/stonks/stonks_ohlcv_yahoo_daily_scrape.py` as a thin manually triggered DAG that invokes the daily runner. Keep schedule selection out of the DAG's business logic; document the intended eventual multi-run cadence (for example 06:00, 10:00, 13:00, 18:00, and 23:00 America/New_York, or hourly if live request volume permits) and leave automatic enablement to the rollout gate. DAG tests prove importability, manual schedule state, parameter forwarding, no-op success, and failure propagation. | Y8.13.4, B1.5-B1.7 |
+| Y8.14.1 | [x] | Add professional Yahoo PDF reports | Render and durably store a branded human-readable `report.pdf` beside `report.json` for every successful Yahoo backfill and daily run. Cover executive status, run scope, acquisition and persistence, provider-series coverage, daily health and reconciliation, native-value semantics, and bounded warning samples. Return both object IDs through Core, CLI, and Airflow summaries and prove both report modes render and persist valid PDFs. | Y8.12-Y8.14, E6.7-E6.8 |
+| Y8.15 | [x] | Verify the Yahoo vertical workflow | Run the complete fixture path from seeded listings through backfill, eligibility-based daily ingestion, reconciliation, stored reports, and raw-object cleanup. Verify lineage, secret safety, request bounds, calendar behavior, provider isolation, reruns, corrections, and coexistence with EODData and historical Stooq data. Verify the manual DAG is discovered in its Airflow runtime. | Y8.14.1, M3.7 |
+
+Done: 2026-07-29 — selected bounded single-symbol Yahoo Chart `1d` JSON for
+both seeded-universe backfill and daily/reconciliation in
+`docs/stonks/ohlcv-yahoo-source-contract.md`; added validated, secret-safe
+Yahoo settings in `packages/empire-stonks-ohlcv/src/empire_stonks_ohlcv/config.py`
+and the OHLCV sections of `deploy/env/local{,.example}.env`; aligned the
+architecture/package docs and config/secret tests. Focused tests passed (47),
+the full package suite passed (397 passed, 17 skipped), and `poetry check`,
+`compileall`, example-environment config smoke, environment-key parity,
+88-column changed-Python scan, and `git diff --check` passed.
+
+Done: 2026-07-29 — designed the shared provider-listing session policy in
+`docs/stonks/ohlcv-market-session-contract.md`: selected
+`pandas_market_calendars`, defined the normalized policy/FK handoff for Y8.4,
+calendar-close and local-cutoff eligibility, three provider-date rules,
+authoritative versus observed-only completeness, safe retry/reconciliation,
+no-synthetic-bar invariants, and fail-closed behavior for unsupported or
+ambiguous mappings. Documentation validation and `git diff --check` passed.
+
+Done: 2026-07-29 — added idempotent migration
+`V2026.07.29.0001__stonks_add_yahoo_instrument_taxonomy.sql` with the six
+reviewed Yahoo index and continuous-future types under the existing `INDEX`
+and `DERIVATIVE` classes. Flyway applied and validated all 33 migrations; a
+direct second execution succeeded and retained exactly six active rows with
+the expected classes. The transactional OHLCV schema contract passed, and
+canonical Core/Stonks schema plus all Stonks ERD groups regenerated without
+structural diffs. `git diff --check` passed.
+
+Done: 2026-07-30 — added
+`V2026.07.30.0001__stonks_add_ohlcv_session_policies_and_yahoo_listings.sql`
+inside the existing `stonks` schema with the normalized session-policy table,
+nullable provider-listing FK, policy-shape constraints, Yahoo metadata
+constraint, and unique `YahooTicker` expression index. Seeded 49 reviewed
+policies and all 93 active `YAHOO`/`XIDX` listings with the Empire code as
+`provider_listing.ticker`, the exact request symbol in `metadata.YahooTicker`,
+and an explicit instrument type and policy. Calendar-backed policy names were
+resolved and year schedules exercised with `pandas_market_calendars` 5.4.0;
+unsupported or provider-calculated cases use explicit observed-only policies.
+Flyway applied and validated all 34 migrations, direct migration replay
+succeeded, both OHLCV schema and Yahoo seed SQL contracts passed, the full
+package suite passed (397 passed, 17 skipped), and canonical Stonks
+schema/Mermaid/pg-diagram documentation regenerated. `git diff --check`
+passed.
+
+Done: 2026-07-30 — added immutable session-policy, calendar-schedule,
+expected-session, and observed-poll values plus the package-owned
+`MarketSessionService`. The narrow `pandas_market_calendars` adapter resolves
+authoritative closes and fails closed for unknown calendars or unreviewed
+warnings. Eligibility supports exact close delays, provider-local cutoffs,
+Yahoo daily-settlement labels, eligible-missing selection, and explicit
+observed-only polling without synthetic sessions. Tests cover normal and early
+closes, DST, UTC-date crossings, disjoint U.S./European/Asian holidays,
+idempotent reruns, futures ambiguity, unsafe calendars/time zones/warnings, and
+ambiguous or nonexistent local times. The full package suite passed (420
+passed, 17 skipped).
+
+Done: 2026-07-30 — implemented bounded, serial Yahoo Chart acquisition for
+caller-selected seeded listings with immutable target/request/outcome values,
+exact percent-encoded request paths, guarded inclusive/exclusive Unix bounds,
+and deterministic backfill chunking. Added injected transport, sleep, random,
+and clock seams; conservative pacing, jitter, `Retry-After`, exponential
+retry, and failure cooldown; ambiguity checks for provider-listing and
+`YahooTicker` identity; and partial-failure results. Every HTTP 200 body is
+stored through Core before safe Chart-envelope classification, while non-200
+and transport failures expose no body or URL content. Tests cover 408/425/429
+and 5xx retries, pre-Unix-epoch boundaries, chunk edges, empty/malformed/error
+payloads, symbol mismatch, missing daily data, empty backfills, raw-storage
+failure, and successful listings around a failed symbol. The full package
+suite passed (446 passed, 17 skipped).
+
+Done: 2026-07-30 — implemented deterministic Yahoo Chart parsing against the
+exact seeded Empire ticker, `metadata.YahooTicker`, acquisition range,
+session policy, response IANA time zone, and caller-planned calendar labels.
+The parser validates the Chart envelope and positional arrays, converts JSON
+numeric text directly to `Decimal`, preserves null and zero volume, derives
+provider-local and daily-settlement dates without UTC truncation, and emits
+shared `ProviderListing`/`DailyBar` output without enrichment. Adjusted close
+is retained only in parse diagnostics and never replaces native close.
+Unplanned and invalid rows receive bounded safe issues; equal duplicates
+collapse and conflicting duplicates reject the date independent of input
+order. Added a policy-compliant constructed Yahoo fixture plus generated tests
+for futures UTC-date crossing, observed-only bounds, structural failures,
+timezone and symbol mismatches, invalid OHLCV/timestamps/adjusted close, and
+array alignment. The full package suite passed (466 passed, 17 skipped).
+
+Done: 2026-07-30 — implemented `import_yahoo_ranges()` as a package-owned,
+seed-only Yahoo persistence service. Each acquired request chunk resolves and
+locks its durable provider-listing UUID, fails closed on inactive or changed
+seed identity, registers valid stored bodies as provider snapshots, and writes
+matching parsed bars through the shared current-state upsert without calling
+the provider-listing writer. Independent chunk transactions preserve successful
+listings across acquisition, seed-resolution, and persistence failures, while
+ordered per-listing summaries retain only bounded safe diagnostics and counts.
+Unit and PostgreSQL integration coverage proves no unseeded listing creation,
+snapshot lineage, partial-failure isolation, unchanged reruns, later provider
+corrections, and inactive-listing protection. The full database-enabled package
+suite passed (493 passed); `poetry check --lock`, public import and `compileall`
+smokes, the 88-column changed-Python scan, and `git diff --check` passed.
+
+Done: 2026-07-30 — added reusable active Yahoo seed/session-policy
+enumeration, explicit `YahooBackfillScope` date and ticker controls, inclusive
+Empire-ticker resume, and `run_yahoo_backfill()` package sequencing. The runner
+acquires the complete selected universe with existing serial pacing and
+source-bounded chunking, heartbeats and emits safe progress per acquisition,
+parses stored bodies against each seed policy, and independently imports every
+chunk through Y8.8. Successful chunks remain committed across partial
+provider/parse/persistence failures; same-range retries are unchanged and later
+provider corrections update current rows. Core runs retain safe params and
+summaries plus a durable schema-versioned JSON execution report. Added the
+`stonks-ohlcv-yahoo-backfill` Poetry command and executable `bin` wrapper with
+configured/default date bounds, repeated ticker selection, inclusive resume,
+JSON stderr progress, and compact JSON stdout. Unit and PostgreSQL vertical
+coverage proves full enumeration, scoped inclusive restart, unchanged rerun,
+provider correction, mixed partial failure, durable report lineage, and
+secret-safe failure handling. The full database-enabled package suite passed
+(510 passed); `poetry check --lock`, public import and `compileall` smokes,
+shell syntax/help validation, the 88-column changed-Python scan, and
+`git diff --check` passed.
+
+Done: 2026-07-31 — added package-owned Yahoo daily completeness planning over
+the active seeded listing/session-policy catalog and exact bounded
+`ohlcv_daily` date reads. Calendar-backed plans retain expected, eligible,
+ineligible, and missing distinctions and emit tightly bounded daily Chart
+pulls justified only by eligible absent session labels; completed and
+pre-eligibility reruns are no-ops, while unstored work remains stateless and
+retryable. Explicit observed-only policies emit due polling candidates without
+claiming authoritative gaps. Distinct policies are resolved once per plan,
+stored sessions split request ranges, configured source bounds are enforced,
+and calendar-policy failures remain isolated with secret-safe reasons. Unit
+coverage exercises deterministic retries, no-ops, bounds, observed-only
+semantics, failure isolation, and real U.S., European, Asian, and futures
+calendars; PostgreSQL coverage proves exact seed enumeration/date comparison,
+completion no-op behavior, and retry planning. A read-only smoke over the seven
+live sample series found no policy failures or earlier in-window gaps and
+planned only the not-yet-stored 2026-07-31 work, correctly labeling DXY as an
+observed poll rather than an authoritative missing session. The full
+database-enabled package suite passed (521 passed); `poetry check --lock`,
+public import, `compileall`, the 88-column changed-Python scan, and
+`git diff --check` passed.
+
+Done: 2026-07-31 — added bounded recent-session reconciliation planning over
+Y8.10 completeness results. Calendar-backed listings re-pull the latest
+configured eligible expected labels whether stored or missing; observed-only
+listings use recent stored provider dates plus a due poll without manufacturing
+expected sessions. Added reusable database-scale daily-bar comparison and
+reconciliation-aware Yahoo imports that classify inserted, unchanged, and
+corrected rows before applying the normal current-state upsert. Results retain
+ordered old/new OHLCV field differences, including null-volume transitions,
+and require comparison totals to agree with persistence counts. Current raw
+adjusted close is compared with native close and explicitly remains
+non-persisted; valid newly returned provider dates are surfaced as inserts
+without heuristically deleting another stored date. Unit coverage proves
+recent-N selection, ineligible exclusion, source-bound splitting, normalized
+field comparison, and observed-only behavior. PostgreSQL coverage proves
+stored-plus-missing planning, a late/corrected provider-date insert, OHLC and
+null-volume correction, adjusted-close diagnostics, normal upsert persistence,
+and an unchanged idempotent rerun. A read-only smoke over the seven populated
+sample series produced one bounded pull per listing with no policy failures:
+seven recent sessions for each calendar-backed listing and seven recent stored
+dates plus one due poll for observed-only DXY. The full database-enabled
+package suite passed (527 passed); `poetry check --lock`, public import,
+`compileall`, the 88-column changed-Python scan, and `git diff --check` passed.
+
+Done: 2026-07-31 — added shared-schema-version-2 Yahoo report builders and a
+single durable Core storage boundary for historical backfill and daily health.
+Backfill reports now identify initial ingestion, retain retry/failure and
+post-import persisted range coverage, and aggregate large history scopes in
+PostgreSQL without loading every date. Daily reports preserve distinct eligible
+ingestion and recent reconciliation phases, calendar-authoritative expected,
+eligible, ineligible, stored, and missing counts, latest-session staleness,
+observed-only unresolved polls without false coverage claims, and bounded
+calendar-policy errors. Reconciliation sections retain inserted/corrected/
+unchanged totals, OHLCV field-difference counts, and native-versus-adjusted
+close diagnostics while reaffirming that only native close is persisted.
+Reports are deterministic, secret-safe, stored without expiration, and remain
+readable after the same run's expiring raw objects are deleted and purged.
+Unit and PostgreSQL coverage verifies report semantics, durable metadata,
+backfill schema migration, retries/failures, corrections, adjustment notes,
+and cleanup-safe report access. The full database-enabled package suite passed
+(531 passed); `poetry check`, public import, `compileall`, the 88-column
+changed-Python scan, and `git diff --check` passed.
+
+Done: 2026-07-31 — added `run_yahoo_daily()` as the package-owned Core
+lifecycle for calendar eligibility planning, eligible-missing ingestion,
+recent-session reconciliation, post-import health reporting, and durable report
+storage. Added explicit `YahooDailyScope` and compact secret-safe run results,
+per-phase progress/heartbeat reporting, configured 30-day default lookback and
+30-day maximum daily request range, exact ticker scoping, and safe systemic
+failure summaries. Sessions freshly acquired during ingestion are omitted from
+same-run reconciliation to avoid duplicate raw-object identities and redundant
+provider calls; failed acquisitions remain eligible for the reconciliation
+retry, and later runs retain the full recent-session correction pass. Added the
+`stonks-ohlcv-yahoo-daily` Poetry command and executable `bin` wrapper using
+`bin/env-load`, with optional bounded dates/tickers, JSON stderr progress, and
+compact JSON stdout. Unit, CLI, and PostgreSQL vertical coverage proves no-op,
+successful ingestion, mixed partial failure, same-run retry, later retry,
+idempotent rerun, provider correction, report phase/correction visibility, and
+final database values. The full database-enabled package suite passed (546
+passed); `poetry check`, public import, `compileall`, shell syntax/help, the
+88-column changed-Python scan, environment-key parity, and `git diff --check`
+passed.
+
+Done: 2026-08-01 — ran the Y8.13.1-Y8.13.3 remediation scope without touching
+the healthy universe. Backfill run
+`fcf7e037-34c2-4784-b2b4-60e0db9ba8ec` selected eight active listings, stored
+and imported all eight requests, inserted 3,131 bars, had no missing, failed,
+or parse-failed chunks, and stored PASS report
+`4fc4b170-3d07-4e20-a404-5ddaccec1f06`. `JTOPI`, `SKEW`, `UST5Y`, `UST10Y`,
+`UST30Y`, `VVIX`, and `VXN` cover 2025-01-02 through 2026-07-30 with the
+expected provider symbols and provider dates. The retry also proved that
+corrected `SET` (`^SET.BK`) returns a valid empty-history response for every
+Bangkok session after its last complete bar on 2026-07-17; migration
+`V2026.08.01.0003__stonks_deactivate_stale_yahoo_set.sql` therefore preserves
+its 372 accepted bars and corrected-symbol audit trail while marking it
+`UNAVAILABLE_STALE_HISTORY` and inactive.
+
+The resulting inactive review set is `IPSA`, `MSCIEM`, and `RVX` as
+`UNSUPPORTED`, plus `BCOM`, `CSI300`, `MOVE`, `PSEI`, `SET`, `TASI`, and
+`W5000` as `UNAVAILABLE_STALE_HISTORY`; active enumeration is 83. Diagnostic
+daily run `e9b43551-44f8-409c-a15b-ab339e1e5b12` explained its WARN entirely
+as the newly confirmed SET gap and July 25-26 weekend probes from the explicit
+observed-only Treasury-yield policy. After SET deactivation, bounded weekday
+runs `f80a03f9-a4d3-49a1-9136-8fae7af05a13` and
+`20ef2f87-5453-44bf-b687-b604a17a7262` each performed zero ingestion requests,
+reconciled the same 21 bars unchanged across seven listings, had zero missing,
+failed, retry, parse, correction, or calendar-policy counts, and stored PASS
+reports `9daf78a4-fc28-4ecc-8dd0-3ae1c121c049` and
+`c0988359-242d-4a1f-b265-1466e00ae79b`. This proves report persistence,
+reconciliation, and idempotent rerun behavior with no unexplained warning.
+Flyway validated all 37 migrations, the transactional Yahoo seed contract
+passed, the focused remediation suite passed (21 tests), and the full
+database-enabled package suite passed (561 tests).
+
+Done: 2026-08-01 — added the thin
+`dags/stonks/stonks_ohlcv_yahoo_daily_scrape.py` Airflow DAG around the
+package-owned Yahoo daily runner. Local/development operation is deliberately
+manual (`schedule=None`, `catchup=False`, `max_active_runs=1`); comments beside
+the schedule record that production should use deployment-specific
+America/New_York runs at 06:00, 10:00, 13:00, 18:00, and 23:00 only after the
+Y8.15/V10.10 rollout gates. Manual JSON configuration can narrowly override
+`effective_date`, `start_date`, `end_date`, and an exact uppercase `tickers`
+array, while omitted values retain the configured package lookback and full
+active universe. Airflow Compose now forwards the complete Yahoo OHLCV
+environment contract to every runtime component. Ten focused DAG tests cover
+manual metadata, the in-source production guidance, New York date handling,
+default and overridden scope forwarding, invalid inputs, no-op success, and
+failure propagation. The Compose model rendered successfully; the running
+Airflow 3.2.1 processor discovered the DAG as paused and reported no import
+errors; and the full database-enabled package suite passed (571 tests).
+
+Done: 2026-08-01 — added a shared Empire-branded Yahoo PDF renderer for both
+historical backfill and daily session-health models. Every successful Yahoo run
+now renders and durably stores `reports/report.pdf` beside `report.json` using
+the shared `stonks_ohlcv_provider_pdf_report` object kind and returns
+`pdf_report_object_id` through the Core summary, CLI result, and Airflow task
+payload. The bounded letter-format report covers executive status, run facts
+and scope, per-phase acquisition/parser/persistence counts, provider-series
+coverage, daily health and reconciliation evidence, and provider-native value
+semantics; JSON remains authoritative for complete samples. Unit and
+PostgreSQL vertical tests verify valid non-expiring PDF objects for both
+workflows. Representative live PASS reports were rendered with Poppler and all
+seven pages were visually inspected; a title-width collision and an orphaned
+final table row found during review were corrected. The full database-enabled
+package suite passed (572 tests), `poetry check`, public imports, compilation,
+the changed-Python line-length scan, and `git diff --check` passed.
+
+Done: 2026-08-01 — completed the Yahoo vertical release gate across seeded
+listing selection, bounded acquisition, provider-date parsing, real-calendar
+eligibility, missing-session planning, historical backfill, daily ingestion,
+recent-session reconciliation, idempotent reruns, provider corrections,
+secret-safe failures, durable JSON/PDF reports, cleanup-safe snapshot lineage,
+and identical-symbol isolation across Yahoo, EODData, and Stooq. The focused
+fixture and PostgreSQL gate passed 122 tests, and the full database-enabled
+package suite passed 572 tests. The live database has all 93 reviewed Yahoo
+listings, 83 active listings, no Yahoo listing missing a session policy or
+`metadata.YahooTicker`, 108,561 Yahoo bars from 1965-01-04 through 2026-07-30,
+and retained Yahoo source snapshots alongside existing EODData and historical
+Stooq bars. Flyway validated all 37 migrations; `poetry check` and compilation
+passed. The running Airflow 3.2.1 worker contains the current PDF-capable
+package, the manual `stonks_ohlcv_yahoo_daily_scrape` DAG is discovered as
+paused, and the DAG processor reports no import errors. No substantial defect
+requiring a Y8.15.x remediation task was found.

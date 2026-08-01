@@ -934,10 +934,17 @@ quotes for discovered symbols are normal; quotes without an accepted listing
 are rejected; absent symbols never cause automatic deletion or inactivation.
 
 EODData says end-of-day data may receive corrections until 7 p.m. market time,
-so the initial Airflow schedule should run no earlier than 8 p.m.
-`America/New_York`. The selected provider material does not establish the OHLC
-or volume adjustment basis. Reports must label both as unspecified and must not
-use listing currency metadata to infer or convert bar currency.
+so its reviewed exchange policies use a calendar-backed 7-p.m. local cutoff
+plus a 60-minute availability delay. `NYSE` maps to `XNYS`, `NASDAQ` maps to
+`NASDAQ`, and `AMEX` uses the explicit `XNYS` fallback because the selected
+calendar library has no AMEX calendar and NYSE American follows the common
+U.S. cash-equity holiday and core-session early-close schedule. All three use
+`America/New_York`, `LOCAL_CUTOFF`, and `PROVIDER_LOCAL_DATE`; no request is
+eligible before 8 p.m. Eastern, including on early-close days. An unknown or
+invalid exchange policy fails closed rather than inheriting an Eastern or NYSE
+default. The selected provider material does not establish the OHLC or volume
+adjustment basis. Reports must label both as unspecified and must not use
+listing currency metadata to infer or convert bar currency.
 
 ### Stooq selected historical contract
 

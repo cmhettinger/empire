@@ -196,10 +196,12 @@ accepted.
 ### `PROVIDER_LOCAL_DATE`
 
 Convert the aware provider timestamp to `timezone_name` and take its local
-date. This is for publisher-calculated indexes and DXY-style provider days.
-With a calendar, the derived date must be one of the planned calendar labels.
-Without a calendar, it is an observed provider date and receives no inferred
-holiday semantics.
+date, or accept an explicit provider-local date when the source contract
+supplies no timestamp and requires exact equality with the requested date.
+This is for publisher-calculated indexes, DXY-style provider days, and
+EODData's explicit exchange-local `dateStamp`. With a calendar, the derived or
+explicit date must be one of the planned calendar labels. Without a calendar,
+it is an observed provider date and receives no inferred holiday semantics.
 
 ### `PROVIDER_DAILY_SETTLEMENT`
 
@@ -236,6 +238,53 @@ Generic `CME` or `ICE` calendar names must not be assigned to all futures by
 venue family. Equity, energy, metals, grains, livestock, and soft commodities
 can have different holiday and settlement behavior. A listing whose exact
 product schedule is not supported safely starts observed-only.
+
+## EODData Exchange Policy Families
+
+EODData acquisition is exchange-bulk rather than listing-by-listing. The
+configured exchange partition is therefore the reviewed policy lookup key;
+every active EODData listing discovered under that exact `market` inherits the
+partition policy. The initial configuration and complete mapping are:
+
+| EODData exchange | Policy code | Calendar | Local time zone | Eligibility | Session-date rule |
+|------------------|-------------|----------|-----------------|-------------|-------------------|
+| `NYSE` | `ED_XNYS_1900_60M` | `XNYS` | `America/New_York` | `LOCAL_CUTOFF` at `19:00` plus 60 minutes | `PROVIDER_LOCAL_DATE` |
+| `NASDAQ` | `ED_XNAS_1900_60M` | `NASDAQ` | `America/New_York` | `LOCAL_CUTOFF` at `19:00` plus 60 minutes | `PROVIDER_LOCAL_DATE` |
+| `AMEX` | `ED_XNYS_1900_60M` | `XNYS` | `America/New_York` | `LOCAL_CUTOFF` at `19:00` plus 60 minutes | `PROVIDER_LOCAL_DATE` |
+
+`XNYS` and `NASDAQ` are exact registered
+`pandas_market_calendars` names. Both provide authoritative U.S. cash-equity
+session labels, holidays, regular closes, and early closes in
+`America/New_York`. The selected library has no registered `AMEX` or `XASE`
+calendar. `AMEX` therefore uses the reviewed `XNYS` schedule as its explicit
+fallback: NYSE American follows the same published U.S. equity holiday and
+core-session early-close calendar. This fallback is limited to the EODData
+`AMEX` exchange code; it is not a general market-name alias.
+
+The provider says daily data may continue to receive corrections until 7 p.m.
+market time. The local `19:00` cutoff models that publication boundary and the
+60-minute availability delay preserves the existing no-earlier-than-8-p.m.
+operational buffer. Using a calendar-backed `LOCAL_CUTOFF`, rather than a fixed
+delay from the actual exchange close, also keeps an early-close session
+ineligible until 8 p.m. Eastern. The EODData `dateStamp` is an explicit local
+provider date; it must equal the requested date and one authoritative planned
+calendar label before its bar can be accepted.
+
+These policy codes are deliberately separate from Yahoo policy codes even
+when they share a calendar. Availability is a provider/source fact, and a
+Yahoo delay change must not alter EODData eligibility. C9.2 owns the minimal
+durable policy rows and exact exchange-policy resolution mechanism.
+
+Policy resolution fails closed. The configured EODData exchange set must
+match the reviewed mapping exactly, every resolved policy must satisfy the
+shared persisted-policy invariants, and every calendar must resolve with the
+expected `America/New_York` schedule time zone. An unknown exchange, missing
+mapping, missing policy row, unsupported calendar, unexpected calendar time
+zone, or ambiguous provider date excludes that exchange from automated work
+and produces a safe policy error. Empire does not substitute `XNYS`, a
+weekday calendar, U.S. Eastern time, or an observed-only policy at runtime.
+Adding or changing an exchange requires a reviewed contract update, calendar
+verification, and an explicit C9.2-style configuration or migration.
 
 ## Completeness And Missing Sessions
 
