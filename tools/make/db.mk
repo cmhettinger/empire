@@ -1,4 +1,4 @@
-.PHONY: db-up db-down db-ps db-logs db-migrate db-info db-validate db-clean db-psql db-test-ohlcv-schema db-test-yahoo-seed db-data-remediation
+.PHONY: db-up db-down db-ps db-logs db-migrate db-info db-validate db-clean db-psql db-test-ohlcv-schema db-test-yahoo-seed db-test-eoddata-session-policy db-data-remediation
 
 db-up: ## Start postgres and pgbouncer
 	$(COMPOSE) up -d postgres pgbouncer
@@ -35,6 +35,9 @@ db-test-ohlcv-schema: ## Run transactional Stonks OHLCV schema contract tests
 
 db-test-yahoo-seed: ## Run transactional Yahoo listing/session-policy seed tests
 	$(COMPOSE) exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < db/tests/stonks/yahoo_seed_contract.sql
+
+db-test-eoddata-session-policy: ## Run EODData session-policy contract tests
+	$(COMPOSE) exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < db/tests/stonks/eoddata_session_policy_contract.sql
 
 db-data-remediation: ## Apply an opt-in data remediation (REMEDIATION=db/data-remediations/...sql)
 	@test -n "$(REMEDIATION)" || (echo "ERROR: Set REMEDIATION=db/data-remediations/...sql" >&2; exit 1)

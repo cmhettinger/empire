@@ -291,7 +291,11 @@ def test_eoddata_import_rolls_back_then_reruns_corrects_and_skips_inactive(
         with connection.cursor() as cursor:  # type: ignore[union-attr]
             cursor.execute(
                 """
-                SELECT listing.market, daily.close, listing.status
+                SELECT
+                    listing.market,
+                    daily.close,
+                    listing.status,
+                    listing.session_policy_code
                 FROM stonks.provider_listing AS listing
                 JOIN stonks.ohlcv_daily AS daily
                   ON daily.provider_listing_id = listing.provider_listing_id
@@ -302,10 +306,10 @@ def test_eoddata_import_rolls_back_then_reruns_corrects_and_skips_inactive(
                 (ticker,),
             )
             rows = cursor.fetchall()
-        assert [(row[0], str(row[1]), row[2]) for row in rows] == [
-            ("AMEX", "10.7500000000", "ACTIVE"),
-            ("NASDAQ", "10.7500000000", "ACTIVE"),
-            ("NYSE", "10.5000000000", "INACTIVE"),
+        assert [(row[0], str(row[1]), row[2], row[3]) for row in rows] == [
+            ("AMEX", "10.7500000000", "ACTIVE", "ED_XNYS_1900_60M"),
+            ("NASDAQ", "10.7500000000", "ACTIVE", "ED_XNAS_1900_60M"),
+            ("NYSE", "10.5000000000", "INACTIVE", "ED_XNYS_1900_60M"),
         ]
     finally:
         connection.rollback()  # type: ignore[union-attr]

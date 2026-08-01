@@ -10,11 +10,12 @@ from typing import Any
 from empire_stonks_ohlcv.config import DEFAULT_EODDATA_EXCHANGES
 from empire_stonks_ohlcv.daily_bars import DailyBarWriteInput, upsert_daily_bars
 from empire_stonks_ohlcv.eoddata import EODDATA_PROVIDER_CODE
-from empire_stonks_ohlcv.exceptions import OHLCVWorkflowError
-from empire_stonks_ohlcv.listings import (
-    ProviderListingWriteResult,
-    upsert_provider_listings,
+from empire_stonks_ohlcv.eoddata_policies import (
+    resolve_eoddata_exchange_policies,
+    upsert_eoddata_provider_listings,
 )
+from empire_stonks_ohlcv.exceptions import OHLCVWorkflowError
+from empire_stonks_ohlcv.listings import ProviderListingWriteResult
 from empire_stonks_ohlcv.results import AcquiredObject, ImportIssue, PersistenceCounts
 from empire_stonks_ohlcv.source_conventions import (
     EODDATA_DAILY_SOURCE,
@@ -203,6 +204,13 @@ def import_eoddata_daily(
         registrations: list[SourceSnapshotRegistration] = []
         write_counts: list[SourceMarketWriteCounts] = []
         with connection.cursor() as cursor:
+            policies = resolve_eoddata_exchange_policies(
+                cursor=cursor,
+                exchanges=DEFAULT_EODDATA_EXCHANGES,
+            )
+            policy_by_exchange = {
+                item.exchange: item for item in policies
+            }
             for acquired_object in ordered_objects:
                 registration = upsert_provider_source_snapshot(
                     cursor=cursor,
@@ -220,11 +228,12 @@ def import_eoddata_daily(
 
             for market in DEFAULT_EODDATA_EXCHANGES:
                 validation = validated_by_market[market]
-                listing_result = upsert_provider_listings(
+                listing_result = upsert_eoddata_provider_listings(
                     cursor=cursor,
                     listings=(
                         batch.listing for batch in validation.output.batches
                     ),
+                    exchange_policy=policy_by_exchange[market],
                 )
                 if not isinstance(listing_result, ProviderListingWriteResult):
                     raise TypeError(

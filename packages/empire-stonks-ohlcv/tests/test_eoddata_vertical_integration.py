@@ -210,7 +210,7 @@ def test_eoddata_six_object_fixture_vertical_and_unchanged_rerun(
         eoddata_request_delay_seconds=0,
         eoddata_credentials=EODDataCredentials(api_key="fixture-secret"),
     )
-    original_listing_writer = eoddata_import.upsert_provider_listings
+    original_listing_writer = eoddata_import.upsert_eoddata_provider_listings
     original_bar_writer = eoddata_import.upsert_daily_bars
 
     def write_listings(**values: object):
@@ -219,13 +219,18 @@ def test_eoddata_six_object_fixture_vertical_and_unchanged_rerun(
         return original_listing_writer(
             cursor=values["cursor"],
             listings=listings,
+            exchange_policy=values["exchange_policy"],
         )
 
     def write_bars(**values: object):
         write_events.append("bars")
         return original_bar_writer(**values)
 
-    monkeypatch.setattr(eoddata_import, "upsert_provider_listings", write_listings)
+    monkeypatch.setattr(
+        eoddata_import,
+        "upsert_eoddata_provider_listings",
+        write_listings,
+    )
     monkeypatch.setattr(eoddata_import, "upsert_daily_bars", write_bars)
 
     run_ids: tuple[UUID, ...] = ()

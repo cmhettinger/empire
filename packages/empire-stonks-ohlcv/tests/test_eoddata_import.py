@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
@@ -172,6 +173,7 @@ def _install_success_writers(
     def write_listings(**values: object) -> ProviderListingWriteResult:
         listings = tuple(values["listings"])  # type: ignore[arg-type]
         market = listings[0].market
+        assert values["exchange_policy"].exchange == market  # type: ignore[union-attr]
         events.append(f"listings:{market}")
         return _listing_result(
             listings,
@@ -199,7 +201,18 @@ def _install_success_writers(
         "upsert_provider_source_snapshot",
         register,
     )
-    monkeypatch.setattr(eoddata_import, "upsert_provider_listings", write_listings)
+    monkeypatch.setattr(
+        eoddata_import,
+        "resolve_eoddata_exchange_policies",
+        lambda **_values: tuple(
+            SimpleNamespace(exchange=market) for market in MARKETS
+        ),
+    )
+    monkeypatch.setattr(
+        eoddata_import,
+        "upsert_eoddata_provider_listings",
+        write_listings,
+    )
     monkeypatch.setattr(eoddata_import, "upsert_daily_bars", write_bars)
 
 
@@ -304,7 +317,7 @@ def test_any_persistence_failure_rolls_back_the_entire_service(
     elif failure_stage == "listing":
         monkeypatch.setattr(
             eoddata_import,
-            "upsert_provider_listings",
+            "upsert_eoddata_provider_listings",
             lambda **_values: (_ for _ in ()).throw(RuntimeError("secret")),
         )
     else:
@@ -359,7 +372,7 @@ def test_duplicate_policy_outcomes_are_carried_without_writing_rejected_rows(
     events: list[str] = []
     written_tickers: list[str] = []
     _install_success_writers(monkeypatch, events=events)
-    original_listing_writer = eoddata_import.upsert_provider_listings
+    original_listing_writer = eoddata_import.upsert_eoddata_provider_listings
 
     def capture_listings(**values: object) -> ProviderListingWriteResult:
         listings = tuple(values["listings"])  # type: ignore[arg-type]
@@ -367,11 +380,12 @@ def test_duplicate_policy_outcomes_are_carried_without_writing_rejected_rows(
         return original_listing_writer(
             cursor=values["cursor"],
             listings=listings,
+            exchange_policy=values["exchange_policy"],
         )
 
     monkeypatch.setattr(
         eoddata_import,
-        "upsert_provider_listings",
+        "upsert_eoddata_provider_listings",
         capture_listings,
     )
 

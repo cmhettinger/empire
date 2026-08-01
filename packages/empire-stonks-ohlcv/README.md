@@ -98,6 +98,14 @@ Unknown calendars, time zones, unsafe calendar warnings, ambiguous local wall
 times, and mismatched provider dates fail closed with no fallback calendar or
 synthetic bar.
 
+EODData persists the reviewed `ED_XNYS_1900_60M` and
+`ED_XNAS_1900_60M` policies and resolves them by exact configured exchange
+through `resolve_eoddata_exchange_policies()`. The EODData listing writer binds
+each newly discovered NYSE, NASDAQ, or AMEX series to that resolved policy in
+the same import transaction without changing operator-owned active/inactive
+status. Existing missing or mismatched assignments, unknown exchanges, and
+drifted policy rows fail closed; no market inherits an Eastern or NYSE default.
+
 ## Yahoo Chart acquisition
 
 `acquire_yahoo_objects()` accepts caller-planned

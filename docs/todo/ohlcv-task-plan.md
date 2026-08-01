@@ -181,7 +181,7 @@ contract and package-owned business logic intact.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | C9.1 | [x] | Define EODData exchange session policies | Map every configured EODData exchange to a supported market calendar, local session/time zone, and post-close availability delay using the shared Y8.2 contract. Document fallbacks and fail closed for an exchange without a valid policy rather than assuming U.S. Eastern time. | Y8.15 |
-| C9.2 | [ ] | Persist and resolve EODData policies | Add the minimal configuration or Flyway data required by the Y8.2 design and implement policy resolution for EODData's dynamically discovered provider listings. Tests cover all configured exchanges, holidays, early closes, DST, and unknown or inactive markets. | C9.1, Y8.5 |
+| C9.2 | [x] | Persist and resolve EODData policies | Add the minimal configuration or Flyway data required by the Y8.2 design and implement policy resolution for EODData's dynamically discovered provider listings. Tests cover all configured exchanges, holidays, early closes, DST, and unknown or inactive markets. | C9.1, Y8.5 |
 | C9.3 | [ ] | Add exchange-level eligibility and reconciliation planning | Before an exchange-bulk EODData request, determine whether its latest expected session is complete and eligible, whether rows are missing, and whether it falls in the configured recent-session reconciliation window. Skip ineligible/complete work while preserving bounded retry and correction behavior. Tests cover exchanges with different calendars on the same date and idempotent repeated runs. | C9.2, E6.10-E6.12 |
 | C9.4 | [ ] | Integrate calendar planning into the EODData runner and reports | Run only planned exchange work, preserve Core lifecycle and partial-exchange failure handling, and report expected-session coverage, ineligible exchanges, missing rows, retries, and corrected current rows. Existing CLI behavior remains compatible and secret safe. | C9.3, E6.7-E6.10 |
 | C9.5 | [ ] | Convert the EODData DAG to eligibility-driven multi-run operation | Keep the DAG thin and invoke it often enough to cover configured exchange closes; the package planner decides whether work is due. Initially retain a safe manual/disabled state until the rollout gate. DAG tests cover discovery, schedule configuration, no-op runs, and failure propagation. | C9.4, B1.5-B1.7 |
@@ -193,6 +193,15 @@ in `docs/stonks/ohlcv-{market-session,eoddata-source}-contract.md` and aligned
 `docs/todo/ohlcv-plan.md`; 68 focused tests passed, 3/3 exchange calendar
 assertions passed across DST/holiday/early-close cases, and Poetry lock check,
 compileall, public imports, and `git diff --check` passed.
+
+Done: 2026-08-01 — added Flyway migration
+`V2026.08.01.0004__stonks_add_eoddata_session_policies.sql`, package resolver
+and first-discovery assignment in `empire_stonks_ohlcv/eoddata_policies.py`,
+EODData import integration, and focused unit/PostgreSQL/SQL contract coverage;
+all 13,672 live configured EODData listings resolved exact policies, the full
+package suite passed 582 tests, Flyway validated 38 migrations, all three DB
+contracts passed, and Poetry check/build, compileall, public imports, pip check,
+88-column scan, and `git diff --check` passed.
 
 ## Phase 10: Documentation, Verification, And Incremental Rollout
 
