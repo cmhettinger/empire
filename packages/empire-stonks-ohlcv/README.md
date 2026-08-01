@@ -772,13 +772,22 @@ Airflow DAG `stonks_ohlcv_eoddata_daily_scrape` is manual-only
 (`schedule=None`). It disables catchup and permits one active run so EODData
 acquisitions cannot overlap. The task reads runtime settings from the
 Compose-provided process environment and delegates the complete workflow to
-`run_eoddata_daily()`.
+`run_eoddata_daily()`. The package planner selects due exchanges; an
+ineligible or already-complete date completes as a normal no-op run with
+durable reports.
 
 For a manual run or rerun, pass an explicit provider date with DAG run
 configuration such as `{"effective_date": "2026-07-15"}`. If omitted, the DAG
 uses the New York date at `data_interval_end`. The task returns only the
 runner's compact secret-safe summary; detailed diagnostics remain in the stored
 report.
+
+After C9.6 and V10.8 approve live operation, the production deployment should
+use `15 20-23 * * 1-5` in `America/New_York`: 20:15, 21:15, 22:15, and 23:15
+ET each weekday. The first run follows the reviewed 20:00 eligibility cutoff;
+the later runs provide same-date retry opportunities. Holidays and completed
+exchanges remain package-planner no-ops. Local/development scheduling stays
+disabled.
 
 ## Development
 
@@ -795,5 +804,6 @@ Shared models, provider-native persistence/query helpers, Core raw-object
 storage, source-snapshot registration, run lifecycle, the transactional import
 boundary, EODData six-request acquisition, and EODData Symbol List parsing are
 implemented along with EODData Quote List parsing/reconciliation, atomic import,
-shared provider health queries, the stored EODData report, and the scheduled
-EODData Airflow entrypoint. Later provider parsers are added in later tasks.
+shared provider health queries, the stored EODData report, and the manual
+eligibility-driven EODData Airflow entrypoint. Later provider parsers are added
+in later tasks.

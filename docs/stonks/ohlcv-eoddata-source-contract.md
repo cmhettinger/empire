@@ -183,9 +183,15 @@ reconciliation corrections.
 The initial Airflow DAG remains manual-only (`schedule=None`), with catchup
 disabled and at most one active DAG run. Manual runs and reruns may provide
 `dag_run.conf.effective_date` as an explicit `YYYY-MM-DD` override; if omitted,
-the current DAG derives the New York date from `data_interval_end`. C9.5 will
-replace that single-date behavior only after package-owned eligibility planning
-is integrated and verified.
+the DAG derives the New York date from `data_interval_end`. It invokes the
+package planner on every run, so an ineligible or already-complete date still
+finishes through the normal no-op Core and report lifecycle.
+
+Automatic production scheduling remains gated by C9.6 and V10.8. The reviewed
+cadence is `15 20-23 * * 1-5` in `America/New_York`, producing weekday runs at
+20:15, 21:15, 22:15, and 23:15 ET. The first invocation follows the 20:00
+eligibility cutoff; later invocations retry same-date missing work. Exchange
+holidays and completed work are planner-owned no-ops rather than DAG logic.
 
 ## Ordered Requests
 

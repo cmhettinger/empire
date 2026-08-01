@@ -184,7 +184,7 @@ contract and package-owned business logic intact.
 | C9.2 | [x] | Persist and resolve EODData policies | Add the minimal configuration or Flyway data required by the Y8.2 design and implement policy resolution for EODData's dynamically discovered provider listings. Tests cover all configured exchanges, holidays, early closes, DST, and unknown or inactive markets. | C9.1, Y8.5 |
 | C9.3 | [x] | Add exchange-level eligibility and reconciliation planning | Before an exchange-bulk EODData request, determine whether its latest expected session is complete and eligible, whether rows are missing, and whether it falls in the configured recent-session reconciliation window. Skip ineligible/complete work while preserving bounded retry and correction behavior. Tests cover exchanges with different calendars on the same date and idempotent repeated runs. | C9.2, E6.10-E6.12 |
 | C9.4 | [x] | Integrate calendar planning into the EODData runner and reports | Run only planned exchange work, preserve Core lifecycle and partial-exchange failure handling, and report expected-session coverage, ineligible exchanges, missing rows, retries, and corrected current rows. Existing CLI behavior remains compatible and secret safe. | C9.3, E6.7-E6.10 |
-| C9.5 | [ ] | Convert the EODData DAG to eligibility-driven multi-run operation | Keep the DAG thin and invoke it often enough to cover configured exchange closes; the package planner decides whether work is due. Initially retain a safe manual/disabled state until the rollout gate. DAG tests cover discovery, schedule configuration, no-op runs, and failure propagation. | C9.4, B1.5-B1.7 |
+| C9.5 | [x] | Convert the EODData DAG to eligibility-driven multi-run operation | Keep the DAG thin and invoke it often enough to cover configured exchange closes; the package planner decides whether work is due. Initially retain a safe manual/disabled state until the rollout gate. DAG tests cover discovery, schedule configuration, no-op runs, and failure propagation. | C9.4, B1.5-B1.7 |
 | C9.6 | [ ] | Verify calendar-aware EODData end to end | Run multi-calendar fixtures through planning, acquisition, persistence, reconciliation, and reports. Prove there are no fabricated weekend/holiday rows, completed rows are skipped, missing rows retry, corrections converge, and Yahoo/EODData policies coexist without provider leakage. | C9.5, Y8.15 |
 
 Done: 2026-08-01 — defined the complete NYSE/NASDAQ/AMEX policy mapping,
@@ -218,6 +218,16 @@ the full database-backed package suite passed 601 tests, 4 focused PostgreSQL
 integration tests and 25 DAG/CLI/report tests passed, Flyway validated 38
 migrations, and Compose config, Poetry check/build, compileall, workspace
 imports, pip check, changed-file 88-column scan, and `git diff --check` passed.
+
+Done: 2026-08-01 — kept
+`dags/stonks/stonks_ohlcv_eoddata_daily_scrape.py` manual while exposing
+planner telemetry and documenting the gated production schedule
+`15 20-23 * * 1-5` America/New_York; updated DAG tests, README, and source
+contract. Forty focused DAG/runner/CLI tests and the full database-backed suite
+of 602 tests passed; Compose config, Poetry check, compileall, imports, pip
+check, changed-file 88-column scan, and `git diff --check` passed. The rebuilt
+Airflow 3.2.1 runtime discovered the external-trigger-only DAG with one active
+run, current worker imports, and no DAG import errors.
 
 ## Phase 10: Documentation, Verification, And Incremental Rollout
 

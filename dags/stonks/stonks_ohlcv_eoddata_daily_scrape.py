@@ -74,13 +74,20 @@ def stonks_ohlcv_eoddata_daily_scrape():
         payload = result.to_dict()
         log.info(
             "Completed EODData daily run %s for %s with JSON report %s, "
-            "run PDF %s, and market PDF %s (%s)",
+            "run PDF %s, and market PDF %s (%s); planned exchanges=%s, "
+            "missing sessions=%s, ineligible exchanges=%s, retries=%s, "
+            "corrected rows=%s",
             payload["run_id"],
             payload["effective_date"],
             payload["report_object_id"],
             payload["pdf_report_object_id"],
             payload["market_pdf_report_object_id"],
             payload["report_outcome"],
+            payload["planned_exchange_count"],
+            payload["missing_session_count"],
+            payload["ineligible_exchange_count"],
+            payload["retry_count"],
+            payload["corrected_current_rows"],
         )
         return payload
 
@@ -90,3 +97,10 @@ def stonks_ohlcv_eoddata_daily_scrape():
 stonks_ohlcv_eoddata_daily_scrape_dag = (
     stonks_ohlcv_eoddata_daily_scrape()
 )
+
+# Production automation note: keep schedule=None for local/development use.
+# After C9.6 and V10.8 approve live operation, configure this deployment with
+# schedule="15 20-23 * * 1-5" in America/New_York: 20:15, 21:15, 22:15, and
+# 23:15 ET each weekday. The first run follows the reviewed 20:00 eligibility
+# cutoff; later runs retry same-date missing work. The package planner makes
+# holidays, pre-eligibility runs, and already-complete exchanges safe no-ops.

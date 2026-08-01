@@ -13,7 +13,9 @@ import pytest
 DAG_ID = "stonks_ohlcv_eoddata_daily_scrape"
 
 
-def test_eoddata_daily_dag_is_manual_and_import_safe(monkeypatch):
+def test_eoddata_daily_dag_is_manual_and_documents_production_cadence(
+    monkeypatch,
+):
     module, _fake_sdk = _load_dag_module(monkeypatch)
 
     dag = module.stonks_ohlcv_eoddata_daily_scrape_dag
@@ -27,6 +29,14 @@ def test_eoddata_daily_dag_is_manual_and_import_safe(monkeypatch):
     assert [item.task_id for item in dag.tasks] == ["run_eoddata_daily"]
 
     source = Path(module.__file__).read_text(encoding="utf-8")
+    production_note = source.index("Production automation note")
+    dag_instance = source.rindex("stonks_ohlcv_eoddata_daily_scrape()")
+    assert production_note > dag_instance
+    assert 'schedule="15 20-23 * * 1-5"' in source
+    assert "20:15, 21:15, 22:15, and" in source
+    assert "23:15 ET each weekday" in source
+    assert "America/New_York" in source
+    assert "package planner" in source
     assert "EMPIRE_STONKS_OHLCV_EODDATA_API_KEY" not in source
     assert "os.environ" not in source
 
@@ -88,7 +98,7 @@ def test_effective_date_rejects_invalid_override(monkeypatch, value):
         module._effective_date_from_context(context)
 
 
-def test_eoddata_daily_task_delegates_and_returns_compact_result(monkeypatch):
+def test_eoddata_daily_task_delegates_noop_result(monkeypatch):
     module, fake_sdk = _load_dag_module(monkeypatch)
     dag_run = SimpleNamespace(
         conf={},
@@ -111,11 +121,18 @@ def test_eoddata_daily_task_delegates_and_returns_compact_result(monkeypatch):
         "pdf_report_object_id": "92d58710-d9f5-4b79-9c76-26348c2733e4",
         "market_pdf_report_object_id": "aaec1a3e-6934-4ce6-9668-c2de7696c131",
         "report_outcome": "PASS",
-        "listing_counts": {"inserted": 3, "updated": 0, "unchanged": 0},
-        "bar_counts": {"inserted": 3, "updated": 0, "unchanged": 0},
+        "listing_counts": {"inserted": 0, "updated": 0, "unchanged": 0},
+        "bar_counts": {"inserted": 0, "updated": 0, "unchanged": 0},
         "skipped_inactive_bars": 0,
         "failure_count": 0,
         "warning_count": 0,
+        "expected_session_count": 0,
+        "eligible_session_count": 0,
+        "missing_session_count": 0,
+        "ineligible_exchange_count": 3,
+        "planned_exchange_count": 0,
+        "retry_count": 0,
+        "corrected_current_rows": 0,
     }
     calls = []
 
@@ -167,6 +184,36 @@ def test_eoddata_daily_task_delegates_and_returns_compact_result(monkeypatch):
             },
         }
     ]
+
+
+def test_eoddata_daily_task_propagates_runner_failure(monkeypatch):
+    module, fake_sdk = _load_dag_module(monkeypatch)
+    fake_sdk.context = {
+        "dag_run": SimpleNamespace(conf={}, run_id="manual__failure"),
+        "data_interval_end": datetime(2026, 8, 1, 13, tzinfo=UTC),
+    }
+
+    class FakeConnectionContext:
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, *_args):
+            return None
+
+    monkeypatch.setattr(
+        module.EmpireDatabase,
+        "connect_from_env",
+        lambda: FakeConnectionContext(),
+    )
+    monkeypatch.setattr(module.OHLCVConfig, "from_env", lambda: object())
+    monkeypatch.setattr(
+        module,
+        "run_eoddata_daily",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("runner failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="runner failed"):
+        dag_run_task(module).python_callable()
 
 
 def dag_run_task(module):
