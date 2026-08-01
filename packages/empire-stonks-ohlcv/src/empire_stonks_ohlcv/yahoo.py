@@ -577,21 +577,55 @@ def _classify_response(
         return _invalid_chart()
     meta = series.get("meta")
     timestamps = series.get("timestamp")
-    if not isinstance(meta, dict) or not isinstance(timestamps, list):
+    if not isinstance(meta, dict):
         return _invalid_chart()
     if meta.get("symbol") != request.listing.yahoo_ticker:
         return _ResponseClassification(
             YahooAcquisitionStatus.FAILED,
             YahooFailureReason.SYMBOL_MISMATCH,
         )
+    if timestamps is None:
+        if not _has_empty_history_indicators(series.get("indicators")):
+            return _invalid_chart()
+        return _no_data_classification(request)
+    if not isinstance(timestamps, list):
+        return _invalid_chart()
     if not timestamps:
-        if request.mode is YahooRequestMode.BACKFILL:
-            return _ResponseClassification(
-                YahooAcquisitionStatus.FAILED,
-                YahooFailureReason.NO_BACKFILL_DATA,
-            )
-        return _ResponseClassification(YahooAcquisitionStatus.MISSING)
+        if not _has_empty_history_indicators(series.get("indicators")):
+            return _invalid_chart()
+        return _no_data_classification(request)
     return _ResponseClassification(YahooAcquisitionStatus.STORED)
+
+
+def _has_empty_history_indicators(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    quote = value.get("quote")
+    if (
+        not isinstance(quote, list)
+        or len(quote) != 1
+        or quote[0] != {}
+    ):
+        return False
+    if "adjclose" not in value:
+        return True
+    adjusted = value["adjclose"]
+    return (
+        isinstance(adjusted, list)
+        and len(adjusted) == 1
+        and adjusted[0] == {}
+    )
+
+
+def _no_data_classification(
+    request: YahooAcquisitionRequest,
+) -> _ResponseClassification:
+    if request.mode is YahooRequestMode.BACKFILL:
+        return _ResponseClassification(
+            YahooAcquisitionStatus.FAILED,
+            YahooFailureReason.NO_BACKFILL_DATA,
+        )
+    return _ResponseClassification(YahooAcquisitionStatus.MISSING)
 
 
 def _invalid_chart() -> _ResponseClassification:

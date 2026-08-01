@@ -145,6 +145,29 @@ def _chart_body(
     return json.dumps(payload, separators=(",", ":")).encode()
 
 
+def _empty_history_body(
+    *,
+    symbol: str = "^GSPC",
+    timestamps: object = None,
+) -> bytes:
+    payload = {
+        "chart": {
+            "result": [
+                {
+                    "meta": {"symbol": symbol},
+                    "timestamp": timestamps,
+                    "indicators": {
+                        "quote": [{}],
+                        "adjclose": [{}],
+                    },
+                }
+            ],
+            "error": None,
+        }
+    }
+    return json.dumps(payload, separators=(",", ":")).encode()
+
+
 def _response(
     body: bytes | None = None,
     *,
@@ -485,6 +508,13 @@ def test_nonretryable_http_failure_is_safe_and_not_stored(
         (_response(b'{"wrong":{}}'), YahooFailureReason.INVALID_CHART),
         (
             _response(
+                b'{"chart":{"result":[{"meta":{"symbol":"^GSPC"},'
+                b'"timestamp":null}],"error":null}}'
+            ),
+            YahooFailureReason.INVALID_CHART,
+        ),
+        (
+            _response(
                 json.dumps(
                     {
                         "chart": {
@@ -531,7 +561,8 @@ def test_http_200_errors_are_stored_before_safe_classification(
     [
         b'{"chart":{"result":null,"error":null}}',
         b'{"chart":{"result":[],"error":null}}',
-        _chart_body(timestamps=[]),
+        _empty_history_body(),
+        _empty_history_body(timestamps=[]),
     ],
 )
 def test_daily_no_data_is_stored_missing_and_retryable(
@@ -565,9 +596,7 @@ def test_empty_backfill_is_a_stored_failure(tmp_path: Path) -> None:
         run_context=_run_context(),
         config=_config(),
         requests=(_request(mode=YahooRequestMode.BACKFILL),),
-        transport=lambda **_: _response(
-            b'{"chart":{"result":null,"error":null}}'
-        ),
+        transport=lambda **_: _response(_empty_history_body()),
         sleep=lambda _: None,
         clock=lambda: STORED_AT,
     )
@@ -577,6 +606,29 @@ def test_empty_backfill_is_a_stored_failure(tmp_path: Path) -> None:
     assert (
         result.outcomes[0].failure_reason
         is YahooFailureReason.NO_BACKFILL_DATA
+    )
+
+
+def test_empty_history_still_validates_the_requested_symbol(
+    tmp_path: Path,
+) -> None:
+    object_store, _ = _store(tmp_path)
+
+    result = acquire_yahoo_objects(
+        object_store=object_store,
+        run_context=_run_context(),
+        config=_config(),
+        requests=(_request(),),
+        transport=lambda **_: _response(
+            _empty_history_body(symbol="^WRONG")
+        ),
+        sleep=lambda _: None,
+        clock=lambda: STORED_AT,
+    )
+
+    assert result.failed_count == 1
+    assert result.outcomes[0].failure_reason is (
+        YahooFailureReason.SYMBOL_MISMATCH
     )
 
 

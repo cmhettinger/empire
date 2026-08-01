@@ -62,13 +62,13 @@ $function$;
 
 SELECT pg_temp.assert_true(
     (
-        SELECT count(*) = 93
+        SELECT count(*) = 90
         FROM provider_listing
         WHERE provider_code = 'YAHOO'
           AND market = 'XIDX'
           AND status = 'ACTIVE'
     ),
-    'Yahoo seed contains exactly 93 active XIDX listings'
+    'Yahoo seed contains exactly 90 active XIDX listings after review'
 );
 
 SELECT pg_temp.assert_true(
@@ -217,6 +217,45 @@ SELECT pg_temp.assert_true(
           AND ticker = 'N225'
     ),
     'representative European and Asian cash indexes are mapped'
+);
+
+SELECT pg_temp.assert_true(
+    (
+        SELECT metadata ->> 'YahooTicker' = '^J200.JO'
+           AND metadata #>> '{YahooSeedReview,disposition}'
+               = 'CORRECTED_TICKER'
+           AND status = 'ACTIVE'
+        FROM provider_listing
+        WHERE provider_code = 'YAHOO'
+          AND market = 'XIDX'
+          AND ticker = 'JTOPI'
+    )
+    AND (
+        SELECT metadata ->> 'YahooTicker' = '^SET.BK'
+           AND metadata #>> '{YahooSeedReview,disposition}'
+               = 'CORRECTED_TICKER'
+           AND status = 'ACTIVE'
+        FROM provider_listing
+        WHERE provider_code = 'YAHOO'
+          AND market = 'XIDX'
+          AND ticker = 'SET'
+    ),
+    'reviewed JTOPI and SET Yahoo symbols are active and corrected'
+);
+
+SELECT pg_temp.assert_true(
+    (
+        SELECT count(*) = 3
+           AND bool_and(status = 'INACTIVE')
+           AND bool_and(
+               metadata #>> '{YahooSeedReview,disposition}' = 'UNSUPPORTED'
+           )
+        FROM provider_listing
+        WHERE provider_code = 'YAHOO'
+          AND market = 'XIDX'
+          AND ticker IN ('IPSA', 'MSCIEM', 'RVX')
+    ),
+    'reviewed unavailable Yahoo seeds are explicitly inactive'
 );
 
 SELECT pg_temp.assert_true(

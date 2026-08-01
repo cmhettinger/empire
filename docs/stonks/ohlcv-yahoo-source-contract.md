@@ -24,7 +24,7 @@ The shared source identity is:
 |-------|-------|
 | Provider code | `YAHOO` |
 | Source code | `yahoo_daily` |
-| Parser version | `1.0.0` |
+| Parser version | `1.1.0` |
 | Content type | `application/json` |
 | Interval | `1d` |
 
@@ -247,10 +247,11 @@ The daily workflow:
   zero-valued bar.
 
 A completely planned daily pass can make at most one initial request per
-selected listing after consolidation. The full initial universe therefore has
-an upper bound of 93 initial requests, plus bounded retries. Most repeated runs
-should plan substantially less work because complete ineligible rows are
-skipped before acquisition.
+selected listing after consolidation. The reviewed active universe therefore
+has an upper bound of 90 initial requests, plus bounded retries. The original
+93 seed rows remain durable: unsupported rows are inactive rather than erased.
+Most repeated runs should plan substantially less work because complete
+ineligible rows are skipped before acquisition.
 
 ## Response And Daily-Bar Contract
 
@@ -304,6 +305,18 @@ collapse with a warning. Conflicting duplicates reject that date rather than
 using first-wins, last-wins, highest-volume, or input-order behavior. Array
 length mismatches, a symbol mismatch, malformed JSON, multiple results, or an
 unexpected top-level shape are structural source failures.
+
+A Chart result with matching `meta.symbol`, valid empty `indicators`, and a
+null, absent, or empty `timestamp` is an explicit no-history response. Daily
+acquisition records it as missing/retryable; historical backfill records
+`no_backfill_data`. Missing indicators, non-empty indicator arrays without
+timestamps, provider errors, and symbol mismatches remain distinct failures.
+
+The 2026-08-01 availability review corrected `JTOPI` from `^JA0R.JO` to
+`^J200.JO` and `SET` from `^SET` to `^SET.BK`. `IPSA`, `MSCIEM`, and `RVX`
+remain as durable seed rows but are inactive with `metadata.YahooSeedReview`
+explaining the unsupported Chart disposition. Active listing enumeration
+therefore excludes them without deleting their reviewed identities.
 
 ## Native Adjustment And Correction Semantics
 
