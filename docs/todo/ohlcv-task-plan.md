@@ -185,7 +185,7 @@ contract and package-owned business logic intact.
 | C9.3 | [x] | Add exchange-level eligibility and reconciliation planning | Before an exchange-bulk EODData request, determine whether its latest expected session is complete and eligible, whether rows are missing, and whether it falls in the configured recent-session reconciliation window. Skip ineligible/complete work while preserving bounded retry and correction behavior. Tests cover exchanges with different calendars on the same date and idempotent repeated runs. | C9.2, E6.10-E6.12 |
 | C9.4 | [x] | Integrate calendar planning into the EODData runner and reports | Run only planned exchange work, preserve Core lifecycle and partial-exchange failure handling, and report expected-session coverage, ineligible exchanges, missing rows, retries, and corrected current rows. Existing CLI behavior remains compatible and secret safe. | C9.3, E6.7-E6.10 |
 | C9.5 | [x] | Convert the EODData DAG to eligibility-driven multi-run operation | Keep the DAG thin and invoke it often enough to cover configured exchange closes; the package planner decides whether work is due. Initially retain a safe manual/disabled state until the rollout gate. DAG tests cover discovery, schedule configuration, no-op runs, and failure propagation. | C9.4, B1.5-B1.7 |
-| C9.6 | [ ] | Verify calendar-aware EODData end to end | Run multi-calendar fixtures through planning, acquisition, persistence, reconciliation, and reports. Prove there are no fabricated weekend/holiday rows, completed rows are skipped, missing rows retry, corrections converge, and Yahoo/EODData policies coexist without provider leakage. | C9.5, Y8.15 |
+| C9.6 | [x] | Verify calendar-aware EODData end to end | Run multi-calendar fixtures through planning, acquisition, persistence, reconciliation, and reports. Prove there are no fabricated weekend/holiday rows, completed rows are skipped, missing rows retry, corrections converge, and Yahoo/EODData policies coexist without provider leakage. | C9.5, Y8.15 |
 
 Done: 2026-08-01 — defined the complete NYSE/NASDAQ/AMEX policy mapping,
 reviewed AMEX-to-XNYS fallback, 8-p.m. local eligibility, and fail-closed rules
@@ -228,6 +228,19 @@ of 602 tests passed; Compose config, Poetry check, compileall, imports, pip
 check, changed-file 88-column scan, and `git diff --check` passed. The rebuilt
 Airflow 3.2.1 runtime discovered the external-trigger-only DAG with one active
 run, current worker imports, and no DAG import errors.
+
+Done: 2026-08-01 — added the PostgreSQL/Core multi-calendar gate in
+`tests/test_eoddata_calendar_vertical_integration.py` and made reconciliation
+recency clock-relative in `eoddata_planning.py`. The gate proved XNYS/NASDAQ
+calendar use, holiday/weekend no-ops without fabricated rows, retry of a
+missing AMEX session, NYSE correction then unchanged convergence, completed
+historical-session skipping, JSON/PDF/report lineage, and isolated EODData and
+Yahoo policies. Twelve focused EODData/Yahoo/isolation integrations and the
+full database-backed suite of 604 tests passed; Flyway validated 38 migrations,
+and Compose config, Poetry check/build, compileall, imports, pip check,
+changed-file 88-column scan, and `git diff --check` passed. The rebuilt Airflow
+3.2.1 worker imported the final package and the manual DAG remained
+external-trigger-only with no import errors.
 
 ## Phase 10: Documentation, Verification, And Incremental Rollout
 

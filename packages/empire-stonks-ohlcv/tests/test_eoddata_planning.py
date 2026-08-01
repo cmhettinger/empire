@@ -48,6 +48,25 @@ class StaticSessionService:
         return result
 
 
+class RangeAwareSessionService:
+    def __init__(self, sessions: tuple[ExpectedSession, ...]) -> None:
+        self.sessions = sessions
+
+    def expected_sessions(
+        self,
+        *,
+        policy: SessionPolicy,
+        start_date: date,
+        end_date: date,
+    ) -> tuple[ExpectedSession, ...]:
+        del policy
+        return tuple(
+            item
+            for item in self.sessions
+            if start_date <= item.session_date <= end_date
+        )
+
+
 class StorageCursor:
     def __init__(
         self,
@@ -222,6 +241,36 @@ def test_ineligible_latest_session_is_never_missing_or_requested() -> None:
         assert tuple(item.effective_date for item in exchange.work) == (
             date(2026, 7, 1),
         )
+
+
+def test_completed_historical_sessions_outside_recent_window_are_skipped() -> None:
+    service = RangeAwareSessionService(
+        tuple(_session(day) for day in (1, 2, 8, 9))
+    )
+    storage = (
+        _stored("NYSE", {1: 5, 2: 5}),
+        _stored("NASDAQ", {2: 5}),
+        _stored("AMEX", {1: 5, 2: 5}),
+    )
+
+    plan = build_eoddata_exchange_plan(
+        policies=_policies(),
+        storage=storage,
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 7, 2),
+        now=datetime(2026, 7, 10, 2, tzinfo=UTC),
+        reconciliation_sessions=2,
+        session_service=service,  # type: ignore[arg-type]
+    )
+
+    assert plan.exchanges[0].work == ()
+    assert tuple(item.effective_date for item in plan.exchanges[1].work) == (
+        date(2026, 7, 1),
+    )
+    assert plan.exchanges[1].work[0].reason is (
+        EODDataExchangeWorkReason.ELIGIBLE_MISSING_SESSION
+    )
+    assert plan.exchanges[2].work == ()
 
 
 def test_different_calendars_can_disagree_on_the_same_date() -> None:

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from empire_stonks_ohlcv.config import (
     DEFAULT_EODDATA_EXCHANGES,
@@ -44,6 +45,10 @@ class EODDataPlanningFailureReason(StrEnum):
     """Stable secret-safe planning failure categories."""
 
     CALENDAR_POLICY = "calendar_policy"
+
+
+_RECENT_SESSION_LOOKBACK_BUFFER_DAYS = 14
+_RECENT_SESSION_LOOKBACK_DAYS_PER_SESSION = 3
 
 
 @dataclass(frozen=True)
@@ -527,6 +532,7 @@ def build_eoddata_exchange_plan(
         )
     service = session_service or MarketSessionService()
     expected_cache: dict[SessionPolicy, tuple[ExpectedSession, ...] | None] = {}
+    recent_cache: dict[SessionPolicy, frozenset[date] | None] = {}
     plans = tuple(
         _plan_exchange(
             resolved_policy=resolved_policy,
@@ -537,6 +543,7 @@ def build_eoddata_exchange_plan(
             reconciliation_sessions=reconciliation_sessions,
             session_service=service,
             expected_cache=expected_cache,
+            recent_cache=recent_cache,
         )
         for resolved_policy, storage_state in zip(policies, storage, strict=True)
     )
@@ -559,6 +566,7 @@ def _plan_exchange(
     reconciliation_sessions: int,
     session_service: MarketSessionService,
     expected_cache: dict[SessionPolicy, tuple[ExpectedSession, ...] | None],
+    recent_cache: dict[SessionPolicy, frozenset[date] | None],
 ) -> EODDataExchangeDailyPlan:
     if storage_state.exchange != resolved_policy.exchange:
         raise ValueError("Policy and storage exchange must match.")
@@ -583,6 +591,27 @@ def _plan_exchange(
             active_listing_count=storage_state.active_listing_count,
             failure_reason=EODDataPlanningFailureReason.CALENDAR_POLICY,
         )
+    recent_dates = recent_cache.get(policy)
+    if policy not in recent_cache:
+        try:
+            recent_dates = _recent_eligible_session_dates(
+                policy=policy,
+                now=now,
+                reconciliation_sessions=reconciliation_sessions,
+                session_service=session_service,
+            )
+        except OHLCVCalendarError:
+            recent_dates = None
+        recent_cache[policy] = recent_dates
+    if recent_dates is None:
+        return EODDataExchangeDailyPlan(
+            exchange=resolved_policy.exchange,
+            policy_code=policy.code,
+            status=EODDataExchangePlanStatus.FAILED,
+            total_listing_count=storage_state.total_listing_count,
+            active_listing_count=storage_state.active_listing_count,
+            failure_reason=EODDataPlanningFailureReason.CALENDAR_POLICY,
+        )
     eligible = tuple(item for item in expected if item.is_eligible(now))
     if storage_state.is_inactive:
         return EODDataExchangeDailyPlan(
@@ -599,7 +628,9 @@ def _plan_exchange(
         for item in eligible
         if storage_state.bar_count_for(item.session_date) == 0
     )
-    reconciliation = eligible[-reconciliation_sessions:]
+    reconciliation = tuple(
+        item for item in eligible if item.session_date in recent_dates
+    )
     reconciliation_dates = set(_session_dates(reconciliation))
     work = tuple(
         EODDataExchangeWork(
@@ -627,6 +658,30 @@ def _plan_exchange(
         missing_sessions=missing,
         reconciliation_sessions=reconciliation,
         work=work,
+    )
+
+
+def _recent_eligible_session_dates(
+    *,
+    policy: SessionPolicy,
+    now: datetime,
+    reconciliation_sessions: int,
+    session_service: MarketSessionService,
+) -> frozenset[date]:
+    local_date = now.astimezone(ZoneInfo(policy.timezone_name)).date()
+    lookback_days = (
+        reconciliation_sessions
+        * _RECENT_SESSION_LOOKBACK_DAYS_PER_SESSION
+        + _RECENT_SESSION_LOOKBACK_BUFFER_DAYS
+    )
+    expected = session_service.expected_sessions(
+        policy=policy,
+        start_date=local_date - timedelta(days=lookback_days),
+        end_date=local_date,
+    )
+    eligible = tuple(item for item in expected if item.is_eligible(now))
+    return frozenset(
+        item.session_date for item in eligible[-reconciliation_sessions:]
     )
 
 

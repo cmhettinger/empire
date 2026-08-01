@@ -112,10 +112,13 @@ exchange's authoritative eligible sessions with stored bars for active EODData
 listings. An eligible date with no active-listing bars is retryable until it is
 filled. Complete dates are skipped unless they are among the most recent
 configured reconciliation sessions, where repeat requests allow provider
-corrections to converge. Ineligible sessions and exchanges whose discovered
-listings are all inactive produce no work. A first-discovery exchange with no
-listings remains due so its Symbol List can be acquired. Planning is pure and
-idempotent for the same database state and aware clock value.
+corrections to converge. The recent window is resolved from each exchange
+calendar against the supplied clock, so an old completed effective date is not
+made recent merely by planning that date alone. Ineligible sessions and
+exchanges whose discovered listings are all inactive produce no work. A
+first-discovery exchange with no listings remains due so its Symbol List can be
+acquired. Planning is pure and idempotent for the same database state and aware
+clock value.
 
 `run_eoddata_daily()` plans inside its Core run and acquires only the ordered
 exchange partitions that have due work. An all-ineligible or inactive result is

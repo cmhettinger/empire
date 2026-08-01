@@ -153,7 +153,11 @@ eligible dates remain planned on every unchanged run, providing stateless,
 bounded retry behavior. Complete dates are skipped except for the latest
 `EMPIRE_STONKS_OHLCV_EODDATA_RECONCILIATION_SESSIONS` eligible dates, which are
 re-requested so provider corrections can update current rows. The window must
-be between 1 and 30 sessions and defaults to 7.
+be between 1 and 30 sessions and defaults to 7. Recency is calculated from
+each policy's authoritative calendar relative to the supplied planning clock,
+not merely from the dates in a caller's requested range. A completed historical
+date therefore becomes a no-op after it leaves the real recent-session window,
+while a missing historical date remains retryable.
 
 An exchange with discovered listings but no active listings is inactive and
 produces no work. An exchange with no discovered listings remains due so its

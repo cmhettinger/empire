@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 from collections.abc import Iterator, Mapping
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -26,6 +26,7 @@ DATABASE_ENVIRONMENT = (
     "EMPIRE_DB_PASSWORD",
 )
 EFFECTIVE_DATE = date(2026, 1, 5)
+PLANNED_AT = datetime(2026, 1, 6, 2, tzinfo=UTC)
 MARKETS = ("NYSE", "NASDAQ", "AMEX")
 
 
@@ -245,6 +246,7 @@ def test_eoddata_six_object_fixture_vertical_and_unchanged_rerun(
             runner=runner,
             transport=_transport(payloads, calls),
             sleep=lambda _delay: None,
+            clock=lambda: PLANNED_AT,
         )
         second = run_eoddata_daily(
             run_service=run_service,
@@ -256,6 +258,7 @@ def test_eoddata_six_object_fixture_vertical_and_unchanged_rerun(
             runner=runner,
             transport=_transport(payloads, calls),
             sleep=lambda _delay: None,
+            clock=lambda: PLANNED_AT,
         )
         run_ids = (first.run_id, second.run_id)
 
