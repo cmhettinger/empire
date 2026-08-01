@@ -9,7 +9,7 @@ from uuid import uuid4
 import pytest
 
 from empire_core import EmpireDatabase
-from empire_stonks_ohlcv import plan_yahoo_daily_completeness
+from empire_stonks_ohlcv import OHLCVConfigError, plan_yahoo_daily_completeness
 
 
 DATABASE_ENVIRONMENT = (
@@ -121,3 +121,24 @@ def test_database_plan_is_noop_after_completion_and_missing_is_retryable(
         missing_again = plan_yahoo_daily_completeness(**arguments)
 
         assert missing_again.pulls == missing.pulls
+
+
+@pytest.mark.parametrize(
+    "ticker",
+    ("BCOM", "CSI300", "MOVE", "PSEI", "TASI", "W5000"),
+)
+def test_database_plan_excludes_reviewed_stale_inactive_seed(
+    database_connection: object,
+    ticker: str,
+) -> None:
+    connection = database_connection
+    with connection.cursor() as cursor:  # type: ignore[union-attr]
+        with pytest.raises(OHLCVConfigError, match="not an active seed"):
+            plan_yahoo_daily_completeness(
+                cursor=cursor,
+                start_date=date(2026, 7, 20),
+                end_date=date(2026, 7, 30),
+                now=datetime(2026, 8, 1, tzinfo=UTC),
+                max_request_days=10,
+                tickers=(ticker,),
+            )

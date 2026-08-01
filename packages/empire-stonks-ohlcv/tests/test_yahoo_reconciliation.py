@@ -102,7 +102,7 @@ def _completeness_plan() -> YahooDailyCompletenessPlan:
         start_date=date(2026, 7, 1),
         end_date=date(2026, 7, 5),
         planned_at=datetime(2026, 7, 5, tzinfo=UTC),
-        enumerated_listing_count=93,
+        enumerated_listing_count=84,
         listings=(dxy, spx),
     )
 

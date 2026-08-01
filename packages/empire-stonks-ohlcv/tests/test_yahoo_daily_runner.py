@@ -61,8 +61,8 @@ def test_compact_run_result_distinguishes_noop_phases() -> None:
             start_date=date(2026, 7, 31),
             end_date=date(2026, 7, 31),
         ),
-        enumerated_listing_count=93,
-        selected_listing_count=93,
+        enumerated_listing_count=84,
+        selected_listing_count=84,
         calendar_policy_error_count=0,
         ingestion=empty_yahoo_report_phase(
             YahooReportPhase.DAILY_INGESTION

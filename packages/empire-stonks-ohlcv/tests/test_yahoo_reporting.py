@@ -143,7 +143,7 @@ def _plan() -> YahooDailyCompletenessPlan:
         start_date=date(2026, 7, 1),
         end_date=date(2026, 7, 4),
         planned_at=datetime(2026, 7, 4, 20, tzinfo=UTC),
-        enumerated_listing_count=93,
+        enumerated_listing_count=84,
         listings=(
             YahooListingCompletenessPlan(
                 listing=dxy,
@@ -235,6 +235,8 @@ def test_daily_report_distinguishes_calendar_coverage_and_observed_polls() -> No
     assert report["schema_version"] == REPORT_SCHEMA_VERSION
     assert report["report_type"] == YAHOO_DAILY_REPORT_TYPE
     assert report["workflow"] == "daily_ingestion_and_reconciliation"
+    assert report["scope"]["enumerated_listing_count"] == 84
+    assert report["scope"]["selected_listing_count"] == 2
     assert report["coverage"]["eligible_session_count"] == 3
     assert report["coverage"]["ineligible_session_count"] == 1
     assert report["coverage"]["missing_eligible_session_count"] == 1
@@ -438,7 +440,7 @@ def test_daily_report_bounds_calendar_policy_errors() -> None:
         start_date=date(2026, 7, 1),
         end_date=date(2026, 7, 4),
         planned_at=datetime(2026, 7, 4, 20, tzinfo=UTC),
-        enumerated_listing_count=93,
+        enumerated_listing_count=84,
         listings=(
             YahooListingCompletenessPlan(
                 listing=target,

@@ -248,7 +248,7 @@ The daily workflow:
 
 A completely planned daily pass can make at most one initial request per
 selected listing after consolidation. The reviewed active universe therefore
-has an upper bound of 90 initial requests, plus bounded retries. The original
+has an upper bound of 84 initial requests, plus bounded retries. The original
 93 seed rows remain durable: unsupported rows are inactive rather than erased.
 Most repeated runs should plan substantially less work because complete
 ineligible rows are skipped before acquisition.
@@ -317,6 +317,15 @@ The 2026-08-01 availability review corrected `JTOPI` from `^JA0R.JO` to
 remain as durable seed rows but are inactive with `metadata.YahooSeedReview`
 explaining the unsupported Chart disposition. Active listing enumeration
 therefore excludes them without deleting their reviewed identities.
+
+The same review found that exact mappings for `BCOM`, `CSI300`, `MOVE`,
+`PSEI`, `TASI`, and `W5000` returned empty OHLC placeholders for every
+eligible session after July 16/17, 2026. Provider symbol search produced no
+exact replacement with continuous completed history. These rows and their
+previously accepted bars remain durable, but the listings are inactive with
+`UNAVAILABLE_STALE_HISTORY` review metadata and an explicit reactivation
+condition. Their calendar policies were not weakened to hide real gaps, and
+no ETF, future, or related index was substituted as a proxy.
 
 ## Native Adjustment And Correction Semantics
 

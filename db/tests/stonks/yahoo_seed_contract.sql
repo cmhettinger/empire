@@ -62,13 +62,13 @@ $function$;
 
 SELECT pg_temp.assert_true(
     (
-        SELECT count(*) = 90
+        SELECT count(*) = 84
         FROM provider_listing
         WHERE provider_code = 'YAHOO'
           AND market = 'XIDX'
           AND status = 'ACTIVE'
     ),
-    'Yahoo seed contains exactly 90 active XIDX listings after review'
+    'Yahoo seed contains exactly 84 active XIDX listings after review'
 );
 
 SELECT pg_temp.assert_true(
@@ -256,6 +256,22 @@ SELECT pg_temp.assert_true(
           AND ticker IN ('IPSA', 'MSCIEM', 'RVX')
     ),
     'reviewed unavailable Yahoo seeds are explicitly inactive'
+);
+
+SELECT pg_temp.assert_true(
+    (
+        SELECT count(*) = 6
+           AND bool_and(status = 'INACTIVE')
+           AND bool_and(
+               metadata #>> '{YahooSeedReview,disposition}'
+                   = 'UNAVAILABLE_STALE_HISTORY'
+           )
+        FROM provider_listing
+        WHERE provider_code = 'YAHOO'
+          AND market = 'XIDX'
+          AND ticker IN ('BCOM', 'CSI300', 'MOVE', 'PSEI', 'TASI', 'W5000')
+    ),
+    'reviewed stale Yahoo seeds are explicitly inactive'
 );
 
 SELECT pg_temp.assert_true(
