@@ -120,6 +120,8 @@ EMPIRE_STONKS_OHLCV_YAHOO_FAILURE_COOLDOWN_MIN_SECONDS=8
 EMPIRE_STONKS_OHLCV_YAHOO_FAILURE_COOLDOWN_MAX_SECONDS=18
 EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_START_DATE=1965-01-01
 EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_CHUNK_DAYS=3650
+EMPIRE_STONKS_OHLCV_YAHOO_DAILY_LOOKBACK_DAYS=30
+EMPIRE_STONKS_OHLCV_YAHOO_DAILY_REQUEST_MAX_DAYS=30
 EMPIRE_STONKS_OHLCV_YAHOO_RECONCILIATION_SESSIONS=7
 ```
 
@@ -157,6 +159,12 @@ date range but may not exceed that chunk limit.
 `RECONCILIATION_SESSIONS` must be from 1 through 30. The initial value of seven
 means the daily workflow rechecks up to the latest seven expected sessions;
 the calendar and eligibility design is finalized in Y8.2.
+
+`DAILY_LOOKBACK_DAYS` must be from 1 through 365 and defines the default
+inclusive operator planning window ending on the effective date.
+`DAILY_REQUEST_MAX_DAYS` must be from 1 through 90 and bounds every range
+created by daily completeness and reconciliation planning. Explicit CLI dates
+may narrow the planning window but do not widen this per-request bound.
 
 No Yahoo credential is required by this selected contract. If that changes,
 the new secret must use the Yahoo prefix, receive redaction tests, and never

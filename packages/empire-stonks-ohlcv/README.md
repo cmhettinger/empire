@@ -56,6 +56,8 @@ EMPIRE_STONKS_OHLCV_YAHOO_FAILURE_COOLDOWN_MIN_SECONDS=8
 EMPIRE_STONKS_OHLCV_YAHOO_FAILURE_COOLDOWN_MAX_SECONDS=18
 EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_START_DATE=1965-01-01
 EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_CHUNK_DAYS=3650
+EMPIRE_STONKS_OHLCV_YAHOO_DAILY_LOOKBACK_DAYS=30
+EMPIRE_STONKS_OHLCV_YAHOO_DAILY_REQUEST_MAX_DAYS=30
 EMPIRE_STONKS_OHLCV_YAHOO_RECONCILIATION_SESSIONS=7
 ```
 
@@ -106,8 +108,9 @@ assigned to multiple listing UUIDs.
 The acquisition service percent-encodes one Yahoo symbol as one Chart path
 segment and constructs explicit UTC `period1` inclusive and `period2` exclusive
 bounds. Backfills are split into deterministic ascending chunks no larger than
-`EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_CHUNK_DAYS`; daily ranges must already fit
-that bound. Requests remain serial and use the configured normal delay,
+`EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_CHUNK_DAYS`; daily plans use the tighter
+`EMPIRE_STONKS_OHLCV_YAHOO_DAILY_REQUEST_MAX_DAYS`. Requests remain serial and
+use the configured normal delay,
 jitter, bounded retries, `Retry-After`, exponential retry delay, and
 post-failure cooldown. Transport, sleep, random, and clock dependencies are
 injectable.
@@ -213,7 +216,7 @@ schema-version-2 provider report contract.
 ## Yahoo daily completeness planning
 
 `plan_yahoo_daily_completeness()` is the package-owned read/plan boundary for
-the later Yahoo daily runner. Its caller supplies an inclusive date window, an
+the Yahoo daily runner. Its caller supplies an inclusive date window, an
 aware clock value, the configured maximum Yahoo request length, and optional
 exact Empire ticker filters. The planner enumerates active seeded listings,
 loads only their in-window `ohlcv_daily.trading_date` values, resolves each
@@ -293,6 +296,40 @@ stored report contains its safe phase, health, correction, and native-value
 facts directly, so it stays queryable after raw-object cleanup. Yahoo request
 symbols, endpoint URLs, response bodies, credentials, and exception text are
 not report inputs.
+
+## Yahoo daily runner
+
+`run_yahoo_daily()` owns the complete reusable daily sequence under one Core
+run. It plans eligible missing sessions over an explicit inclusive
+`YahooDailyScope`, imports those pulls with per-listing isolation, plans the
+configured recent-session reconciliation window, imports corrections through
+the normal upsert path, stores the post-import health report, and completes the
+Core lifecycle. Calendar-policy errors and individual acquisition, parse, or
+persistence failures remain safe `WARN` results; a systemic planning,
+reporting, or Core failure fails the run.
+
+Sessions successfully acquired during missing-session ingestion are already
+provider-fresh, so the same dates are omitted from reconciliation within that
+Core run. A failed acquisition has no fresh object and remains eligible for the
+reconciliation phase's bounded retry. Later runs still reconcile the latest
+configured sessions normally. This prevents duplicate raw-object identities
+and unnecessary same-run provider calls without suppressing retries.
+
+The operator wrapper defaults its inclusive start to
+`EMPIRE_STONKS_OHLCV_YAHOO_DAILY_LOOKBACK_DAYS` ending on the required
+effective date. Optional exact dates and repeated Empire tickers support
+bounded diagnostics:
+
+```bash
+bin/stonks-ohlcv-yahoo-daily \
+  --effective-date 2026-07-31 \
+  --ticker SPX
+```
+
+The wrapper loads `deploy/env/local.env` through `bin/env-load`, prints only
+secret-safe JSON progress on stderr, and emits one compact result on stdout.
+The package itself never loads an environment file and remains usable by the
+next thin Airflow DAG.
 
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the

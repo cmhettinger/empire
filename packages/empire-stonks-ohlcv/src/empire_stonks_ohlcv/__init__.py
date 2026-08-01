@@ -279,6 +279,13 @@ from empire_stonks_ohlcv.yahoo_reporting import (
     store_yahoo_report,
     yahoo_report_to_json,
 )
+from empire_stonks_ohlcv.yahoo_daily_runner import (
+    YAHOO_DAILY_JOB_NAME,
+    YAHOO_DAILY_SUBJECT_KEY,
+    YahooDailyRunResult,
+    YahooDailyScope,
+    run_yahoo_daily,
+)
 
 __all__ = [
     "AcquiredObject",
@@ -401,6 +408,8 @@ __all__ = [
     "YAHOO_DAILY_REPORT_FILENAME",
     "YAHOO_DAILY_REPORT_LOGICAL_NAME",
     "YAHOO_DAILY_REPORT_TYPE",
+    "YAHOO_DAILY_JOB_NAME",
+    "YAHOO_DAILY_SUBJECT_KEY",
     "YAHOO_MARKET",
     "YAHOO_PROVIDER_CODE",
     "WeekdayGapCandidate",
@@ -417,6 +426,8 @@ __all__ = [
     "YahooCompletenessStatus",
     "YahooDailyCompletenessPlan",
     "YahooDailyPull",
+    "YahooDailyRunResult",
+    "YahooDailyScope",
     "YahooFailureReason",
     "YahooHTTPResponse",
     "YahooHTTPTransport",
@@ -483,6 +494,7 @@ __all__ = [
     "run_eoddata_daily",
     "run_stooq_history_backfill",
     "run_yahoo_backfill",
+    "run_yahoo_daily",
     "render_eoddata_daily_pdf",
     "render_eoddata_daily_market_pdf",
     "render_stooq_history_pdf",

@@ -17,6 +17,8 @@ from empire_stonks_ohlcv.config import (
     YAHOO_BACKFILL_CHUNK_DAYS_ENV,
     YAHOO_BACKFILL_START_DATE_ENV,
     YAHOO_BASE_URL_ENV,
+    YAHOO_DAILY_LOOKBACK_DAYS_ENV,
+    YAHOO_DAILY_REQUEST_MAX_DAYS_ENV,
     YAHOO_FAILURE_COOLDOWN_MAX_SECONDS_ENV,
     YAHOO_FAILURE_COOLDOWN_MIN_SECONDS_ENV,
     YAHOO_RECONCILIATION_SESSIONS_ENV,
@@ -43,6 +45,8 @@ OHLCV_ENV_VARS = (
     YAHOO_FAILURE_COOLDOWN_MAX_SECONDS_ENV,
     YAHOO_BACKFILL_START_DATE_ENV,
     YAHOO_BACKFILL_CHUNK_DAYS_ENV,
+    YAHOO_DAILY_LOOKBACK_DAYS_ENV,
+    YAHOO_DAILY_REQUEST_MAX_DAYS_ENV,
     YAHOO_RECONCILIATION_SESSIONS_ENV,
 )
 
@@ -72,6 +76,8 @@ def test_config_uses_defaults() -> None:
     assert config.yahoo_failure_cooldown_max_seconds == 18.0
     assert config.yahoo_backfill_start_date == "1965-01-01"
     assert config.yahoo_backfill_chunk_days == 3650
+    assert config.yahoo_daily_lookback_days == 30
+    assert config.yahoo_daily_request_max_days == 30
     assert config.yahoo_reconciliation_sessions == 7
 
 
@@ -134,6 +140,8 @@ def test_config_loads_yahoo_source_settings(
     monkeypatch.setenv(YAHOO_FAILURE_COOLDOWN_MAX_SECONDS_ENV, "40")
     monkeypatch.setenv(YAHOO_BACKFILL_START_DATE_ENV, "1970-01-01")
     monkeypatch.setenv(YAHOO_BACKFILL_CHUNK_DAYS_ENV, "730")
+    monkeypatch.setenv(YAHOO_DAILY_LOOKBACK_DAYS_ENV, "45")
+    monkeypatch.setenv(YAHOO_DAILY_REQUEST_MAX_DAYS_ENV, "15")
     monkeypatch.setenv(YAHOO_RECONCILIATION_SESSIONS_ENV, "5")
 
     config = OHLCVConfig.from_env()
@@ -146,6 +154,8 @@ def test_config_loads_yahoo_source_settings(
     assert config.yahoo_failure_cooldown_max_seconds == 40.0
     assert config.yahoo_backfill_start_date == "1970-01-01"
     assert config.yahoo_backfill_chunk_days == 730
+    assert config.yahoo_daily_lookback_days == 45
+    assert config.yahoo_daily_request_max_days == 15
     assert config.yahoo_reconciliation_sessions == 5
 
 
@@ -198,6 +208,10 @@ def test_config_loads_yahoo_source_settings(
         (YAHOO_BACKFILL_START_DATE_ENV, "01-01-1965", "YYYY-MM-DD"),
         (YAHOO_BACKFILL_CHUNK_DAYS_ENV, "0", "between 1 and 3650"),
         (YAHOO_BACKFILL_CHUNK_DAYS_ENV, "3651", "between 1 and 3650"),
+        (YAHOO_DAILY_LOOKBACK_DAYS_ENV, "0", "between 1 and 365"),
+        (YAHOO_DAILY_LOOKBACK_DAYS_ENV, "366", "between 1 and 365"),
+        (YAHOO_DAILY_REQUEST_MAX_DAYS_ENV, "0", "between 1 and 90"),
+        (YAHOO_DAILY_REQUEST_MAX_DAYS_ENV, "91", "between 1 and 90"),
         (YAHOO_RECONCILIATION_SESSIONS_ENV, "0", "between 1 and 30"),
         (YAHOO_RECONCILIATION_SESSIONS_ENV, "31", "between 1 and 30"),
     ],

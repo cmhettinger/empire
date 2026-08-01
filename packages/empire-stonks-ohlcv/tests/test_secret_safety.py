@@ -118,5 +118,7 @@ def test_safe_dict_excludes_secrets_from_operational_surfaces() -> None:
         "yahoo_failure_cooldown_max_seconds",
         "yahoo_backfill_start_date",
         "yahoo_backfill_chunk_days",
+        "yahoo_daily_lookback_days",
+        "yahoo_daily_request_max_days",
         "yahoo_reconciliation_sessions",
     }

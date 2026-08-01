@@ -297,7 +297,7 @@ later migration to add, correct, deactivate, or remove individual listings.
 | Y8.10 | [x] | Implement Yahoo daily completeness planning | For each active seeded Yahoo listing, determine completed expected sessions, calculate eligibility, compare them with stored `ohlcv_daily` rows, and produce a bounded pull plan containing only eligible missing sessions. A rerun before eligibility or after completion is a no-op; a failed/missing session remains retryable on a later run. Tests prove one record per real market session across U.S., European, Asian, and futures examples. | Y8.5, Y8.8-Y8.9 |
 | Y8.11 | [x] | Add recent-session reconciliation | Add a daily reconciliation pass that re-pulls the configured recent 5-7 expected sessions, compares provider OHLC, close/adjustment semantics, and volume with current rows, and applies idempotent corrections through the normal upsert path. Surface corrected-row counts and field-level differences in run results/reports without adding a bar-revision table. Tests cover late bars, changed values, null volume, provider-date corrections, and unchanged history. | Y8.7-Y8.10 |
 | Y8.12 | [x] | Build and store Yahoo reports | Reuse the shared report contract for Yahoo-scoped backfill and daily health, expected-session coverage, ineligible versus missing sessions, stale listings, retries/failures, reconciliation corrections, calendar-policy errors, and native adjustment notes. Reports distinguish initial ingestion from reconciliation and remain queryable after raw-object cleanup. | Y8.9-Y8.11, E6.7-E6.8 |
-| Y8.13 | [ ] | Add Yahoo daily runner and CLI | Add package-owned sequencing and an operator CLI/`bin` wrapper that run eligibility planning, eligible missing-session ingestion, recent-session reconciliation, Core lifecycle, and reporting with configured request bounds. Tests cover no-op, success, partial failure, retry, correction, and idempotent rerun. | Y8.10-Y8.12, B1.8 |
+| Y8.13 | [x] | Add Yahoo daily runner and CLI | Add package-owned sequencing and an operator CLI/`bin` wrapper that run eligibility planning, eligible missing-session ingestion, recent-session reconciliation, Core lifecycle, and reporting with configured request bounds. Tests cover no-op, success, partial failure, retry, correction, and idempotent rerun. | Y8.10-Y8.12, B1.8 |
 | Y8.14 | [ ] | Add the initially manual Yahoo DAG | Add `dags/stonks/stonks_ohlcv_yahoo_daily_scrape.py` as a thin manually triggered DAG that invokes the daily runner. Keep schedule selection out of the DAG's business logic; document the intended eventual multi-run cadence (for example 06:00, 10:00, 13:00, 18:00, and 23:00 America/New_York, or hourly if live request volume permits) and leave automatic enablement to the rollout gate. DAG tests prove importability, manual schedule state, parameter forwarding, no-op success, and failure propagation. | Y8.13, B1.5-B1.7 |
 | Y8.15 | [ ] | Verify the Yahoo vertical workflow | Run the complete fixture path from seeded listings through backfill, eligibility-based daily ingestion, reconciliation, stored reports, and raw-object cleanup. Verify lineage, secret safety, request bounds, calendar behavior, provider isolation, reruns, corrections, and coexistence with EODData and historical Stooq data. Verify the manual DAG is discovered in its Airflow runtime. | Y8.14, M3.7 |
 
@@ -481,6 +481,26 @@ backfill schema migration, retries/failures, corrections, adjustment notes,
 and cleanup-safe report access. The full database-enabled package suite passed
 (531 passed); `poetry check`, public import, `compileall`, the 88-column
 changed-Python scan, and `git diff --check` passed.
+
+Done: 2026-07-31 — added `run_yahoo_daily()` as the package-owned Core
+lifecycle for calendar eligibility planning, eligible-missing ingestion,
+recent-session reconciliation, post-import health reporting, and durable report
+storage. Added explicit `YahooDailyScope` and compact secret-safe run results,
+per-phase progress/heartbeat reporting, configured 30-day default lookback and
+30-day maximum daily request range, exact ticker scoping, and safe systemic
+failure summaries. Sessions freshly acquired during ingestion are omitted from
+same-run reconciliation to avoid duplicate raw-object identities and redundant
+provider calls; failed acquisitions remain eligible for the reconciliation
+retry, and later runs retain the full recent-session correction pass. Added the
+`stonks-ohlcv-yahoo-daily` Poetry command and executable `bin` wrapper using
+`bin/env-load`, with optional bounded dates/tickers, JSON stderr progress, and
+compact JSON stdout. Unit, CLI, and PostgreSQL vertical coverage proves no-op,
+successful ingestion, mixed partial failure, same-run retry, later retry,
+idempotent rerun, provider correction, report phase/correction visibility, and
+final database values. The full database-enabled package suite passed (546
+passed); `poetry check`, public import, `compileall`, shell syntax/help, the
+88-column changed-Python scan, environment-key parity, and `git diff --check`
+passed.
 
 ## Phase 9: Calendar-Aware EODData Daily Scheduling
 

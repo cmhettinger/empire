@@ -20,6 +20,7 @@ stonks-ohlcv-config = "empire_stonks_ohlcv.scripts.config:main"
 stonks-ohlcv-eoddata-daily = "empire_stonks_ohlcv.scripts.eoddata_daily:main"
 stonks-ohlcv-stooq-backfill = "empire_stonks_ohlcv.scripts.stooq_backfill:main"
 stonks-ohlcv-yahoo-backfill = "empire_stonks_ohlcv.scripts.yahoo_backfill:main"
+stonks-ohlcv-yahoo-daily = "empire_stonks_ohlcv.scripts.yahoo_daily:main"
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]

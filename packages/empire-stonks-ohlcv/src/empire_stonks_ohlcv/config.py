@@ -27,8 +27,12 @@ DEFAULT_YAHOO_FAILURE_COOLDOWN_MIN_SECONDS = 8.0
 DEFAULT_YAHOO_FAILURE_COOLDOWN_MAX_SECONDS = 18.0
 DEFAULT_YAHOO_BACKFILL_START_DATE = "1965-01-01"
 DEFAULT_YAHOO_BACKFILL_CHUNK_DAYS = 3650
+DEFAULT_YAHOO_DAILY_LOOKBACK_DAYS = 30
+DEFAULT_YAHOO_DAILY_REQUEST_MAX_DAYS = 30
 DEFAULT_YAHOO_RECONCILIATION_SESSIONS = 7
 MAX_YAHOO_BACKFILL_CHUNK_DAYS = 3650
+MAX_YAHOO_DAILY_LOOKBACK_DAYS = 365
+MAX_YAHOO_DAILY_REQUEST_DAYS = 90
 MAX_YAHOO_RECONCILIATION_SESSIONS = 30
 
 STORAGE_KEY_ENV = "EMPIRE_STORAGE_KEY_STONKS_OHLCV"
@@ -62,6 +66,12 @@ YAHOO_BACKFILL_START_DATE_ENV = (
 )
 YAHOO_BACKFILL_CHUNK_DAYS_ENV = (
     "EMPIRE_STONKS_OHLCV_YAHOO_BACKFILL_CHUNK_DAYS"
+)
+YAHOO_DAILY_LOOKBACK_DAYS_ENV = (
+    "EMPIRE_STONKS_OHLCV_YAHOO_DAILY_LOOKBACK_DAYS"
+)
+YAHOO_DAILY_REQUEST_MAX_DAYS_ENV = (
+    "EMPIRE_STONKS_OHLCV_YAHOO_DAILY_REQUEST_MAX_DAYS"
 )
 YAHOO_RECONCILIATION_SESSIONS_ENV = (
     "EMPIRE_STONKS_OHLCV_YAHOO_RECONCILIATION_SESSIONS"
@@ -254,6 +264,8 @@ class OHLCVConfig:
     )
     yahoo_backfill_start_date: str = DEFAULT_YAHOO_BACKFILL_START_DATE
     yahoo_backfill_chunk_days: int = DEFAULT_YAHOO_BACKFILL_CHUNK_DAYS
+    yahoo_daily_lookback_days: int = DEFAULT_YAHOO_DAILY_LOOKBACK_DAYS
+    yahoo_daily_request_max_days: int = DEFAULT_YAHOO_DAILY_REQUEST_MAX_DAYS
     yahoo_reconciliation_sessions: int = DEFAULT_YAHOO_RECONCILIATION_SESSIONS
     eoddata_credentials: EODDataCredentials | None = field(
         default=None,
@@ -310,6 +322,20 @@ class OHLCVConfig:
             raise OHLCVConfigError(
                 f"{YAHOO_BACKFILL_CHUNK_DAYS_ENV} must be between 1 and "
                 f"{MAX_YAHOO_BACKFILL_CHUNK_DAYS}."
+            )
+        if not 1 <= self.yahoo_daily_lookback_days <= MAX_YAHOO_DAILY_LOOKBACK_DAYS:
+            raise OHLCVConfigError(
+                f"{YAHOO_DAILY_LOOKBACK_DAYS_ENV} must be between 1 and "
+                f"{MAX_YAHOO_DAILY_LOOKBACK_DAYS}."
+            )
+        if not (
+            1
+            <= self.yahoo_daily_request_max_days
+            <= MAX_YAHOO_DAILY_REQUEST_DAYS
+        ):
+            raise OHLCVConfigError(
+                f"{YAHOO_DAILY_REQUEST_MAX_DAYS_ENV} must be between 1 and "
+                f"{MAX_YAHOO_DAILY_REQUEST_DAYS}."
             )
         if not (
             1
@@ -386,6 +412,14 @@ class OHLCVConfig:
                 YAHOO_BACKFILL_CHUNK_DAYS_ENV,
                 DEFAULT_YAHOO_BACKFILL_CHUNK_DAYS,
             ),
+            yahoo_daily_lookback_days=_environment_int(
+                YAHOO_DAILY_LOOKBACK_DAYS_ENV,
+                DEFAULT_YAHOO_DAILY_LOOKBACK_DAYS,
+            ),
+            yahoo_daily_request_max_days=_environment_int(
+                YAHOO_DAILY_REQUEST_MAX_DAYS_ENV,
+                DEFAULT_YAHOO_DAILY_REQUEST_MAX_DAYS,
+            ),
             yahoo_reconciliation_sessions=_environment_int(
                 YAHOO_RECONCILIATION_SESSIONS_ENV,
                 DEFAULT_YAHOO_RECONCILIATION_SESSIONS,
@@ -430,5 +464,7 @@ class OHLCVConfig:
             ),
             "yahoo_backfill_start_date": self.yahoo_backfill_start_date,
             "yahoo_backfill_chunk_days": self.yahoo_backfill_chunk_days,
+            "yahoo_daily_lookback_days": self.yahoo_daily_lookback_days,
+            "yahoo_daily_request_max_days": self.yahoo_daily_request_max_days,
             "yahoo_reconciliation_sessions": self.yahoo_reconciliation_sessions,
         }

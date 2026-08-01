@@ -32,6 +32,8 @@ def test_config_script_prints_secret_safe_json(monkeypatch, capsys) -> None:
         "storage_key": "test/ohlcv",
         "yahoo_backfill_chunk_days": 3650,
         "yahoo_backfill_start_date": "1965-01-01",
+        "yahoo_daily_lookback_days": 30,
+        "yahoo_daily_request_max_days": 30,
         "yahoo_base_url": "https://query2.finance.yahoo.com",
         "yahoo_failure_cooldown_max_seconds": 18.0,
         "yahoo_failure_cooldown_min_seconds": 8.0,
