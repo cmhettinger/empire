@@ -90,10 +90,12 @@ only work whose UTC eligibility time has passed.
 Observed-only publisher and DXY policies intentionally return no expected
 sessions. `observed_poll_candidate()` says only when a bounded provider range
 may be polled; it never claims that a weekend, holiday, or weekday bar exists.
-Provider timestamps are converted under the policy's explicit date rule and
-must match a planned calendar label when a calendar is assigned. Unknown
-calendars, time zones, unsafe calendar warnings, ambiguous local wall times,
-and mismatched provider dates fail closed with no fallback calendar or
+Provider timestamps are converted under the provider response's validated IANA
+time zone and the policy's explicit date rule, and must match a planned
+calendar label when a calendar is assigned. The session-policy time zone owns
+calendar/cutoff eligibility and need not equal the provider response time zone.
+Unknown calendars, time zones, unsafe calendar warnings, ambiguous local wall
+times, and mismatched provider dates fail closed with no fallback calendar or
 synthetic bar.
 
 ## Yahoo Chart acquisition

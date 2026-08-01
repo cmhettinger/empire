@@ -35,7 +35,7 @@ def test_production_source_identifiers_are_exact_and_stable() -> None:
             ProviderSourceMetadata("stooq_daily", "1.0.0"),
             ProviderSourceMetadata("stooq_history", "1.0.0"),
         ),
-        "YAHOO": (ProviderSourceMetadata("yahoo_daily", "1.0.0"),),
+        "YAHOO": (ProviderSourceMetadata("yahoo_daily", "1.1.0"),),
     }
 
 

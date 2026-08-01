@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "provider_code": "YAHOO",
+  "source_code": "yahoo_daily",
+  "parser_version": "1.1.0",
+  "format_reference": "docs/stonks/ohlcv-yahoo-source-contract.md#response-and-daily-bar-contract",
+  "provenance": "constructed_from_documented_format",
+  "payload_file": "ust5y_timezone_mismatch.json",
+  "payload_size_bytes": 268,
+  "payload_sha256": "a52fba06fada86af169009cbe0d694a289204c3e8285a60189f43d1d8f00c8ba",
+  "sanitization": [
+    "Retained the affected public Yahoo symbol and observed response timezone with fixed representative OHLC values.",
+    "Excluded request URLs, headers, cookies, credentials, and unrelated response metadata."
+  ],
+  "cases": [
+    "UST5Y response timezone differs from its eligibility-policy timezone",
+    "provider dates remain correct across the March daylight-saving boundary"
+  ]
+}

@@ -402,14 +402,15 @@ class MarketSessionService:
         *,
         policy: SessionPolicy,
         provider_timestamp: datetime,
+        provider_timezone_name: str,
         expected_session_dates: Iterable[date] | None = None,
     ) -> date:
-        """Map an aware provider timestamp under the policy's date rule."""
+        """Map an aware timestamp in the provider-declared time zone."""
 
         _validate_policy(policy)
         timestamp = _aware_utc("provider_timestamp", provider_timestamp)
         session_date = timestamp.astimezone(
-            _timezone(policy.timezone_name)
+            _timezone(provider_timezone_name)
         ).date()
 
         if policy.calendar_name is None:

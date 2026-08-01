@@ -21,5 +21,5 @@ STOOQ_HISTORY_SOURCE = ProviderSourceMetadata(
 )
 YAHOO_DAILY_SOURCE = ProviderSourceMetadata(
     source_code="yahoo_daily",
-    parser_version="1.0.0",
+    parser_version="1.1.0",
 )

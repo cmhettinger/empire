@@ -2,7 +2,7 @@
   "schema_version": 1,
   "provider_code": "YAHOO",
   "source_code": "yahoo_daily",
-  "parser_version": "1.0.0",
+  "parser_version": "1.1.0",
   "format_reference": "docs/stonks/ohlcv-yahoo-source-contract.md#response-and-daily-bar-contract",
   "provenance": "constructed_from_documented_format",
   "payload_file": "spx_chart_daily.json",

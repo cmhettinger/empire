@@ -106,6 +106,18 @@ def _observed_policy(
     )
 
 
+def _cboe_policy() -> SessionPolicy:
+    return SessionPolicy(
+        code="YH_CBOE_CLOSE_120M",
+        calendar_name="CBOE_Index_Options",
+        timezone_name="America/Chicago",
+        eligibility_rule=EligibilityRule.SESSION_CLOSE,
+        cutoff_local_time=None,
+        availability_delay_minutes=120,
+        session_date_rule=SessionDateRule.CALENDAR_SESSION,
+    )
+
+
 def _chart_payload(
     *,
     symbol: str = "^GSPC",
@@ -506,19 +518,85 @@ def test_required_quote_and_adjusted_arrays_must_align() -> None:
 
 
 @pytest.mark.parametrize(
-    ("timezone_name", "message"),
+    ("ticker", "yahoo_ticker", "fixture_name", "policy", "planned"),
     [
-        ("Europe/London", "does not match"),
-        ("Mars/Olympus", "unknown exchange timezone"),
+        (
+            "SKEW",
+            "^SKEW",
+            "skew_timezone_mismatch.json",
+            _cboe_policy(),
+            (date(2026, 3, 6), date(2026, 3, 9)),
+        ),
+        (
+            "VVIX",
+            "^VVIX",
+            "vvix_timezone_mismatch.json",
+            _cboe_policy(),
+            (date(2026, 3, 6), date(2026, 3, 9)),
+        ),
+        (
+            "VXN",
+            "^VXN",
+            "vxn_timezone_mismatch.json",
+            _cboe_policy(),
+            (date(2026, 3, 6), date(2026, 3, 9)),
+        ),
+        (
+            "UST5Y",
+            "^FVX",
+            "ust5y_timezone_mismatch.json",
+            _observed_policy(code="YH_US_PUBLISHER_120M"),
+            None,
+        ),
+        (
+            "UST10Y",
+            "^TNX",
+            "ust10y_timezone_mismatch.json",
+            _observed_policy(code="YH_US_PUBLISHER_120M"),
+            None,
+        ),
+        (
+            "UST30Y",
+            "^TYX",
+            "ust30y_timezone_mismatch.json",
+            _observed_policy(code="YH_US_PUBLISHER_120M"),
+            None,
+        ),
     ],
 )
-def test_response_timezone_must_match_policy(
-    timezone_name: str,
-    message: str,
+def test_response_timezone_is_independent_from_session_policy_timezone(
+    ticker: str,
+    yahoo_ticker: str,
+    fixture_name: str,
+    policy: SessionPolicy,
+    planned: tuple[date, ...] | None,
 ) -> None:
-    with pytest.raises(OHLCVParseError, match=message):
+    result = parse_yahoo_chart(
+        (FIXTURE_PATH.parent / fixture_name).read_bytes(),
+        request=_request(
+            ticker=ticker,
+            yahoo_ticker=yahoo_ticker,
+            start_date=date(2026, 3, 6),
+            end_date_exclusive=date(2026, 3, 10),
+        ),
+        listing=_listing(ticker=ticker, yahoo_ticker=yahoo_ticker),
+        policy=policy,
+        planned_session_dates=planned,
+    )
+
+    assert result.response_timezone_name != policy.timezone_name
+    assert [bar.trading_date for bar in result.batch.bars] == [
+        date(2026, 3, 6),
+        date(2026, 3, 9),
+    ]
+    assert result.accepted_rows == 2
+    assert result.rejected_rows == 0
+
+
+def test_response_timezone_must_be_a_known_iana_timezone() -> None:
+    with pytest.raises(OHLCVParseError, match="unknown exchange timezone"):
         parse_yahoo_chart(
-            _chart_payload(timezone_name=timezone_name),
+            _chart_payload(timezone_name="Mars/Olympus"),
             request=_request(),
             listing=_listing(),
             policy=_calendar_policy(),

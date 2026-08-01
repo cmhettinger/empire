@@ -225,7 +225,7 @@ def test_stores_exact_guarded_request_and_safe_identity_metadata(
         "effective_date": "2026-07-29",
         "acquired_at": "2026-07-30T15:30:00+00:00",
         "retention_days": 7,
-        "parser_version": "1.0.0",
+        "parser_version": "1.1.0",
         "http_status": 200,
         "market": "XIDX",
         "provider_listing_id": str(LISTING_ID),

@@ -343,6 +343,7 @@ def test_futures_cutoff_uses_session_label_and_daily_settlement_rule() -> None:
     assert service.provider_session_date(
         policy=policy,
         provider_timestamp=datetime(2026, 7, 7, 2, tzinfo=UTC),
+        provider_timezone_name="America/New_York",
         expected_session_dates=(date(2026, 7, 6),),
     ) == date(2026, 7, 6)
 
@@ -350,6 +351,7 @@ def test_futures_cutoff_uses_session_label_and_daily_settlement_rule() -> None:
         service.provider_session_date(
             policy=policy,
             provider_timestamp=datetime(2026, 7, 8, 2, tzinfo=UTC),
+            provider_timezone_name="America/New_York",
             expected_session_dates=(date(2026, 7, 6),),
         )
 
@@ -508,5 +510,6 @@ def test_naive_now_and_provider_timestamp_are_rejected() -> None:
         service.provider_session_date(
             policy=policy,
             provider_timestamp=datetime(2026, 1, 2),
+            provider_timezone_name="America/New_York",
             expected_session_dates=(),
         )

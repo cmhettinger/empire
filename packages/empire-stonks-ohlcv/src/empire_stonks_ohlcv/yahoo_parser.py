@@ -263,7 +263,7 @@ def parse_yahoo_chart(
         quote,
         adjusted_values,
     ) = _chart_values(value, request=request)
-    response_timezone_name, response_timezone = _response_timezone(meta)
+    response_timezone_name = _response_timezone_name(meta)
     exchange_name = _exchange_name(meta)
     service = session_service or MarketSessionService()
     diagnostics = _ParseDiagnostics()
@@ -280,15 +280,11 @@ def parse_yahoo_chart(
         )
         if instant is None:
             continue
-        _require_timezone_alignment(
-            instant=instant,
-            response_timezone=response_timezone,
-            policy=policy,
-        )
         try:
             session_date = service.provider_session_date(
                 policy=policy,
                 provider_timestamp=instant,
+                provider_timezone_name=response_timezone_name,
                 expected_session_dates=(
                     planned if policy.calendar_name is not None else None
                 ),
@@ -514,17 +510,15 @@ def _shape_error() -> OHLCVParseError:
     return OHLCVParseError("Yahoo Chart payload has an invalid response shape.")
 
 
-def _response_timezone(
-    meta: dict[str, Any],
-) -> tuple[str, ZoneInfo]:
+def _response_timezone_name(meta: dict[str, Any]) -> str:
     timezone_name = _required_meta_text(meta, "exchangeTimezoneName")
     try:
-        timezone = ZoneInfo(timezone_name)
+        ZoneInfo(timezone_name)
     except ZoneInfoNotFoundError:
         raise OHLCVParseError(
             "Yahoo Chart response has an unknown exchange timezone."
         ) from None
-    return timezone_name, timezone
+    return timezone_name
 
 
 def _exchange_name(meta: dict[str, Any]) -> str:
@@ -587,29 +581,6 @@ def _provider_instant(
             record_reference=record_reference,
         )
         return None
-
-
-def _require_timezone_alignment(
-    *,
-    instant: datetime,
-    response_timezone: ZoneInfo,
-    policy: SessionPolicy,
-) -> None:
-    try:
-        policy_timezone = ZoneInfo(policy.timezone_name)
-    except ZoneInfoNotFoundError:
-        raise OHLCVParseError(
-            "Yahoo session policy has an unknown timezone."
-        ) from None
-    response_local = instant.astimezone(response_timezone)
-    policy_local = instant.astimezone(policy_timezone)
-    if (
-        response_local.utcoffset() != policy_local.utcoffset()
-        or response_local.date() != policy_local.date()
-    ):
-        raise OHLCVParseError(
-            "Yahoo response timezone does not match the session policy."
-        )
 
 
 def _daily_bar(
