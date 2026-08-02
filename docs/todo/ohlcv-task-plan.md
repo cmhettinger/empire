@@ -179,7 +179,7 @@ fixture workflows to normal provider operation one proven path at a time.
 |----|--------|------|---------------|------------|
 | V10.1 | [x] | Complete package README | Document scope, provider-native semantics, `deploy/env/local.env` runtime loading, `os.environ` package boundary, secret handling, CLIs, raw retention, source snapshots, tables, calendar/session policies, enabled DAGs/reports, the manual Stooq backfill boundary, and deferred bridge/enrichment work. | C9.6, Y8.15, H7.8 |
 | V10.2 | [x] | Add operator runbook | Document local secret/config setup, manual runs, each enabled provider DAG, historical Stooq file acquisition/import, Yahoo backfill, eligibility and reconciliation interpretation, report interpretation, raw-object inspection, reruns, and failure recovery without printing credentials. | V10.1 |
-| V10.3 | [ ] | Run formatting and full package tests | Configured formatting/linting and the full `empire-stonks-ohlcv` test suite pass from the repository root. | V10.2 |
+| V10.3 | [x] | Run formatting and full package tests | Configured formatting/linting and the full `empire-stonks-ohlcv` test suite pass from the repository root. | V10.2 |
 | V10.4 | [ ] | Run DB validation and regenerate docs | Repo-standard DB validation and Stonks schema documentation generation pass with no drift. | V10.2 |
 | V10.5 | [ ] | Verify package, CLI, and DAG imports | Package, all CLI modules, and all enabled provider DAGs import cleanly in their actual runtime environments. | V10.3-V10.4 |
 | V10.6 | [ ] | Verify raw-object cleanup | Expire and clean a test raw object and prove stored-object/membership rows are removed while source snapshot, provider listing, bars, session policy, and report remain queryable. | V10.4-V10.5 |
@@ -206,6 +206,14 @@ Focused tests passed 163; five wrapper help smokes, package/four-runner/five-CLI
 imports, 18/18 documentation links, 32 balanced fenced blocks, four live
 read-only SQL checks, Compose config, `poetry check --lock`, Flyway validation
 of 38 migrations, and `git diff --check` passed.
+
+Done: 2026-08-02 — wrapped five overlong lines in `queries.py`,
+`reports/eoddata_daily_market_pdf.py`, and
+`tests/test_daily_market_reporting.py`; no formatter/linter is configured
+beyond `.editorconfig`. From the repository root, the full database-enabled
+suite passed 604 tests in 73.78 seconds with no skips. UTF-8/final-newline and
+88-column scans, `poetry check --lock`, compilation, `pip check`, focused
+imports, and `git diff --check` passed.
 
 ## Phase 11: Stooq Daily End-To-End Vertical Slice
 

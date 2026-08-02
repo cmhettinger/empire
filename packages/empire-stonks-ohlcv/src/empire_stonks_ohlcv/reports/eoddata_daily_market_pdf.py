@@ -341,8 +341,9 @@ def _body_story(
 def _executive_summary(report: EODDataDailyMarketReport) -> str:
     universe = report.universe
     if universe.equity_bar_count == 0:
+        trading_date = report.trading_date.isoformat()
         return (
-            f"No EODData equities were available for {report.trading_date.isoformat()}. "
+            f"No EODData equities were available for {trading_date}. "
             f"The database contained {universe.source_bar_count:,} provider bars for "
             "the date, but none were classified by EODData as Equity."
         )
@@ -419,7 +420,17 @@ def _breadth_table(
     renderer: PdfRenderer,
 ) -> Table:
     rows: list[list[object]] = [
-        ["Market", "Equities", "Compared", "Up", "Down", "Flat", "No Prior", "Avg Return", "Volume"]
+        [
+            "Market",
+            "Equities",
+            "Compared",
+            "Up",
+            "Down",
+            "Flat",
+            "No Prior",
+            "Avg Return",
+            "Volume",
+        ]
     ]
     for item in report.breadth:
         rows.append(

@@ -297,7 +297,17 @@ def _complete_report() -> EODDataDailyMarketReport:
         generated_at=GENERATED_AT,
         universe=DailyMarketUniverse(3500, 3100, 300, 100),
         breadth=(
-            MarketBreadth("NYSE", 1200, 1190, 700, 480, 10, 10, Decimal("1.2e9"), Decimal("0.004")),
+            MarketBreadth(
+                "NYSE",
+                1200,
+                1190,
+                700,
+                480,
+                10,
+                10,
+                Decimal("1.2e9"),
+                Decimal("0.004"),
+            ),
             MarketBreadth(
                 "NASDAQ",
                 1500,
@@ -309,7 +319,17 @@ def _complete_report() -> EODDataDailyMarketReport:
                 Decimal("2.4e9"),
                 Decimal("-0.006"),
             ),
-            MarketBreadth("AMEX", 400, 390, 180, 200, 10, 10, Decimal("2.3e8"), Decimal("-0.001")),
+            MarketBreadth(
+                "AMEX",
+                400,
+                390,
+                180,
+                200,
+                10,
+                10,
+                Decimal("2.3e8"),
+                Decimal("-0.001"),
+            ),
         ),
         move_buckets=(
             MoveBucket("Down 10%+", 8, 12, 3),

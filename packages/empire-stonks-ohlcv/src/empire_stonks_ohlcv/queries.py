@@ -54,7 +54,9 @@ class ProviderListingCoverage:
         }
 
 
-def select_latest_trading_date(*, cursor: Any, provider_listing_id: UUID) -> date | None:
+def select_latest_trading_date(
+    *, cursor: Any, provider_listing_id: UUID
+) -> date | None:
     """Return one series' incremental cutoff, or ``None`` when it has no bars.
 
     The caller owns the transaction. This helper only reads provider-native data.
