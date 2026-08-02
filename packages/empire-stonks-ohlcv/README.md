@@ -141,7 +141,10 @@ Run repository wrappers from the repository root. Each wrapper loads the
 runtime environment, validates its scope before opening the database where
 possible, emits a compact secret-safe JSON result on successful stdout, and
 returns nonzero with a fixed safe error on failure. Long-running Stooq and Yahoo
-commands emit JSON progress on stderr.
+commands emit JSON progress on stderr. See the
+[OHLCV operator runbook](../../docs/stonks/ohlcv-operator-runbook.md) for local
+setup, provider and DAG procedures, report interpretation, safe inspection,
+reruns, and failure recovery.
 
 | Command | Purpose |
 |---|---|

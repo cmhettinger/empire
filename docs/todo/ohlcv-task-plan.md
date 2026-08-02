@@ -178,7 +178,7 @@ fixture workflows to normal provider operation one proven path at a time.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | V10.1 | [x] | Complete package README | Document scope, provider-native semantics, `deploy/env/local.env` runtime loading, `os.environ` package boundary, secret handling, CLIs, raw retention, source snapshots, tables, calendar/session policies, enabled DAGs/reports, the manual Stooq backfill boundary, and deferred bridge/enrichment work. | C9.6, Y8.15, H7.8 |
-| V10.2 | [ ] | Add operator runbook | Document local secret/config setup, manual runs, each enabled provider DAG, historical Stooq file acquisition/import, Yahoo backfill, eligibility and reconciliation interpretation, report interpretation, raw-object inspection, reruns, and failure recovery without printing credentials. | V10.1 |
+| V10.2 | [x] | Add operator runbook | Document local secret/config setup, manual runs, each enabled provider DAG, historical Stooq file acquisition/import, Yahoo backfill, eligibility and reconciliation interpretation, report interpretation, raw-object inspection, reruns, and failure recovery without printing credentials. | V10.1 |
 | V10.3 | [ ] | Run formatting and full package tests | Configured formatting/linting and the full `empire-stonks-ohlcv` test suite pass from the repository root. | V10.2 |
 | V10.4 | [ ] | Run DB validation and regenerate docs | Repo-standard DB validation and Stonks schema documentation generation pass with no drift. | V10.2 |
 | V10.5 | [ ] | Verify package, CLI, and DAG imports | Package, all CLI modules, and all enabled provider DAGs import cleanly in their actual runtime environments. | V10.3-V10.4 |
@@ -197,6 +197,15 @@ and five CLI imports passed; five wrapper help smokes, 8/8 README links, nine
 balanced fenced blocks, Compose config, `poetry check --lock`, package
 sdist/wheel build, `pip check`, compilation, Flyway validation of 38 migrations,
 the OHLCV schema contract, and `git diff --check` passed.
+
+Done: 2026-08-02 — added `docs/stonks/ohlcv-operator-runbook.md`, linked it
+from `packages/empire-stonks-ohlcv/README.md`, and updated this checklist with
+secret-safe setup, CLI/DAG operation, Stooq acquisition, Yahoo backfill,
+eligibility/reconciliation, report/raw inspection, rerun, and recovery steps.
+Focused tests passed 163; five wrapper help smokes, package/four-runner/five-CLI
+imports, 18/18 documentation links, 32 balanced fenced blocks, four live
+read-only SQL checks, Compose config, `poetry check --lock`, Flyway validation
+of 38 migrations, and `git diff --check` passed.
 
 ## Phase 11: Stooq Daily End-To-End Vertical Slice
 
