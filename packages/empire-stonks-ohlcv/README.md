@@ -1,21 +1,73 @@
 # empire-stonks-ohlcv
 
-Reusable provider-native daily OHLCV ingestion utilities for Empire stonks.
+Reusable provider-native daily OHLCV ingestion for Empire Stonks.
 
-This package will own source acquisition and parsing, provider-native listing
-series and daily-bar persistence, Empire Core run and raw-object integration,
-and provider-scoped validation and reporting. Airflow and other runtimes should
-call package-owned functions rather than embedding ingestion logic directly.
+The package owns EODData daily ingestion, Yahoo historical and daily ingestion,
+operator-supplied Stooq historical imports, provider-native persistence,
+calendar/session planning, Empire Core run and raw-object integration, durable
+source-content identity, and provider-scoped JSON/PDF reporting. Airflow and
+other runtimes call package-owned runners; provider acquisition, parsing,
+validation, persistence, planning, and reporting do not live in DAG files.
 
-The package stores values as supplied by each provider. It does not normalize
-values across providers, map provider series to canonical securities or
-listings, or construct an authoritative OHLCV history.
+## Scope and provider-native semantics
+
+A provider listing is one exact provider-native market/ticker series. Its
+identity does not prove that the ticker represented one real-world listing for
+its entire history, and the same market/ticker/date under different providers
+remains separate. Market and ticker text is case-sensitive and is not silently
+trimmed or normalized.
+
+The package stores each provider's current native `open`, `high`, `low`,
+`close`, and nullable `volume` values. Equal reruns are unchanged; a later
+provider correction replaces the same provider-series/date row and recalculates
+the affected derived values. The package does not reconcile values across
+providers, reconstruct adjustments or corporate actions, retain bar revision
+history, or claim that unlike provider series share an adjustment basis.
+
+The implemented provider boundaries are:
+
+| Provider | Supported workflow | Provider-native boundary |
+|---|---|---|
+| EODData | Calendar-planned Symbol List plus effective-date Quote List for `NYSE`, `NASDAQ`, and `AMEX` | Exact exchange/code identity; OHLC and volume adjustment basis is unspecified. |
+| Yahoo | Bounded backfill plus eligibility-driven daily ingestion and recent-session reconciliation for the reviewed `XIDX` seed catalog | Stable Empire ticker in `provider_listing.ticker`; exact Yahoo request symbol in `metadata.YahooTicker`; native quote close is stored and adjusted close is diagnostic only. |
+| Stooq | One-shot streaming import from an operator-supplied `d_us_txt.zip` | Exact `nasdaq`, `nyse`, or `nysemkt` market and `.US` ticker; adjustment, currency, and corporate-action semantics are unspecified. |
+
+Sector, industry, fundamentals, broad descriptive enrichment, intraday data,
+extended-hours data, provider-to-canonical mappings, and an authoritative or
+consensus OHLCV history are outside this package.
+
+## Data model and lineage
+
+The package uses the existing `stonks` and `core` schemas; it does not own a
+package-local database or migration runner.
+
+| Relation | Purpose |
+|---|---|
+| `stonks.provider_listing` | Durable provider-native series keyed by exact `(provider_code, market, ticker)`, with operator-owned active/inactive status, optional provider metadata, coverage dates, instrument type, and optional session policy. |
+| `stonks.ohlcv_daily` | Current provider-native daily bars keyed by `(provider_listing_id, trading_date)`, including writer-owned `change`, `changepct`, `typ`, `hl_range`, and `oc_range`. |
+| `stonks.ohlcv_session_policy` | Reusable calendar, local-cutoff, time-zone, availability-delay, and provider-date rules used by EODData and Yahoo planning. |
+| `core.core_run` / `core.stored_object` | Run lifecycle plus raw provider objects and durable reports. |
+| `stonks.provider_source_snapshot` / `stonks.provider_source_snapshot_object` | Durable provider/source/parser/checksum identity and the link to each retained Core raw object. |
+
+Raw objects normally expire after seven days. Cleanup may remove the physical
+Core object and its snapshot-object membership, but the checksum-based source
+snapshot, provider listing, bars, session policy, and non-expiring reports
+remain queryable. Individual mutable bars deliberately have no Core run,
+stored-object, or source-snapshot foreign key.
+
+There is no `listing_id` or other canonical-security relationship in this
+model. A future bridge may add temporal provider-to-canonical mappings only
+after its consumers and identity evidence are designed.
 
 ## Configuration
 
-Package configuration is read only from the process environment. Runtime
-wrappers, Docker Compose, and Airflow are responsible for loading environment
-files; this package does not load `.env` files or assume a repository path.
+Package configuration is read only from `os.environ`. Reusable package code
+does not load `.env` files, import `python-dotenv`, or assume the repository
+layout. From the repository root, the `bin/stonks-ohlcv-*` wrappers use
+`bin/env-load` and load `deploy/env/local.env` by default; `--env-file` selects
+another runtime-owned file. Docker Compose and Airflow receive the same values
+from their process environment. Non-secret examples live in
+`deploy/env/local.example.env`.
 
 Common settings and defaults are:
 
@@ -36,15 +88,25 @@ EMPIRE_STONKS_OHLCV_EODDATA_REQUEST_DELAY_SECONDS=2
 EMPIRE_STONKS_OHLCV_EODDATA_RECONCILIATION_SESSIONS=7
 ```
 
-The initial source contract makes Symbol List requests for all three exchanges
-before their effective-date Quote List requests. It stores six exchange-scoped
-JSON objects and keeps EODData name/type/currency data best-effort on provider
-listings while leaving `instrument_type_code` as `UNKNOWN`. See
+The source contract makes Symbol List requests for each selected exchange
+before its effective-date Quote List request. A full three-exchange run stores
+six exchange-scoped JSON objects; calendar planning may select a due subset.
+EODData name/type/currency data remains best-effort provider-listing metadata
+while `instrument_type_code` remains `UNKNOWN`. See
 [`docs/stonks/ohlcv-eoddata-source-contract.md`](../../docs/stonks/ohlcv-eoddata-source-contract.md)
 for request, duplicate, reconciliation, delivery, and provider-native value
 semantics.
 
 Stooq and Yahoo do not require credentials in the current package contract.
+
+`EMPIRE_STONKS_OHLCV_EODDATA_API_KEY` is the only current provider secret. It
+must remain in the active runtime environment and must not be committed or
+placed in command arguments, URLs, Core parameters/summaries, object keys or
+metadata, reports, logs, Airflow task payloads, or serialized results. Use
+`OHLCVConfig.to_safe_dict()` for operational configuration; it exposes only an
+`eoddata_configured` boolean, never the credential. Errors and stored issue
+samples use bounded, allowlisted reason/stage values rather than response bodies,
+query-bearing URLs, request headers, or exception text.
 
 Yahoo daily and historical Chart acquisition uses:
 
@@ -72,6 +134,61 @@ for the request, response, identity, pacing, adjustment, compliance, and raw
 object contract. The shared calendar-close/local-cutoff policy, provider-date
 rules, observed-only fallback, eligibility, and reconciliation design is in
 [`docs/stonks/ohlcv-market-session-contract.md`](../../docs/stonks/ohlcv-market-session-contract.md).
+
+## Operator commands
+
+Run repository wrappers from the repository root. Each wrapper loads the
+runtime environment, validates its scope before opening the database where
+possible, emits a compact secret-safe JSON result on successful stdout, and
+returns nonzero with a fixed safe error on failure. Long-running Stooq and Yahoo
+commands emit JSON progress on stderr.
+
+| Command | Purpose |
+|---|---|
+| `bin/stonks-ohlcv-config` | Print the credential-free effective OHLCV configuration. |
+| `bin/stonks-ohlcv-eoddata-daily --effective-date YYYY-MM-DD` | Plan and run the exchange-bulk EODData daily workflow for one provider date. |
+| `bin/stonks-ohlcv-stooq-backfill --input-path PATH --effective-date YYYY-MM-DD` | Stream an operator-supplied Stooq US stock archive with optional inclusive date, exact market/ticker, and chunk-size bounds. |
+| `bin/stonks-ohlcv-yahoo-backfill --effective-date YYYY-MM-DD` | Import a bounded historical range for all active Yahoo seeds or an exact selected/resumed subset. |
+| `bin/stonks-ohlcv-yahoo-daily --effective-date YYYY-MM-DD` | Ingest eligible missing Yahoo sessions and reconcile the configured recent-session window. |
+
+The equivalent installed Poetry commands omit the `bin/` prefix and require
+the caller to load the environment first. Use `--help` for exact options; the
+workflow sections below document scope and rerun behavior.
+
+## Airflow DAGs and stored reports
+
+Two thin DAGs are implemented and discovered by the Airflow runtime. Both are
+deliberately external-trigger-only in local/development operation, with
+`schedule=None`, `catchup=False`, and `max_active_runs=1`:
+
+| DAG ID | Delegated runner | Automatic scheduling state |
+|---|---|---|
+| `stonks_ohlcv_eoddata_daily_scrape` | `run_eoddata_daily()` | Disabled until the bounded V10.8 rollout gate approves the documented weekday multi-run cadence. |
+| `stonks_ohlcv_yahoo_daily_scrape` | `run_yahoo_daily()` | Disabled until the bounded V10.10 rollout gate approves a measured production cadence. |
+
+The Stooq historical workflow has no DAG. It remains a manual CLI-only import
+because Empire neither downloads the archive nor automates provider CAPTCHA,
+JavaScript, browser-verification, or challenge flows. See the
+[Stooq backfill operator guide](../../docs/stonks/ohlcv-stooq-backfill-operator-guide.md)
+and [source contract](../../docs/stonks/ohlcv-stooq-history-source-contract.md).
+Unattended Stooq daily ingestion is deferred to the later source-authorization
+and machine-access gate.
+
+Completed workflows store reports under
+`<storage_key>/<provider>/runs/YYYY/MM/DD/<run_id>/reports/`:
+
+| Workflow | Durable reports |
+|---|---|
+| EODData daily | Authoritative structured `report.json`, human-readable `report.pdf`, and equity-focused `daily-market-report.pdf`. |
+| Yahoo backfill and daily | Authoritative structured `report.json` plus human-readable `report.pdf`. |
+| Stooq historical backfill | Authoritative complete-or-partial `report.json` plus human-readable `report.pdf`. |
+
+Reports have no expiration and carry provider scope, import/validation counts,
+coverage, freshness or session-planning evidence, bounded warnings/failures,
+lineage identities, and provider-native interpretation notes. JSON is
+authoritative for complete structured samples. Inactive listings are separated
+or excluded from ordinary stale/gap findings, and observed-only session
+policies never manufacture holiday, weekday, or missing-session claims.
 
 ## Market-session eligibility
 
@@ -372,7 +489,9 @@ bin/stonks-ohlcv-yahoo-daily \
 The wrapper loads `deploy/env/local.env` through `bin/env-load`, prints only
 secret-safe JSON progress on stderr, and emits one compact result on stdout.
 The package itself never loads an environment file and remains usable by the
-next thin Airflow DAG.
+thin Airflow DAG.
+
+## Stooq historical backfill
 
 The Stooq historical backfill accepts one operator-supplied
 `d_us_txt.zip`, normally at `$EMPIRE_TEMP_DIR/d_us_txt.zip`. It copies the
@@ -546,7 +665,7 @@ only establish runtime scope and call the package.
 ## CLI
 
 Local commands use `bin/env-load` to load `deploy/env/local.env` before calling
-package-owned command modules. The initial configuration check prints only the
+package-owned command modules. The configuration check prints only the
 secret-safe configuration summary:
 
 ```bash
@@ -748,11 +867,13 @@ capabilities exist in the current schema.
 
 ## EODData daily runner
 
-`run_eoddata_daily()` owns the provider's nightly package sequence under one
-Core run: acquire the three Symbol List objects followed by three Quote List
-objects, read and parse/reconcile them in NYSE/NASDAQ/AMEX order, execute the
-atomic import, build and store the run-status and daily-market reports, and
-complete the Core run.
+`run_eoddata_daily()` owns the provider's daily package sequence under one Core
+run: plan due exchange work, acquire Symbol List objects followed by Quote List
+objects for only the selected exchange subset, parse/reconcile in configured
+order, execute the scoped atomic import, build and store the run-status and
+daily-market reports, and complete the Core run. A full due run covers NYSE,
+NASDAQ, and AMEX; an ineligible or already-complete plan stores normal no-op
+reports without provider acquisition.
 Callers provide the connection, Core services, explicit effective date, and
 runtime identity; the package neither loads environment files nor depends on
 Airflow.
@@ -801,12 +922,30 @@ poetry install
 poetry run pytest
 ```
 
-## Status
+Repository-level database migrations and Airflow configuration remain outside
+this Poetry package. Run their validation through the monorepo Make targets
+when changing those integration surfaces.
 
-Shared models, provider-native persistence/query helpers, Core raw-object
-storage, source-snapshot registration, run lifecycle, the transactional import
-boundary, EODData six-request acquisition, and EODData Symbol List parsing are
-implemented along with EODData Quote List parsing/reconciliation, atomic import,
-shared provider health queries, the stored EODData report, and the manual
-eligibility-driven EODData Airflow entrypoint. Later provider parsers are added
-in later tasks.
+## Deferred work and current status
+
+The provider-native package paths are implemented for EODData daily, Yahoo
+historical/daily/reconciliation, and operator-supplied historical Stooq data.
+The EODData and Yahoo DAGs remain manual pending their explicit rollout gates;
+Stooq daily acquisition remains deferred pending proof of a stable, authorized
+non-browser machine-download path.
+
+The following work is intentionally not implied by package completion:
+
+- mapping provider series to canonical issuers, securities, listings, or
+  exchanges;
+- detecting ticker reuse or reconstructing real-world identity continuity;
+- canonical or consensus prices, cross-provider adjustment normalization, or
+  stored provider-bar revision history;
+- sector, industry, fundamentals, broad enrichment, or canonical technical
+  indicators;
+- intraday, extended-hours, or arbitrary alternate bar variants; and
+- automated Stooq CAPTCHA, browser-challenge, or interactive enrollment flows.
+
+A future bridge must use explicit effective-dated mappings and preserve
+unresolved or ambiguous provider series. It must not be inferred from the
+current provider listing key or started merely because native OHLCV rows exist.

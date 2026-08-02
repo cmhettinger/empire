@@ -177,7 +177,7 @@ fixture workflows to normal provider operation one proven path at a time.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| V10.1 | [ ] | Complete package README | Document scope, provider-native semantics, `deploy/env/local.env` runtime loading, `os.environ` package boundary, secret handling, CLIs, raw retention, source snapshots, tables, calendar/session policies, enabled DAGs/reports, the manual Stooq backfill boundary, and deferred bridge/enrichment work. | C9.6, Y8.15, H7.8 |
+| V10.1 | [x] | Complete package README | Document scope, provider-native semantics, `deploy/env/local.env` runtime loading, `os.environ` package boundary, secret handling, CLIs, raw retention, source snapshots, tables, calendar/session policies, enabled DAGs/reports, the manual Stooq backfill boundary, and deferred bridge/enrichment work. | C9.6, Y8.15, H7.8 |
 | V10.2 | [ ] | Add operator runbook | Document local secret/config setup, manual runs, each enabled provider DAG, historical Stooq file acquisition/import, Yahoo backfill, eligibility and reconciliation interpretation, report interpretation, raw-object inspection, reruns, and failure recovery without printing credentials. | V10.1 |
 | V10.3 | [ ] | Run formatting and full package tests | Configured formatting/linting and the full `empire-stonks-ohlcv` test suite pass from the repository root. | V10.2 |
 | V10.4 | [ ] | Run DB validation and regenerate docs | Repo-standard DB validation and Stonks schema documentation generation pass with no drift. | V10.2 |
@@ -188,6 +188,15 @@ fixture workflows to normal provider operation one proven path at a time.
 | V10.9 | [ ] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V10.8, H7.8 |
 | V10.10 | [ ] | Run Yahoo backfill and enable daily scheduling | Run the bounded live Yahoo backfill for the reviewed seed universe, inspect calendar assignments, lineage, native semantics, bars, reports, and recent-session reconciliation, then enable the Yahoo DAG at a measured multi-run cadence only after results are healthy. Record request volume, cadence, and rollback decision. | V10.9, Y8.15 |
 | V10.11 | [ ] | Audit derived daily-bar consistency | Recompute expected `change` and `changepct` from each provider listing's nearest preceding stored bar and compare them with every `ohlcv_daily` row, covering first rows, zero predecessor closes, market-session gaps, corrections, and out-of-order imports. Report bounded discrepancy counts and samples by provider and market. If discrepancies exist, identify the cause and add a tested, bounded, idempotent repair command or workflow; if none exist, record the evidence and do not add a scheduled mutation task. | V10.10, H7.8 |
+
+Done: 2026-08-02 — completed
+`packages/empire-stonks-ohlcv/README.md` and this checklist with current scope,
+data/lineage, runtime/secret, CLI, DAG/report, session-policy, Stooq-manual, and
+deferred-work contracts. Focused package tests passed 130; package, four runners,
+and five CLI imports passed; five wrapper help smokes, 8/8 README links, nine
+balanced fenced blocks, Compose config, `poetry check --lock`, package
+sdist/wheel build, `pip check`, compilation, Flyway validation of 38 migrations,
+the OHLCV schema contract, and `git diff --check` passed.
 
 ## Phase 11: Stooq Daily End-To-End Vertical Slice
 
