@@ -183,7 +183,7 @@ fixture workflows to normal provider operation one proven path at a time.
 | V10.4 | [x] | Run DB validation and regenerate docs | Repo-standard DB validation and Stonks schema documentation generation pass with no drift. | V10.2 |
 | V10.5 | [x] | Verify package, CLI, and DAG imports | Package, all CLI modules, and all enabled provider DAGs import cleanly in their actual runtime environments. | V10.3-V10.4 |
 | V10.6 | [x] | Verify raw-object cleanup | Expire and clean a test raw object and prove stored-object/membership rows are removed while source snapshot, provider listing, bars, session policy, and report remain queryable. | V10.4-V10.5 |
-| V10.7 | [ ] | Run combined fixture regression | Run EODData, operator-supplied historical Stooq, and Yahoo fixture paths through provider reports and prove reruns, calendar isolation, provider isolation, secret safety, and report scoping. | V10.3-V10.6 |
+| V10.7 | [x] | Run combined fixture regression | Run EODData, operator-supplied historical Stooq, and Yahoo fixture paths through provider reports and prove reruns, calendar isolation, provider isolation, secret safety, and report scoping. | V10.3-V10.6 |
 | V10.8 | [ ] | Run and enable bounded EODData | Run bounded live EODData imports across representative calendar windows, inspect eligibility, lineage, bars, reconciliation, and reports, then enable its multi-run DAG only after results are healthy. Record the cadence and decision. | V10.7, C9.6, E6.13 |
 | V10.9 | [ ] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V10.8, H7.8 |
 | V10.10 | [ ] | Run Yahoo backfill and enable daily scheduling | Run the bounded live Yahoo backfill for the reviewed seed universe, inspect calendar assignments, lineage, native semantics, bars, reports, and recent-session reconciliation, then enable the Yahoo DAG at a measured multi-run cadence only after results are healthy. Record request volume, cadence, and rollback decision. | V10.9, Y8.15 |
@@ -239,6 +239,16 @@ session policy, and non-expiring report remain queryable. Ten focused OHLCV
 lineage tests and 20 Core object-store tests passed; Flyway validated 38
 migrations, fixture residue was 0/0/0/0, and dependency, compilation, import,
 88-column, and `git diff --check` checks passed.
+
+Done: 2026-08-02 — ran the existing EODData calendar, operator-supplied Stooq
+history, Yahoo daily, three-provider isolation, provider-report, and
+secret-safety fixtures together without code changes. The combined regression
+passed 29 tests in 27.02 seconds, covering unchanged/corrected reruns,
+EODData/Yahoo calendar isolation, exact three-provider identity isolation,
+provider/market/listing report scopes, and secret-safe operational surfaces.
+Fixture run/object/listing/membership residue was 0/0/0/0; Flyway validated 38
+migrations, and lock, compilation, dependency, import, and `git diff --check`
+checks passed.
 
 ## Phase 11: Stooq Daily End-To-End Vertical Slice
 
