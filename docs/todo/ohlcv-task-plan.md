@@ -170,30 +170,13 @@ Fully completed phases and their `Done:` notes are moved to the
 active checklist focused. Phases 0-10 are currently archived there;
 their task IDs remain valid dependencies for active work.
 
-## Phase 11: Stooq Daily End-To-End Vertical Slice
+## Phase 11: Implement Provider Technical Indicators
 
-Goal: revisit Stooq daily acquisition only after the rest of the package is
-operational, and add unattended ingestion only if Stooq provides a stable,
-authorized machine-download path that does not depend on browser-challenge
-automation.
+Goal: implement provider-level technical indicators after the requirements,
+scope, and task breakdown are completed in a separate planning chat.
 
-T11.1 is a decision gate. A documented manual-only or defer decision completes
-this phase without starting T11.2-T11.10; those implementation tasks remain
-deferred until the source conditions change. A go decision continues through
-T11.10.
-
-| ID | Status | Goal | Complete When | Depends On |
-|----|--------|------|---------------|------------|
-| T11.1 | [ ] | Gate Stooq daily automation | Document current Stooq API-key enrollment, terms and rate expectations, secret handling, CSV format, and browser-verification behavior. Manually enroll if appropriate, then prove whether a key-authenticated endpoint works from a clean non-browser HTTP client without cookies or challenge circumvention. Record a go, manual-only, or defer decision. | V10.11, H7.1 |
-| T11.2 | [ ] | Implement Stooq daily acquisition when approved | If T11.1 approves unattended use, acquire the selected daily source through the documented interface and store it through the Core object/snapshot flow. Tests cover success, retryable failure, challenge/error content, and secret-safe diagnostics. Do not add headless-browser, CAPTCHA-solving, or challenge-bypass code. | T11.1, C4.2, A5.5 |
-| T11.3 | [ ] | Implement Stooq daily parser | Parse documented Stooq daily fixtures into shared records without EODData-specific persistence branches. Shared parser-contract tests pass. Reuse historical parsing only where the evidenced formats genuinely match. | T11.1-T11.2, H7.2, A5.3-A5.4 |
-| T11.4 | [ ] | Implement Stooq daily import service | Compose validation, snapshot registration, provider-listing writes, bar upserts, and import summaries. Reruns are idempotent. | T11.2-T11.3, E6.5-E6.6 |
-| T11.5 | [ ] | Build and store Stooq daily report | Reuse the shared health/report contract for Stooq-scoped freshness, coverage, stale series, gap warnings, failures, and native-semantics notes. Tests prove provider scoping and stored report paths. | T11.4, H7.5 |
-| T11.6 | [ ] | Add Stooq daily CLI | Add an operator CLI and `bin` wrapper using `bin/env-load`; it runs Stooq daily import plus reporting and emits a secret-safe JSON summary. | T11.5, B1.8 |
-| T11.7 | [ ] | Add Stooq daily runner | Add package-owned Stooq sequencing with Core run lifecycle and reporting. Tests cover success, failure, challenge responses, and reruns. | T11.5-T11.6 |
-| T11.8 | [ ] | Decide and implement Stooq DAG mode | Select scheduled, manual-only, or limited-symbol operation based on the approved interface and implemented source constraints. Add a thin scheduled DAG only when operationally justified; never add a browser-dependent DAG. Tests cover whichever go-path mode is selected. | T11.7, B1.5-B1.7 |
-| T11.9 | [ ] | Verify Stooq daily vertical workflow | Verify any enabled DAG discovery and run the full Stooq daily fixture path through reporting. Confirm lineage, report rows, secret safety, rerun behavior, and isolation from EODData, Yahoo, and historical Stooq imports. | T11.8, M3.7 |
-| T11.10 | [ ] | Run bounded Stooq daily and finalize docs | Run a bounded live import and enable any selected DAG only after healthy results. Update the README and runbook with the decision and exact operational boundary. | T11.9 |
+No tasks are defined yet. Existing technical-indicator discussions are
+exploratory and are not an authoritative implementation plan.
 
 ---
 
@@ -205,7 +188,7 @@ security-master contracts are stable enough to support temporal mappings.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| X12.1 | [ ] | Confirm bridge readiness | Record the concrete consumers and stable OHLCV/security-master contracts that require provider-to-canonical mapping. | V10.11, completed T11.1 gate decision, plus future securities readiness |
+| X12.1 | [ ] | Confirm bridge readiness | Record the concrete consumers and stable OHLCV/security-master contracts that require provider-to-canonical mapping. | V10.11, plus future securities readiness |
 | X12.2 | [ ] | Review provider-series identity evidence | Evaluate what market, ticker, date-range, identifier, and provider metadata is actually available after live ingestion. Do not assume ticker reuse can be detected automatically. | X12.1 |
 | X12.3 | [ ] | Design temporal mapping storage | Design mappings that can attach different date ranges of one provider series to different canonical listings and multiple provider series to one listing. Preserve candidate/decision evidence and ambiguity. | X12.2 |
 | X12.4 | [ ] | Decide bridge package creation | Create `empire-stonks-ohlcv-bridge` only when implemented mapping or canonical-series logic justifies a separate Python package. | X12.3 |
@@ -213,22 +196,20 @@ security-master contracts are stable enough to support temporal mappings.
 
 ---
 
-## Expected End State After Phases 0-11
+## Current End State After Phases 0-10
 
-When phases 0-11 are complete, Empire should have a reusable
+With phases 0-10 complete, Empire has a reusable
 `empire-stonks-ohlcv` package with:
 
 - Provider-neutral listing and daily-bar dataclasses.
-- Provider-specific EODData and Yahoo daily acquisition/parsing modules, a
-  Stooq historical-file parser, and Stooq daily acquisition only if T11.1
-  approves a sustainable machine-download path.
+- Provider-specific EODData and Yahoo daily acquisition/parsing modules and a
+  Stooq historical-file parser.
 - Provider-native daily histories stored independently in
   `stonks.ohlcv_daily`.
 - Idempotent current-state imports and update counts.
 - Durable provider-source content identity after short-lived raw objects expire.
 - One controlled historical Stooq import path.
-- Thin Airflow DAGs for the provider modes that are operationally enabled;
-  Stooq daily may remain manual-only or deferred if its automation gate fails.
+- Thin Airflow DAGs for the provider modes that are operationally enabled.
 - JSON health reports for ingestion counts, freshness, expected-session
   coverage, eligibility, reconciliation, stale series, and failures.
 - Tests proving provider isolation, rerun safety, cleanup-safe Core object and
