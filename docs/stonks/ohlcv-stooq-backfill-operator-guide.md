@@ -142,13 +142,19 @@ partitions are always excluded.
 
 The inspected 2026-07-18 archive contained 9,598 selected stock files and about
 1.36 GB of selected uncompressed data. Of those files, 36 are zero-byte
-placeholders and 9,562 are parseable series. A complete read-only parse found
-20,475,807 input rows, of which 20,475,736 were accepted and 71 invalid OHLCV
-rows were rejected. The expected report is therefore `WARN`, with at least 107
-warnings from the 36 placeholders and 71 rejected rows. Additional inactive
-listing skips would increase that total. These values are planning evidence,
-not fixed requirements for later archives. Monitor the JSON progress stream
-during the broad run rather than assuming the rehearsal runtime predicts it.
+placeholders and 9,562 are parseable series. V10.9 verified the completed broad
+run `64b2752a-6e6e-48d0-9ea6-c5ac8cfa2fcd`: 20,475,807 input rows produced
+20,475,736 accepted bars and 71 rejected invalid-OHLCV rows. All 410 bounded
+chunks committed in 4:41:30.9, about 1,212 accepted rows per second, with no
+failed chunks or hard failures. The resulting `WARN` report contains exactly
+107 warnings from the 36 placeholders and 71 rejected rows.
+
+The run inserted 9,561 listings and 20,475,731 bars. It reused the checksum
+snapshot from the H7.8 rehearsal and classified the five rehearsal bars as
+unchanged. Its expired raw ZIP has been cleaned from storage while the source
+snapshot, 9,562 listings, 20,475,736 current bars, and durable JSON/PDF reports
+remain visible. These counts describe this archive, not fixed requirements for
+later archives. Continue to monitor progress when importing a new bundle.
 
 ## Success, Failure, And Reruns
 

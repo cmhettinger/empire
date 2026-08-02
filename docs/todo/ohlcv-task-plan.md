@@ -185,7 +185,7 @@ fixture workflows to normal provider operation one proven path at a time.
 | V10.6 | [x] | Verify raw-object cleanup | Expire and clean a test raw object and prove stored-object/membership rows are removed while source snapshot, provider listing, bars, session policy, and report remain queryable. | V10.4-V10.5 |
 | V10.7 | [x] | Run combined fixture regression | Run EODData, operator-supplied historical Stooq, and Yahoo fixture paths through provider reports and prove reruns, calendar isolation, provider isolation, secret safety, and report scoping. | V10.3-V10.6 |
 | V10.8 | [x] | Run and enable bounded EODData | Run bounded live EODData imports across representative calendar windows, inspect eligibility, lineage, bars, reconciliation, and reports, then enable its multi-run DAG only after results are healthy. Record the cadence and decision. | V10.7, C9.6, E6.13 |
-| V10.9 | [ ] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V10.8, H7.8 |
+| V10.9 | [x] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V10.8, H7.8 |
 | V10.10 | [ ] | Run Yahoo backfill and enable daily scheduling | Run the bounded live Yahoo backfill for the reviewed seed universe, inspect calendar assignments, lineage, native semantics, bars, reports, and recent-session reconciliation, then enable the Yahoo DAG at a measured multi-run cadence only after results are healthy. Record request volume, cadence, and rollback decision. | V10.9, Y8.15 |
 | V10.11 | [ ] | Audit derived daily-bar consistency | Recompute expected `change` and `changepct` from each provider listing's nearest preceding stored bar and compare them with every `ohlcv_daily` row, covering first rows, zero predecessor closes, market-session gaps, corrections, and out-of-order imports. Report bounded discrepancy counts and samples by provider and market. If discrepancies exist, identify the cause and add a tested, bounded, idempotent repair command or workflow; if none exist, record the evidence and do not add a scheduled mutation task. | V10.10, H7.8 |
 
@@ -264,6 +264,22 @@ rollback. Focused DAG tests passed 10; lock, compilation, dependency, Compose,
 and diff checks passed; Flyway validated 38 migrations. The rebuilt Airflow
 runtime reported 0 import errors, exact cron/timezone/catchup/overlap settings,
 DAG version 2 unpaused, and next creation at 2026-08-04 00:15:00+00:00.
+
+Done: 2026-08-02 — audited the existing large Stooq run
+`64b2752a-6e6e-48d0-9ea6-c5ac8cfa2fcd` instead of replaying the unavailable
+537,380,289-byte archive. It completed 9,562/9,562 files and 410/410 chunks in
+4:41:30.9, accepting 20,475,736 of 20,475,807 rows at 1,212.23 rows/second,
+inserting 9,561 listings and 20,475,731 bars, and reusing the H7.8 snapshot plus
+five unchanged rehearsal bars. Database totals matched the WARN report across
+Nasdaq 4,704/9,082,078, NYSE 4,537/10,558,875, and NYSE MKT 321/834,783
+listings/bars; 71 invalid rows and 36 empty files caused 107 warnings, with 0
+hard failures or failed chunks. The expired raw ZIP was physically cleaned;
+the checksum snapshot, all 9,562 listings and 20,475,736 bars, and valid durable
+82,952-byte JSON plus five-page PDF reports remain visible. Updated the Stooq
+operator guide, source contract, and this checklist with the passed gate. Forty
+focused non-integration tests passed in 0.90 seconds; Poetry lock, compilation,
+public import, dependency, Flyway validation of 38 migrations, and diff checks
+passed.
 
 ## Phase 11: Stooq Daily End-To-End Vertical Slice
 

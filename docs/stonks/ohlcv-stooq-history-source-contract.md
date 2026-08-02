@@ -283,9 +283,12 @@ CLI defaults to 50,000 bars, matching the supplied prior implementation's
 bounded row batch, and rejects values above 100,000. The H7.8 bounded
 development run retained this initial operating value after a real-archive CLI
 run completed one actual five-row transaction. That result validates the
-bounded path, not 50,000-row capacity; any broad import must still be monitored
-through per-chunk progress. These CLI bounds do not weaken the
-one-transaction-per-chunk contract.
+bounded path. V10.9 subsequently audited a complete 20,475,736-bar import using
+410 successful 50,000-row-or-smaller chunks with no failed chunk. The run took
+4:41:30.9 and averaged about 1,212 accepted rows per second. This demonstrates
+the configured chunk size on the reviewed archive but does not remove the need
+to monitor a new bundle through per-chunk progress. These CLI bounds do not
+weaken the one-transaction-per-chunk contract.
 
 The package runner uses Core job `stonks_ohlcv_stooq_backfill`, subject
 `us_stocks`, and a 900-second heartbeat timeout. Run parameters contain only the
