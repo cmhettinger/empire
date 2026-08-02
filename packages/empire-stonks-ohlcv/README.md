@@ -160,13 +160,12 @@ workflow sections below document scope and rerun behavior.
 
 ## Airflow DAGs and stored reports
 
-Two thin DAGs are implemented and discovered by the Airflow runtime. Both are
-deliberately external-trigger-only in local/development operation, with
-`schedule=None`, `catchup=False`, and `max_active_runs=1`:
+Two thin DAGs are implemented and discovered by the Airflow runtime. Both use
+`catchup=False` and `max_active_runs=1`; their rollout states differ:
 
 | DAG ID | Delegated runner | Automatic scheduling state |
 |---|---|---|
-| `stonks_ohlcv_eoddata_daily_scrape` | `run_eoddata_daily()` | Disabled until the bounded V10.8 rollout gate approves the documented weekday multi-run cadence. |
+| `stonks_ohlcv_eoddata_daily_scrape` | `run_eoddata_daily()` | Enabled at 20:15 and 23:15 ET each weekday after the bounded V10.8 rollout. |
 | `stonks_ohlcv_yahoo_daily_scrape` | `run_yahoo_daily()` | Disabled until the bounded V10.10 rollout gate approves a measured production cadence. |
 
 The Stooq historical workflow has no DAG. It remains a manual CLI-only import
@@ -893,11 +892,12 @@ while the original exception is re-raised. Previously stored raw
 objects and successfully committed import data are not deleted on later-stage
 failure, making a new Core run for the same effective date safe to retry.
 
-## EODData manual DAG
+## EODData scheduled DAG
 
-Airflow DAG `stonks_ohlcv_eoddata_daily_scrape` is manual-only
-(`schedule=None`). It disables catchup and permits one active run so EODData
-acquisitions cannot overlap. The task reads runtime settings from the
+Airflow DAG `stonks_ohlcv_eoddata_daily_scrape` runs at 20:15 and 23:15 ET on
+weekdays (`15 20,23 * * 1-5` in `America/New_York`). It disables catchup and
+permits one active run so EODData acquisitions cannot overlap. The task reads
+runtime settings from the
 Compose-provided process environment and delegates the complete workflow to
 `run_eoddata_daily()`. The package planner selects due exchanges; an
 ineligible or already-complete date completes as a normal no-op run with
@@ -909,12 +909,15 @@ uses the New York date at `data_interval_end`. The task returns only the
 runner's compact secret-safe summary; detailed diagnostics remain in the stored
 report.
 
-After C9.6 and V10.8 approve live operation, the production deployment should
-use `15 20-23 * * 1-5` in `America/New_York`: 20:15, 21:15, 22:15, and 23:15
-ET each weekday. The first run follows the reviewed 20:00 eligibility cutoff;
-the later runs provide same-date retry opportunities. Holidays and completed
-exchanges remain package-planner no-ops. Local/development scheduling stays
-disabled.
+V10.8 enabled the reduced two-run cadence after a bounded 2026-07-31 import
+completed all three markets with no failures, valid lineage and reports, and
+12,617 inserted bars. That run needed 13 recovered retries, so the earlier
+four-run proposal was deliberately reduced to limit provider pressure. The
+first run follows the reviewed 20:00 eligibility cutoff; the second provides a
+same-date retry and recent-session reconciliation opportunity. Holidays and
+completed exchanges remain package-planner no-ops. Pause the DAG and restore
+`schedule=None` if scheduled runs repeatedly show similar retry pressure or
+provider failures.
 
 ## Development
 
@@ -933,9 +936,10 @@ when changing those integration surfaces.
 
 The provider-native package paths are implemented for EODData daily, Yahoo
 historical/daily/reconciliation, and operator-supplied historical Stooq data.
-The EODData and Yahoo DAGs remain manual pending their explicit rollout gates;
-Stooq daily acquisition remains deferred pending proof of a stable, authorized
-non-browser machine-download path.
+The EODData DAG is enabled at its bounded weekday cadence. The Yahoo DAG
+remains manual pending its explicit rollout gate; Stooq daily acquisition
+remains deferred pending proof of a stable, authorized non-browser
+machine-download path.
 
 The following work is intentionally not implied by package completion:
 

@@ -9,7 +9,7 @@ workflows:
 - Yahoo historical backfill.
 - Yahoo eligibility-driven daily ingestion and recent-session reconciliation.
 - Historical Stooq import from an operator-supplied archive.
-- The manual EODData and Yahoo Airflow DAGs.
+- The scheduled EODData and manual Yahoo Airflow DAGs.
 - Safe inspection, reruns, and failure recovery.
 
 Run commands from the Empire repository root. These workflows mutate only the
@@ -98,7 +98,7 @@ DAG source, or a committed script.
 | Seed or repair Yahoo history | `bin/stonks-ohlcv-yahoo-backfill` | All active reviewed seeds by default; exact Empire-ticker and resume bounds are available. |
 | Keep Yahoo current | `bin/stonks-ohlcv-yahoo-daily` | Eligible missing sessions plus recent-session reconciliation. |
 | Import Stooq US stock history | `bin/stonks-ohlcv-stooq-backfill` | Operator-supplied `d_us_txt.zip`; exact date, market, ticker, and chunk bounds are available. |
-| Trigger a provider DAG | Airflow UI or deployment API | Manual EODData or Yahoo DAG only; no Stooq DAG exists. |
+| Trigger a provider DAG | Airflow UI or deployment API | Scheduled or manual EODData and manual Yahoo; no Stooq DAG exists. |
 
 Every CLI accepts `--env-file PATH`; omit it to use
 `deploy/env/local.env`. Use each command's `--help` output as the exact option
@@ -247,11 +247,11 @@ make airflow-up
 make airflow-dags
 ```
 
-The current local/development DAGs are configured external-trigger-only. Both
-use `schedule=None`, disable catchup, and allow one active run; keep them paused
-until their rollout gates. Trigger them through the Airflow UI or the
-deployment's authenticated API; do not put provider credentials in
-`dag_run.conf`.
+Both DAGs disable catchup and allow one active run. EODData is enabled at its
+bounded weekday cadence; Yahoo remains external-trigger-only with
+`schedule=None` until its rollout gate. Manual triggers and reruns use the
+Airflow UI or the deployment's authenticated API; do not put provider
+credentials in `dag_run.conf`.
 
 ### EODData DAG
 
@@ -266,8 +266,12 @@ provide:
 ```
 
 The task delegates once to `run_eoddata_daily()`. It logs and returns only the
-compact result. Local scheduling remains disabled until V10.8 approves the
-documented production cadence.
+compact result. V10.8 enabled `15 20,23 * * 1-5` in `America/New_York`, or
+20:15 and 23:15 ET each weekday. The first run follows eligibility; the second
+provides a same-date retry and reconciliation opportunity. A bounded live run
+completed all markets but needed 13 recovered retries, so monitor provider
+pressure. Pause the DAG and restore `schedule=None` after repeated similar
+retry pressure or provider failures.
 
 ### Yahoo DAG
 

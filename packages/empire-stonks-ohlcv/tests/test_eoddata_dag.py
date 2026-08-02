@@ -13,7 +13,7 @@ import pytest
 DAG_ID = "stonks_ohlcv_eoddata_daily_scrape"
 
 
-def test_eoddata_daily_dag_is_manual_and_documents_production_cadence(
+def test_eoddata_daily_dag_has_bounded_production_cadence(
     monkeypatch,
 ):
     module, _fake_sdk = _load_dag_module(monkeypatch)
@@ -21,20 +21,22 @@ def test_eoddata_daily_dag_is_manual_and_documents_production_cadence(
     dag = module.stonks_ohlcv_eoddata_daily_scrape_dag
 
     assert dag.dag_id == DAG_ID
-    assert dag.schedule is None
+    assert dag.schedule == "15 20,23 * * 1-5"
     assert dag.start_date.tzinfo.key == "America/New_York"
     assert dag.catchup is False
     assert dag.max_active_runs == 1
-    assert dag.tags == ["stonks", "ohlcv", "eoddata", "manual"]
+    assert dag.tags == ["stonks", "ohlcv", "eoddata", "scheduled"]
     assert [item.task_id for item in dag.tasks] == ["run_eoddata_daily"]
 
     source = Path(module.__file__).read_text(encoding="utf-8")
-    production_note = source.index("Production automation note")
+    production_note = source.index("V10.8 rollout decision")
     dag_instance = source.rindex("stonks_ohlcv_eoddata_daily_scrape()")
     assert production_note > dag_instance
-    assert 'schedule="15 20-23 * * 1-5"' in source
-    assert "20:15, 21:15, 22:15, and" in source
-    assert "23:15 ET each weekday" in source
+    assert 'schedule="15 20,23 * * 1-5"' in source
+    assert "20:15 and 23:15 ET each weekday" in source
+    assert "13 recovered retries" in source
+    assert "restore" in source
+    assert "schedule=None" in source
     assert "America/New_York" in source
     assert "package planner" in source
     assert "EMPIRE_STONKS_OHLCV_EODDATA_API_KEY" not in source

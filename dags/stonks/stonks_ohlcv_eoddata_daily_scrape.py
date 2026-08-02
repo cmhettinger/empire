@@ -43,10 +43,10 @@ def _effective_date_from_context(context: dict[str, object]) -> date:
 @dag(
     dag_id=DAG_ID,
     start_date=datetime(2026, 7, 17, tzinfo=MARKET_TIMEZONE),
-    schedule=None,
+    schedule="15 20,23 * * 1-5",
     catchup=False,
     max_active_runs=1,
-    tags=["stonks", "ohlcv", "eoddata", "manual"],
+    tags=["stonks", "ohlcv", "eoddata", "scheduled"],
 )
 def stonks_ohlcv_eoddata_daily_scrape():
     @task(task_id="run_eoddata_daily")
@@ -98,9 +98,11 @@ stonks_ohlcv_eoddata_daily_scrape_dag = (
     stonks_ohlcv_eoddata_daily_scrape()
 )
 
-# Production automation note: keep schedule=None for local/development use.
-# After C9.6 and V10.8 approve live operation, configure this deployment with
-# schedule="15 20-23 * * 1-5" in America/New_York: 20:15, 21:15, 22:15, and
-# 23:15 ET each weekday. The first run follows the reviewed 20:00 eligibility
-# cutoff; later runs retry same-date missing work. The package planner makes
-# holidays, pre-eligibility runs, and already-complete exchanges safe no-ops.
+# V10.8 rollout decision: run at 20:15 and 23:15 ET each weekday. The first
+# run follows the reviewed 20:00 eligibility cutoff; the second provides a
+# same-date retry and recent-session reconciliation opportunity. The bounded
+# 2026-07-31 run completed all three markets but needed 13 recovered retries,
+# so this two-run cadence limits provider pressure. Pause this DAG and restore
+# schedule=None if scheduled runs repeatedly show similar retry pressure or
+# provider failures. The package planner keeps holidays and completed work as
+# no-ops.
