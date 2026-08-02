@@ -182,7 +182,7 @@ fixture workflows to normal provider operation one proven path at a time.
 | V10.3 | [x] | Run formatting and full package tests | Configured formatting/linting and the full `empire-stonks-ohlcv` test suite pass from the repository root. | V10.2 |
 | V10.4 | [x] | Run DB validation and regenerate docs | Repo-standard DB validation and Stonks schema documentation generation pass with no drift. | V10.2 |
 | V10.5 | [x] | Verify package, CLI, and DAG imports | Package, all CLI modules, and all enabled provider DAGs import cleanly in their actual runtime environments. | V10.3-V10.4 |
-| V10.6 | [ ] | Verify raw-object cleanup | Expire and clean a test raw object and prove stored-object/membership rows are removed while source snapshot, provider listing, bars, session policy, and report remain queryable. | V10.4-V10.5 |
+| V10.6 | [x] | Verify raw-object cleanup | Expire and clean a test raw object and prove stored-object/membership rows are removed while source snapshot, provider listing, bars, session policy, and report remain queryable. | V10.4-V10.5 |
 | V10.7 | [ ] | Run combined fixture regression | Run EODData, operator-supplied historical Stooq, and Yahoo fixture paths through provider reports and prove reruns, calendar isolation, provider isolation, secret safety, and report scoping. | V10.3-V10.6 |
 | V10.8 | [ ] | Run and enable bounded EODData | Run bounded live EODData imports across representative calendar windows, inspect eligibility, lineage, bars, reconciliation, and reports, then enable its multi-run DAG only after results are healthy. Record the cadence and decision. | V10.7, C9.6, E6.13 |
 | V10.9 | [ ] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V10.8, H7.8 |
@@ -230,6 +230,15 @@ modules imported in both Poetry and the installed Airflow 3.2.1 worker; 5/5
 CLI modules and wrappers imported, and both manual-only DAGs imported with the
 intended IDs, `schedule=None`, disabled catchup, and one active run. Airflow
 discovered both DAGs with zero import errors; 57 focused CLI/DAG tests passed.
+
+Done: 2026-08-02 — upgraded
+`tests/test_cleanup_safe_lineage_integration.py` to expire, clean, and purge an
+isolated Core-backed raw object while proving its stored-object and membership
+rows disappear and its source snapshot, provider listing, daily bar, attached
+session policy, and non-expiring report remain queryable. Ten focused OHLCV
+lineage tests and 20 Core object-store tests passed; Flyway validated 38
+migrations, fixture residue was 0/0/0/0, and dependency, compilation, import,
+88-column, and `git diff --check` checks passed.
 
 ## Phase 11: Stooq Daily End-To-End Vertical Slice
 
