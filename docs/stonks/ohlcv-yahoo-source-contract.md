@@ -9,8 +9,15 @@ identity, native-value interpretation, raw-object layout, pacing, and failure
 behavior shared by:
 
 - A one-time, operator-controlled historical backfill.
-- Repeated daily ingestion and recent-session reconciliation, initially
-  invoked manually and later by a thin Airflow DAG.
+- Operator-triggered daily ingestion and recent-session reconciliation through
+  a thin manual Airflow DAG or the package CLI.
+
+V10.10 retains `schedule=None` and keeps the deployed DAG paused between
+operator runs. The bounded Y8 evidence proved the workflow, but the selected
+Yahoo endpoint has no published quota or availability contract. Automatic
+scheduling requires a future explicit operator decision and source-access
+review; rollback from any temporary schedule is to restore `schedule=None` and
+pause the DAG.
 
 The exact 93-listing starting universe is maintained in
 [`docs/todo/ohlcv-task-plan.md`](../todo/ohlcv-task-plan.md#initial-yahoo-seed-universe).

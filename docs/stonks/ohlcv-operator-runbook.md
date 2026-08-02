@@ -248,10 +248,10 @@ make airflow-dags
 ```
 
 Both DAGs disable catchup and allow one active run. EODData is enabled at its
-bounded weekday cadence; Yahoo remains external-trigger-only with
-`schedule=None` until its rollout gate. Manual triggers and reruns use the
-Airflow UI or the deployment's authenticated API; do not put provider
-credentials in `dag_run.conf`.
+bounded weekday cadence. V10.10 keeps Yahoo external-trigger-only with
+`schedule=None` and paused between operator runs. Temporarily unpause it for a
+manual trigger, then pause it again. Use the Airflow UI or the deployment's
+authenticated API; do not put provider credentials in `dag_run.conf`.
 
 ### EODData DAG
 
@@ -288,8 +288,12 @@ universe. Optional bounds use ISO dates and exact uppercase Empire tickers:
 }
 ```
 
-The task delegates once to `run_yahoo_daily()`. Local scheduling remains
-disabled until V10.10 approves a measured production cadence.
+The task delegates once to `run_yahoo_daily()`. V10.10 deliberately approved
+no automatic cadence: the selected Yahoo endpoint has no published quota or
+availability contract, and the operator chose explicit control after the
+bounded Y8 validation. Keep the DAG paused between manual runs. If a temporary
+schedule is ever tested, rollback means restoring `schedule=None` and pausing
+the DAG.
 
 There is no Stooq backfill or Stooq daily DAG. Do not repurpose either provider
 DAG to run Stooq work.

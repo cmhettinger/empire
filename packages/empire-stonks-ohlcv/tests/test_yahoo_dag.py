@@ -13,7 +13,7 @@ import pytest
 DAG_ID = "stonks_ohlcv_yahoo_daily_scrape"
 
 
-def test_yahoo_daily_dag_is_manual_and_documents_production_cadence(
+def test_yahoo_daily_dag_records_manual_only_rollout_decision(
     monkeypatch,
 ):
     module, _fake_sdk = _load_dag_module(monkeypatch)
@@ -29,10 +29,11 @@ def test_yahoo_daily_dag_is_manual_and_documents_production_cadence(
     assert [item.task_id for item in dag.tasks] == ["run_yahoo_daily"]
 
     source = Path(module.__file__).read_text(encoding="utf-8")
-    assert "Local/development policy" in source
-    assert "Production rollout policy" in source
-    assert "06:00, 10:00, 13:00, 18:00, and 23:00" in source
-    assert "America/New_York" in source
+    assert "V10.10 rollout decision" in source
+    assert "no automatic cadence" in source
+    assert "schedule=None" in source
+    assert "pausing the DAG" in source
+    assert "06:00, 10:00, 13:00, 18:00, and 23:00" not in source
     assert "os.environ" not in source
 
 

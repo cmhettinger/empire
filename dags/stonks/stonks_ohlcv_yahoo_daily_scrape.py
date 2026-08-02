@@ -102,12 +102,14 @@ def _optional_tickers(conf: Mapping[str, object]) -> tuple[str, ...]:
     return tuple(tickers)
 
 
-# Local/development policy: keep this DAG manual so a laptop never starts an
-# 83-listing provider run merely because Airflow was rebuilt or left running.
-# Production rollout policy: after Y8.15/V10.10 validates live operation, use
-# America/New_York runs at 06:00, 10:00, 13:00, 18:00, and 23:00. Represent
-# that cadence with an explicit production timetable or deployment-specific
-# schedule; do not copy it into package business logic.
+# V10.10 rollout decision: keep this DAG manual and the deployed DAG paused so
+# an 83-listing provider run never starts merely because Airflow is running.
+# Y8.15 proved bounded backfill, reconciliation, and rerun behavior, but Yahoo's
+# selected endpoint has no published quota or availability contract. The
+# approved cadence is therefore no automatic cadence (`schedule=None`). Revisit
+# scheduling only after an explicit operator decision and provider-access
+# review. Roll back any temporary schedule by restoring `schedule=None` and
+# pausing the DAG.
 @dag(
     dag_id=DAG_ID,
     start_date=datetime(2026, 8, 1, tzinfo=MARKET_TIMEZONE),

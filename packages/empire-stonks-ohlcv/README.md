@@ -166,7 +166,7 @@ Two thin DAGs are implemented and discovered by the Airflow runtime. Both use
 | DAG ID | Delegated runner | Automatic scheduling state |
 |---|---|---|
 | `stonks_ohlcv_eoddata_daily_scrape` | `run_eoddata_daily()` | Enabled at 20:15 and 23:15 ET each weekday after the bounded V10.8 rollout. |
-| `stonks_ohlcv_yahoo_daily_scrape` | `run_yahoo_daily()` | Disabled until the bounded V10.10 rollout gate approves a measured production cadence. |
+| `stonks_ohlcv_yahoo_daily_scrape` | `run_yahoo_daily()` | Manual-only and paused by the explicit V10.10 rollout decision. |
 
 The Stooq historical workflow has no DAG. It remains a manual CLI-only import
 because Empire neither downloads the archive nor automates provider CAPTCHA,
@@ -936,8 +936,8 @@ when changing those integration surfaces.
 
 The provider-native package paths are implemented for EODData daily, Yahoo
 historical/daily/reconciliation, and operator-supplied historical Stooq data.
-The EODData DAG is enabled at its bounded weekday cadence. The Yahoo DAG
-remains manual pending its explicit rollout gate; Stooq daily acquisition
+The EODData DAG is enabled at its bounded weekday cadence. The Yahoo DAG stays
+manual-only and paused by the explicit V10.10 decision; Stooq daily acquisition
 remains deferred pending proof of a stable, authorized non-browser
 machine-download path.
 

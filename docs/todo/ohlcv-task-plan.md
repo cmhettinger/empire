@@ -186,7 +186,7 @@ fixture workflows to normal provider operation one proven path at a time.
 | V10.7 | [x] | Run combined fixture regression | Run EODData, operator-supplied historical Stooq, and Yahoo fixture paths through provider reports and prove reruns, calendar isolation, provider isolation, secret safety, and report scoping. | V10.3-V10.6 |
 | V10.8 | [x] | Run and enable bounded EODData | Run bounded live EODData imports across representative calendar windows, inspect eligibility, lineage, bars, reconciliation, and reports, then enable its multi-run DAG only after results are healthy. Record the cadence and decision. | V10.7, C9.6, E6.13 |
 | V10.9 | [x] | Run bounded historical Stooq import | Run the defined limited historical import and verify performance, counts, rerun behavior, cleanup, and report visibility before expanding scope. | V10.8, H7.8 |
-| V10.10 | [ ] | Run Yahoo backfill and enable daily scheduling | Run the bounded live Yahoo backfill for the reviewed seed universe, inspect calendar assignments, lineage, native semantics, bars, reports, and recent-session reconciliation, then enable the Yahoo DAG at a measured multi-run cadence only after results are healthy. Record request volume, cadence, and rollback decision. | V10.9, Y8.15 |
+| V10.10 | [x] | Close the Yahoo rollout gate | Audit the completed bounded live Yahoo backfill and daily runs for the reviewed seed universe, including calendar assignments, lineage, native semantics, bars, reports, and recent-session reconciliation. Record request volume, then explicitly select scheduled or manual-only operation and document the rollback decision. | V10.9, Y8.15 |
 | V10.11 | [ ] | Audit derived daily-bar consistency | Recompute expected `change` and `changepct` from each provider listing's nearest preceding stored bar and compare them with every `ohlcv_daily` row, covering first rows, zero predecessor closes, market-session gaps, corrections, and out-of-order imports. Report bounded discrepancy counts and samples by provider and market. If discrepancies exist, identify the cause and add a tested, bounded, idempotent repair command or workflow; if none exist, record the evidence and do not add a scheduled mutation task. | V10.10, H7.8 |
 
 Done: 2026-08-02 — completed
@@ -280,6 +280,24 @@ operator guide, source contract, and this checklist with the passed gate. Forty
 focused non-integration tests passed in 0.90 seconds; Poetry lock, compilation,
 public import, dependency, Flyway validation of 38 migrations, and diff checks
 passed.
+
+Done: 2026-08-02 — closed the Yahoo rollout gate by reusing the completed Y8
+evidence and the operator's explicit manual-only decision; no provider request
+was made. The reviewed release sequence used 126 logical request chunks: 93 for
+the full-universe backfill, 8 for remediation, 11 for the diagnostic daily run,
+and 7 for each of two unchanged reconciliation reruns. The live catalog has 93
+reviewed listings, 83 active, 10 inactive, 0 missing session policies or Yahoo
+tickers, 108,561 bars from 1965-01-04 through 2026-07-30, 166 snapshots and
+lineage links, and 11 durable JSON reports. The final two daily runs each had
+0 ingestion requests, 7 reconciliation requests, 21 unchanged bars, and 0
+missing, failed, retry, correction, or calendar-policy counts. Updated the
+Yahoo DAG and focused test, package README, Yahoo source contract, operator
+runbook, and this checklist: `schedule=None` is the approved cadence, the DAG
+stays paused between manual runs, and rollback from temporary scheduling is to
+restore `schedule=None` and pause it. Focused DAG tests passed 10; Poetry lock,
+compilation, public imports, dependency and Compose checks, Flyway validation
+of 38 migrations, and diff checks passed. Airflow reported 0 import errors,
+manual metadata, `is_paused=True`, and no next run.
 
 ## Phase 11: Stooq Daily End-To-End Vertical Slice
 
