@@ -112,6 +112,7 @@ def test_quote_tile_grid_renders_semantic_market_colors(tmp_path: Path) -> None:
                 QuoteTileSpec("DOWN", 98.75, -1.25, -1.25),
                 QuoteTileSpec("FLAT", 100.00, 0.00, 0.00),
                 QuoteTileSpec("NEW", 12.00, None, None),
+                QuoteTileSpec("CLOSED", None, None, None, "MARKET CLOSED"),
             ),
             theme=renderer.theme,
         )

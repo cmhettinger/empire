@@ -248,6 +248,9 @@ def test_daily_runner_partial_retry_rerun_correction_and_noop(
         assert object_store.get_bytes(partial.pdf_report_object_id).startswith(
             b"%PDF-"
         )
+        assert object_store.get_bytes(
+            partial.benchmark_pdf_report_object_id
+        ).startswith(b"%PDF-")
 
         failing.clear()
         retry = run(selected_tickers=(tickers[1],))

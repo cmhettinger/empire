@@ -72,6 +72,7 @@ def test_compact_run_result_distinguishes_noop_phases() -> None:
         ),
         report_object_id=UUID(int=2),
         pdf_report_object_id=UUID(int=3),
+        benchmark_pdf_report_object_id=UUID(int=4),
         report_outcome="PASS",
     )
 
@@ -81,3 +82,4 @@ def test_compact_run_result_distinguishes_noop_phases() -> None:
     assert payload["bar_counts"]["inserted"] == 0
     assert payload["corrected_reconciliation_bars"] == 0
     assert payload["pdf_report_object_id"] == str(UUID(int=3))
+    assert payload["benchmark_pdf_report_object_id"] == str(UUID(int=4))

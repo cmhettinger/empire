@@ -11,20 +11,16 @@ placeholder pages and unsupported claims: a page should be added only when its
 data and methodology are supported by the current schema or by a tested
 calculation over that data.
 
+## Provider-Separated Benchmark Implementation
+
+Legacy pages 5-8 are intentionally not part of the EODData equity report. Their
+supported equivalents are implemented in the Yahoo Daily Benchmark Report,
+which uses active Yahoo listings, stable Empire tickers, exact-date coverage,
+session-policy-aware unavailable states, and provider-native continuous futures.
+This preserves the boundary between EODData equities and Yahoo benchmarks while
+allowing both reports to evolve independently.
+
 ## Missing Pages
-
-### Indices and Benchmarks
-
-| Legacy pages | Page or section | Why it is not implemented |
-| --- | --- | --- |
-| 5 | Core U.S. Benchmarks and Volatility/Macro | The provider-native EODData equity report does not yet have a supported index benchmark universe or reliable mappings for SPX, DJI, NDX, VIX, MOVE, and DXY. |
-| 6 | Europe and Asia/APAC Indices | International index series and their provider-native symbol mappings are not yet modeled for this report. |
-| 7 | India, Americas ex-U.S., Emerging Markets, and Global Indices | The required benchmark series and mappings are not yet available through the current report model. |
-| 8 | Commodity, Energy, and Metals Benchmarks | Commodity and macro benchmark series are not yet part of the EODData daily report universe. |
-
-These pages should wait for an explicit benchmark/index capability rather than
-using unversioned ticker guesses. That capability needs durable provider
-symbols, benchmark identity, coverage checks, and clear adjustment semantics.
 
 ### Sector and Industry Analysis
 
@@ -105,3 +101,7 @@ part of this TODO:
 - Configured Dow 30 and Nasdaq-100 basket performance with coverage disclosure.
 - Price and volume anomalies supported by the current schema.
 - Methodology, scope, and provider-native capability disclosures.
+- Core U.S., European, Asia-Pacific, regional, and global index benchmarks in
+  the separate Yahoo Daily Benchmark Report.
+- Yahoo volatility, currency, Treasury-yield, equity-index-futures, commodity,
+  energy, metals, agriculture, and livestock benchmark pages.

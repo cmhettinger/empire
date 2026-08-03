@@ -33,9 +33,10 @@ class QuoteTileSpec:
     """Display values for one reusable market-performance tile."""
 
     ticker: str
-    price: float
+    price: float | None
     change: float | None
     change_pct: float | None
+    status: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,7 +116,10 @@ class QuoteTileGrid(Flowable):
     ) -> None:
         canvas = self.canv
         theme = self.theme
-        palette = _quote_tile_palette(tile.change_pct, theme=theme)
+        palette = _quote_tile_palette(
+            None if tile.status is not None else tile.change_pct,
+            theme=theme,
+        )
         header_height = self.tile_height * 0.23
         percent_height = self.tile_height * 0.27
 
@@ -154,7 +158,7 @@ class QuoteTileGrid(Flowable):
             tile.ticker,
         )
 
-        price_text = f"{tile.price:,.2f}"
+        price_text = "-" if tile.price is None else f"{tile.price:,.2f}"
         price_size = _fit_font_size(
             price_text,
             theme.body_bold_font,
@@ -170,7 +174,13 @@ class QuoteTileGrid(Flowable):
             price_text,
         )
 
-        change_text = "-" if tile.change is None else f"{tile.change:+,.2f}"
+        change_text = (
+            ""
+            if tile.status is not None
+            else "-"
+            if tile.change is None
+            else f"{tile.change:+,.2f}"
+        )
         canvas.setFont(theme.body_font, 8.0)
         canvas.setFillColor(palette.value)
         canvas.drawCentredString(
@@ -180,7 +190,9 @@ class QuoteTileGrid(Flowable):
         )
 
         percent_text = (
-            "NO PRIOR CLOSE"
+            tile.status
+            if tile.status is not None
+            else "NO PRIOR CLOSE"
             if tile.change_pct is None
             else "UNCHANGED"
             if abs(tile.change_pct) < 1e-12

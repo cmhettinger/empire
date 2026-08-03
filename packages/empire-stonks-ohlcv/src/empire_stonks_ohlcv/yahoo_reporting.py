@@ -15,12 +15,17 @@ from empire_core import ObjectStore, RunContext, StoredObject
 from empire_stonks_ohlcv.config import OHLCVConfig
 from empire_stonks_ohlcv.object_store import DEFAULT_STORAGE_ROOT
 from empire_stonks_ohlcv.reporting import (
+    MARKET_PDF_REPORT_OBJECT_KIND,
     PDF_REPORT_CONTENT_TYPE,
     PDF_REPORT_OBJECT_KIND,
     REPORT_CONTENT_TYPE,
     REPORT_OBJECT_KIND,
     REPORT_SCHEMA_VERSION,
     build_report_object_key,
+)
+from empire_stonks_ohlcv.reports.yahoo_daily_benchmark_pdf import (
+    YAHOO_DAILY_BENCHMARK_PDF_REPORT_ID,
+    render_yahoo_daily_benchmark_pdf,
 )
 from empire_stonks_ohlcv.reports.yahoo_pdf import (
     YAHOO_BACKFILL_PDF_REPORT_ID,
@@ -34,6 +39,9 @@ from empire_stonks_ohlcv.yahoo import (
     YahooAcquisitionResult,
     YahooAcquisitionStatus,
     YahooListingTarget,
+)
+from empire_stonks_ohlcv.yahoo_benchmark_reporting import (
+    YahooDailyBenchmarkReport,
 )
 from empire_stonks_ohlcv.yahoo_completeness import (
     YahooCompletenessStatus,
@@ -57,6 +65,10 @@ YAHOO_DAILY_REPORT_FILENAME = YAHOO_REPORT_FILENAME
 YAHOO_PDF_REPORT_FILENAME = "report.pdf"
 YAHOO_BACKFILL_PDF_REPORT_LOGICAL_NAME = "yahoo_backfill_pdf_report"
 YAHOO_DAILY_PDF_REPORT_LOGICAL_NAME = "yahoo_daily_pdf_report"
+YAHOO_DAILY_BENCHMARK_PDF_REPORT_FILENAME = "daily-benchmark-report.pdf"
+YAHOO_DAILY_BENCHMARK_PDF_REPORT_LOGICAL_NAME = (
+    "yahoo_daily_benchmark_pdf_report"
+)
 
 
 class YahooReportPhase(StrEnum):
@@ -412,6 +424,71 @@ def store_yahoo_pdf_report(
             "generated_at": report["generated_at"],
             "outcome": report["outcome"],
             "workflow": report["workflow"],
+        },
+    )
+
+
+def store_yahoo_daily_benchmark_pdf_report(
+    *,
+    object_store: ObjectStore,
+    run_context: RunContext,
+    config: OHLCVConfig,
+    report: YahooDailyBenchmarkReport,
+    storage_root: str = DEFAULT_STORAGE_ROOT,
+    output_dir: str | Path | None = None,
+) -> StoredObject:
+    """Render and store the exact-date active Yahoo benchmark report."""
+
+    if not isinstance(object_store, ObjectStore):
+        raise TypeError("object_store must be a Core ObjectStore.")
+    if not isinstance(config, OHLCVConfig):
+        raise TypeError("config must be an OHLCVConfig.")
+    if not isinstance(report, YahooDailyBenchmarkReport):
+        raise TypeError("report must be a YahooDailyBenchmarkReport.")
+    _validate_run_context(run_context)
+    if report.trading_date != run_context.effective_date:
+        raise ValueError("report trading_date must match the Core run.")
+
+    render_root = Path(output_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp"))
+    render_dir = (
+        render_root
+        / "empire"
+        / "stonks-ohlcv"
+        / str(run_context.run_id)
+        / "reports"
+    )
+    result = render_yahoo_daily_benchmark_pdf(
+        report=report,
+        output_dir=render_dir,
+        filename=YAHOO_DAILY_BENCHMARK_PDF_REPORT_FILENAME,
+    )
+    return object_store.put_file(
+        run_context=run_context,
+        object_scope="run",
+        domain="stonks",
+        logical_name=YAHOO_DAILY_BENCHMARK_PDF_REPORT_LOGICAL_NAME,
+        storage_root=storage_root,
+        object_key=build_report_object_key(
+            storage_key=config.storage_key,
+            run_context=run_context,
+            provider_code=YAHOO_PROVIDER_CODE,
+        ),
+        filename=YAHOO_DAILY_BENCHMARK_PDF_REPORT_FILENAME,
+        source_path=result.primary_artifact.path,
+        move=False,
+        content_type=PDF_REPORT_CONTENT_TYPE,
+        object_kind=MARKET_PDF_REPORT_OBJECT_KIND,
+        metadata={
+            "report_id": YAHOO_DAILY_BENCHMARK_PDF_REPORT_ID,
+            "provider_code": YAHOO_PROVIDER_CODE,
+            "source_code": YAHOO_DAILY_SOURCE.source_code,
+            "trading_date": report.trading_date.isoformat(),
+            "generated_at": report.generated_at.isoformat(),
+            "active_listing_count": report.active_listing_count,
+            "reported_count": report.reported_count,
+            "market_closed_count": report.market_closed_count,
+            "not_yet_eligible_count": report.not_yet_eligible_count,
+            "no_data_count": report.no_data_count,
         },
     )
 

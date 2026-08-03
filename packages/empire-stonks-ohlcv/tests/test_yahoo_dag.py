@@ -135,6 +135,9 @@ def test_yahoo_daily_task_delegates_noop_result(monkeypatch):
         "reconciliation": {"request_count": 0},
         "report_object_id": "c0988359-242d-4a1f-b265-1466e00ae79b",
         "pdf_report_object_id": "f0fa81fb-e88b-4a81-ae28-a221b1dbad8f",
+        "benchmark_pdf_report_object_id": (
+            "8bf5c2d2-6b2e-4c61-b645-25a474613845"
+        ),
         "report_outcome": "PASS",
     }
     calls = []

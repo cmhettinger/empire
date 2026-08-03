@@ -144,11 +144,12 @@ def stonks_ohlcv_yahoo_daily_scrape():
         payload = result.to_dict()
         log.info(
             "Completed Yahoo daily run %s for %s with JSON report %s and "
-            "PDF report %s (%s)",
+            "health PDF %s, benchmark PDF %s (%s)",
             payload["run_id"],
             payload["scope"]["effective_date"],
             payload["report_object_id"],
             payload["pdf_report_object_id"],
+            payload["benchmark_pdf_report_object_id"],
             payload["report_outcome"],
         )
         return payload
