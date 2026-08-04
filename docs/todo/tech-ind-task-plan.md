@@ -20,9 +20,10 @@ Copy this prompt and replace `<TASK_ID>` with the task to complete.
 Complete task <TASK_ID> from docs/todo/tech-ind-task-plan.md.
 
 Before changing code, read AGENTS.md, the full active plan and archive, and the
-OHLCV plans/source contracts required by the task. Inspect the live repository
-and completed prerequisite Done: notes; do not assume the plan is newer than
-the implementation.
+full docs/stonks/technical-indicators-design-contract.md. Also read the OHLCV
+plans/source contracts required by the task. Inspect the live repository and
+completed prerequisite Done: notes; do not assume the plan is newer than the
+implementation.
 
 Implement only the named task and necessary integration points. Follow Empire
 package, database, Core, reporting, environment, CLI, and Airflow conventions.
@@ -46,6 +47,18 @@ corporate-action normalization, strategy thresholds, target selection,
 portfolio/backtest execution, point-in-time sector mappings, intraday
 indicators, or Airflow business logic. `empire-stonks-ohlcv` stays upstream and
 must not import technicals.
+
+## Required Design Baseline
+
+The agreed table shape, feature inventory, formula direction, generated-versus
+Python ownership, validation split, SPX identity, index philosophy, operational
+surfaces, deferred indicators, and narrowly scoped open decisions are preserved
+in the
+[daily technical indicators design contract](../stonks/technical-indicators-design-contract.md).
+
+Implementation tasks refine and prove that baseline. They must not restart the
+indicator-selection or table-design discussion without new evidence and an
+explicit contract update.
 
 ```text
 empire-stonks-ohlcv -> stonks.ohlcv_daily
@@ -132,10 +145,10 @@ or calculation code is committed.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| P0.1 | [ ] | Record package architecture | Add the authoritative architecture contract covering ownership, boundaries, current-state persistence, provider-native grain, and deferred strategy/backtest/sector work. | — |
+| P0.1 | [ ] | Ratify the design contract | Audit the existing design contract against live OHLCV/Core/reporting conventions, resolve contradictions without reopening settled scope, and mark it as the authoritative V1 baseline. | — |
 | P0.2 | [ ] | Freeze naming conventions | Select package/import, table/state-table, calculation version, Core jobs, storage keys, object kinds, report IDs, CLI names, and DAG ID. | P0.1 |
-| P0.3 | [ ] | Freeze feature profile V1 | Define every persisted, generated, and query-time feature, including units, nullability, lookback, current-observation inclusion, and deferred families. | P0.1 |
-| P0.4 | [ ] | Freeze formula semantics | Define returns, gaps, averages, slopes, extrema, volatility, z-scores, Wilder indicators, Bollinger, MACD, streak, dollar volume, and zero-denominator behavior. | P0.3 |
+| P0.3 | [ ] | Freeze feature profile V1 | Convert the contract inventory into the exact persisted/generated/query-time profile, resolving only its named open units, nullability, and ownership decisions. | P0.1 |
+| P0.4 | [ ] | Freeze formula semantics | Turn the contract formulas into executable specifications and resolve its named volatility, z-score, TA-Lib warm-up, tolerance, and denominator decisions. | P0.3 |
 | P0.5 | [ ] | Define SPX contract | Define `YAHOO/XIDX/SPX` resolution, eligible subjects, exact alignment, relative return, beta/correlation, complete windows, and unavailable behavior. | P0.3-P0.4 |
 | P0.6 | [ ] | Define source-value policy | Audit EODData, Stooq, and Yahoo adjustment/corporate-action semantics and select initially eligible provider listings without claiming normalization. | P0.1, OHLCV V10.11 |
 | P0.7 | [ ] | Define recalculation semantics | Specify daily append, missing row, source correction, SPX correction, version change, inactive listing, and deletion behavior with full/incremental equivalence. | P0.4-P0.6 |
@@ -168,7 +181,7 @@ and the proven incremental strategy.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| S2.1 | [ ] | Finalize main-table columns | Translate V1 into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, metadata, and comments; every column has one formula owner. | P0.3-P0.7, B1.2 |
+| S2.1 | [ ] | Finalize main-table columns | Translate the design-contract baseline into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, metadata, and comments; every column has one formula owner. | P0.3-P0.7, B1.2 |
 | S2.2 | [ ] | Decide recurrence-state schema | Based on B1.2, explicitly reject or design minimal calculation-state storage. Do not add generic state without demonstrated need. | B1.2, S2.1 |
 | S2.3 | [ ] | Finalize keys and constraints | Define PK/source FK, benchmark/Core FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
 | S2.4 | [ ] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
