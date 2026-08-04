@@ -433,6 +433,52 @@ formula code and are fast over contiguous arrays. Empire still owns input
 ordering, formula parameters, warm-up interpretation, versioning, validation,
 persistence, and independent regression tests.
 
+## Publication, Readiness, And Concurrency Contract
+
+Calculation completion and feature publication are separate concepts. A
+successful calculation run must not make a partially refreshed effective date,
+mixed calculation versions, incomplete SPX-relative results, or a partially
+rebuilt scope available to model consumers as ready data.
+
+Phase P0.9 must define the V1 publication unit and readiness predicate for
+daily refreshes, corrections, and backfills. The implementation may use one
+database transaction when that meets the performance gate, or an explicit
+staging/generation and atomic publication mechanism when bounded commits are
+required. A completion marker by itself is insufficient if current-state rows
+can be overwritten and expose mixed semantics before the marker changes. The
+selected mechanism must preserve these invariants:
+
+- A consumer observes either the previously complete publication or the newly
+  complete publication, never an in-progress mixture.
+- One published unit has one calculation version and one resolved benchmark
+  contract.
+- Model-input and readiness queries fail closed unless the requested
+  scope/effective date/version/benchmark coverage is published as complete.
+- Resumable backfill progress may be inspectable, but incomplete batches are
+  not advertised as a complete model-input publication.
+- Failure or cancellation rolls back the active atomic unit or leaves its
+  staged generation unpublished; it cannot advance readiness.
+- Publication state, if required, is package-owned durable data with database
+  constraints and is covered by Flyway, cleanup, and recovery contracts.
+
+Concurrency protection also belongs to the package. Airflow
+`max_active_runs`, pools, and task coordination are useful secondary controls,
+but do not protect against simultaneous CLI runs, manual DAG runs, source
+reruns, or backfills.
+
+Phase P0.10 must freeze a PostgreSQL-backed lock contract, normally advisory
+locking, with a deterministic identity derived from job kind, calculation
+version, provider/listing scope, and effective date or date range. Daily,
+backfill, CLI, and Airflow paths must acquire the same conflicting lock before
+readiness/planning and hold it through database publication. Lock contention
+has a bounded, explicit fail-or-healthy-no-op policy; runners do not wait
+indefinitely. Scope normalization must make any jobs capable of writing the
+same current-state rows conflict, including different job kinds and calculation
+versions; version cannot partition locks that protect the same rows. Tests must
+cover overlapping and nonoverlapping scopes, lock release after
+success/failure/cancellation, and recovery after process or database-session
+loss.
+
 ## Run Reports And Operational Surfaces
 
 The package provides daily and historical-backfill Core runners, package
@@ -456,7 +502,8 @@ investment recommendation or a dump of feature rows.
 Airflow coordination must join successful EODData and Yahoo/SPX readiness for
 the same effective date. Task timing alone is insufficient. The package owns a
 readiness decision, and repeated source runs must lead to idempotent,
-nonconcurrent refresh behavior.
+nonconcurrent refresh behavior. Airflow must call the same package-owned
+publication and locking paths as CLI and manual execution.
 
 ## Deliberately Deferred Features
 
@@ -494,6 +541,8 @@ chats should resolve them rather than reopen the entire design:
 | Recursive incremental/state-table strategy | B1.2, S2.2 |
 | Initial evidence-backed indexes | S2.4 |
 | Performance thresholds and batch sizes | P0.8, W7.9, V12.6 |
+| Atomic publication unit and readiness predicate | P0.9, S2.2, W7.10 |
+| Package-owned lock identity and contention policy | P0.10, J9.9 |
 | Airflow source-completion coordination | A11.1-A11.8 |
 
 Any new indicator or material formula change requires a concrete consumer,

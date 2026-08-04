@@ -85,6 +85,11 @@ reruns are idempotent. Source, SPX, and calculation-version changes trigger
 tested affected-range recalculation. A calculation-state table is allowed only
 if the recursive-equivalence prototype proves it necessary.
 
+Model consumers see only complete publication units with one calculation
+version and complete benchmark semantics. The package owns database-backed
+scope locking across daily, backfill, CLI, and Airflow entry points; Airflow
+scheduler limits are not the concurrency boundary.
+
 Lookbacks count chronological observations, never future rows. TA-Lib warm-up
 and unstable periods are versioned; non-finite output becomes null, never zero.
 Subject/SPX observations align by exact date without forward fill. Adjustment
@@ -152,7 +157,9 @@ or calculation code is committed.
 | P0.5 | [ ] | Define SPX contract | Define `YAHOO/XIDX/SPX` resolution, eligible subjects, exact alignment, relative return, beta/correlation, complete windows, and unavailable behavior. | P0.3-P0.4 |
 | P0.6 | [ ] | Define source-value policy | Audit EODData, Stooq, and Yahoo adjustment/corporate-action semantics and select initially eligible provider listings without claiming normalization. | P0.1, OHLCV V10.11 |
 | P0.7 | [ ] | Define recalculation semantics | Specify daily append, missing row, source correction, SPX correction, version change, inactive listing, and deletion behavior with full/incremental equivalence. | P0.4-P0.6 |
-| P0.8 | [ ] | Set performance and release gates | Record representative sizes, daily/backfill timing and memory targets, query-plan expectations, report bounds, and live rollout criteria. | P0.3-P0.7 |
+| P0.8 | [ ] | Set performance and release gates | Record representative sizes, daily/backfill timing and memory targets, transaction/staging bounds, query-plan expectations, report bounds, and live rollout criteria. | P0.3-P0.7 |
+| P0.9 | [ ] | Define atomic publication semantics | Freeze the publication unit and readiness predicate for daily, correction, version rebuild, and backfill work; choose transaction or staged-generation behavior so consumers fail closed on partial, mixed-version, or incomplete-benchmark state. | P0.5, P0.7-P0.8 |
+| P0.10 | [ ] | Define concurrency contract | Freeze the database-backed lock identity, scope normalization/overlap rules across job kinds and versions, acquisition lifetime, contention result, timeout, release, and recovery behavior shared by package, CLI, and Airflow runners. Any jobs able to write the same current rows must conflict. | P0.7-P0.9 |
 
 ---
 
@@ -182,11 +189,11 @@ and the proven incremental strategy.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | S2.1 | [ ] | Finalize main-table columns | Translate the design-contract baseline into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, metadata, and comments; every column has one formula owner. | P0.3-P0.7, B1.2 |
-| S2.2 | [ ] | Decide recurrence-state schema | Based on B1.2, explicitly reject or design minimal calculation-state storage. Do not add generic state without demonstrated need. | B1.2, S2.1 |
-| S2.3 | [ ] | Finalize keys and constraints | Define PK/source FK, benchmark/Core FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
+| S2.2 | [ ] | Decide auxiliary state schemas | Based on B1.2 and P0.9, explicitly reject or design minimal recurrence and publication/staging state. Do not add generic state or rely on a marker that permits current rows to expose mixed semantics. | B1.2, P0.9, S2.1 |
+| S2.3 | [ ] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
 | S2.4 | [ ] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
-| S2.5 | [ ] | Add Flyway migration | Create `ohlcv_daily_technicals`, any proven state table, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
-| S2.6 | [ ] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark dependencies, duplicates, and valid rows. | S2.5 |
+| S2.5 | [ ] | Add Flyway migration | Create `ohlcv_daily_technicals`, any proven recurrence/publication state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
+| S2.6 | [ ] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
 | S2.7 | [ ] | Add OHLCV regression | Prove no provider-identity, provider-isolation, source-cleanup, or existing-writer regression. | S2.5-S2.6 |
 | S2.8 | [ ] | Add database documentation group | Add technical tables to Stonks docs, regenerate schema/ERD/diagrams, and verify no stale artifacts. | S2.5-S2.7 |
 
@@ -278,6 +285,7 @@ preserving caller transaction ownership.
 | W7.7 | [ ] | Add feature queries | Add date/listing coverage, freshness, version, benchmark, ranking, and model-input reads without strategy thresholds. | S2.4, W7.3 |
 | W7.8 | [ ] | Add PostgreSQL integration | Cover rollback, generated values, idempotency, correction propagation, provider/benchmark isolation, and repeated runs. | W7.3-W7.7 |
 | W7.9 | [ ] | Benchmark persistence | Measure batches, upserts, index cost, memory, and latest-date latency; adjust only with evidence against P0.8. | P0.8, W7.8 |
+| W7.10 | [ ] | Implement atomic publication | Implement P0.9's transaction or staged-generation mechanism and fail-closed readiness/model-input queries; prove readers never observe partial dates, mixed versions, incomplete benchmark output, or failed/cancelled work. | P0.9, S2.5, W7.3-W7.6 |
 
 ---
 
@@ -287,7 +295,7 @@ Goal: make every run operationally inspectable before production runners.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| R8.1 | [ ] | Define report schema V1 | Define secret-safe JSON for identity, scope, versions, readiness, provider/market/listing counts, writes, warm-up/null/benchmark coverage, warnings, timing, throughput, and bounded samples. | P0.2, P0.8, W7.7 |
+| R8.1 | [ ] | Define report schema V1 | Define secret-safe JSON for identity, scope, versions, source/publication readiness, lock outcome, provider/market/listing counts, writes, warm-up/null/benchmark coverage, warnings, timing, throughput, and bounded samples. | P0.2, P0.8-P0.10, W7.7 |
 | R8.2 | [ ] | Add summary queries | Implement provider/market/type/date/version quality and coverage aggregations without serializing feature payloads; plans meet P0.8. | W7.7-W7.9, R8.1 |
 | R8.3 | [ ] | Build JSON report | Produce deterministic versioned JSON for success, warning, no-op, resumed/partial backfill, and failure. | R8.1-R8.2 |
 | R8.4 | [ ] | Store JSON report | Store durable `report.json` through Core with approved kind, logical name, metadata, retention, and run relationship. | R8.3 |
@@ -307,11 +315,12 @@ runtime services and explicit scope.
 |----|--------|------|---------------|------------|
 | J9.1 | [ ] | Add Core lifecycle | Start, heartbeat, succeed, fail, and summarize jobs with stable identity and no source/feature payloads in Core metadata. | P0.2, B1.6 |
 | J9.2 | [ ] | Define daily scope | Add effective date, provider/market/listing filters, readiness, version, dry-run, and force semantics; reject ambiguity. | P0.7, I3.6, W7.5 |
-| J9.3 | [ ] | Implement daily runner | Sequence readiness, planning, calculation, validation, persistence, summaries, JSON/PDF storage, and Core completion. | W7.8, R8.8, J9.1-J9.2 |
+| J9.9 | [ ] | Add package-owned scope locks | Implement P0.10's PostgreSQL-backed lock in reusable runner infrastructure; daily/backfill, CLI, manual, and Airflow paths share it, overlapping work has a bounded result, and locks release on every terminal path or lost session. | P0.10, J9.1-J9.2 |
+| J9.3 | [ ] | Implement daily runner | Sequence lock acquisition, readiness, planning, calculation, validation, atomic publication, summaries, JSON/PDF storage, and Core completion. | W7.8, W7.10, R8.8, J9.1-J9.2, J9.9 |
 | J9.4 | [ ] | Implement healthy no-op | No eligible new/corrected/version work succeeds with explicit readiness and durable reports but no writes. | J9.3 |
 | J9.5 | [ ] | Define backfill scope | Add provider/market/listing/date ranges, batches, resume cursor, version, rebuild, and confirmation for broad scopes. | P0.7-P0.8, W7.5 |
-| J9.6 | [ ] | Implement resumable backfill | Process deterministic batches with independent commits, heartbeats, progress, partial/final reports, exact resume, and no duplicate work. | W7.9, R8.8, J9.1, J9.5 |
-| J9.7 | [ ] | Add failure safety | Validation, DB, cancellation, report, and benchmark failures mark Core correctly, preserve committed chunks, roll back active work, and expose safe errors. | J9.3-J9.6 |
+| J9.6 | [ ] | Implement resumable backfill | Process deterministic batches with independent commits, unpublished partial progress, heartbeats, progress, partial/final reports, exact resume, and no duplicate work; publish only a complete P0.9 unit. | W7.9-W7.10, R8.8, J9.1, J9.5, J9.9 |
+| J9.7 | [ ] | Add failure safety | Validation, DB, cancellation, report, and benchmark failures mark Core correctly, preserve only safely resumable unpublished chunks, roll back active work, never advance publication readiness, release locks, and expose safe errors. | J9.3-J9.6, J9.9 |
 | J9.8 | [ ] | Add vertical runner integration | Run append, no-op, correction, version rebuild, and resumed backfill through PostgreSQL, Core, JSON, and PDF with zero fixture residue. | J9.3-J9.7 |
 
 ---
@@ -326,8 +335,8 @@ Goal: expose safe operator workflows before Airflow coordination.
 | O10.2 | [ ] | Add daily command | Add package command and `bin/stonks-technicals-daily` with effective date/scope/version/dry-run options and compact JSON stdout. | J9.3-J9.4 |
 | O10.3 | [ ] | Add backfill command | Add package command and `bin/stonks-technicals-backfill` with bounded scope, resume, rebuild protection, progress, and compact JSON stdout. | J9.5-J9.7 |
 | O10.4 | [ ] | Add inspect command | Add a read-only command/wrapper for coverage, freshness, drift, SPX readiness, and bounded samples without target recommendations. | W7.7, R8.2 |
-| O10.5 | [ ] | Add CLI validation | Cover help, invalid scopes, missing config, benchmark failure, dry run, no-op, success, resume, exit codes, and safe stdout/stderr. | O10.1-O10.4 |
-| O10.6 | [ ] | Add operator documentation | Document setup, reports, scopes, backfill/resume, rebuild, corrections, benchmark failure, and safe SQL inspection. | O10.1-O10.5 |
+| O10.5 | [ ] | Add CLI validation | Cover help, invalid scopes, missing config, benchmark failure, lock contention, dry run, no-op, success, resume, exit codes, and safe stdout/stderr. | O10.1-O10.4 |
+| O10.6 | [ ] | Add operator documentation | Document setup, reports, scopes, publication readiness, lock contention/recovery, backfill/resume, rebuild, corrections, benchmark failure, and safe SQL inspection. | O10.1-O10.5 |
 | O10.7 | [ ] | Verify installed commands | Build/install and prove package scripts/wrappers work in Poetry and Airflow with environment loading owned by runtime. | O10.1-O10.6 |
 
 ---
@@ -344,7 +353,7 @@ ready for the same effective date, without moving package logic into DAGs.
 | A11.3 | [ ] | Add manual technicals DAG | Add thin `stonks_technicals_daily_refresh` wiring runtime services and validated effective-date/scope overrides to the package runner; begin `schedule=None`, no catchup, one active run. | O10.7, A11.1 |
 | A11.4 | [ ] | Add DAG contract tests | Cover import, tags, schedule, task shape, date handling, overrides, runner identity, logging, and absence of calculation SQL/business logic. | A11.3 |
 | A11.5 | [ ] | Wire prerequisites | Implement the selected EODData plus Yahoo/SPX join so automatic refresh occurs only after both inputs succeed or readiness is explicitly proven for the same date. | A11.2-A11.4 |
-| A11.6 | [ ] | Handle repeated source runs | Prove EODData's multiple daily runs and Yahoo/manual reconciliation coalesce or safely trigger idempotent refresh without concurrent duplicate work. | A11.5, J9.4 |
+| A11.6 | [ ] | Handle repeated source runs | Prove EODData's multiple daily runs and Yahoo/manual reconciliation coalesce or safely trigger idempotent refresh through the package-owned scope lock, without concurrent duplicate work or partial publication. | A11.5, J9.4, J9.9 |
 | A11.7 | [ ] | Verify Airflow vertical | Rebuild Airflow, verify zero import errors, run source fixture completions through technicals, and inspect Core plus JSON/PDF objects. | A11.4-A11.6 |
 | A11.8 | [ ] | Decide production cadence | From bounded evidence, choose event-driven, scheduled, or manual-only operation and document pause/rollback before enabling it. | A11.7 |
 
@@ -358,14 +367,14 @@ operation before normal refresh begins.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | V12.1 | [ ] | Complete package README | Document ownership, profile, formulas, source caveats, config, tables, validation, versions, reports, CLIs, DAGs, and deferred work. | O10.6, A11.8 |
-| V12.2 | [ ] | Complete operator runbook | Document daily operation, backfill, resume/rebuild, reports, SPX readiness, corrections, version rollout, Airflow recovery, and rollback. | V12.1 |
+| V12.2 | [ ] | Complete operator runbook | Document daily operation, atomic publication, lock diagnosis/recovery, backfill, resume/rebuild, reports, SPX readiness, corrections, version rollout, Airflow recovery, and rollback. | V12.1 |
 | V12.3 | [ ] | Run formatting and full tests | Formatting/linting, package, schema, PostgreSQL/Core, report, CLI, and DAG suites pass from repository root. | V12.2 |
 | V12.4 | [ ] | Validate DB and regenerate docs | Flyway, Stonks contracts, OHLCV regressions, and all DB documentation generation pass without drift. | V12.2 |
-| V12.5 | [ ] | Run numerical audit | Compare stored features with fresh rebuilds, pinned TA-Lib, independent formulas, and incremental outputs across providers, gaps, short history, corrections, and SPX alignment. | W7.6, J9.8, V12.3-V12.4 |
-| V12.6 | [ ] | Run performance gate | Measure rebuild, append, source/SPX correction, upsert, latest-date scan/rank, report, and memory against P0.8; tune only from evidence. | W7.9, V12.3-V12.5 |
+| V12.5 | [ ] | Run correctness and isolation audit | Compare stored features with fresh rebuilds, pinned TA-Lib, independent formulas, and incremental outputs across providers, gaps, short history, corrections, and SPX alignment; concurrently exercise publication visibility, version isolation, benchmark completeness, scope locks, and failure recovery. | W7.6, W7.10, J9.8-J9.9, V12.3-V12.4 |
+| V12.6 | [ ] | Run performance gate | Measure rebuild, append, source/SPX correction, upsert, atomic publication/staging, lock acquisition/contention, latest-date scan/rank, report, and memory against P0.8; tune only from evidence. | W7.9-W7.10, V12.3-V12.5 |
 | V12.7 | [ ] | Run bounded backfill | Backfill a representative cohort and verify counts, warm-up/null coverage, generated/SPX values, resume, reports, and no source mutation. | V12.5-V12.6 |
 | V12.8 | [ ] | Expand backfill in stages | Expand by provider/market cohorts with checkpoints and stop criteria; audit adjustment warnings, inactive listings, performance, and reports. | V12.7 |
-| V12.9 | [ ] | Run bounded live daily | Execute live source prerequisites then technical refresh; inspect readiness, idempotency, corrections, Core, JSON/PDF, and Airflow. | A11.8, V12.7 |
+| V12.9 | [ ] | Run bounded live daily | Execute live source prerequisites then technical refresh; inspect atomic readiness/publication, idempotency, corrections, lock behavior, Core, JSON/PDF, and Airflow. | A11.8, V12.7 |
 | V12.10 | [ ] | Close rollout gate | Record cadence, calculation version, supported universes, coverage, performance, risks, recovery, and go/no-go; enable only after healthy evidence. | V12.8-V12.9 |
 
 ---
