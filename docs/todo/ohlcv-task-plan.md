@@ -172,11 +172,14 @@ their task IDs remain valid dependencies for active work.
 
 ## Phase 11: Implement Provider Technical Indicators
 
-Goal: implement provider-level technical indicators after the requirements,
-scope, and task breakdown are completed in a separate planning chat.
+Goal: implement provider-level technical indicators through the separate,
+authoritative
+[technical indicators package action plan](tech-ind-task-plan.md).
 
-No tasks are defined yet. Existing technical-indicator discussions are
-exploratory and are not an authoritative implementation plan.
+The technicals plan owns the package, calculation, schema, persistence,
+reporting, CLI, Airflow, backfill, and rollout task breakdown. Its associated
+[archive](tech-ind-task-plan-archive.md) preserves completed phases and `Done:`
+notes. Technical task IDs are defined there rather than duplicated here.
 
 ---
 
