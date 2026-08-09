@@ -313,3 +313,98 @@ schema contracts passed (the latter with 64 expected failures), and filter
 compilation and `git diff --check` passed.
 
 ---
+
+## Phase 3: Build Input, Scope, And Readiness Services
+
+Goal: provide deterministic chronological inputs and explicit source readiness
+without coupling calculations to source runners or Airflow.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| I3.1 | [x] | Add eligible-listing queries | Implement provider/market/type/status/date selection from P0.6; cover active, inactive, insufficient-history, and explicit selections. | P0.6, B1.6, S2.5 |
+| I3.2 | [x] | Add chronological bar reader | Stream/page exact OHLCV in listing/date order without whole-universe memory load; cover null volume, gaps, negative-capable values, and ordering. | I3.1 |
+| I3.3 | [x] | Add SPX resolver | Resolve exactly one reviewed active `YAHOO/XIDX/SPX` and fail closed on missing, duplicate, inactive, or metadata drift. | P0.5, I3.1 |
+| I3.4 | [x] | Add benchmark bar reader | Load exact-date SPX history for ratio, relative return, beta, and correlation without forward fill. | I3.2-I3.3 |
+| I3.5 | [x] | Add state-comparison queries | Detect missing rows, copied-source drift, version drift, and earliest changed dates needed by recalculation. | P0.7, S2.5, I3.2 |
+| I3.6 | [x] | Add source-readiness decision | Decide effective-date readiness from OHLCV/SPX coverage and successful source evidence where required, not wall-clock ordering alone. | P0.5-P0.7, I3.3-I3.5 |
+| I3.7 | [x] | Verify large-read behavior | Exercise query plans, paging, transaction ownership, cancellation, and memory bounds at representative size. | P0.8, I3.1-I3.6 |
+
+Done: 2026-08-09 — added public caller-transaction-owned P0.6 selection and
+scoped coverage in `empire_stonks_tech_indicators/queries.py`, with active,
+explicit inactive, exact provider/market/type predicates, inclusive dates, and
+zero/short-history coverage plus unit/PostgreSQL tests and README handoff.
+Package pytest passed 96 tests with 1 expected Core-runtime skip; the focused
+rollback-only PostgreSQL test passed 1 test. Wheel/sdist build, Poetry lock,
+compilation, public import, `pip check`, 88-column scan, `git diff --check`, and
+Flyway validation of 39 migrations passed.
+
+Done: 2026-08-09 — added public keyset-paged chronological OHLCV reads in
+`empire_stonks_tech_indicators/queries.py`, reusing I3.1 selection and the
+configured 1,000-50,000 page bounds while preserving exact `Decimal` values,
+null/zero volume, negative prices, calendar gaps, and deterministic provider/
+listing/date order without transaction mutation. Package pytest passed 102
+tests with 1 expected Core-runtime skip; the focused rollback-only PostgreSQL
+suite passed 2 tests, including the I3.2 reader, and the 1,002-row unit fixture
+crossed two pages. Wheel/sdist build, Poetry lock, compilation, public import,
+`pip check`, changed-Python 88-column scan, `git diff --check`, and Flyway
+validation of 39 migrations passed.
+
+Done: 2026-08-09 — added public fail-closed SPX resolution in
+`empire_stonks_tech_indicators/queries.py`, using injected frozen benchmark
+configuration for an exact bounded `YAHOO/XIDX/SPX` lookup and separately
+validating one row, active status, `EQUITY_INDEX`, object metadata, exact
+`YahooTicker=^GSPC`, and the generated UUID through `ResolvedBenchmark`.
+Package pytest passed 112 tests with 1 expected Core-runtime skip; the focused
+rollback-only PostgreSQL suite passed 3 tests, including live SPX success and
+inactive/type/metadata drift. Wheel/sdist build, Poetry lock, compilation,
+public import, `pip check`, changed-Python 88-column scan, `git diff --check`,
+and Flyway validation of 39 migrations passed.
+
+Done: 2026-08-09 — added public immutable `BenchmarkHistory` and
+`load_spx_benchmark_history()` in
+`empire_stonks_tech_indicators/queries.py`, resolving reviewed SPX then reusing
+bounded source pages to retain strictly chronological exact-date OHLCV with
+binary exact lookup and no synthetic, nearest-date, or forward-filled values.
+Package pytest passed 120 tests with 1 expected Core-runtime skip; the focused
+rollback-only PostgreSQL suite passed 4 tests, including a live stored SPX gap.
+Wheel/sdist build, Poetry check/lock, compilation, public import, `pip check`,
+changed-Python 88-column scan, `git diff --check`, and Flyway validation of 39
+migrations passed.
+
+Done: 2026-08-09 — added public paged `ListingStateComparison` and
+`iter_state_comparison_pages()` in `empire_stonks_tech_indicators/state.py`,
+using one set-based published-view comparison to distinguish tail appends from
+historical missing rows and detect exact null-safe OHLCV-copy, chronological-
+count, and requested-version drift with conservative earliest dates. Package
+pytest passed 133 tests with 1 expected Core-runtime skip; the focused
+rollback-only PostgreSQL suite passed 5 tests, including valid A-slot drift and
+equivalent rerun fixtures. Wheel/sdist build, Poetry check/lock, compilation,
+public import, `pip check`, changed-Python 88-column scan, `git diff --check`,
+and Flyway validation of 39 migrations passed.
+
+Done: 2026-08-09 — added public `SourceReadinessDecision` and
+`decide_source_readiness()` in
+`empire_stonks_tech_indicators/readiness.py`, combining exact eligible-scope
+OHLCV/SPX coverage with healthy benchmark resolution and effective-date-
+matched successful EODData/Yahoo Core evidence rather than task timing; Stooq
+remains coverage-driven. Package pytest passed 141 tests with 1 expected Core-
+runtime skip; the focused rollback-only PostgreSQL suite passed 6 tests,
+including live ready 2026-08-03 and same-listing wrong-date failure. Wheel/
+sdist build, Poetry check/lock, compilation, public import, `pip check`, wheel-
+content and changed-Python 88-column scans, `git diff --check`, and Flyway
+validation of 39 migrations passed.
+
+Done: 2026-08-09 — added the read-only I3.7 live probe and evidence in
+`tools/tech-indicators/large-read-smoke.py` and
+`docs/stonks/tech-indicators-large-read-evidence-i3.7.md`, and corrected
+`queries.py` source paging to primary-key `(provider_listing_id, trading_date)`
+order. Against 20,684,494 OHLCV rows and 22,261 eligible listings, the
+16,238-row public read paged 10,000/6,238 and the full scope filled a 10,000-row
+page at 103.83 MiB RSS; five-run 50,000-row source/drift plans had 7.57/8.03 ms
+and 6.77/7.15 ms median/max, no temp I/O,
+and cancellation plus caller rollback recovery passed. Package pytest passed
+141 tests with 1 expected skip; rollback-only PostgreSQL passed 6 tests;
+Poetry check/build, compilation, `pip check`, `git diff --check`, and Flyway
+validation of 39 migrations passed.
+
+---
