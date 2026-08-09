@@ -12,16 +12,19 @@ from empire_stonks_tech_indicators import (
     BenchmarkConfig,
     BenchmarkHistory,
     EligibleListing,
+    ListingStateComparison,
     ResolvedBenchmark,
     SourceBar,
     TechIndicatorsScope,
     TechIndicatorsValidationError,
     iter_source_bar_pages,
+    iter_state_comparison_pages,
     load_spx_benchmark_history,
     resolve_spx_benchmark,
     select_eligible_listings,
 )
 from empire_stonks_tech_indicators import queries as queries_module
+from empire_stonks_tech_indicators import state as state_module
 
 
 ACTIVE_ID = UUID("00000000-0000-4000-8000-000000000001")
@@ -42,17 +45,29 @@ class FakeCursor:
     def fetchall(self) -> list[tuple[object, ...]]:
         return self.rows
 
+    def fetchmany(self, size: int) -> list[tuple[object, ...]]:
+        rows = self.rows[:size]
+        self.rows = self.rows[size:]
+        return rows
+
 
 class SequencedCursor:
     def __init__(self, responses: list[list[tuple[object, ...]]]) -> None:
         self.responses = responses
         self.executions: list[tuple[str, tuple[object, ...]]] = []
+        self.fetch_sizes: list[int] = []
 
     def execute(self, sql: str, parameters: tuple[object, ...]) -> None:
         self.executions.append((sql, parameters))
 
     def fetchall(self) -> list[tuple[object, ...]]:
         return self.responses.pop(0)
+
+    def fetchmany(self, size: int) -> list[tuple[object, ...]]:
+        self.fetch_sizes.append(size)
+        rows = self.responses[0][:size]
+        self.responses[0] = self.responses[0][size:]
+        return rows
 
 
 def _row(**overrides: object) -> tuple[object, ...]:
@@ -200,6 +215,52 @@ def _benchmark_bar_row(trading_date: date, close: str) -> tuple[object, ...]:
     )
 
 
+def _state_row(**overrides: object) -> tuple[object, ...]:
+    values: list[object] = [
+        ACTIVE_ID,
+        "EODDATA",
+        "NASDAQ",
+        "TEST",
+        date(2026, 1, 2),
+        date(2026, 1, 8),
+        5,
+        date(2026, 1, 7),
+        1,
+        1,
+        1,
+        1,
+        1,
+        date(2026, 1, 8),
+        date(2026, 1, 3),
+        date(2026, 1, 5),
+        date(2026, 1, 6),
+        date(2026, 1, 7),
+    ]
+    positions = {
+        "provider_listing_id": 0,
+        "provider_code": 1,
+        "market": 2,
+        "ticker": 3,
+        "first_source_date": 4,
+        "last_source_date": 5,
+        "source_observation_count": 6,
+        "last_technical_date": 7,
+        "tail_append_count": 8,
+        "missing_tech_row_count": 9,
+        "source_copy_drift_count": 10,
+        "history_count_drift_count": 11,
+        "version_drift_count": 12,
+        "earliest_tail_append_date": 13,
+        "earliest_missing_tech_date": 14,
+        "earliest_source_copy_drift_date": 15,
+        "earliest_history_count_drift_date": 16,
+        "earliest_version_drift_date": 17,
+    }
+    for name, value in overrides.items():
+        values[positions[name]] = value
+    return tuple(values)
+
+
 def test_query_api_is_explicitly_exported() -> None:
     assert queries_module.__all__ == [
         "BenchmarkHistory",
@@ -209,9 +270,15 @@ def test_query_api_is_explicitly_exported() -> None:
         "resolve_spx_benchmark",
         "select_eligible_listings",
     ]
+    assert state_module.__all__ == [
+        "ListingStateComparison",
+        "iter_state_comparison_pages",
+    ]
     assert public_api.BenchmarkHistory is BenchmarkHistory
     assert public_api.EligibleListing is EligibleListing
+    assert public_api.ListingStateComparison is ListingStateComparison
     assert public_api.iter_source_bar_pages is iter_source_bar_pages
+    assert public_api.iter_state_comparison_pages is iter_state_comparison_pages
     assert public_api.load_spx_benchmark_history is load_spx_benchmark_history
     assert public_api.resolve_spx_benchmark is resolve_spx_benchmark
     assert public_api.select_eligible_listings is select_eligible_listings
@@ -691,3 +758,187 @@ def test_benchmark_history_loader_rejects_invalid_date_ranges(
             end_date=end_date,  # type: ignore[arg-type]
         )
     assert cursor.sql == ""
+
+
+def test_listing_state_comparison_exposes_reasons_and_version_restart() -> None:
+    comparison = ListingStateComparison(*_state_row())
+
+    assert comparison.missing_row_count == 2
+    assert comparison.reasons == (
+        "TAIL_APPEND",
+        "MISSING_TECH_ROW",
+        "SOURCE_COPY_DRIFT",
+        "HISTORY_COUNT_DRIFT",
+        "VERSION_DRIFT",
+    )
+    assert comparison.earliest_recalculation_date == date(2026, 1, 2)
+    assert comparison.is_equivalent is False
+    assert comparison.to_dict()["earliest_recalculation_date"] == "2026-01-02"
+    json.dumps(comparison.to_dict())
+
+
+def test_listing_state_comparison_uses_earliest_non_version_uncertainty() -> None:
+    comparison = ListingStateComparison(
+        *_state_row(
+            version_drift_count=0,
+            earliest_version_drift_date=None,
+        )
+    )
+
+    assert comparison.earliest_recalculation_date == date(2026, 1, 3)
+
+
+def test_listing_state_comparison_preserves_equivalent_empty_source() -> None:
+    comparison = ListingStateComparison(
+        *_state_row(
+            first_source_date=None,
+            last_source_date=None,
+            source_observation_count=0,
+            last_technical_date=None,
+            tail_append_count=0,
+            missing_tech_row_count=0,
+            source_copy_drift_count=0,
+            history_count_drift_count=0,
+            version_drift_count=0,
+            earliest_tail_append_date=None,
+            earliest_missing_tech_date=None,
+            earliest_source_copy_drift_date=None,
+            earliest_history_count_drift_date=None,
+            earliest_version_drift_date=None,
+        )
+    )
+
+    assert comparison.is_equivalent is True
+    assert comparison.reasons == ()
+    assert comparison.earliest_recalculation_date is None
+
+
+@pytest.mark.parametrize(
+    ("row", "message"),
+    [
+        (_state_row(source_observation_count=-1), "non-negative"),
+        (_state_row(earliest_tail_append_date=None), "exactly when"),
+        (
+            _state_row(first_source_date=None, last_source_date=None),
+            "exactly when source count is zero",
+        ),
+    ],
+)
+def test_listing_state_comparison_rejects_invalid_rows(
+    row: tuple[object, ...],
+    message: str,
+) -> None:
+    with pytest.raises((TypeError, ValueError), match=message):
+        ListingStateComparison(*row)  # type: ignore[arg-type]
+
+
+def test_state_comparison_query_is_set_based_paged_and_scope_safe() -> None:
+    cursor = SequencedCursor(
+        [
+            [_row()],
+            [_state_row()],
+        ]
+    )
+    scope = TechIndicatorsScope(
+        provider_listing_ids=(ACTIVE_ID,),
+        start_date=date(2026, 1, 3),
+        end_date=date(2026, 1, 8),
+    )
+
+    pages = list(
+        iter_state_comparison_pages(
+            cursor=cursor,
+            scope=scope,
+            calculation_version="TECH_INDICATORS_V1",
+            page_size=1000,
+        )
+    )
+
+    assert pages == [(ListingStateComparison(*_state_row()),)]
+    assert cursor.fetch_sizes == [1000, 1000]
+    assert len(cursor.executions) == 2
+    sql, parameters = cursor.executions[1]
+    assert "row_number() OVER" in sql
+    assert "stonks.ohlcv_daily_tech_indicators AS technical" in sql
+    assert "ROW(" in sql
+    assert "IS DISTINCT FROM ROW(" in sql
+    assert "technical.history_observation_count" in sql
+    assert "source_state.trading_date BETWEEN %s AND %s" in sql
+    assert parameters == (
+        [ACTIVE_ID],
+        "TECH_INDICATORS_V1",
+        date(2026, 1, 3),
+        date(2026, 1, 8),
+    )
+
+
+def test_state_comparison_query_handles_empty_selection() -> None:
+    cursor = SequencedCursor([[]])
+
+    assert list(
+        iter_state_comparison_pages(
+            cursor=cursor,
+            scope=TechIndicatorsScope(),
+            calculation_version="TECH_INDICATORS_V1",
+        )
+    ) == []
+    assert len(cursor.executions) == 1
+    assert cursor.fetch_sizes == []
+
+
+@pytest.mark.parametrize(
+    ("version", "exception"),
+    [
+        (1, TypeError),
+        ("tech_indicators_v1", ValueError),
+        ("TECH-INDICATORS-V1", ValueError),
+        ("A" * 65, ValueError),
+    ],
+)
+def test_state_comparison_query_rejects_invalid_versions(
+    version: object,
+    exception: type[Exception],
+) -> None:
+    with pytest.raises(exception, match="calculation_version"):
+        list(
+            iter_state_comparison_pages(
+                cursor=SequencedCursor([[]]),
+                scope=TechIndicatorsScope(),
+                calculation_version=version,  # type: ignore[arg-type]
+            )
+        )
+
+
+def test_state_comparison_query_requires_fetchmany_and_ordered_identity() -> None:
+    class FetchAllOnlyCursor:
+        def execute(self, sql: str, parameters: tuple[object, ...]) -> None:
+            pass
+
+        def fetchall(self) -> list[tuple[object, ...]]:
+            return []
+
+    with pytest.raises(TypeError, match="fetchmany"):
+        list(
+            iter_state_comparison_pages(
+                cursor=FetchAllOnlyCursor(),
+                scope=TechIndicatorsScope(),
+                calculation_version="TECH_INDICATORS_V1",
+            )
+        )
+
+    cursor = SequencedCursor(
+        [
+            [_row()],
+            [_state_row(ticker="DRIFT")],
+        ]
+    )
+    with pytest.raises(ValueError, match="identity drift"):
+        list(
+            iter_state_comparison_pages(
+                cursor=cursor,
+                scope=TechIndicatorsScope(
+                    provider_listing_ids=(ACTIVE_ID,),
+                ),
+                calculation_version="TECH_INDICATORS_V1",
+            )
+        )

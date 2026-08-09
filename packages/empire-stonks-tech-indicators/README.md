@@ -94,6 +94,8 @@ The immutable domain-model API consists of:
 - `resolve_spx_benchmark()` for exact fail-closed `YAHOO/XIDX/SPX` resolution
 - `BenchmarkHistory` and `load_spx_benchmark_history()` for bounded exact-date
   SPX OHLCV history and close lookup
+- `ListingStateComparison` and `iter_state_comparison_pages()` for paged,
+  set-based current-source versus published-state drift facts
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -129,6 +131,13 @@ subject at a time. It is loaded through the same configured source pages,
 remains strictly chronological, and exposes only exact stored dates.
 `bar_on()` returns `None` for a missing date and `close_by_date()` contains no
 synthetic, nearest-date, or forward-filled keys.
+
+State comparison uses the atomic published view and the full chronological
+source prefix. It distinguishes ordinary tail appends from historical missing
+rows, compares copied OHLCV null-safely, detects observation-count and requested
+calculation-version drift, and exposes each reason's earliest date. A version
+drift conservatively promotes recalculation to the listing's first source date;
+the later affected-range planner owns suffix expansion and safe horizons.
 
 ## Development
 

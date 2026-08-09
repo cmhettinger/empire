@@ -13,6 +13,7 @@ from empire_stonks_tech_indicators import (
     TechIndicatorsScope,
     TechIndicatorsValidationError,
     iter_source_bar_pages,
+    iter_state_comparison_pages,
     load_spx_benchmark_history,
     resolve_spx_benchmark,
     select_eligible_listings,
@@ -148,6 +149,228 @@ def _insert_exact_bar(
             close_value,
             open_value,
         ),
+    )
+
+
+def _publish_drifted_state(
+    cursor: object,
+    *,
+    provider_listing_id: UUID,
+    first_date: date,
+    drift_date: date,
+    marker: str,
+) -> None:
+    cursor.execute(  # type: ignore[union-attr]
+        """
+        INSERT INTO stonks.ohlcv_daily_tech_indicators_a (
+            provider_listing_id,
+            trading_date,
+            history_observation_count,
+            calculation_version,
+            calculated_at,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            consecutive_up_days,
+            consecutive_down_days
+        )
+        SELECT
+            source.provider_listing_id,
+            source.trading_date,
+            CASE WHEN source.trading_date = %s THEN 1 ELSE 99 END,
+            CASE
+                WHEN source.trading_date = %s
+                    THEN 'TECH_INDICATORS_OLD'
+                ELSE 'TECH_INDICATORS_V1'
+            END,
+            now(),
+            source.open,
+            source.high,
+            source.low,
+            source.close,
+            CASE
+                WHEN source.trading_date = %s THEN 999::numeric
+                ELSE source.volume
+            END,
+            0,
+            0
+        FROM stonks.ohlcv_daily AS source
+        WHERE source.provider_listing_id = %s
+          AND source.trading_date IN (%s, %s)
+        """,
+        (
+            first_date,
+            drift_date,
+            drift_date,
+            provider_listing_id,
+            first_date,
+            drift_date,
+        ),
+    )
+    cursor.execute(  # type: ignore[union-attr]
+        """
+        INSERT INTO core.core_run (
+            domain,
+            job_name,
+            subject_key,
+            run_type,
+            status,
+            runner
+        )
+        VALUES (
+            'stonks',
+            'stonks_tech_indicators_backfill',
+            %s,
+            'manual',
+            'succeeded',
+            'pytest'
+        )
+        RETURNING run_id
+        """,
+        (f"i35:{marker}",),
+    )
+    run_id = cursor.fetchone()[0]  # type: ignore[union-attr]
+    cursor.execute(  # type: ignore[union-attr]
+        """
+        SELECT storage_root_id
+        FROM core.storage_root
+        WHERE root_name = 'global'
+          AND is_active
+        """
+    )
+    storage_root_id = cursor.fetchone()[0]  # type: ignore[union-attr]
+    object_ids: list[UUID] = []
+    for filename, logical_name, content_type, object_kind, checksum in (
+        (
+            "report.json",
+            "tech_indicators_backfill_report",
+            "application/json",
+            "stonks_tech_indicators_report",
+            "a" * 64,
+        ),
+        (
+            "report.pdf",
+            "tech_indicators_backfill_pdf_report",
+            "application/pdf",
+            "stonks_tech_indicators_pdf_report",
+            "b" * 64,
+        ),
+    ):
+        cursor.execute(  # type: ignore[union-attr]
+            """
+            INSERT INTO core.stored_object (
+                run_id,
+                storage_root_id,
+                object_key,
+                filename,
+                object_scope,
+                domain,
+                logical_name,
+                content_type,
+                object_kind,
+                size_bytes,
+                checksum_sha256,
+                metadata
+            )
+            VALUES (
+                %s, %s, %s, %s, 'run', 'stonks', %s, %s, %s,
+                1, %s, '{}'::jsonb
+            )
+            RETURNING object_id
+            """,
+            (
+                run_id,
+                storage_root_id,
+                f"stonks/tech-indicators/tests/{marker}",
+                filename,
+                logical_name,
+                content_type,
+                object_kind,
+                checksum,
+            ),
+        )
+        object_ids.append(cursor.fetchone()[0])  # type: ignore[union-attr]
+    cursor.execute(  # type: ignore[union-attr]
+        """
+        INSERT INTO stonks.tech_indicators_publication (
+            publication_kind,
+            status,
+            calculation_version
+        )
+        VALUES ('BACKFILL', 'BUILDING', 'TECH_INDICATORS_V1')
+        RETURNING publication_id
+        """
+    )
+    publication_id = cursor.fetchone()[0]  # type: ignore[union-attr]
+    cursor.execute(  # type: ignore[union-attr]
+        """
+        UPDATE stonks.tech_indicators_publication
+        SET
+            publication_method = 'STAGED',
+            scope_schema_version = 1,
+            scope_hash = repeat('a', 64),
+            run_id = %s,
+            benchmark_required = false,
+            expected_listing_count = 1,
+            expected_source_row_count = 4,
+            expected_payload_row_count = 2,
+            inserted_row_count = 2,
+            updated_row_count = 0,
+            deleted_row_count = 0,
+            equivalent_row_count = 0,
+            warning_count = 0,
+            failure_count = 0,
+            completed_batch_count = 0,
+            staged_payload_row_count = 0,
+            json_report_object_id = %s,
+            pdf_report_object_id = %s,
+            source_validated_at = now(),
+            prepared_at = now(),
+            status = 'PREPARED',
+            updated_at = now()
+        WHERE publication_id = %s
+        """,
+        (run_id, object_ids[0], object_ids[1], publication_id),
+    )
+    cursor.execute(  # type: ignore[union-attr]
+        """
+        INSERT INTO stonks.tech_indicators_publication_listing (
+            publication_id,
+            provider_listing_id,
+            action,
+            target_slot,
+            calculation_version,
+            source_coverage_start_date,
+            source_coverage_end_date,
+            source_row_count,
+            payload_row_count,
+            candidate_completed_at
+        )
+        VALUES (
+            %s, %s, 'PRESENT', 'A', 'TECH_INDICATORS_V1',
+            %s, %s, 2, 2, now()
+        )
+        """,
+        (publication_id, provider_listing_id, first_date, drift_date),
+    )
+    cursor.execute(  # type: ignore[union-attr]
+        """
+        UPDATE stonks.tech_indicators_publication
+        SET status = 'PUBLISHED', published_at = now(), updated_at = now()
+        WHERE publication_id = %s
+        """,
+        (publication_id,),
+    )
+    cursor.execute(  # type: ignore[union-attr]
+        """
+        UPDATE stonks.tech_indicators_publication_listing
+        SET is_active = true, activated_at = now(), updated_at = now()
+        WHERE publication_id = %s
+          AND provider_listing_id = %s
+        """,
+        (publication_id, provider_listing_id),
     )
 
 
@@ -525,3 +748,89 @@ def test_benchmark_history_reads_only_exact_live_spx_dates(
             bar.provider_listing_id == resolved.provider_listing_id
             for bar in history.bars
         )
+
+
+def test_state_comparison_detects_published_drift_and_earliest_restart(
+    database_connection: object,
+) -> None:
+    marker = uuid4().hex[:12].upper()
+    dates = (
+        date(2026, 2, 2),
+        date(2026, 2, 3),
+        date(2026, 2, 4),
+        date(2026, 2, 5),
+    )
+
+    with database_connection.cursor() as cursor:  # type: ignore[union-attr]
+        listing_id = _insert_listing(
+            cursor,
+            provider_code="EODDATA",
+            market="NASDAQ",
+            ticker=f"I35{marker}",
+            metadata_json='{"type": "Equity"}',
+        )
+        for index, trading_date in enumerate(dates):
+            base = Decimal(10 + index)
+            _insert_exact_bar(
+                cursor,
+                provider_listing_id=listing_id,
+                trading_date=trading_date,
+                open_value=base,
+                high_value=base + 2,
+                low_value=base - 1,
+                close_value=base + 1,
+                volume=Decimal(100 + index),
+            )
+        _publish_drifted_state(
+            cursor,
+            provider_listing_id=listing_id,
+            first_date=dates[0],
+            drift_date=dates[2],
+            marker=marker,
+        )
+
+        pages = list(
+            iter_state_comparison_pages(
+                cursor=cursor,
+                scope=TechIndicatorsScope(
+                    provider_listing_ids=(listing_id,),
+                    start_date=dates[1],
+                    end_date=dates[3],
+                ),
+                calculation_version="TECH_INDICATORS_V1",
+                page_size=1000,
+            )
+        )
+
+        assert len(pages) == 1
+        assert len(pages[0]) == 1
+        comparison = pages[0][0]
+        assert comparison.provider_listing_id == listing_id
+        assert comparison.source_observation_count == 4
+        assert comparison.last_technical_date == dates[2]
+        assert comparison.tail_append_count == 1
+        assert comparison.earliest_tail_append_date == dates[3]
+        assert comparison.missing_tech_row_count == 1
+        assert comparison.earliest_missing_tech_date == dates[1]
+        assert comparison.source_copy_drift_count == 1
+        assert comparison.earliest_source_copy_drift_date == dates[2]
+        assert comparison.history_count_drift_count == 1
+        assert comparison.earliest_history_count_drift_date == dates[2]
+        assert comparison.version_drift_count == 1
+        assert comparison.earliest_version_drift_date == dates[2]
+        assert comparison.earliest_recalculation_date == dates[0]
+
+        equivalent_pages = list(
+            iter_state_comparison_pages(
+                cursor=cursor,
+                scope=TechIndicatorsScope(
+                    provider_listing_ids=(listing_id,),
+                    start_date=dates[0],
+                    end_date=dates[0],
+                ),
+                calculation_version="TECH_INDICATORS_V1",
+                page_size=1000,
+            )
+        )
+        assert equivalent_pages[0][0].is_equivalent is True
+        assert equivalent_pages[0][0].earliest_recalculation_date is None
