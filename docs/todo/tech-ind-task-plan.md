@@ -159,7 +159,7 @@ without coupling calculations to source runners or Airflow.
 | I3.4 | [x] | Add benchmark bar reader | Load exact-date SPX history for ratio, relative return, beta, and correlation without forward fill. | I3.2-I3.3 |
 | I3.5 | [x] | Add state-comparison queries | Detect missing rows, copied-source drift, version drift, and earliest changed dates needed by recalculation. | P0.7, S2.5, I3.2 |
 | I3.6 | [x] | Add source-readiness decision | Decide effective-date readiness from OHLCV/SPX coverage and successful source evidence where required, not wall-clock ordering alone. | P0.5-P0.7, I3.3-I3.5 |
-| I3.7 | [ ] | Verify large-read behavior | Exercise query plans, paging, transaction ownership, cancellation, and memory bounds at representative size. | P0.8, I3.1-I3.6 |
+| I3.7 | [x] | Verify large-read behavior | Exercise query plans, paging, transaction ownership, cancellation, and memory bounds at representative size. | P0.8, I3.1-I3.6 |
 
 Done: 2026-08-09 — added public caller-transaction-owned P0.6 selection and
 scoped coverage in `empire_stonks_tech_indicators/queries.py`, with active,
@@ -224,6 +224,19 @@ runtime skip; the focused rollback-only PostgreSQL suite passed 6 tests,
 including live ready 2026-08-03 and same-listing wrong-date failure. Wheel/
 sdist build, Poetry check/lock, compilation, public import, `pip check`, wheel-
 content and changed-Python 88-column scans, `git diff --check`, and Flyway
+validation of 39 migrations passed.
+
+Done: 2026-08-09 — added the read-only I3.7 live probe and evidence in
+`tools/tech-indicators/large-read-smoke.py` and
+`docs/stonks/tech-indicators-large-read-evidence-i3.7.md`, and corrected
+`queries.py` source paging to primary-key `(provider_listing_id, trading_date)`
+order. Against 20,684,494 OHLCV rows and 22,261 eligible listings, the
+16,238-row public read paged 10,000/6,238 and the full scope filled a 10,000-row
+page at 103.83 MiB RSS; five-run 50,000-row source/drift plans had 7.57/8.03 ms
+and 6.77/7.15 ms median/max, no temp I/O,
+and cancellation plus caller rollback recovery passed. Package pytest passed
+141 tests with 1 expected skip; rollback-only PostgreSQL passed 6 tests;
+Poetry check/build, compilation, `pip check`, `git diff --check`, and Flyway
 validation of 39 migrations passed.
 
 ---

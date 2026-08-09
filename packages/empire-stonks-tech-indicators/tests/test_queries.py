@@ -459,8 +459,11 @@ def test_source_bar_reader_uses_bounded_keyset_pages_and_exact_values() -> None:
     first_page_sql, first_page_parameters = cursor.executions[1]
     assert "daily.provider_listing_id = ANY(%s::uuid[])" in first_page_sql
     assert "daily.trading_date BETWEEN %s AND %s" in first_page_sql
-    assert ") > ROW(%s, %s, %s, %s, %s)" not in first_page_sql
+    assert "> ROW(%s, %s)" not in first_page_sql
     assert "LIMIT %s" in first_page_sql
+    order_clause = first_page_sql.split("ORDER BY", maxsplit=1)[1]
+    assert "daily.provider_listing_id" in order_clause
+    assert "listing.provider_code" not in order_clause
     assert first_page_parameters == (
         [ACTIVE_ID],
         date(2020, 1, 1),
@@ -468,11 +471,8 @@ def test_source_bar_reader_uses_bounded_keyset_pages_and_exact_values() -> None:
         1000,
     )
     second_page_sql, second_page_parameters = cursor.executions[2]
-    assert ") > ROW(%s, %s, %s, %s, %s)" in second_page_sql
-    assert second_page_parameters[-6:] == (
-        "EODDATA",
-        "NASDAQ",
-        "TEST",
+    assert "> ROW(%s, %s)" in second_page_sql
+    assert second_page_parameters[-3:] == (
         ACTIVE_ID,
         source_rows[999][4],
         1000,

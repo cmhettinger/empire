@@ -615,18 +615,28 @@ def test_source_bar_reader_preserves_order_gaps_nulls_and_negative_values(
         )
 
         assert len(pages) == 1
+        expected_keys = sorted(
+            [
+                (first_listing_id, first_date),
+                (first_listing_id, gap_date),
+                (second_listing_id, other_date),
+            ]
+        )
         assert [
             (bar.provider_listing_id, bar.trading_date) for bar in pages[0]
-        ] == [
-            (first_listing_id, first_date),
-            (first_listing_id, gap_date),
-            (second_listing_id, other_date),
-        ]
-        assert pages[0][0].open == Decimal("-3.0000000000")
-        assert pages[0][0].close == Decimal("-2.0000000000")
-        assert pages[0][0].volume is None
-        assert pages[0][1].volume == Decimal("100.25000000")
-        assert pages[0][2].volume == Decimal("0E-8")
+        ] == expected_keys
+        by_key = {
+            (bar.provider_listing_id, bar.trading_date): bar for bar in pages[0]
+        }
+        assert by_key[first_listing_id, first_date].open == Decimal(
+            "-3.0000000000"
+        )
+        assert by_key[first_listing_id, first_date].close == Decimal(
+            "-2.0000000000"
+        )
+        assert by_key[first_listing_id, first_date].volume is None
+        assert by_key[first_listing_id, gap_date].volume == Decimal("100.25000000")
+        assert by_key[second_listing_id, other_date].volume == Decimal("0E-8")
 
 
 def test_spx_resolver_validates_live_identity_and_fails_closed_on_drift(

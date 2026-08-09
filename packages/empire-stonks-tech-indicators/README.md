@@ -30,6 +30,11 @@ write only the affected suffix. Fixed bounded replay and persisted recurrence
 state are not part of V1. See the
 [recursive-equivalence decision](../../docs/stonks/tech-indicators-recursive-equivalence-v1.md).
 
+Live input paging, query-plan, transaction, cancellation, and RSS verification
+is provided by `tools/tech-indicators/large-read-smoke.py`; its representative
+I3.7 result is recorded in the
+[large-read evidence](../../docs/stonks/tech-indicators-large-read-evidence-i3.7.md).
+
 ## Ownership and configuration
 
 Reusable package code reads configuration only from `os.environ`. It does not

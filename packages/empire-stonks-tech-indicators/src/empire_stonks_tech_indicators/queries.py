@@ -256,7 +256,7 @@ def iter_source_bar_pages(
     scope: TechIndicatorsScope,
     page_size: int = DEFAULT_SOURCE_READ_PAGE_SIZE,
 ) -> Iterator[tuple[SourceBar, ...]]:
-    """Yield exact OHLCV pages in provider/listing/date order.
+    """Yield exact OHLCV pages in provider-listing/date natural-key order.
 
     Eligible listings are resolved once through :func:`select_eligible_listings`.
     Each bounded SQL query advances with a strict composite keyset, so neither
@@ -279,7 +279,7 @@ def iter_source_bar_pages(
         item.provider_listing_id: (item.provider_code, item.market, item.ticker)
         for item in listings
     }
-    after: tuple[str, str, str, UUID, date] | None = None
+    after: tuple[UUID, date] | None = None
 
     while True:
         where_conditions = [
@@ -291,13 +291,8 @@ def iter_source_bar_pages(
             parameters.extend((scope.start_date, scope.end_date))
         if after is not None:
             where_conditions.append(
-                """ROW(
-                    listing.provider_code,
-                    listing.market,
-                    listing.ticker,
-                    listing.provider_listing_id,
-                    daily.trading_date
-                ) > ROW(%s, %s, %s, %s, %s)"""
+                """ROW(daily.provider_listing_id, daily.trading_date)
+                    > ROW(%s, %s)"""
             )
             parameters.extend(after)
         parameters.append(page_size)
@@ -320,10 +315,7 @@ def iter_source_bar_pages(
               ON listing.provider_listing_id = daily.provider_listing_id
             WHERE {' AND '.join(where_conditions)}
             ORDER BY
-                listing.provider_code,
-                listing.market,
-                listing.ticker,
-                listing.provider_listing_id,
+                daily.provider_listing_id,
                 daily.trading_date
             LIMIT %s
             """,
@@ -461,8 +453,8 @@ def _source_bar_page(
     rows: object,
     *,
     listing_identity: dict[UUID, tuple[str, str, str]],
-    after: tuple[str, str, str, UUID, date] | None,
-) -> tuple[tuple[SourceBar, ...], tuple[str, str, str, UUID, date]]:
+    after: tuple[UUID, date] | None,
+) -> tuple[tuple[SourceBar, ...], tuple[UUID, date]]:
     if not isinstance(rows, list):
         raise ValueError("Source-bar query returned an invalid page.")
 
@@ -472,7 +464,7 @@ def _source_bar_page(
         if not isinstance(row, (tuple, list)) or len(row) != 10:
             raise ValueError("Source-bar query returned an invalid row.")
         provider_code, market, ticker, provider_listing_id, trading_date = row[:5]
-        key = (provider_code, market, ticker, provider_listing_id, trading_date)
+        key = (provider_listing_id, trading_date)
         if (
             not isinstance(provider_listing_id, UUID)
             or listing_identity.get(provider_listing_id)
