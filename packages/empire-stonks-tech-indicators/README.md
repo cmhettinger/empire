@@ -51,8 +51,10 @@ shell. `TechIndicatorsConfig.from_env()` validates these non-secret settings:
 | `EMPIRE_STONKS_TECH_INDICATORS_DIAGNOSTIC_SAMPLE_LIMIT` | `100` | `1` through `100` |
 
 The P0.8 hard ceiling of 25,000 rows in a write transaction is a package
-constant, not an environment override. B1.8 adds example/local values and
-runtime passthrough; reusable package code never opens those files itself.
+constant, not an environment override. Non-secret examples live in
+`deploy/env/local.example.env`; the active local values live in the ignored
+`deploy/env/local.env`. Airflow Compose passes the same values into every
+Airflow service. Reusable package code never opens either environment file.
 
 The package does not own an internal migration runner. Empire Flyway
 migrations under `db/` own the eventual technical-indicator schema. Core run

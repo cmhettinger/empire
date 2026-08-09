@@ -77,7 +77,15 @@ runtime. The package does not depend on or import Airflow.
 The final image must import `empire_stonks_tech_indicators`, NumPy, TA-Lib,
 `empire_core`, `empire_reports`, and `empire_stonks_ohlcv` in one process. It
 must also pass `pip check` and the package-independent calculation smoke. DAG,
-CLI, and environment passthrough remain owned by later tasks.
+and CLI entrypoints remain owned by later tasks.
+
+Runtime settings are not image metadata. The ten non-secret settings accepted
+by `TechIndicatorsConfig.from_env()` are recorded in
+`deploy/env/local.example.env` and the ignored active `deploy/env/local.env`.
+The shared environment in `deploy/compose/airflow.yml` passes those exact
+values to every Airflow service, with the frozen V1 defaults as Compose
+fallbacks. Package code continues to read only `os.environ`; images and DAGs
+do not load, copy, or define the settings.
 
 ## License Review
 

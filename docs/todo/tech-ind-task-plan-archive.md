@@ -114,3 +114,95 @@ two-session advisory-lock/release checks, PgBouncer/Core marker scans, local
 links/status/stale-boundary scans, and `git diff --check` passed.
 
 ---
+
+## Phase 1: Prove Dependencies And Scaffold The Package
+
+Goal: establish an independently importable package and prove TA-Lib works in
+every runtime before building around it.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| B1.1 | [x] | Prove TA-Lib runtime support | Pin a reviewed TA-Lib/NumPy combination and prove local Poetry and Airflow-image installation/import. Record wheel/native-library behavior, license, Python compatibility, and rollback. | P0.4, P0.8 |
+| B1.2 | [x] | Prototype recursive equivalence | Compare full-series output with append and historical-correction suffix strategies for EMA, RSI, ATR, ADX, and MACD. Decide whether exact updates require state, bounded replay, or full replay. | B1.1, P0.7 |
+| B1.3 | [x] | Scaffold Poetry package | Create `packages/empire-stonks-tech-indicators` version `0.1.0` with `src/` layout, README, tests, minimum dependencies, isolated import, lock, and build. | B1.1 |
+| B1.4 | [x] | Add exceptions and exports | Add a small public exception hierarchy and explicit API without exposing TA-Lib or persistence internals. | B1.3 |
+| B1.5 | [x] | Add environment config | Add environment-only typed config for version, benchmark, batches, storage key, and limits; package code never loads `.env`. | P0.2, B1.3 |
+| B1.6 | [x] | Add typed base models | Add immutable source-bar, feature-row, scope, benchmark, issue, count, summary, and run-result models with bounded JSON-ready forms. | P0.3-P0.7, B1.4 |
+| B1.7 | [x] | Install in Airflow image | Install in dependency-safe order and prove tech-indicators, TA-Lib, NumPy, Core, and OHLCV imports coexist in the built image. | B1.1, B1.3 |
+| B1.8 | [x] | Add runtime settings plumbing | Add non-secret example/local settings and Compose passthrough without embedding configuration in images or DAGs. | B1.5, B1.7 |
+
+Done: 2026-08-09 — pinned wheel-only TA-Lib 0.7.1/C 0.7.1 and NumPy
+2.4.6 in `deploy/docker/airflow/airflow-requirements.txt`; added
+`docs/stonks/tech-indicators-runtime-contract-v1.md` and
+`tools/tech-indicators/runtime-smoke.py`. A clean CPython 3.14.6 Poetry env
+passed lock, exact-version calculation smoke, native-link/license inspection,
+and `pip check`; `make airflow-build` completed 19 steps, and final CPython
+3.13.13 Airflow one-offs passed the same smoke, Airflow/Core/OHLCV coexistence
+imports, and `pip check`. Compilation, local-link, and `git diff --check`
+passed.
+
+Done: 2026-08-09 — added
+`tools/tech-indicators/recursive-equivalence.py` and froze full-prefix
+calculation with affected-suffix writes and no V1 recurrence-state table in
+`docs/stonks/tech-indicators-recursive-equivalence-v1.md`; aligned the formula,
+recalculation, and design contracts. Exact NumPy 2.4.6/TA-Lib 0.7.1 runs on
+local CPython 3.14.6 and Airflow CPython 3.13.13 proved full-prefix append and
+two correction cases equivalent, exposed bounded-restart mismatches across
+EMA/RSI/ATR/ADX/MACD, and rejected EMA-derived MACD. Both 20,000-row fixture
+runs passed the 120-second/512-MiB gates (0.031s/51.2 MiB local;
+0.033s/119.9 MiB Airflow); compile, help, invalid-input, local-link, and diff
+checks passed.
+
+Done: 2026-08-09 — scaffolded
+`packages/empire-stonks-tech-indicators` 0.1.0 with Poetry lock, `src/` import
+boundary, README, and package test; runtime metadata contains only exact NumPy
+2.4.6 and TA-Lib 0.7.1 pins. `poetry check --lock`, pytest (1 passed), package
+and isolated wheel imports, both `pip check` runs, wheel/sdist build and content
+inspection, local-link validation, compilation, and `git diff --check` passed.
+
+Done: 2026-08-09 — added the public base plus configuration, calculation,
+validation, persistence, and workflow exceptions in
+`empire_stonks_tech_indicators/exceptions.py`, with exact package-root exports
+and README guidance. Pytest passed 8 tests; cold Poetry and isolated-wheel
+imports exposed only the declared API and loaded no NumPy, TA-Lib, psycopg, or
+persistence implementation, while build, compilation, lock, dependency,
+local-link, and diff checks passed.
+
+Done: 2026-08-09 — added immutable `BenchmarkConfig` and
+`TechIndicatorsConfig` with exact V1 calculation/benchmark identity,
+environment-only storage, bounded read/write batches, diagnostic limits, safe
+serialization, and a non-configurable 25,000-row transaction ceiling; exported
+both types and documented variables without adding B1.8 runtime plumbing.
+Pytest passed 37 tests; Poetry and dependency checks, `.env`/dotenv isolation,
+inclusive-bound and drift failures, compilation, wheel/sdist build, isolated
+wheel import, local links, and `git diff --check` passed.
+
+Done: 2026-08-09 — added immutable source-bar, exact 65-column package-write
+feature-row, normalized scope, resolved SPX benchmark, bounded issue/reason and
+feature-count ledgers, summary, and compact run-result models in
+`empire_stonks_tech_indicators/models.py`; exported and documented the API
+without adding generated/database-owned fields or unbounded row collections.
+Pytest passed 85 tests; an independent P0.3 audit matched all 53 Python fields,
+and Poetry/dependency checks, JSON/non-finite validation, compilation,
+wheel/sdist build, dependency-free isolated-wheel import, local links, dotenv
+scan, and `git diff --check` passed.
+
+Done: 2026-08-09 — installed `empire-stonks-tech-indicators` after the pinned
+binary calculation runtime and OHLCV package in
+`deploy/docker/airflow/Dockerfile`; amended the runtime contract and README.
+`make airflow-build` completed 21 steps, and final CPython 3.13.13/Airflow
+3.2.1 one-offs proved technical-indicators 0.1.0, Core 0.1.0, reports 0.1.0,
+OHLCV 0.1.0, NumPy 2.4.6, and TA-Lib/C 0.7.1 coexist; the 65-column model,
+calculation smoke, `pip check`, bundled-native `ldd`, Airflow CLI, local-link,
+and `git diff --check` checks passed.
+
+Done: 2026-08-09 — added all ten non-secret V1 settings to tracked
+`deploy/env/local.example.env`, the ignored active `deploy/env/local.env`, and
+the shared Airflow environment in `deploy/compose/airflow.yml`; updated the
+runtime contract and README. Both environment files loaded the exact safe
+config, Compose rendered all ten values across all six Airflow services from
+each file, the image contained no embedded settings, and pytest (85), Poetry
+lock, `pip check`, configuration-isolation scans, and `git diff --check`
+passed.
+
+---
