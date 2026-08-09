@@ -29,7 +29,11 @@ PUBLIC_EXCEPTIONS = (
 def test_public_api_is_explicit() -> None:
     expected = [exception.__name__ for exception in PUBLIC_EXCEPTIONS]
 
-    assert public_api.__all__ == expected
+    assert public_api.__all__ == [
+        *expected,
+        "BenchmarkConfig",
+        "TechIndicatorsConfig",
+    ]
     assert exceptions_module.__all__ == expected
     assert all(
         getattr(public_api, name) is exception
