@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "empire-stonks-tech-indicators"
+version = "0.1.0"
+description = "Reusable provider-native technical-indicator calculation utilities for Empire stonks."
+readme = "README.md"
+authors = ["Empire"]
+packages = [{ include = "empire_stonks_tech_indicators", from = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+numpy = "2.4.6"
+TA-Lib = "0.7.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
