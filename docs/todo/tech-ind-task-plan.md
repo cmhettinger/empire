@@ -157,7 +157,7 @@ and the proven incremental strategy.
 | S2.2 | [x] | Finalize auxiliary state schemas | Based on B1.2, explicitly reject or design minimal recurrence state, and translate P0.9's two slots, publication lifecycle, membership, and published view without generic markers or mixed visibility. | B1.2, P0.9, S2.1 |
 | S2.3 | [x] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
 | S2.4 | [x] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
-| S2.5 | [ ] | Add Flyway migration | Create both payload slots, publication/membership state, the `ohlcv_daily_tech_indicators` published view, any proven recurrence state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
+| S2.5 | [x] | Add Flyway migration | Create both payload slots, publication/membership state, the `ohlcv_daily_tech_indicators` published view, any proven recurrence state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
 | S2.6 | [ ] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
 | S2.7 | [ ] | Add OHLCV regression | Prove no provider-identity, provider-isolation, source-cleanup, or existing-writer regression. | S2.5-S2.6 |
 | S2.8 | [ ] | Add database documentation group | Add technical tables to Stonks docs, regenerate schema/ERD/diagrams, and verify no stale artifacts. | S2.5-S2.7 |
@@ -205,6 +205,19 @@ drift paths with no temporary I/O; the rank quicksort used 2,264 kB at 4 MB
 `work_mem`. Rolled-back index DDL/catalog checks, pytest (85), Poetry
 lock/public imports, `make db-validate` (38 migrations), contract, local-link,
 whitespace, fixture-residue, and `git diff --check` checks passed.
+
+Done: 2026-08-09 — added and applied
+`db/flyway/sql/V2026.08.09.0001__stonks_create_tech_indicators.sql` with both
+90-column/23-generated-column payload slots, 41-column publication and
+16-column membership state, exact constraints/delete actions, lifecycle
+triggers, three designed secondary/integrity indexes, comments, and the
+explicit non-updatable 90-column A/B published view; no recurrence state or
+extra grants/indexes were added. Catalog audits found zero slot/view signature
+drift, complete comments, 13 intended FKs, 35 checks, seven total indexes, and
+both triggers. A rolled-back A/B publish/deactivate/retire fixture passed with
+generated-value and visibility assertions; Flyway migrated and validated 39
+migrations, pytest passed 85 tests, Poetry lock/public imports and migration-
+source/whitespace/fixture-residue/`git diff --check` audits passed.
 
 ---
 
