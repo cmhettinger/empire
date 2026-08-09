@@ -154,7 +154,7 @@ and the proven incremental strategy.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | S2.1 | [x] | Finalize payload/view columns | Translate the design-contract baseline into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, view projection, metadata, and comments; both payload slots share the exact 90-column profile and every column has one formula owner. | P0.3-P0.9, B1.2 |
-| S2.2 | [ ] | Finalize auxiliary state schemas | Based on B1.2, explicitly reject or design minimal recurrence state, and translate P0.9's two slots, publication lifecycle, membership, and published view without generic markers or mixed visibility. | B1.2, P0.9, S2.1 |
+| S2.2 | [x] | Finalize auxiliary state schemas | Based on B1.2, explicitly reject or design minimal recurrence state, and translate P0.9's two slots, publication lifecycle, membership, and published view without generic markers or mixed visibility. | B1.2, P0.9, S2.1 |
 | S2.3 | [ ] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
 | S2.4 | [ ] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
 | S2.5 | [ ] | Add Flyway migration | Create both payload slots, publication/membership state, the `ohlcv_daily_tech_indicators` published view, any proven recurrence state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
@@ -172,6 +172,18 @@ lock/public imports passed; independent profile/model/schema audits passed (90
 = 9 + 5 + 53 + 23, 65 writable fields, identical explicit view projection,
 23 generated owners, 90 comment mappings); `make db-validate` validated 38
 migrations; local-link, forbidden-field, and `git diff --check` scans passed.
+
+Done: 2026-08-09 — rejected V1 recurrence state and froze exact publication
+and membership columns, five unit kinds, three publication methods, six
+statuses, normalized scope/benchmark/count/report/resume facts,
+`PRESENT`/`REMOVE` per-listing slot
+membership, cleanup-safe evidence, and explicit 90-column A/B view SQL in
+`docs/stonks/tech-indicators-publication-schema-v1.md`; linked the payload,
+publication, and design contracts. Rolled-back PostgreSQL compilation and
+visibility fixtures passed; schema/view/lifecycle audits matched 41
+publication columns, 16 membership columns, and 90 columns per view arm;
+pytest (85), Poetry lock/public imports, `make db-validate` (38 migrations),
+local-link, forbidden-marker, whitespace, and `git diff --check` checks passed.
 
 ---
 

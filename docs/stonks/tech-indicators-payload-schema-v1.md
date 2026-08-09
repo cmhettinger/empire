@@ -9,10 +9,11 @@ authoritative for column names, order, types, nullability, generated
 expressions, defaults, ownership, and column comments in both physical slots.
 The formula specification remains authoritative for calculation semantics.
 
-S2.2 owns publication and membership columns plus the final view join. S2.3
-owns keys, foreign keys, checks, delete actions, and grants. S2.4 owns indexes.
-S2.5 must create the two tables and view from this contract without changing
-the payload signature.
+S2.2 freezes publication/membership columns, rejects recurrence state, and
+supplies the final view join in
+[`tech-indicators-publication-schema-v1.md`](tech-indicators-publication-schema-v1.md).
+S2.3 owns keys, foreign keys, checks, delete actions, and grants. S2.4 owns
+indexes. S2.5 must create the tables and view without changing this signature.
 
 ## Physical Relations And Shared Signature
 

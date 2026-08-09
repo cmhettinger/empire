@@ -14,6 +14,11 @@ Lock identity, lifetime, contention, and recovery are frozen in
 S2.1-S2.3 own exact DDL types, constraints, indexes, grants, and view SQL
 without changing this mechanism.
 
+S2.2 freezes the auxiliary columns, lifecycle vocabulary, normalized
+membership facts, recurrence-state rejection, benchmark-contract identity,
+and slot-selecting view SQL in
+[`tech-indicators-publication-schema-v1.md`](tech-indicators-publication-schema-v1.md).
+
 ## Selected Hybrid Mechanism
 
 V1 uses two bounded physical payload slots and one published consumer view:

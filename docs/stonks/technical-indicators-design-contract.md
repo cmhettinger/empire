@@ -182,6 +182,9 @@ table. B1.2 rejected recurrence state for V1; S2.2 must record that decision
 and must not design a state table.
 P0.9 freezes the two payload slots, publication table, membership table, and
 published view above. They do not reuse the conditional recurrence-state name.
+S2.2 translates that mechanism and state rejection into the exact
+[`tech-indicators-publication-schema-v1.md`](tech-indicators-publication-schema-v1.md)
+auxiliary and view contract.
 
 Core jobs use `subject_key="all_series"` for the unfiltered universe. P0.10
 freezes normalized scope identity and one capability-wide writer lock below;
