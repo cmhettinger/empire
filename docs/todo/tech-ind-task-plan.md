@@ -3,10 +3,12 @@
 This document tracks the implementation roadmap for provider-native daily
 technical indicators in Empire Stonks.
 
-The first implementation creates a reusable `empire-stonks-technicals` package
+The first implementation creates a reusable
+`empire-stonks-tech-indicators` package
 that reads `stonks.ohlcv_daily`, calculates versioned daily analytical
-features, and stores current state in `stonks.ohlcv_daily_technicals`. It does
-not put calculation logic in the OHLCV package, DAGs, reports, or strategies.
+features, and stores current state in
+`stonks.ohlcv_daily_tech_indicators`. It does not put calculation logic in the
+OHLCV package, DAGs, reports, or strategies.
 
 The rollout proves one manageable, testable layer at a time: contracts,
 runtime dependencies, schema, inputs, calculation families, persistence,
@@ -36,7 +38,7 @@ instead of weakening completion criteria.
 
 ## Package Boundary
 
-`empire-stonks-technicals` owns chronological OHLCV reads, benchmark
+`empire-stonks-tech-indicators` owns chronological OHLCV reads, benchmark
 resolution, TA-Lib/NumPy calculation adapters, versioned formulas, numerical
 validation, affected-range planning, current-state persistence, daily and
 backfill runners, feature/coverage queries, JSON/PDF run reports, and thin CLI
@@ -46,7 +48,7 @@ It does not own provider ingestion, OHLCV mutation, canonical identity,
 corporate-action normalization, strategy thresholds, target selection,
 portfolio/backtest execution, point-in-time sector mappings, intraday
 indicators, or Airflow business logic. `empire-stonks-ohlcv` stays upstream and
-must not import technicals.
+must not import `empire_stonks_tech_indicators`.
 
 ## Required Design Baseline
 
@@ -62,13 +64,13 @@ explicit contract update.
 
 ```text
 empire-stonks-ohlcv -> stonks.ohlcv_daily
-    -> empire-stonks-technicals -> stonks.ohlcv_daily_technicals
+    -> empire-stonks-tech-indicators -> stonks.ohlcv_daily_tech_indicators
     -> reports / screens / future backtests
 ```
 
 ## Initial Persistence And Calculation Contract
 
-`stonks.ohlcv_daily_technicals` has one current row per
+`stonks.ohlcv_daily_tech_indicators` has one current row per
 `(provider_listing_id, trading_date)` with an owning FK to `ohlcv_daily`. Rows
 remain provider-native. The read-optimized table copies OHLCV so ordinary
 screens need no source join, stores historical/cross-series outputs calculated
@@ -150,8 +152,8 @@ or calculation code is committed.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| P0.1 | [ ] | Ratify the design contract | Audit the existing design contract against live OHLCV/Core/reporting conventions, resolve contradictions without reopening settled scope, and mark it as the authoritative V1 baseline. | — |
-| P0.2 | [ ] | Freeze naming conventions | Select package/import, table/state-table, calculation version, Core jobs, storage keys, object kinds, report IDs, CLI names, and DAG ID. | P0.1 |
+| P0.1 | [x] | Ratify the design contract | Audit the existing design contract against live OHLCV/Core/reporting conventions, resolve contradictions without reopening settled scope, and mark it as the authoritative V1 baseline. | — |
+| P0.2 | [x] | Freeze naming conventions | Select package/import, table/state-table, calculation version, Core jobs, storage keys, object kinds, report IDs, CLI names, and DAG ID. | P0.1 |
 | P0.3 | [ ] | Freeze feature profile V1 | Convert the contract inventory into the exact persisted/generated/query-time profile, resolving only its named open units, nullability, and ownership decisions. | P0.1 |
 | P0.4 | [ ] | Freeze formula semantics | Turn the contract formulas into executable specifications and resolve its named volatility, z-score, TA-Lib warm-up, tolerance, and denominator decisions. | P0.3 |
 | P0.5 | [ ] | Define SPX contract | Define `YAHOO/XIDX/SPX` resolution, eligible subjects, exact alignment, relative return, beta/correlation, complete windows, and unavailable behavior. | P0.3-P0.4 |
@@ -160,6 +162,22 @@ or calculation code is committed.
 | P0.8 | [ ] | Set performance and release gates | Record representative sizes, daily/backfill timing and memory targets, transaction/staging bounds, query-plan expectations, report bounds, and live rollout criteria. | P0.3-P0.7 |
 | P0.9 | [ ] | Define atomic publication semantics | Freeze the publication unit and readiness predicate for daily, correction, version rebuild, and backfill work; choose transaction or staged-generation behavior so consumers fail closed on partial, mixed-version, or incomplete-benchmark state. | P0.5, P0.7-P0.8 |
 | P0.10 | [ ] | Define concurrency contract | Freeze the database-backed lock identity, scope normalization/overlap rules across job kinds and versions, acquisition lifetime, contention result, timeout, release, and recovery behavior shared by package, CLI, and Airflow runners. Any jobs able to write the same current rows must conflict. | P0.7-P0.9 |
+
+Done: 2026-08-09 — ratified
+`docs/stonks/technical-indicators-design-contract.md` against the live OHLCV
+schema/package, completed source contracts, Core lifecycle/object services,
+`empire-reports`, wrappers, and DAGs; froze cleanup-safe non-owning Core run
+lineage while preserving task-owned open decisions. `make db-validate`
+validated 38 migrations; focused contract marker/link checks and
+`git diff --check` passed.
+
+Done: 2026-08-09 — froze the `tech-indicators` naming contract in
+`docs/stonks/technical-indicators-design-contract.md` and aligned future task
+references in this plan for the distribution/import, main and conditional
+state tables, `TECH_INDICATORS_V1`, Core jobs, environment/storage names,
+report artifacts/IDs, four CLIs, and Airflow DAG/task. Identifier syntax,
+length, uniqueness, and forbidden-legacy-name scans passed; `make db-validate`
+validated 38 migrations, and `git diff --check` passed.
 
 ---
 
@@ -172,11 +190,11 @@ every runtime before building around it.
 |----|--------|------|---------------|------------|
 | B1.1 | [ ] | Prove TA-Lib runtime support | Pin a reviewed TA-Lib/NumPy combination and prove local Poetry and Airflow-image installation/import. Record wheel/native-library behavior, license, Python compatibility, and rollback. | P0.4, P0.8 |
 | B1.2 | [ ] | Prototype recursive equivalence | Compare full-series output with append and historical-correction suffix strategies for EMA, RSI, ATR, ADX, and MACD. Decide whether exact updates require state, bounded replay, or full replay. | B1.1, P0.7 |
-| B1.3 | [ ] | Scaffold Poetry package | Create `packages/empire-stonks-technicals` version `0.1.0` with `src/` layout, README, tests, minimum dependencies, isolated import, lock, and build. | B1.1 |
+| B1.3 | [ ] | Scaffold Poetry package | Create `packages/empire-stonks-tech-indicators` version `0.1.0` with `src/` layout, README, tests, minimum dependencies, isolated import, lock, and build. | B1.1 |
 | B1.4 | [ ] | Add exceptions and exports | Add a small public exception hierarchy and explicit API without exposing TA-Lib or persistence internals. | B1.3 |
 | B1.5 | [ ] | Add environment config | Add environment-only typed config for version, benchmark, batches, storage key, and limits; package code never loads `.env`. | P0.2, B1.3 |
 | B1.6 | [ ] | Add typed base models | Add immutable source-bar, feature-row, scope, benchmark, issue, count, summary, and run-result models with bounded JSON-ready forms. | P0.3-P0.7, B1.4 |
-| B1.7 | [ ] | Install in Airflow image | Install in dependency-safe order and prove technicals, TA-Lib, NumPy, Core, and OHLCV imports coexist in the built image. | B1.1, B1.3 |
+| B1.7 | [ ] | Install in Airflow image | Install in dependency-safe order and prove tech-indicators, TA-Lib, NumPy, Core, and OHLCV imports coexist in the built image. | B1.1, B1.3 |
 | B1.8 | [ ] | Add runtime settings plumbing | Add non-secret example/local settings and Compose passthrough without embedding configuration in images or DAGs. | B1.5, B1.7 |
 
 ---
@@ -192,7 +210,7 @@ and the proven incremental strategy.
 | S2.2 | [ ] | Decide auxiliary state schemas | Based on B1.2 and P0.9, explicitly reject or design minimal recurrence and publication/staging state. Do not add generic state or rely on a marker that permits current rows to expose mixed semantics. | B1.2, P0.9, S2.1 |
 | S2.3 | [ ] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
 | S2.4 | [ ] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
-| S2.5 | [ ] | Add Flyway migration | Create `ohlcv_daily_technicals`, any proven recurrence/publication state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
+| S2.5 | [ ] | Add Flyway migration | Create `ohlcv_daily_tech_indicators`, any proven recurrence/publication state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
 | S2.6 | [ ] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
 | S2.7 | [ ] | Add OHLCV regression | Prove no provider-identity, provider-isolation, source-cleanup, or existing-writer regression. | S2.5-S2.6 |
 | S2.8 | [ ] | Add database documentation group | Add technical tables to Stonks docs, regenerate schema/ERD/diagrams, and verify no stale artifacts. | S2.5-S2.7 |
@@ -331,10 +349,10 @@ Goal: expose safe operator workflows before Airflow coordination.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| O10.1 | [ ] | Add config command | Add a secret-safe package command and `bin/stonks-technicals-config` using `bin/env-load`; validate runtime, dependency, benchmark, and DB readiness. | B1.5-B1.8, I3.6 |
-| O10.2 | [ ] | Add daily command | Add package command and `bin/stonks-technicals-daily` with effective date/scope/version/dry-run options and compact JSON stdout. | J9.3-J9.4 |
-| O10.3 | [ ] | Add backfill command | Add package command and `bin/stonks-technicals-backfill` with bounded scope, resume, rebuild protection, progress, and compact JSON stdout. | J9.5-J9.7 |
-| O10.4 | [ ] | Add inspect command | Add a read-only command/wrapper for coverage, freshness, drift, SPX readiness, and bounded samples without target recommendations. | W7.7, R8.2 |
+| O10.1 | [ ] | Add config command | Add a secret-safe package command and `bin/stonks-tech-indicators-config` using `bin/env-load`; validate runtime, dependency, benchmark, and DB readiness. | B1.5-B1.8, I3.6 |
+| O10.2 | [ ] | Add daily command | Add package command and `bin/stonks-tech-indicators-daily` with effective date/scope/version/dry-run options and compact JSON stdout. | J9.3-J9.4 |
+| O10.3 | [ ] | Add backfill command | Add package command and `bin/stonks-tech-indicators-backfill` with bounded scope, resume, rebuild protection, progress, and compact JSON stdout. | J9.5-J9.7 |
+| O10.4 | [ ] | Add inspect command | Add read-only `bin/stonks-tech-indicators-inspect` for coverage, freshness, drift, SPX readiness, and bounded samples without target recommendations. | W7.7, R8.2 |
 | O10.5 | [ ] | Add CLI validation | Cover help, invalid scopes, missing config, benchmark failure, lock contention, dry run, no-op, success, resume, exit codes, and safe stdout/stderr. | O10.1-O10.4 |
 | O10.6 | [ ] | Add operator documentation | Document setup, reports, scopes, publication readiness, lock contention/recovery, backfill/resume, rebuild, corrections, benchmark failure, and safe SQL inspection. | O10.1-O10.5 |
 | O10.7 | [ ] | Verify installed commands | Build/install and prove package scripts/wrappers work in Poetry and Airflow with environment loading owned by runtime. | O10.1-O10.6 |
@@ -343,18 +361,18 @@ Goal: expose safe operator workflows before Airflow coordination.
 
 ## Phase 11: Add Thin Airflow Coordination
 
-Goal: refresh technicals only after required EODData and Yahoo/SPX inputs are
-ready for the same effective date, without moving package logic into DAGs.
+Goal: refresh tech indicators only after required EODData and Yahoo/SPX inputs
+are ready for the same effective date, without moving package logic into DAGs.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | A11.1 | [ ] | Select coordination mechanism | Evaluate Airflow 3 assets/events, coordinator DAG, and trigger/wait patterns against scheduled EODData and manual Yahoo. Select a date-scoped prerequisite join that does not rely on timing alone. | I3.6, J9.3, OHLCV V10.8-V10.10 |
 | A11.2 | [ ] | Define source completion signals | Add/reuse minimal date-scoped source outputs/assets so EODData and Yahoo success is unambiguous, rerun-safe, and contains no credentials/raw data. | A11.1 |
-| A11.3 | [ ] | Add manual technicals DAG | Add thin `stonks_technicals_daily_refresh` wiring runtime services and validated effective-date/scope overrides to the package runner; begin `schedule=None`, no catchup, one active run. | O10.7, A11.1 |
+| A11.3 | [ ] | Add manual tech-indicators DAG | Add thin `stonks_tech_indicators_daily_refresh` wiring runtime services and validated effective-date/scope overrides to the package runner; begin `schedule=None`, no catchup, one active run. | O10.7, A11.1 |
 | A11.4 | [ ] | Add DAG contract tests | Cover import, tags, schedule, task shape, date handling, overrides, runner identity, logging, and absence of calculation SQL/business logic. | A11.3 |
 | A11.5 | [ ] | Wire prerequisites | Implement the selected EODData plus Yahoo/SPX join so automatic refresh occurs only after both inputs succeed or readiness is explicitly proven for the same date. | A11.2-A11.4 |
 | A11.6 | [ ] | Handle repeated source runs | Prove EODData's multiple daily runs and Yahoo/manual reconciliation coalesce or safely trigger idempotent refresh through the package-owned scope lock, without concurrent duplicate work or partial publication. | A11.5, J9.4, J9.9 |
-| A11.7 | [ ] | Verify Airflow vertical | Rebuild Airflow, verify zero import errors, run source fixture completions through technicals, and inspect Core plus JSON/PDF objects. | A11.4-A11.6 |
+| A11.7 | [ ] | Verify Airflow vertical | Rebuild Airflow, verify zero import errors, run source fixture completions through tech indicators, and inspect Core plus JSON/PDF objects. | A11.4-A11.6 |
 | A11.8 | [ ] | Decide production cadence | From bounded evidence, choose event-driven, scheduled, or manual-only operation and document pause/rollback before enabling it. | A11.7 |
 
 ---

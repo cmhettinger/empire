@@ -7,6 +7,13 @@ technical-indicator capability. It is the required input to the
 [technical indicators package action plan](../todo/tech-ind-task-plan.md), not
 a retrospective or an invitation to rediscover the scope in each task.
 
+P0.1 ratified this document on 2026-08-09 as the authoritative V1 baseline
+after auditing the live OHLCV schema/package, completed OHLCV contracts, Core
+run/object services, `empire-reports`, runtime wrappers, and Airflow DAGs. The
+ratification confirms the selected scope and resolves live-convention
+ambiguities below; it does not preempt the narrowly assigned open decisions at
+the end of this document.
+
 Implementation tasks may refine a formula where this document explicitly
 records an open decision, or revise the design when evidence proves a problem.
 Material changes must update this contract and explain the evidence. The
@@ -14,17 +21,66 @@ package boundary, provider-native grain, read-optimized persistence strategy,
 initial feature families, SPX identity, validation split, and deferred families
 are already selected.
 
-No table or package described here exists yet. The active task plan controls
-implementation order and verification.
+As of ratification, no technical-indicator table or package described here
+exists. The active task plan controls implementation order and verification.
+
+## Ratified Live-Convention Handoff
+
+The live repository establishes these implementation constraints for the V1
+baseline:
+
+- `stonks.ohlcv_daily` is provider-native current state keyed by
+  `(provider_listing_id, trading_date)`. Its OHLC fields are
+  `NUMERIC(30,10)`, volume is nullable `NUMERIC(30,8)`, its owning
+  provider-listing FK cascades deletes, and corrections update only distinct
+  source values. Technicals must read this table without mutating it.
+- The upstream `change`, `changepct`, `typ`, `hl_range`, and `oc_range`
+  columns remain OHLCV-owned daily conveniences. They are not copied into the
+  V1 technical table and do not replace the technical package's chronological,
+  versioned calculations.
+- Individual OHLCV rows intentionally have no Core-run or source-snapshot
+  lineage. Missing technical rows, copied-source drift, calculation-version
+  drift, and source-row deletion are therefore detected from current source
+  state; tech-indicator code must not invent unavailable per-bar provenance.
+- Core integration uses injected `RunService`, `ObjectStore`, and database
+  services with `domain="stonks"`. The technical row's nullable `run_id` is
+  non-owning last-write lineage and uses `ON DELETE SET NULL`, consistent with
+  cleanup-safe optional Core lineage; deleting a Core run must never delete a
+  source or technical row.
+- Domain code owns report facts, report-specific models and sections, Core
+  object keys, object kinds, logical names, metadata, and retention.
+  `empire-reports` owns reusable rendering contracts, branding, and PDF
+  primitives. Technical JSON serialization is deterministic and rejects
+  non-finite values before Core storage, matching the OHLCV domain serializers.
+  Substantive run artifacts are durable run-scoped `report.json` and
+  `report.pdf` objects stored through Core. P0.2 freezes their exact
+  tech-indicator identifiers below.
+- Reusable packages read configuration from `os.environ` and receive injected
+  services. `bin` wrappers load environment files, and Airflow DAGs only
+  construct runtime services, validate context/overrides, call package runners,
+  and return compact secret-safe results.
+- The reviewed SPX identity exists in the live Yahoo seed as active
+  `YAHOO/XIDX/SPX` with `metadata.YahooTicker = ^GSPC`. Resolution remains by
+  those stable facts and must not hardcode its generated UUID.
+- Source semantics are intentionally unlike: EODData and Stooq adjustment and
+  volume bases are unspecified, while Yahoo stores native unadjusted Chart
+  OHLC and does not persist adjusted close. Technicals inherit and disclose
+  those semantics; P0.6 still owns initial eligibility and comparability rules.
+
+These findings do not change the selected provider-native grain, wide
+current-state table, initial feature inventory, formula direction, SPX
+benchmark, validation split, publication/concurrency requirements, or deferred
+families. A later contradiction with live implementation requires an explicit
+contract amendment with evidence rather than an implicit task-level departure.
 
 ## Selected Architecture
 
 The reusable package is:
 
 ```text
-distribution: empire-stonks-technicals
-import:       empire_stonks_technicals
-location:     packages/empire-stonks-technicals
+distribution: empire-stonks-tech-indicators
+import:       empire_stonks_tech_indicators
+location:     packages/empire-stonks-tech-indicators
 ```
 
 The dependency direction is:
@@ -36,25 +92,91 @@ empire-stonks-ohlcv
 stonks.ohlcv_daily
         |
         v
-empire-stonks-technicals
+empire-stonks-tech-indicators
         |
         v
-stonks.ohlcv_daily_technicals
+stonks.ohlcv_daily_tech_indicators
         |
         v
 reports / target screens / future backtests
 ```
 
 `empire-stonks-ohlcv` owns provider acquisition, parsing, listing identity,
-daily-bar persistence, and source semantics. It must not import technicals.
+daily-bar persistence, and source semantics. It must not import
+`empire_stonks_tech_indicators`.
 
-`empire-stonks-technicals` owns chronological input reads, benchmark
+`empire-stonks-tech-indicators` owns chronological input reads, benchmark
 resolution, calculations, validation, recalculation planning, feature
 persistence, operational queries, Core runners, reports, and thin commands.
 
 Strategies and future backtests consume stored features. They own thresholds,
 target labels, execution timing, portfolio construction, costs, and scoring.
 Airflow only invokes package workflows.
+
+## Frozen Naming Contract
+
+P0.2 selects `tech-indicators` as the only abbreviated capability stem for
+code and operational identifiers. Do not introduce `technicals` or a fully
+spelled `technical-indicators` variant. Human prose may continue to say
+"technical indicators."
+
+Use hyphens where the host convention permits them and underscores where it
+does not:
+
+| Surface | Frozen V1 identifier |
+|---------|----------------------|
+| Poetry distribution | `empire-stonks-tech-indicators` |
+| Python import | `empire_stonks_tech_indicators` |
+| Package directory | `packages/empire-stonks-tech-indicators` |
+| Environment prefix | `EMPIRE_STONKS_TECH_INDICATORS_` |
+| Main table | `stonks.ohlcv_daily_tech_indicators` |
+| Conditional recurrence-state table | `stonks.ohlcv_daily_tech_indicators_state` |
+| Initial calculation version | `TECH_INDICATORS_V1` |
+| Core domain | `stonks` |
+| Daily Core job | `stonks_tech_indicators_daily` |
+| Backfill Core job | `stonks_tech_indicators_backfill` |
+| Storage-key environment variable | `EMPIRE_STORAGE_KEY_STONKS_TECH_INDICATORS` |
+| Default storage-key prefix | `stonks/tech-indicators` |
+| JSON object kind | `stonks_tech_indicators_report` |
+| PDF object kind | `stonks_tech_indicators_pdf_report` |
+| Daily report ID | `stonks.tech-indicators.daily` |
+| Backfill report ID | `stonks.tech-indicators.backfill` |
+| Config CLI/wrapper | `stonks-tech-indicators-config` |
+| Daily CLI/wrapper | `stonks-tech-indicators-daily` |
+| Backfill CLI/wrapper | `stonks-tech-indicators-backfill` |
+| Inspect CLI/wrapper | `stonks-tech-indicators-inspect` |
+| Airflow DAG/module stem | `stonks_tech_indicators_daily_refresh` |
+| Airflow task ID | `run_tech_indicators_daily` |
+
+The two Core report artifact names per job are also frozen:
+
+| Workflow | JSON logical name | PDF logical name |
+|----------|-------------------|------------------|
+| Daily | `tech_indicators_daily_report` | `tech_indicators_daily_pdf_report` |
+| Backfill | `tech_indicators_backfill_report` | `tech_indicators_backfill_pdf_report` |
+
+Both formats for one workflow use the same report ID because they render the
+same operational facts. The initial report schema version is integer `1`; R8.1
+owns its fields. Filenames remain `report.json` and `report.pdf`. Run-scoped
+objects use this path, partitioned by the Core run's effective date:
+
+```text
+stonks/tech-indicators/runs/YYYY/MM/DD/<run_id>/reports
+```
+
+The initial calculation version is an immutable formula-profile identity, not
+the Poetry package version. Formula-semantic changes receive a new uppercase
+identifier such as `TECH_INDICATORS_V2`; code fixes that do not alter accepted
+outputs do not. The exact database constraint is finalized in S2.3.
+
+The conditional state-table name is reserved, not approval to create the
+table. B1.2 and S2.2 must still prove that recurrence state is necessary.
+Publication or staging tables required by P0.9 must receive purpose-specific
+`tech_indicators` names rather than reusing the recurrence-state name.
+
+Core jobs use `subject_key="all_series"` for the unfiltered universe. P0.10
+and J9.9 own normalized scoped subject/lock identities; those later values
+must remain secret-safe and must not change the frozen job names.
 
 ## Provider-Native Identity And Source Semantics
 
@@ -83,7 +205,7 @@ rows through a deterministic rebuild policy.
 The selected primary table is:
 
 ```text
-stonks.ohlcv_daily_technicals
+stonks.ohlcv_daily_tech_indicators
 ```
 
 Its primary key is `(provider_listing_id, trading_date)`. The same composite
@@ -532,7 +654,7 @@ chats should resolve them rather than reopen the entire design:
 
 | Decision | Owning tasks |
 |----------|--------------|
-| Exact naming/version/report/object conventions | P0.2 |
+| Exact naming/version/report/object conventions | P0.2 (frozen above) |
 | Final generated-column ownership and DDL types | S2.1-S2.3 |
 | Sample/population and annualized/daily volatility | P0.4 |
 | Z-score reference inclusion | P0.4 |
