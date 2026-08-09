@@ -7,7 +7,9 @@ triggers, and the Python/PostgreSQL validation boundary for the payload schema
 in [`tech-indicators-payload-schema-v1.md`](tech-indicators-payload-schema-v1.md)
 and auxiliary schema in
 [`tech-indicators-publication-schema-v1.md`](tech-indicators-publication-schema-v1.md).
-S2.4 owns non-integrity access indexes; S2.5 implements this contract.
+S2.4 freezes non-integrity access indexes in
+[`tech-indicators-indexes-v1.md`](tech-indicators-indexes-v1.md); S2.5
+implements both contracts.
 
 ## Payload Keys And Foreign Keys
 

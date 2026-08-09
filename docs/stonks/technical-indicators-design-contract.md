@@ -579,6 +579,10 @@ design deliberately rejects:
 
 A latest-day slice of tens of thousands of precomputed rows should normally be
 cheap. Index count must balance read evidence against daily/backfill write cost.
+S2.4 selected only the primary key plus one date-leading B-tree per payload
+slot and rejected feature-specific indexes from live 20.7M-row plan evidence;
+the exact DDL and measurements are frozen in
+[`tech-indicators-indexes-v1.md`](tech-indicators-indexes-v1.md).
 
 ## Recalculation And Performance Direction
 

@@ -156,7 +156,7 @@ and the proven incremental strategy.
 | S2.1 | [x] | Finalize payload/view columns | Translate the design-contract baseline into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, view projection, metadata, and comments; both payload slots share the exact 90-column profile and every column has one formula owner. | P0.3-P0.9, B1.2 |
 | S2.2 | [x] | Finalize auxiliary state schemas | Based on B1.2, explicitly reject or design minimal recurrence state, and translate P0.9's two slots, publication lifecycle, membership, and published view without generic markers or mixed visibility. | B1.2, P0.9, S2.1 |
 | S2.3 | [x] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
-| S2.4 | [ ] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
+| S2.4 | [x] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
 | S2.5 | [ ] | Add Flyway migration | Create both payload slots, publication/membership state, the `ohlcv_daily_tech_indicators` published view, any proven recurrence state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
 | S2.6 | [ ] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
 | S2.7 | [ ] | Add OHLCV regression | Prove no provider-identity, provider-isolation, source-cleanup, or existing-writer regression. | S2.5-S2.6 |
@@ -194,6 +194,17 @@ payload, publication, and design contracts. Rolled-back PostgreSQL compilation,
 constraint/delete-action/lifecycle fixtures, and Core/report cleanup passed;
 pytest (85), Poetry lock/public imports, `make db-validate` (38 migrations),
 contract/link/whitespace, and `git diff --check` checks passed.
+
+Done: 2026-08-09 — froze exactly one date-leading B-tree per payload slot and
+no auxiliary or feature-specific access indexes in
+`docs/stonks/tech-indicators-indexes-v1.md`; primary keys retain listing
+history, backfill/resume, and correction ownership. Five-run read-only
+PostgreSQL 18.4 plans over 20,684,494 live OHLCV rows proved 16,238-row paged
+history, a 21,276-row latest slice/rank, 50,000-row backfill, and 50,000-row
+drift paths with no temporary I/O; the rank quicksort used 2,264 kB at 4 MB
+`work_mem`. Rolled-back index DDL/catalog checks, pytest (85), Poetry
+lock/public imports, `make db-validate` (38 migrations), contract, local-link,
+whitespace, fixture-residue, and `git diff --check` checks passed.
 
 ---
 

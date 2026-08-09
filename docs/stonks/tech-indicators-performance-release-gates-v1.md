@@ -165,6 +165,10 @@ without actually controlling the cache.
 
 Required plan shapes are:
 
+S2.4's initial evidence and exact two-slot index handoff are frozen in
+[`tech-indicators-indexes-v1.md`](tech-indicators-indexes-v1.md). The later
+tasks named below must repeat the gates on populated technical relations.
+
 - Exact listing history uses the technical primary-key/index order with no
   explicit sort, sequential scan of the technical universe, or temporary I/O.
 - Latest-date/model-input slices use a date-leading index and read only the

@@ -16,6 +16,8 @@ S2.3 owns keys, foreign keys, checks, delete actions, and grants. S2.4 owns
 indexes. S2.5 must create the tables and view without changing this signature.
 The exact S2.3 integrity and Python-validation boundary is frozen in
 [`tech-indicators-constraints-v1.md`](tech-indicators-constraints-v1.md).
+The exact S2.4 payload access indexes and evidence are frozen in
+[`tech-indicators-indexes-v1.md`](tech-indicators-indexes-v1.md).
 
 ## Physical Relations And Shared Signature
 
