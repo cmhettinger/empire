@@ -60,6 +60,9 @@ The safe run horizon is normally the requested effective/end date. If an
 earlier change can affect already persisted or published rows after that date,
 the planner must expand through those downstream rows or reject the narrowed
 scope. It must never knowingly leave a stale tail behind a successful result.
+Work exceeding the ordinary daily envelope follows the backfill-class gates in
+[`tech-indicators-performance-release-gates-v1.md`](tech-indicators-performance-release-gates-v1.md)
+without weakening this suffix.
 
 ## Drift Detection
 

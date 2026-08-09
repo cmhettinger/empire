@@ -559,7 +559,10 @@ cheap. Index count must balance read evidence against daily/backfill write cost.
 P0.7 freezes work detection, suffix invalidation, status, version, benchmark,
 and deletion behavior in
 [`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md).
-The rules below summarize that contract.
+P0.8 freezes representative sizes, timing/memory targets, batch/transaction,
+query-plan, report, and rollout gates in
+[`tech-indicators-performance-release-gates-v1.md`](tech-indicators-performance-release-gates-v1.md).
+The rules below summarize those contracts.
 
 Repeated target queries must not execute rolling windows. The package computes
 features once, validates them, bulk persists them, and lets screens compare
@@ -693,10 +696,11 @@ chats should resolve them rather than reopen the entire design:
 | SPX identity, subjects, alignment, statistics, and unavailable behavior | P0.5 (frozen in `tech-indicators-spx-contract-v1.md`) |
 | Eligible source-value and adjustment/comparability policy | P0.6 (frozen in `tech-indicators-source-value-policy-v1.md`) |
 | Recalculation, correction, status, version, and deletion semantics | P0.7 (frozen in `tech-indicators-recalculation-contract-v1.md`) |
+| Performance, resource, query-plan, report, and release gates | P0.8 (frozen in `tech-indicators-performance-release-gates-v1.md`) |
 | TA-Lib/NumPy versions and Airflow packaging | B1.1 |
 | Recursive incremental/state-table strategy | B1.2, S2.2 |
 | Initial evidence-backed indexes | S2.4 |
-| Performance thresholds and batch sizes | P0.8, W7.9, V12.6 |
+| Performance measurements and evidence-based tuning within frozen gates | W7.9, V12.6 |
 | Atomic publication unit and readiness predicate | P0.9, S2.2, W7.10 |
 | Package-owned lock identity and contention policy | P0.10, J9.9 |
 | Airflow source-completion coordination | A11.1-A11.8 |

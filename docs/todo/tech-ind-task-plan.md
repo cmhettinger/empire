@@ -160,7 +160,7 @@ or calculation code is committed.
 | P0.5 | [x] | Define SPX contract | Define `YAHOO/XIDX/SPX` resolution, eligible subjects, exact alignment, relative return, beta/correlation, complete windows, and unavailable behavior. | P0.3-P0.4 |
 | P0.6 | [x] | Define source-value policy | Audit EODData, Stooq, and Yahoo adjustment/corporate-action semantics and select initially eligible provider listings without claiming normalization. | P0.1, OHLCV V10.11 |
 | P0.7 | [x] | Define recalculation semantics | Specify daily append, missing row, source correction, SPX correction, version change, inactive listing, and deletion behavior with full/incremental equivalence. | P0.4-P0.6 |
-| P0.8 | [ ] | Set performance and release gates | Record representative sizes, daily/backfill timing and memory targets, transaction/staging bounds, query-plan expectations, report bounds, and live rollout criteria. | P0.3-P0.7 |
+| P0.8 | [x] | Set performance and release gates | Record representative sizes, daily/backfill timing and memory targets, transaction/staging bounds, query-plan expectations, report bounds, and live rollout criteria. | P0.3-P0.7 |
 | P0.9 | [ ] | Define atomic publication semantics | Freeze the publication unit and readiness predicate for daily, correction, version rebuild, and backfill work; choose transaction or staged-generation behavior so consumers fail closed on partial, mixed-version, or incomplete-benchmark state. | P0.5, P0.7-P0.8 |
 | P0.10 | [ ] | Define concurrency contract | Freeze the database-backed lock identity, scope normalization/overlap rules across job kinds and versions, acquisition lifetime, contention result, timeout, release, and recovery behavior shared by package, CLI, and Airflow runners. Any jobs able to write the same current rows must conflict. | P0.7-P0.9 |
 
@@ -221,6 +221,14 @@ eligibility cleanup, safe horizons, and deletion behavior in
 feature, SPX, source-value, and design contracts. Deterministic affected-range
 fixtures, OHLCV FK/writer marker checks, local-link/status/stale-boundary scans,
 and `git diff --check` passed.
+
+Done: 2026-08-09 — froze measured live-size envelopes, daily/no-op/backfill
+timing and RSS targets, read/write/transaction/staging/disk bounds, query-plan
+and latency expectations, JSON/PDF limits, and nine staged rollout gates in
+`docs/stonks/tech-indicators-performance-release-gates-v1.md`; linked the
+recalculation and design contracts. Read-only PostgreSQL sizing/report evidence,
+contract threshold fixtures, local-link/status/stale-boundary scans, and
+`git diff --check` passed.
 
 ---
 
