@@ -1,6 +1,6 @@
 # Tech-Indicators Publication Contract V1
 
-Status: frozen implementation contract for P0.9 as of 2026-08-09.
+Status: frozen implementation contract for P0.9, amended by P0.10 on 2026-08-09.
 
 This document freezes V1 atomic publication units, physical visibility,
 readiness, failure, recovery, and rollback behavior. It extends the
@@ -9,8 +9,10 @@ readiness, failure, recovery, and rollback behavior. It extends the
 and
 [`tech-indicators-performance-release-gates-v1.md`](tech-indicators-performance-release-gates-v1.md).
 
-P0.10 still owns lock identity and contention. S2.1-S2.3 own exact DDL types,
-constraints, indexes, grants, and view SQL without changing this mechanism.
+Lock identity, lifetime, contention, and recovery are frozen in
+[`tech-indicators-concurrency-contract-v1.md`](tech-indicators-concurrency-contract-v1.md).
+S2.1-S2.3 own exact DDL types, constraints, indexes, grants, and view SQL
+without changing this mechanism.
 
 ## Selected Hybrid Mechanism
 
@@ -117,8 +119,9 @@ It is not counted as a recalculation or last-write update. Recalculated rows use
 the candidate run lineage and timestamps.
 
 Committed inactive-slot batches are resumable but unpublished. The package
-must not stage into a slot currently active for the same listing. P0.10 must
-prevent overlapping jobs from choosing or mutating the same target payload.
+must not stage into a slot currently active for the same listing. The global
+P0.10 writer lock prevents another job from choosing or mutating any target
+payload concurrently.
 
 ## Atomic Publication Units
 
@@ -220,7 +223,7 @@ difference prevent `PREPARED`.
 
 The normal workflow order is fixed:
 
-1. acquire the future P0.10 scope lock and create a `BUILDING` publication;
+1. acquire P0.10's global writer lock and create a `BUILDING` publication;
 2. plan, calculate, validate, and either retain bounded in-place changes or
    commit resumable inactive-slot batches;
 3. render and durably store the candidate's final JSON/PDF report pair;

@@ -136,6 +136,8 @@ does not:
 | Physical payload slot B | `stonks.ohlcv_daily_tech_indicators_b` |
 | Publication table | `stonks.tech_indicators_publication` |
 | Publication membership table | `stonks.tech_indicators_publication_listing` |
+| Writer-lock seed | `empire:stonks:tech-indicators:writer:v1` |
+| Writer-lock key | `7681980501239933110` |
 | Conditional recurrence-state table | `stonks.ohlcv_daily_tech_indicators_state` |
 | Initial calculation version | `TECH_INDICATORS_V1` |
 | Core domain | `stonks` |
@@ -181,8 +183,9 @@ P0.9 freezes the two payload slots, publication table, membership table, and
 published view above. They do not reuse the conditional recurrence-state name.
 
 Core jobs use `subject_key="all_series"` for the unfiltered universe. P0.10
-and J9.9 own normalized scoped subject/lock identities; those later values
-must remain secret-safe and must not change the frozen job names.
+freezes normalized scope identity and one capability-wide writer lock below;
+J9.9 implements them. Scoped values must remain secret-safe and must not
+change the frozen job names.
 
 ## Provider-Native Identity And Source Semantics
 
@@ -633,18 +636,16 @@ Concurrency protection also belongs to the package. Airflow
 but do not protect against simultaneous CLI runs, manual DAG runs, source
 reruns, or backfills.
 
-Phase P0.10 must freeze a PostgreSQL-backed lock contract, normally advisory
-locking, with a deterministic identity derived from job kind, calculation
-version, provider/listing scope, and effective date or date range. Daily,
-backfill, CLI, and Airflow paths must acquire the same conflicting lock before
-readiness/planning and hold it through database publication. Lock contention
-has a bounded, explicit fail-or-healthy-no-op policy; runners do not wait
-indefinitely. Scope normalization must make any jobs capable of writing the
-same current-state rows conflict, including different job kinds and calculation
-versions; version cannot partition locks that protect the same rows. Tests must
-cover overlapping and nonoverlapping scopes, lock release after
-success/failure/cancellation, and recovery after process or database-session
-loss.
+P0.10 freezes one capability-wide PostgreSQL transaction advisory lock in
+[`tech-indicators-concurrency-contract-v1.md`](tech-indicators-concurrency-contract-v1.md).
+Every daily, backfill, correction, rebuild, cleanup, resume, dry-run, CLI, and
+Airflow writer path uses the same key, so even disjoint scopes and different
+versions serialize. This deliberately simple V1 rule avoids overlap analysis
+for an operationally single-run workflow. The lock is acquired nonblockingly
+before Core/publication state, held on a dedicated transaction-pool-compatible
+connection through terminal publication, and released automatically by commit,
+rollback, or connection loss. Contention returns immediately without creating
+workflow state. Read-only inspection and readiness remain lock-free.
 
 ## Run Reports And Operational Surfaces
 
@@ -712,7 +713,7 @@ chats should resolve them rather than reopen the entire design:
 | Initial evidence-backed indexes | S2.4 |
 | Performance measurements and evidence-based tuning within frozen gates | W7.9, V12.6 |
 | Atomic publication unit and readiness predicate | P0.9 (frozen in `tech-indicators-publication-contract-v1.md`) |
-| Package-owned lock identity and contention policy | P0.10, J9.9 |
+| Package-owned lock identity and contention policy | P0.10 (frozen in `tech-indicators-concurrency-contract-v1.md`) |
 | Airflow source-completion coordination | A11.1-A11.8 |
 
 Any new indicator or material formula change requires a concrete consumer,

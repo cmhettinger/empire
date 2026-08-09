@@ -1,6 +1,6 @@
 # Tech-Indicators Performance And Release Gates V1
 
-Status: frozen implementation contract for P0.8, amended by P0.9 on 2026-08-09.
+Status: frozen implementation contract for P0.8, amended by P0.9-P0.10 on 2026-08-09.
 
 This document sets the representative sizes, performance targets, resource
 bounds, query-plan expectations, report limits, and staged release criteria for
@@ -14,7 +14,8 @@ below. A missed target requires measurement and tuning or an explicit contract
 revision with evidence; it must not be relabeled healthy. The atomic
 publication mechanism is frozen in
 [`tech-indicators-publication-contract-v1.md`](tech-indicators-publication-contract-v1.md),
-and P0.10 selects the lock contract.
+and the deliberately serialized writer lock is frozen in
+[`tech-indicators-concurrency-contract-v1.md`](tech-indicators-concurrency-contract-v1.md).
 
 ## Measured Planning Baseline
 

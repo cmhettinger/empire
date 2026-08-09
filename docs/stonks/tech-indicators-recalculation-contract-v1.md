@@ -1,6 +1,6 @@
 # Tech-Indicators Recalculation Contract V1
 
-Status: frozen implementation contract for P0.7, amended by P0.9 on 2026-08-09.
+Status: frozen implementation contract for P0.7, amended by P0.9-P0.10 on 2026-08-09.
 
 This document defines how V1 plans work after daily appends, missing technical
 rows, subject-source corrections, SPX corrections, calculation-version
@@ -11,8 +11,10 @@ changes, listing-status changes, and deletions. It extends the
 
 Atomic visibility and readiness are frozen in
 [`tech-indicators-publication-contract-v1.md`](tech-indicators-publication-contract-v1.md).
-P0.10 owns concurrency. B1.2 may choose full replay, bounded replay with proven
-state, or a recurrence-state table. It
+Concurrency is frozen in
+[`tech-indicators-concurrency-contract-v1.md`](tech-indicators-concurrency-contract-v1.md).
+B1.2 may choose full replay, bounded replay with proven state, or a
+recurrence-state table. It
 may optimize input reads and calculation, but it may not narrow the output
 that this contract says is potentially affected without proving equivalence to
 the full-series reference.
@@ -225,9 +227,9 @@ Calculation and validation complete before the caller-owned persistence unit
 is committed. Inserted, updated, deleted, equivalent/unchanged, and reason
 counts are reported without retaining unbounded row payloads. Resumable
 backfills may use deterministic batches, but the publication contract decides
-when those batches become visible as one complete publication. P0.10 decides
-lock overlap; neither Airflow timing nor separate provider jobs can weaken this
-recalculation logic.
+when those batches become visible as one complete publication. P0.10's global
+writer lock serializes all such work; neither Airflow timing nor separate
+provider jobs can weaken this recalculation logic.
 
 ## Required Contract Tests
 
