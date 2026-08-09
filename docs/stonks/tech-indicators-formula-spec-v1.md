@@ -11,9 +11,11 @@ contract remains authoritative for field presence, units, ownership, and
 logical nullability.
 
 P0.5 remains responsible for the exact SPX benchmark, subject eligibility,
-alignment, and relative-statistic contract. P0.7 remains responsible for
-affected-range and recalculation behavior. B1.1 pins the reviewed TA-Lib and
-NumPy package versions without changing the formulas below.
+alignment, and relative-statistic contract. Affected-range and recalculation
+behavior is frozen in
+[`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md).
+B1.1 pins the reviewed TA-Lib and NumPy package versions without changing the
+formulas below.
 
 ## Notation And Ordered Inputs
 

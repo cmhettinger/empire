@@ -200,7 +200,8 @@ disclosures, and prohibited normalization/comparability claims are frozen in
 
 The table is current calculated state. It does not preserve technical
 revisions. Source corrections and calculation-version changes update affected
-rows through a deterministic rebuild policy.
+rows through the deterministic
+[`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md).
 
 ## Primary Table Shape
 
@@ -555,6 +556,11 @@ cheap. Index count must balance read evidence against daily/backfill write cost.
 
 ## Recalculation And Performance Direction
 
+P0.7 freezes work detection, suffix invalidation, status, version, benchmark,
+and deletion behavior in
+[`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md).
+The rules below summarize that contract.
+
 Repeated target queries must not execute rolling windows. The package computes
 features once, validates them, bulk persists them, and lets screens compare
 stored values.
@@ -686,6 +692,7 @@ chats should resolve them rather than reopen the entire design:
 | Formula, denominator, warm-up, estimator, z-score, and tolerance semantics | P0.4 (frozen in `tech-indicators-formula-spec-v1.md`) |
 | SPX identity, subjects, alignment, statistics, and unavailable behavior | P0.5 (frozen in `tech-indicators-spx-contract-v1.md`) |
 | Eligible source-value and adjustment/comparability policy | P0.6 (frozen in `tech-indicators-source-value-policy-v1.md`) |
+| Recalculation, correction, status, version, and deletion semantics | P0.7 (frozen in `tech-indicators-recalculation-contract-v1.md`) |
 | TA-Lib/NumPy versions and Airflow packaging | B1.1 |
 | Recursive incremental/state-table strategy | B1.2, S2.2 |
 | Initial evidence-backed indexes | S2.4 |

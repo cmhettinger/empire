@@ -14,7 +14,9 @@ The initial source-value and adjustment/comparability policy is frozen in
 [`tech-indicators-source-value-policy-v1.md`](tech-indicators-source-value-policy-v1.md).
 It selects both supported subject cohorts plus the exact Yahoo SPX row for base
 calculation without changing this contract's formulas or support predicate.
-P0.7 owns correction and affected-range planning; P0.9 owns atomic publication.
+Correction and affected-range planning is frozen in
+[`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md).
+P0.9 owns atomic publication.
 
 ## Benchmark Identity And Resolution
 

@@ -61,8 +61,9 @@ and cross-listing claims are frozen in
 | `volume` | source copy | provider-native volume | nullable exactly when the source bar volume is null |
 
 The primary row identity is `(provider_listing_id, trading_date)`. Source-copy
-values represent the source bar used by the current calculation version; P0.7
-owns the exact correction and refresh workflow.
+values represent the source bar used by the current calculation version. The
+exact correction and refresh workflow is frozen in
+[`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md).
 
 ## Persisted Python-Computed Fields
 

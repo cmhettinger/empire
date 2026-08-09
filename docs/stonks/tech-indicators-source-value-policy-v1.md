@@ -9,8 +9,9 @@ their values. It extends the
 without creating adjusted, normalized, canonical, or cross-provider data.
 
 The policy is deliberately independent of `provider_listing.status`. It says
-whether a listing's source-value semantics are supported. P0.7 owns active,
-inactive, explicit-backfill, source-correction, and affected-range selection.
+whether a listing's source-value semantics are supported. Active, inactive,
+explicit-backfill, source-correction, and affected-range behavior is frozen in
+[`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md).
 P0.5 remains authoritative for SPX-relative subject support.
 
 ## Initial Eligibility Predicate
@@ -117,8 +118,10 @@ an economically normalized return.
 
 `ohlcv_daily` is current state. A provider correction may replace previously
 stored OHLCV without an append-only bar revision. The tech-indicators package
-must not mutate source bars; P0.7 defines how source drift selects technical
-rows for recalculation, and P0.9 defines atomic publication.
+must not mutate source bars. The
+[`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md)
+defines how source drift selects technical rows, and P0.9 defines atomic
+publication.
 
 ## Evidence Boundary And Implementation Tests
 
