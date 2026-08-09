@@ -158,7 +158,7 @@ or calculation code is committed.
 | P0.3 | [x] | Freeze feature profile V1 | Convert the contract inventory into the exact persisted/generated/query-time profile, resolving only its named open units, nullability, and ownership decisions. | P0.1 |
 | P0.4 | [x] | Freeze formula semantics | Turn the contract formulas into executable specifications and resolve its named volatility, z-score, TA-Lib warm-up, tolerance, and denominator decisions. | P0.3 |
 | P0.5 | [x] | Define SPX contract | Define `YAHOO/XIDX/SPX` resolution, eligible subjects, exact alignment, relative return, beta/correlation, complete windows, and unavailable behavior. | P0.3-P0.4 |
-| P0.6 | [ ] | Define source-value policy | Audit EODData, Stooq, and Yahoo adjustment/corporate-action semantics and select initially eligible provider listings without claiming normalization. | P0.1, OHLCV V10.11 |
+| P0.6 | [x] | Define source-value policy | Audit EODData, Stooq, and Yahoo adjustment/corporate-action semantics and select initially eligible provider listings without claiming normalization. | P0.1, OHLCV V10.11 |
 | P0.7 | [ ] | Define recalculation semantics | Specify daily append, missing row, source correction, SPX correction, version change, inactive listing, and deletion behavior with full/incremental equivalence. | P0.4-P0.6 |
 | P0.8 | [ ] | Set performance and release gates | Record representative sizes, daily/backfill timing and memory targets, transaction/staging bounds, query-plan expectations, report bounds, and live rollout criteria. | P0.3-P0.7 |
 | P0.9 | [ ] | Define atomic publication semantics | Freeze the publication unit and readiness predicate for daily, correction, version rebuild, and backfill work; choose transaction or staged-generation behavior so consumers fail closed on partial, mixed-version, or incomplete-benchmark state. | P0.5, P0.7-P0.8 |
@@ -206,6 +206,13 @@ live seed identity, intersection `[1, 4]`, 20-pair relative return
 `0.21779997158616426`, beta `2.0`, correlation `1.0`); local-link,
 P0.4/P0.5/P0.6 status, alternate-identifier `rg`, and `git diff --check` checks
 passed.
+
+Done: 2026-08-09 — froze exact EODData Equity, Stooq U.S. stock, and Yahoo
+SPX-only source-value eligibility plus native adjustment, volume, currency,
+corporate-action, correction, and comparability limits in
+`docs/stonks/tech-indicators-source-value-policy-v1.md`; linked the feature,
+SPX, and design contracts. Exact-predicate fixtures, live OHLCV report-label
+and Yahoo seed checks, local-link/status scans, and `git diff --check` passed.
 
 ---
 

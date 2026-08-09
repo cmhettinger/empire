@@ -10,10 +10,11 @@ outcomes. It extends the
 without changing that specification's observation, denominator, finite-output,
 or tolerance rules.
 
-P0.6 still owns the initial source-value and adjustment/comparability policy.
-It may narrow which provider listings are calculated, but it must not silently
-change the SPX formulas or label an unsupported subject as supported. P0.7 owns
-correction and affected-range planning; P0.9 owns atomic publication.
+The initial source-value and adjustment/comparability policy is frozen in
+[`tech-indicators-source-value-policy-v1.md`](tech-indicators-source-value-policy-v1.md).
+It selects both supported subject cohorts plus the exact Yahoo SPX row for base
+calculation without changing this contract's formulas or support predicate.
+P0.7 owns correction and affected-range planning; P0.9 owns atomic publication.
 
 ## Benchmark Identity And Resolution
 
@@ -73,10 +74,9 @@ unsupported in V1. There is no canonical-listing join, ticker inference,
 market-name folding, or proxy mapping.
 
 Provider-listing `status` controls work selection under P0.7; it does not
-change the historical semantic support predicate. P0.6 may exclude a supported
-source cohort from the initial calculation policy because its adjustment or
-value semantics are unsuitable. Such exclusion means no selected row, not a
-different SPX formula.
+change the historical semantic support predicate. The source-value policy
+selects both supported source cohorts. A future source-policy exclusion means
+no selected row, not a different SPX formula.
 
 For a supported subject and healthy resolution,
 `relative_strength_benchmark_provider_listing_id` is the resolved SPX UUID on

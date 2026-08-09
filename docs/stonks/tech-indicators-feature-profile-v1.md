@@ -9,6 +9,9 @@ architecture and rollout sequencing. P0.4 freezes exact formulas,
 complete-window mechanics, TA-Lib warm-up normalization, tolerance, and
 denominator behavior in
 [`tech-indicators-formula-spec-v1.md`](tech-indicators-formula-spec-v1.md).
+Provider eligibility and the limits on adjustment, currency, corporate-action,
+and cross-listing claims are frozen in
+[`tech-indicators-source-value-policy-v1.md`](tech-indicators-source-value-policy-v1.md).
 
 ## Profile Rules
 
@@ -23,7 +26,8 @@ denominator behavior in
 - Price-level values remain in the provider-native price unit. Volume-level
   values remain in the provider-native volume unit.
 - `dollar_volume` names a nominal provider-native price-times-volume product;
-  it does not assert USD denomination or cross-provider comparability.
+  it does not assert USD denomination or cross-provider comparability and is
+  approved only as a within-listing time-series feature in V1.
 - `rsi_14`, `plus_di_14`, `minus_di_14`, and `adx_14` use TA-Lib's point scale,
   conventionally 0 through 100, rather than decimal ratios.
 - Return volatility is the non-annualized dispersion of one-observation

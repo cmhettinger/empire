@@ -65,7 +65,8 @@ baseline:
 - Source semantics are intentionally unlike: EODData and Stooq adjustment and
   volume bases are unspecified, while Yahoo stores native unadjusted Chart
   OHLC and does not persist adjusted close. Technicals inherit and disclose
-  those semantics; P0.6 still owns initial eligibility and comparability rules.
+  those semantics. P0.6 freezes initial eligibility and comparability rules in
+  [`tech-indicators-source-value-policy-v1.md`](tech-indicators-source-value-policy-v1.md).
 
 These findings do not change the selected provider-native grain, wide
 current-state table, initial feature inventory, formula direction, SPX
@@ -193,8 +194,9 @@ Indicators inherit the owning provider series' adjustment and correction
 semantics. The technical package does not reconstruct splits, distributions,
 or adjusted histories. A split or other discontinuity in an unadjusted series
 can affect returns, averages, volatility, RSI, ATR, Bollinger state, breakouts,
-and model signals. The initial eligible-source policy must therefore be audited
-and reported rather than assumed.
+and model signals. The audited initial eligibility predicate, provider
+disclosures, and prohibited normalization/comparability claims are frozen in
+[`tech-indicators-source-value-policy-v1.md`](tech-indicators-source-value-policy-v1.md).
 
 The table is current calculated state. It does not preserve technical
 revisions. Source corrections and calculation-version changes update affected
@@ -448,8 +450,10 @@ dollar_volume_avg_20 = average(dollar_volume over 20 observations)
 volume_ratio_20 = volume / volume_avg_20
 ```
 
-Volume windows are 20 and 60. Phase P0.6 must state which source/instrument
-types make dollar-volume comparisons meaningful.
+Volume windows are 20 and 60. Under the
+[`tech-indicators-source-value-policy-v1.md`](tech-indicators-source-value-policy-v1.md),
+volume and dollar-volume features are nominal within-listing time-series
+features. V1 does not authorize cross-listing liquidity comparison.
 
 ## SPX Benchmark Contract
 
@@ -503,9 +507,9 @@ database bound.
 
 V1 supports SPX features only for exact EODData `NYSE`/`NASDAQ`/`AMEX` Equity
 metadata series and Stooq `nasdaq`/`nyse`/`nysemkt` stock partitions. Yahoo and
-all other subjects retain a null benchmark ID and null SPX fields. P0.6 may
-narrow the initially calculated source cohorts based on provider-native value
-semantics without changing this SPX-support predicate.
+all other subjects retain a null benchmark ID and null SPX fields. The source-
+value policy selects both supported subject cohorts and only the Yahoo SPX row
+for base calculation without changing this SPX-support predicate.
 
 Sector-relative features remain deferred until Empire owns point-in-time
 subject membership and benchmark mappings.
@@ -681,7 +685,7 @@ chats should resolve them rather than reopen the entire design:
 | Final DDL types and generated expressions | S2.1-S2.3 |
 | Formula, denominator, warm-up, estimator, z-score, and tolerance semantics | P0.4 (frozen in `tech-indicators-formula-spec-v1.md`) |
 | SPX identity, subjects, alignment, statistics, and unavailable behavior | P0.5 (frozen in `tech-indicators-spx-contract-v1.md`) |
-| Eligible source-value and adjustment/comparability policy | P0.6 |
+| Eligible source-value and adjustment/comparability policy | P0.6 (frozen in `tech-indicators-source-value-policy-v1.md`) |
 | TA-Lib/NumPy versions and Airflow packaging | B1.1 |
 | Recursive incremental/state-table strategy | B1.2, S2.2 |
 | Initial evidence-backed indexes | S2.4 |
