@@ -33,6 +33,15 @@ def test_public_api_is_explicit() -> None:
         *expected,
         "BenchmarkConfig",
         "TechIndicatorsConfig",
+        "FeatureCounts",
+        "FeatureRow",
+        "ReasonCount",
+        "ResolvedBenchmark",
+        "SourceBar",
+        "TechIndicatorsIssue",
+        "TechIndicatorsRunResult",
+        "TechIndicatorsScope",
+        "TechIndicatorsSummary",
     ]
     assert exceptions_module.__all__ == expected
     assert all(

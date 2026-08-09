@@ -157,7 +157,7 @@ every runtime before building around it.
 | B1.3 | [x] | Scaffold Poetry package | Create `packages/empire-stonks-tech-indicators` version `0.1.0` with `src/` layout, README, tests, minimum dependencies, isolated import, lock, and build. | B1.1 |
 | B1.4 | [x] | Add exceptions and exports | Add a small public exception hierarchy and explicit API without exposing TA-Lib or persistence internals. | B1.3 |
 | B1.5 | [x] | Add environment config | Add environment-only typed config for version, benchmark, batches, storage key, and limits; package code never loads `.env`. | P0.2, B1.3 |
-| B1.6 | [ ] | Add typed base models | Add immutable source-bar, feature-row, scope, benchmark, issue, count, summary, and run-result models with bounded JSON-ready forms. | P0.3-P0.7, B1.4 |
+| B1.6 | [x] | Add typed base models | Add immutable source-bar, feature-row, scope, benchmark, issue, count, summary, and run-result models with bounded JSON-ready forms. | P0.3-P0.7, B1.4 |
 | B1.7 | [ ] | Install in Airflow image | Install in dependency-safe order and prove tech-indicators, TA-Lib, NumPy, Core, and OHLCV imports coexist in the built image. | B1.1, B1.3 |
 | B1.8 | [ ] | Add runtime settings plumbing | Add non-secret example/local settings and Compose passthrough without embedding configuration in images or DAGs. | B1.5, B1.7 |
 
@@ -206,6 +206,16 @@ both types and documented variables without adding B1.8 runtime plumbing.
 Pytest passed 37 tests; Poetry and dependency checks, `.env`/dotenv isolation,
 inclusive-bound and drift failures, compilation, wheel/sdist build, isolated
 wheel import, local links, and `git diff --check` passed.
+
+Done: 2026-08-09 — added immutable source-bar, exact 65-column package-write
+feature-row, normalized scope, resolved SPX benchmark, bounded issue/reason and
+feature-count ledgers, summary, and compact run-result models in
+`empire_stonks_tech_indicators/models.py`; exported and documented the API
+without adding generated/database-owned fields or unbounded row collections.
+Pytest passed 85 tests; an independent P0.3 audit matched all 53 Python fields,
+and Poetry/dependency checks, JSON/non-finite validation, compilation,
+wheel/sdist build, dependency-free isolated-wheel import, local links, dotenv
+scan, and `git diff --check` passed.
 
 ---
 

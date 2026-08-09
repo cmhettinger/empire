@@ -76,6 +76,21 @@ It also exports the two immutable configuration types:
 - `BenchmarkConfig`
 - `TechIndicatorsConfig`
 
+The immutable domain-model API consists of:
+
+- `SourceBar` for one exact provider-native source observation
+- `FeatureRow` for the fixed 65 package-written columns
+- `TechIndicatorsScope` for normalized provider/listing/date selection
+- `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
+- `TechIndicatorsIssue` for bounded secret-safe diagnostics
+- `ReasonCount` and `FeatureCounts` for deterministic aggregate ledgers
+- `TechIndicatorsSummary` for counts and at most 100 issue samples
+- `TechIndicatorsRunResult` for compact runner output
+
+`FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
+`created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
+reports and run results never embed source or feature-row collections.
+
 Callers may catch the package base or the narrow category they can handle. The
 public exceptions contain no TA-Lib values, SQL, database-driver exceptions,
 connection details, or persistence implementation types. Additional public
