@@ -1,6 +1,7 @@
 # Tech-Indicators Recalculation Contract V1
 
-Status: frozen implementation contract for P0.7, amended by P0.9-P0.10 on 2026-08-09.
+Status: frozen implementation contract for P0.7, amended by P0.9-P0.10 and
+B1.2 on 2026-08-09.
 
 This document defines how V1 plans work after daily appends, missing technical
 rows, subject-source corrections, SPX corrections, calculation-version
@@ -13,11 +14,9 @@ Atomic visibility and readiness are frozen in
 [`tech-indicators-publication-contract-v1.md`](tech-indicators-publication-contract-v1.md).
 Concurrency is frozen in
 [`tech-indicators-concurrency-contract-v1.md`](tech-indicators-concurrency-contract-v1.md).
-B1.2 may choose full replay, bounded replay with proven state, or a
-recurrence-state table. It
-may optimize input reads and calculation, but it may not narrow the output
-that this contract says is potentially affected without proving equivalence to
-the full-series reference.
+B1.2 selects full-prefix calculation without persisted recurrence state in
+[`tech-indicators-recursive-equivalence-v1.md`](tech-indicators-recursive-equivalence-v1.md).
+It does not narrow the output that this contract says is potentially affected.
 
 ## Full-Series Reference And Equivalence
 
@@ -49,10 +48,11 @@ write range = rows whose persisted output may need insertion, update, or delete
 input context = earlier source/benchmark observations needed to calculate them
 ```
 
-The write range never reads a future observation. Input context normally begins
-at the listing's earliest source observation because EMA, RSI, ATR, DI, ADX,
-MACD, and streaks are recursive. B1.2 may replace full-prefix reads with proven
-state or replay, but the resulting rows must match the full-series reference.
+The write range never reads a future observation. V1 input context begins at
+the listing's earliest eligible source observation because EMA, RSI, ATR, DI,
+ADX, MACD, and streaks are recursive. B1.2 rejected fixed bounded replay and a
+recurrence-state table; calculation uses the complete prefix through the safe
+run horizon and still compares or writes only the affected range.
 
 For a listing-local uncertainty at date `d`, the conservative V1 write range is
 the complete source-observation suffix from `d` through the safe run horizon.

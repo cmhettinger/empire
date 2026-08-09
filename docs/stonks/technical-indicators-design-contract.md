@@ -178,7 +178,8 @@ identifier such as `TECH_INDICATORS_V2`; code fixes that do not alter accepted
 outputs do not. The exact database constraint is finalized in S2.3.
 
 The conditional state-table name is reserved, not approval to create the
-table. B1.2 and S2.2 must still prove that recurrence state is necessary.
+table. B1.2 rejected recurrence state for V1; S2.2 must record that decision
+and must not design a state table.
 P0.9 freezes the two payload slots, publication table, membership table, and
 published view above. They do not reuse the conditional recurrence-state name.
 
@@ -449,9 +450,9 @@ macd_12_26_pct = macd_12_26 / abs(ema_26)
 macd_histogram_12_26_9_pct = macd_histogram_12_26_9 / abs(close)
 ```
 
-Phase B1.2 must verify whether independently stored EMA 12/26 values reproduce
-TA-Lib's MACD line at every accepted date before any generated-column shortcut
-is used.
+Phase B1.2 proved that independently stored EMA 12/26 values do not reproduce
+TA-Lib's MACD line at every accepted date. The MACD line remains an output of
+the pinned three-output `MACD` call; no generated-column shortcut is allowed.
 
 ### Volume And Liquidity
 
@@ -584,8 +585,9 @@ stored values.
 Daily append, source correction, SPX correction, missing technical row, and
 calculation-version change are separate work-planning cases. Recursive
 indicators make correction replay nontrivial: a historical input can affect a
-suffix beyond its nominal period. Phase B1.2 must prove an exact strategy before
-the state schema is frozen.
+suffix beyond its nominal period. B1.2 selected full-prefix calculation with
+affected-suffix writes and no V1 recurrence-state table in
+[`tech-indicators-recursive-equivalence-v1.md`](tech-indicators-recursive-equivalence-v1.md).
 
 Required properties are:
 
@@ -713,7 +715,7 @@ chats should resolve them rather than reopen the entire design:
 | Recalculation, correction, status, version, and deletion semantics | P0.7 (frozen in `tech-indicators-recalculation-contract-v1.md`) |
 | Performance, resource, query-plan, report, and release gates | P0.8 (frozen in `tech-indicators-performance-release-gates-v1.md`) |
 | TA-Lib/NumPy versions and Airflow packaging | B1.1 |
-| Recursive incremental/state-table strategy | B1.2, S2.2 |
+| Recursive incremental/state-table strategy | B1.2 (full-prefix calculation, no V1 state table); S2.2 records the schema consequence |
 | Initial evidence-backed indexes | S2.4 |
 | Performance measurements and evidence-based tuning within frozen gates | W7.9, V12.6 |
 | Atomic publication unit and readiness predicate | P0.9 (frozen in `tech-indicators-publication-contract-v1.md`) |

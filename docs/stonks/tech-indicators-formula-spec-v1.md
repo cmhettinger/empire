@@ -245,9 +245,10 @@ stored source observation for that provider listing. EMA uses the TA-Lib seed,
 the SMA of the first `N` closes, followed by `alpha = 2 / (N + 1)` recursion.
 RSI, ATR, DI, and ADX use TA-Lib's Wilder calculations. MACD is the three-output
 result from the one `MACD` call; it is not reconstructed from the separately
-stored `ema_12` and `ema_26`. B1.2 may select an incremental state/replay
-strategy only if it reproduces this full-series reference within the frozen
-tolerance.
+stored `ema_12` and `ema_26`. B1.2 proved the independent EMA reconstruction is
+not equivalent and selected full-prefix calculation without recurrence state
+in
+[`tech-indicators-recursive-equivalence-v1.md`](tech-indicators-recursive-equivalence-v1.md).
 
 The official TA-Lib API describes function lookbacks and configurable unstable
 periods, and the Python wrapper documents the pre-lookback `NaN` convention:

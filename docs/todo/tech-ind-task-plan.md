@@ -153,7 +153,7 @@ every runtime before building around it.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | B1.1 | [x] | Prove TA-Lib runtime support | Pin a reviewed TA-Lib/NumPy combination and prove local Poetry and Airflow-image installation/import. Record wheel/native-library behavior, license, Python compatibility, and rollback. | P0.4, P0.8 |
-| B1.2 | [ ] | Prototype recursive equivalence | Compare full-series output with append and historical-correction suffix strategies for EMA, RSI, ATR, ADX, and MACD. Decide whether exact updates require state, bounded replay, or full replay. | B1.1, P0.7 |
+| B1.2 | [x] | Prototype recursive equivalence | Compare full-series output with append and historical-correction suffix strategies for EMA, RSI, ATR, ADX, and MACD. Decide whether exact updates require state, bounded replay, or full replay. | B1.1, P0.7 |
 | B1.3 | [ ] | Scaffold Poetry package | Create `packages/empire-stonks-tech-indicators` version `0.1.0` with `src/` layout, README, tests, minimum dependencies, isolated import, lock, and build. | B1.1 |
 | B1.4 | [ ] | Add exceptions and exports | Add a small public exception hierarchy and explicit API without exposing TA-Lib or persistence internals. | B1.3 |
 | B1.5 | [ ] | Add environment config | Add environment-only typed config for version, benchmark, batches, storage key, and limits; package code never loads `.env`. | P0.2, B1.3 |
@@ -170,6 +170,18 @@ and `pip check`; `make airflow-build` completed 19 steps, and final CPython
 3.13.13 Airflow one-offs passed the same smoke, Airflow/Core/OHLCV coexistence
 imports, and `pip check`. Compilation, local-link, and `git diff --check`
 passed.
+
+Done: 2026-08-09 — added
+`tools/tech-indicators/recursive-equivalence.py` and froze full-prefix
+calculation with affected-suffix writes and no V1 recurrence-state table in
+`docs/stonks/tech-indicators-recursive-equivalence-v1.md`; aligned the formula,
+recalculation, and design contracts. Exact NumPy 2.4.6/TA-Lib 0.7.1 runs on
+local CPython 3.14.6 and Airflow CPython 3.13.13 proved full-prefix append and
+two correction cases equivalent, exposed bounded-restart mismatches across
+EMA/RSI/ATR/ADX/MACD, and rejected EMA-derived MACD. Both 20,000-row fixture
+runs passed the 120-second/512-MiB gates (0.031s/51.2 MiB local;
+0.033s/119.9 MiB Airflow); compile, help, invalid-input, local-link, and diff
+checks passed.
 
 ---
 
