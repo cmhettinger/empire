@@ -23,6 +23,10 @@ from empire_stonks_tech_indicators.models import (
     TechIndicatorsScope,
     TechIndicatorsSummary,
 )
+from empire_stonks_tech_indicators.queries import (
+    EligibleListing,
+    select_eligible_listings,
+)
 
 __all__ = [
     "EmpireStonksTechIndicatorsError",
@@ -33,6 +37,8 @@ __all__ = [
     "TechIndicatorsWorkflowError",
     "BenchmarkConfig",
     "TechIndicatorsConfig",
+    "EligibleListing",
+    "select_eligible_listings",
     "FeatureCounts",
     "FeatureRow",
     "ReasonCount",

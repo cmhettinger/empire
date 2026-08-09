@@ -33,6 +33,8 @@ def test_public_api_is_explicit() -> None:
         *expected,
         "BenchmarkConfig",
         "TechIndicatorsConfig",
+        "EligibleListing",
+        "select_eligible_listings",
         "FeatureCounts",
         "FeatureRow",
         "ReasonCount",

@@ -88,6 +88,8 @@ The immutable domain-model API consists of:
 - `ReasonCount` and `FeatureCounts` for deterministic aggregate ledgers
 - `TechIndicatorsSummary` for counts and at most 100 issue samples
 - `TechIndicatorsRunResult` for compact runner output
+- `EligibleListing` and `select_eligible_listings()` for caller-transaction-
+  owned P0.6 source selection and scoped source-history coverage
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -97,6 +99,14 @@ Callers may catch the package base or the narrow category they can handle. The
 public exceptions contain no TA-Lib values, SQL, database-driver exceptions,
 connection details, or persistence implementation types. Additional public
 models and capabilities are added only by their assigned tasks.
+
+Eligible-listing selection applies the frozen EODData Equity, Stooq U.S. stock,
+and exact Yahoo SPX predicates in one set-based read. Default scopes select only
+active listings. Inactive listings require exact listing IDs plus
+`include_inactive=True`. Inclusive date bounds limit the returned coverage
+facts; zero- and short-history listings remain visible so callers can apply an
+explicit minimum without confusing source-value support with history
+sufficiency.
 
 ## Development
 
