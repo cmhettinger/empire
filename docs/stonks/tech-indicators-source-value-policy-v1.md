@@ -120,8 +120,9 @@ an economically normalized return.
 stored OHLCV without an append-only bar revision. The tech-indicators package
 must not mutate source bars. The
 [`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md)
-defines how source drift selects technical rows, and P0.9 defines atomic
-publication.
+defines how source drift selects technical rows, and
+[`tech-indicators-publication-contract-v1.md`](tech-indicators-publication-contract-v1.md)
+defines atomic publication.
 
 ## Evidence Boundary And Implementation Tests
 

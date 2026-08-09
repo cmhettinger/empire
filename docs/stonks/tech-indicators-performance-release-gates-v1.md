@@ -1,6 +1,6 @@
 # Tech-Indicators Performance And Release Gates V1
 
-Status: frozen implementation contract for P0.8 as of 2026-08-09.
+Status: frozen implementation contract for P0.8, amended by P0.9 on 2026-08-09.
 
 This document sets the representative sizes, performance targets, resource
 bounds, query-plan expectations, report limits, and staged release criteria for
@@ -11,8 +11,10 @@ and the frozen feature, formula, SPX, source-value, and recalculation contracts.
 Correctness, isolation, bounded resources, and atomic visibility are hard
 gates. Timing targets are release gates on the local Empire runtime described
 below. A missed target requires measurement and tuning or an explicit contract
-revision with evidence; it must not be relabeled healthy. P0.9 still selects
-the atomic publication mechanism, and P0.10 selects the lock contract.
+revision with evidence; it must not be relabeled healthy. The atomic
+publication mechanism is frozen in
+[`tech-indicators-publication-contract-v1.md`](tech-indicators-publication-contract-v1.md),
+and P0.10 selects the lock contract.
 
 ## Measured Planning Baseline
 
@@ -124,11 +126,12 @@ configured paging and batching rather than scaling with the full universe.
 - A normal write transaction contains at most 25,000 feature rows and targets
   at most 30 seconds from first write through commit. Sixty seconds is the hard
   representative maximum; exceeding it fails the gate and requires a smaller
-  batch or a different P0.9 publication design.
-- Daily publication may use one transaction only if the 25,000-row, 60-second,
-  memory, lock, and reader-visibility gates all pass. Broad backfills must use
-  independently committed unpublished staging batches; they cannot hold one
-  transaction for millions of rows.
+  inactive-slot batch or the staged publication path frozen by P0.9.
+- Daily publication may update active slots in one transaction only if the
+  25,000-row, 60-second, memory, lock, and reader-visibility gates all pass.
+  Broad backfills use independently committed inactive-slot batches and one
+  bounded membership flip; they cannot hold one transaction for millions of
+  rows.
 - Every committed or staged batch records a deterministic cursor. Failure
   rolls back the active batch only, and resume does not recalculate or publish
   a previously completed batch as a second logical result.
@@ -136,11 +139,12 @@ configured paging and batching rather than scaling with the full universe.
   at least once every 30 seconds during calculation without retaining per-row
   history.
 
-P0.9 may select a generation or staging table, but staging must be purpose-
+P0.9's two payload slots, publication state, and membership are purpose-
 specific, constrained, cleanup-safe, and invisible to model-input queries until
 atomic publication. Before broad backfill, W7.9 must measure a one-million-row
-pilot and project heap, index, WAL, and temporary space. The projected final
-technical heap plus indexes must be at most 40 GiB for the initial universe.
+pilot and project both slots' heap, indexes, WAL, and temporary space. The
+projected combined populated payload slots plus indexes must be at most 40 GiB
+for the initial universe.
 Available disk before a full generation must be at least twice that projected
 additional footprint plus 10 GiB of headroom so old and new complete state can
 coexist safely when publication requires it.

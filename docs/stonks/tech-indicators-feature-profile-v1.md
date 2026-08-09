@@ -1,6 +1,6 @@
 # Tech-Indicators Feature Profile V1
 
-Status: frozen implementation contract for P0.3 as of 2026-08-09.
+Status: frozen implementation contract for P0.3, amended by P0.9 on 2026-08-09.
 
 This document converts the ratified tech-indicators inventory into the
 exact V1 row profile. It is authoritative for field presence, ownership,
@@ -15,9 +15,14 @@ and cross-listing claims are frozen in
 
 ## Profile Rules
 
-- The main table is `stonks.ohlcv_daily_tech_indicators`.
+- The published consumer relation is the read-only view
+  `stonks.ohlcv_daily_tech_indicators`. Physical package writes target
+  `stonks.ohlcv_daily_tech_indicators_a` or
+  `stonks.ohlcv_daily_tech_indicators_b` under the
+  [`tech-indicators-publication-contract-v1.md`](tech-indicators-publication-contract-v1.md).
 - One row is persisted for every source bar selected by the calculator, even
-  when the history is too short to populate analytical fields.
+  when the history is too short to populate analytical fields. The published
+  view exposes only the active complete slot image for each listing.
 - The row contains 90 columns: 9 identity/lineage columns, 5 copied OHLCV
   columns, 53 Python-computed columns, and 23 PostgreSQL `STORED` generated
   columns.
@@ -60,9 +65,11 @@ and cross-listing claims are frozen in
 | `close` | source copy | provider-native price | `NOT NULL` |
 | `volume` | source copy | provider-native volume | nullable exactly when the source bar volume is null |
 
-The primary row identity is `(provider_listing_id, trading_date)`. Source-copy
-values represent the source bar used by the current calculation version. The
-exact correction and refresh workflow is frozen in
+Each physical payload slot has primary row identity
+`(provider_listing_id, trading_date)`. Active publication membership makes the
+same identity unique in the published view. Source-copy values represent the
+source bar used by the current calculation version. The exact correction and
+refresh workflow is frozen in
 [`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md).
 
 ## Persisted Python-Computed Fields

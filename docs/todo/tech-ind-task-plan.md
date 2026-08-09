@@ -161,7 +161,7 @@ or calculation code is committed.
 | P0.6 | [x] | Define source-value policy | Audit EODData, Stooq, and Yahoo adjustment/corporate-action semantics and select initially eligible provider listings without claiming normalization. | P0.1, OHLCV V10.11 |
 | P0.7 | [x] | Define recalculation semantics | Specify daily append, missing row, source correction, SPX correction, version change, inactive listing, and deletion behavior with full/incremental equivalence. | P0.4-P0.6 |
 | P0.8 | [x] | Set performance and release gates | Record representative sizes, daily/backfill timing and memory targets, transaction/staging bounds, query-plan expectations, report bounds, and live rollout criteria. | P0.3-P0.7 |
-| P0.9 | [ ] | Define atomic publication semantics | Freeze the publication unit and readiness predicate for daily, correction, version rebuild, and backfill work; choose transaction or staged-generation behavior so consumers fail closed on partial, mixed-version, or incomplete-benchmark state. | P0.5, P0.7-P0.8 |
+| P0.9 | [x] | Define atomic publication semantics | Freeze the publication unit and readiness predicate for daily, correction, version rebuild, and backfill work; choose transaction or staged-generation behavior so consumers fail closed on partial, mixed-version, or incomplete-benchmark state. | P0.5, P0.7-P0.8 |
 | P0.10 | [ ] | Define concurrency contract | Freeze the database-backed lock identity, scope normalization/overlap rules across job kinds and versions, acquisition lifetime, contention result, timeout, release, and recovery behavior shared by package, CLI, and Airflow runners. Any jobs able to write the same current rows must conflict. | P0.7-P0.9 |
 
 Done: 2026-08-09 — ratified
@@ -230,6 +230,15 @@ recalculation and design contracts. Read-only PostgreSQL sizing/report evidence,
 contract threshold fixtures, local-link/status/stale-boundary scans, and
 `git diff --check` passed.
 
+Done: 2026-08-09 — froze bounded in-place daily publication, two physical
+payload slots, inactive-slot backfill/version builds, per-listing atomic
+membership, terminal Core/report-aware finalization, crash recovery, and
+one-snapshot fail-closed readiness in
+`docs/stonks/tech-indicators-publication-contract-v1.md`; amended the frozen
+naming/90-column relation handoff and linked dependent contracts. Publication
+state/slot/readiness fixtures, live Core commit and PostgreSQL MVCC marker
+checks, local-link/status/stale-boundary scans, and `git diff --check` passed.
+
 ---
 
 ## Phase 1: Prove Dependencies And Scaffold The Package
@@ -257,11 +266,11 @@ and the proven incremental strategy.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| S2.1 | [ ] | Finalize main-table columns | Translate the design-contract baseline into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, metadata, and comments; every column has one formula owner. | P0.3-P0.7, B1.2 |
-| S2.2 | [ ] | Decide auxiliary state schemas | Based on B1.2 and P0.9, explicitly reject or design minimal recurrence and publication/staging state. Do not add generic state or rely on a marker that permits current rows to expose mixed semantics. | B1.2, P0.9, S2.1 |
+| S2.1 | [ ] | Finalize payload/view columns | Translate the design-contract baseline into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, view projection, metadata, and comments; both payload slots share the exact 90-column profile and every column has one formula owner. | P0.3-P0.9, B1.2 |
+| S2.2 | [ ] | Finalize auxiliary state schemas | Based on B1.2, explicitly reject or design minimal recurrence state, and translate P0.9's two slots, publication lifecycle, membership, and published view without generic markers or mixed visibility. | B1.2, P0.9, S2.1 |
 | S2.3 | [ ] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
 | S2.4 | [ ] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
-| S2.5 | [ ] | Add Flyway migration | Create `ohlcv_daily_tech_indicators`, any proven recurrence/publication state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
+| S2.5 | [ ] | Add Flyway migration | Create both payload slots, publication/membership state, the `ohlcv_daily_tech_indicators` published view, any proven recurrence state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
 | S2.6 | [ ] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
 | S2.7 | [ ] | Add OHLCV regression | Prove no provider-identity, provider-isolation, source-cleanup, or existing-writer regression. | S2.5-S2.6 |
 | S2.8 | [ ] | Add database documentation group | Add technical tables to Stonks docs, regenerate schema/ERD/diagrams, and verify no stale artifacts. | S2.5-S2.7 |
@@ -347,14 +356,14 @@ preserving caller transaction ownership.
 |----|--------|------|---------------|------------|
 | W7.1 | [ ] | Add strict row validation | Validate finite values, copied source, bounds, warm-up nulls, dependencies, benchmark, observation counts, and generated inputs before SQL. | C4.8, T5.8, X6.8 |
 | W7.2 | [ ] | Assemble complete rows | Merge core, TA-Lib, and SPX outputs without positional drift; every V1 field is intentionally populated or null. | W7.1 |
-| W7.3 | [ ] | Implement bulk upsert | Write bounded batches, omit generated columns, count inserted/updated/unchanged, and avoid no-change updates. | S2.5, W7.2 |
+| W7.3 | [ ] | Implement slot bulk upsert | Write bounded active/inactive-slot batches, omit generated columns, preserve copied-equivalent rows, count inserted/updated/unchanged, and avoid no-change updates. | S2.5, W7.2 |
 | W7.4 | [ ] | Persist optional recurrence state | If S2.2 approved state, write it atomically and prevent advancement without its feature row; otherwise record no writer is needed. | S2.2, W7.3 |
 | W7.5 | [ ] | Implement affected-range planner | Convert missing rows, source/SPX corrections, and version drift into deterministic work ranges with required prefix and suffix propagation. | I3.5, X6.7, W7.3-W7.4 |
 | W7.6 | [ ] | Prove rebuild equivalence | Compare full rebuild, append, resume, source correction, SPX correction, and version rebuild within approved tolerance. | B1.2, W7.3-W7.5 |
-| W7.7 | [ ] | Add feature queries | Add date/listing coverage, freshness, version, benchmark, ranking, and model-input reads without strategy thresholds. | S2.4, W7.3 |
-| W7.8 | [ ] | Add PostgreSQL integration | Cover rollback, generated values, idempotency, correction propagation, provider/benchmark isolation, and repeated runs. | W7.3-W7.7 |
+| W7.7 | [ ] | Add published feature queries | Add view-backed date/listing coverage, freshness, version, benchmark, ranking, readiness-token, and one-snapshot model-input reads without strategy thresholds. | S2.4, W7.3 |
+| W7.8 | [ ] | Add PostgreSQL integration | Cover slot/view visibility, rollback, generated values, idempotency, correction propagation, provider/benchmark isolation, and repeated runs. | W7.3-W7.7 |
 | W7.9 | [ ] | Benchmark persistence | Measure batches, upserts, index cost, memory, and latest-date latency; adjust only with evidence against P0.8. | P0.8, W7.8 |
-| W7.10 | [ ] | Implement atomic publication | Implement P0.9's transaction or staged-generation mechanism and fail-closed readiness/model-input queries; prove readers never observe partial dates, mixed versions, incomplete benchmark output, or failed/cancelled work. | P0.9, S2.5, W7.3-W7.6 |
+| W7.10 | [ ] | Implement atomic publication | Implement P0.9's bounded in-place finalizer, inactive-slot build/membership flip, recovery, and fail-closed readiness/model-input queries; prove readers never observe partial dates, mixed versions, incomplete benchmark output, or failed/cancelled work. | P0.9, S2.5, W7.3-W7.6 |
 
 ---
 
@@ -388,7 +397,7 @@ runtime services and explicit scope.
 | J9.3 | [ ] | Implement daily runner | Sequence lock acquisition, readiness, planning, calculation, validation, atomic publication, summaries, JSON/PDF storage, and Core completion. | W7.8, W7.10, R8.8, J9.1-J9.2, J9.9 |
 | J9.4 | [ ] | Implement healthy no-op | No eligible new/corrected/version work succeeds with explicit readiness and durable reports but no writes. | J9.3 |
 | J9.5 | [ ] | Define backfill scope | Add provider/market/listing/date ranges, batches, resume cursor, version, rebuild, and confirmation for broad scopes. | P0.7-P0.8, W7.5 |
-| J9.6 | [ ] | Implement resumable backfill | Process deterministic batches with independent commits, unpublished partial progress, heartbeats, progress, partial/final reports, exact resume, and no duplicate work; publish only a complete P0.9 unit. | W7.9-W7.10, R8.8, J9.1, J9.5, J9.9 |
+| J9.6 | [ ] | Implement resumable backfill | Process deterministic inactive-slot batches with independent commits, unpublished partial progress, heartbeats, reports, exact resume, and no duplicate work; flip membership only for a complete P0.9 unit. | W7.9-W7.10, R8.8, J9.1, J9.5, J9.9 |
 | J9.7 | [ ] | Add failure safety | Validation, DB, cancellation, report, and benchmark failures mark Core correctly, preserve only safely resumable unpublished chunks, roll back active work, never advance publication readiness, release locks, and expose safe errors. | J9.3-J9.6, J9.9 |
 | J9.8 | [ ] | Add vertical runner integration | Run append, no-op, correction, version rebuild, and resumed backfill through PostgreSQL, Core, JSON, and PDF with zero fixture residue. | J9.3-J9.7 |
 

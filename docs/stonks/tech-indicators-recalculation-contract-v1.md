@@ -1,6 +1,6 @@
 # Tech-Indicators Recalculation Contract V1
 
-Status: frozen implementation contract for P0.7 as of 2026-08-09.
+Status: frozen implementation contract for P0.7, amended by P0.9 on 2026-08-09.
 
 This document defines how V1 plans work after daily appends, missing technical
 rows, subject-source corrections, SPX corrections, calculation-version
@@ -9,8 +9,10 @@ changes, listing-status changes, and deletions. It extends the
 [`tech-indicators-spx-contract-v1.md`](tech-indicators-spx-contract-v1.md), and
 [`tech-indicators-source-value-policy-v1.md`](tech-indicators-source-value-policy-v1.md).
 
-P0.9 still owns atomic publication and P0.10 owns concurrency. B1.2 may choose
-full replay, bounded replay with proven state, or a recurrence-state table. It
+Atomic visibility and readiness are frozen in
+[`tech-indicators-publication-contract-v1.md`](tech-indicators-publication-contract-v1.md).
+P0.10 owns concurrency. B1.2 may choose full replay, bounded replay with proven
+state, or a recurrence-state table. It
 may optimize input reads and calculation, but it may not narrow the output
 that this contract says is potentially affected without proving equivalence to
 the full-series reference.
@@ -166,10 +168,10 @@ first source observation through the safe horizon. A version change is never a
 suffix beginning at the first mismatched row because the new implementation
 may change warm-up, recursive initialization, null masks, or every output.
 
-One current-state row cannot represent two versions. P0.9 must keep the old
-complete publication visible until the new rebuild unit is complete. A code
-fix proven not to change accepted output retains the existing version and
-should converge as an idempotent no-op.
+One current-state row cannot represent two versions. The publication contract
+keeps the old complete publication visible until the new rebuild unit is
+complete. A code fix proven not to change accepted output retains the existing
+version and should converge as an idempotent no-op.
 
 ### Active And Inactive Listings
 
@@ -191,8 +193,9 @@ Source-value eligibility and operational status remain separate:
   rebuilt.
 
 If a listing ceases to satisfy P0.6's semantic predicate, status does not make
-it eligible. Its derived technical rows are removed as one atomic cleanup unit;
-source listings and bars remain untouched. If it later becomes eligible again,
+it eligible. Its derived technical rows are removed from the published view as
+one atomic `REMOVE` unit; inactive-slot payload cleanup may follow later.
+Source listings and bars remain untouched. If it later becomes eligible again,
 an active or explicitly opted-in inactive scope performs a full rebuild.
 
 ## Deletion Behavior
@@ -221,9 +224,10 @@ SPX-driven work.
 Calculation and validation complete before the caller-owned persistence unit
 is committed. Inserted, updated, deleted, equivalent/unchanged, and reason
 counts are reported without retaining unbounded row payloads. Resumable
-backfills may use deterministic batches, but P0.9 decides when those batches
-become visible as one complete publication. P0.10 decides lock overlap; neither
-Airflow timing nor separate provider jobs can weaken this recalculation logic.
+backfills may use deterministic batches, but the publication contract decides
+when those batches become visible as one complete publication. P0.10 decides
+lock overlap; neither Airflow timing nor separate provider jobs can weaken this
+recalculation logic.
 
 ## Required Contract Tests
 
@@ -241,7 +245,8 @@ Implementation tests must cover at least:
 7. version drift forcing a full selected-listing rebuild with exact null masks;
 8. active-to-inactive retention, bounded inactive maintenance, explicit
    inactive rebuild, and reactivation catch-up;
-9. P0.6 eligibility loss deleting only derived rows;
+9. P0.6 eligibility loss atomically publishing `REMOVE`, with later inactive-
+   payload cleanup touching only derived rows;
 10. Core-run cleanup nulling lineage without changing features;
 11. unsafe narrowed horizons expanding or failing rather than leaving a stale
     tail; and

@@ -16,7 +16,8 @@ It selects both supported subject cohorts plus the exact Yahoo SPX row for base
 calculation without changing this contract's formulas or support predicate.
 Correction and affected-range planning is frozen in
 [`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md).
-P0.9 owns atomic publication.
+Atomic publication and readiness are frozen in
+[`tech-indicators-publication-contract-v1.md`](tech-indicators-publication-contract-v1.md).
 
 ## Benchmark Identity And Resolution
 
@@ -278,7 +279,8 @@ It must fail closed before publication rather than publish a current daily
 slice whose supported subjects are all `CURRENT_DATE_NOT_ALIGNED`. Historical
 backfills may contain legitimate disjoint dates; those rows retain deterministic
 nulls and coverage diagnostics instead of receiving filled benchmark values.
-P0.9 still decides the atomic publication unit and complete-coverage predicate.
+The publication contract decides the atomic unit and complete-coverage
+predicate.
 
 Unexpected non-finite results, out-of-tolerance correlation, identity drift,
 or inconsistent row shape are hard calculation failures. They are not reported

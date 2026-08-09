@@ -69,10 +69,11 @@ baseline:
   [`tech-indicators-source-value-policy-v1.md`](tech-indicators-source-value-policy-v1.md).
 
 These findings do not change the selected provider-native grain, wide
-current-state table, initial feature inventory, formula direction, SPX
-benchmark, validation split, publication/concurrency requirements, or deferred
-families. A later contradiction with live implementation requires an explicit
-contract amendment with evidence rather than an implicit task-level departure.
+published current-state relation, initial feature inventory, formula direction,
+SPX benchmark, validation split, publication/concurrency requirements, or
+deferred families. A later contradiction with live implementation requires an
+explicit contract amendment with evidence rather than an implicit task-level
+departure.
 
 ## Selected Architecture
 
@@ -130,7 +131,11 @@ does not:
 | Python import | `empire_stonks_tech_indicators` |
 | Package directory | `packages/empire-stonks-tech-indicators` |
 | Environment prefix | `EMPIRE_STONKS_TECH_INDICATORS_` |
-| Main table | `stonks.ohlcv_daily_tech_indicators` |
+| Published consumer view | `stonks.ohlcv_daily_tech_indicators` |
+| Physical payload slot A | `stonks.ohlcv_daily_tech_indicators_a` |
+| Physical payload slot B | `stonks.ohlcv_daily_tech_indicators_b` |
+| Publication table | `stonks.tech_indicators_publication` |
+| Publication membership table | `stonks.tech_indicators_publication_listing` |
 | Conditional recurrence-state table | `stonks.ohlcv_daily_tech_indicators_state` |
 | Initial calculation version | `TECH_INDICATORS_V1` |
 | Core domain | `stonks` |
@@ -172,8 +177,8 @@ outputs do not. The exact database constraint is finalized in S2.3.
 
 The conditional state-table name is reserved, not approval to create the
 table. B1.2 and S2.2 must still prove that recurrence state is necessary.
-Publication or staging tables required by P0.9 must receive purpose-specific
-`tech_indicators` names rather than reusing the recurrence-state name.
+P0.9 freezes the two payload slots, publication table, membership table, and
+published view above. They do not reuse the conditional recurrence-state name.
 
 Core jobs use `subject_key="all_series"` for the unfiltered universe. P0.10
 and J9.9 own normalized scoped subject/lock identities; those later values
@@ -203,27 +208,32 @@ revisions. Source corrections and calculation-version changes update affected
 rows through the deterministic
 [`tech-indicators-recalculation-contract-v1.md`](tech-indicators-recalculation-contract-v1.md).
 
-## Primary Table Shape
+## Published Relation And Payload Shape
 
-The selected primary table is:
+The selected published consumer relation is:
 
 ```text
 stonks.ohlcv_daily_tech_indicators
 ```
 
-Its primary key is `(provider_listing_id, trading_date)`. The same composite
-columns reference `stonks.ohlcv_daily` with deletion cascading from the owning
-bar. The row also carries a nullable FK to the provider listing used as the
-relative-strength benchmark and a nullable FK to `core.core_run`.
+It is a read-only 90-column view over physical payload tables
+`ohlcv_daily_tech_indicators_a` and `ohlcv_daily_tech_indicators_b`, selected by
+active publication membership. Each payload table has primary key
+`(provider_listing_id, trading_date)`. The same composite columns reference
+`stonks.ohlcv_daily` with deletion cascading from the owning bar. A payload row
+also carries a nullable FK to the provider listing used as the relative-
+strength benchmark and a nullable FK to `core.core_run`.
 
-The table is a wide, read-optimized feature store. Storage minimization is not
-the goal, but width still affects I/O and must be measured. Features requiring
-historical windows, recursive state, or cross-series alignment are calculated
-once and stored. Strategy thresholds remain query-time comparisons.
+The published view is a wide, read-optimized feature store. Storage
+minimization is not the goal, but both bounded slots affect I/O and disk and
+must meet P0.8. Features requiring historical windows, recursive state, or
+cross-series alignment are calculated once and stored. Strategy thresholds
+remain query-time comparisons.
 
-The row copies source open, high, low, close, and volume so an ordinary daily
-target scan does not join `ohlcv_daily`. The Python writer must prove copied
-values agree with the owning source bar.
+A payload row copies source open, high, low, close, and volume so an ordinary
+published target scan does not join `ohlcv_daily`. The Python writer must prove
+copied values agree with the owning source bar. Readiness queries still compare
+published and source state before model use.
 
 An additional recurrence-state table is not selected by default. It may be
 added only if the recursive-equivalence prototype proves it is required for
@@ -597,13 +607,13 @@ successful calculation run must not make a partially refreshed effective date,
 mixed calculation versions, incomplete SPX-relative results, or a partially
 rebuilt scope available to model consumers as ready data.
 
-Phase P0.9 must define the V1 publication unit and readiness predicate for
-daily refreshes, corrections, and backfills. The implementation may use one
-database transaction when that meets the performance gate, or an explicit
-staging/generation and atomic publication mechanism when bounded commits are
-required. A completion marker by itself is insufficient if current-state rows
-can be overwritten and expose mixed semantics before the marker changes. The
-selected mechanism must preserve these invariants:
+P0.9 freezes the hybrid in-place/two-slot mechanism, publication units,
+terminal finalization, crash recovery, and one-snapshot readiness predicate in
+[`tech-indicators-publication-contract-v1.md`](tech-indicators-publication-contract-v1.md).
+A bounded daily/correction unit may update its active slots in one terminal
+transaction. Backfills, version rebuilds, and larger corrections build complete
+inactive listing images and publish through one membership flip. A completion
+marker by itself remains insufficient.
 
 - A consumer observes either the previously complete publication or the newly
   complete publication, never an in-progress mixture.
@@ -701,7 +711,7 @@ chats should resolve them rather than reopen the entire design:
 | Recursive incremental/state-table strategy | B1.2, S2.2 |
 | Initial evidence-backed indexes | S2.4 |
 | Performance measurements and evidence-based tuning within frozen gates | W7.9, V12.6 |
-| Atomic publication unit and readiness predicate | P0.9, S2.2, W7.10 |
+| Atomic publication unit and readiness predicate | P0.9 (frozen in `tech-indicators-publication-contract-v1.md`) |
 | Package-owned lock identity and contention policy | P0.10, J9.9 |
 | Airflow source-completion coordination | A11.1-A11.8 |
 
