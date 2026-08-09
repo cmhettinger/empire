@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Iterator
 from uuid import UUID, uuid4
@@ -13,6 +13,7 @@ from empire_stonks_tech_indicators import (
     TechIndicatorsScope,
     TechIndicatorsValidationError,
     iter_source_bar_pages,
+    load_spx_benchmark_history,
     resolve_spx_benchmark,
     select_eligible_listings,
 )
@@ -462,3 +463,65 @@ def test_spx_resolver_validates_live_identity_and_fails_closed_on_drift(
             (resolved.provider_listing_id,),
         )
         assert resolve_spx_benchmark(cursor=cursor, config=config) == resolved
+
+
+def test_benchmark_history_reads_only_exact_live_spx_dates(
+    database_connection: object,
+) -> None:
+    config = BenchmarkConfig()
+
+    with database_connection.cursor() as cursor:  # type: ignore[union-attr]
+        resolved = resolve_spx_benchmark(cursor=cursor, config=config)
+        cursor.execute(
+            """
+            SELECT trading_date, next_trading_date
+            FROM (
+                SELECT
+                    trading_date,
+                    lead(trading_date) OVER (ORDER BY trading_date)
+                        AS next_trading_date
+                FROM stonks.ohlcv_daily
+                WHERE provider_listing_id = %s
+            ) AS dated
+            WHERE next_trading_date > trading_date + 1
+            ORDER BY trading_date
+            LIMIT 1
+            """,
+            (resolved.provider_listing_id,),
+        )
+        gap_bounds = cursor.fetchone()
+        assert gap_bounds is not None
+        first_date, last_date = gap_bounds
+        missing_date = first_date + timedelta(days=1)
+
+        cursor.execute(
+            """
+            SELECT trading_date, close
+            FROM stonks.ohlcv_daily
+            WHERE provider_listing_id = %s
+              AND trading_date BETWEEN %s AND %s
+            ORDER BY trading_date
+            """,
+            (resolved.provider_listing_id, first_date, last_date),
+        )
+        expected = cursor.fetchall()
+
+        history = load_spx_benchmark_history(
+            cursor=cursor,
+            config=config,
+            start_date=first_date,
+            end_date=last_date,
+            page_size=1000,
+        )
+
+        assert history.benchmark == resolved
+        assert [
+            (bar.trading_date, bar.close) for bar in history.bars
+        ] == expected
+        assert missing_date not in {trading_date for trading_date, _ in expected}
+        assert history.bar_on(missing_date) is None
+        assert missing_date not in history.close_by_date()
+        assert all(
+            bar.provider_listing_id == resolved.provider_listing_id
+            for bar in history.bars
+        )

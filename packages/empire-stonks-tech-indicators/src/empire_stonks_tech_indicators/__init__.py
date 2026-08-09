@@ -24,8 +24,10 @@ from empire_stonks_tech_indicators.models import (
     TechIndicatorsSummary,
 )
 from empire_stonks_tech_indicators.queries import (
+    BenchmarkHistory,
     EligibleListing,
     iter_source_bar_pages,
+    load_spx_benchmark_history,
     resolve_spx_benchmark,
     select_eligible_listings,
 )
@@ -39,8 +41,10 @@ __all__ = [
     "TechIndicatorsWorkflowError",
     "BenchmarkConfig",
     "TechIndicatorsConfig",
+    "BenchmarkHistory",
     "EligibleListing",
     "iter_source_bar_pages",
+    "load_spx_benchmark_history",
     "resolve_spx_benchmark",
     "select_eligible_listings",
     "FeatureCounts",

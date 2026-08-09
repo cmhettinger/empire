@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -96,6 +98,76 @@ class EligibleListing:
             "first_trading_date": _date_to_string(self.first_trading_date),
             "last_trading_date": _date_to_string(self.last_trading_date),
             "source_observation_count": self.source_observation_count,
+        }
+
+
+@dataclass(frozen=True)
+class BenchmarkHistory:
+    """One resolved benchmark and its exact-date chronological source bars."""
+
+    benchmark: ResolvedBenchmark
+    bars: tuple[SourceBar, ...]
+    _trading_dates: tuple[date, ...] = field(
+        init=False,
+        repr=False,
+        compare=False,
+    )
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.benchmark, ResolvedBenchmark):
+            raise TypeError("benchmark must be a ResolvedBenchmark.")
+        if not isinstance(self.bars, tuple) or any(
+            not isinstance(bar, SourceBar) for bar in self.bars
+        ):
+            raise TypeError("bars must contain only SourceBar records.")
+        previous_date: date | None = None
+        for bar in self.bars:
+            if bar.provider_listing_id != self.benchmark.provider_listing_id:
+                raise ValueError("benchmark bars must use the resolved listing ID.")
+            if previous_date is not None and bar.trading_date <= previous_date:
+                raise ValueError("benchmark bars must be strictly chronological.")
+            previous_date = bar.trading_date
+        object.__setattr__(
+            self,
+            "_trading_dates",
+            tuple(bar.trading_date for bar in self.bars),
+        )
+
+    @property
+    def observation_count(self) -> int:
+        return len(self.bars)
+
+    @property
+    def first_trading_date(self) -> date | None:
+        return None if not self.bars else self.bars[0].trading_date
+
+    @property
+    def last_trading_date(self) -> date | None:
+        return None if not self.bars else self.bars[-1].trading_date
+
+    def bar_on(self, trading_date: date) -> SourceBar | None:
+        """Return only an exact-date bar; never fill or select a nearby date."""
+
+        if type(trading_date) is not date:
+            raise TypeError("trading_date must be a date.")
+        index = bisect_left(self._trading_dates, trading_date)
+        if index == len(self.bars) or self.bars[index].trading_date != trading_date:
+            return None
+        return self.bars[index]
+
+    def close_by_date(self) -> dict[date, Decimal]:
+        """Return a new exact-date close lookup without forward-filled keys."""
+
+        return {bar.trading_date: bar.close for bar in self.bars}
+
+    def to_dict(self) -> dict[str, object]:
+        """Return bounded history facts without serializing source payloads."""
+
+        return {
+            "benchmark": self.benchmark.to_dict(),
+            "observation_count": self.observation_count,
+            "first_trading_date": _date_to_string(self.first_trading_date),
+            "last_trading_date": _date_to_string(self.last_trading_date),
         }
 
 
@@ -311,6 +383,35 @@ def resolve_spx_benchmark(
     return _resolved_spx_benchmark(rows[0], config=config)
 
 
+def load_spx_benchmark_history(
+    *,
+    cursor: Any,
+    config: BenchmarkConfig,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    page_size: int = DEFAULT_SOURCE_READ_PAGE_SIZE,
+) -> BenchmarkHistory:
+    """Resolve SPX and load its exact stored OHLCV history through pages."""
+
+    _validate_optional_date_range(start_date=start_date, end_date=end_date)
+    benchmark = resolve_spx_benchmark(cursor=cursor, config=config)
+    scope = TechIndicatorsScope(
+        provider_listing_ids=(benchmark.provider_listing_id,),
+        start_date=start_date,
+        end_date=end_date,
+    )
+    bars = tuple(
+        bar
+        for page in iter_source_bar_pages(
+            cursor=cursor,
+            scope=scope,
+            page_size=page_size,
+        )
+        for bar in page
+    )
+    return BenchmarkHistory(benchmark=benchmark, bars=bars)
+
+
 _SOURCE_VALUE_ELIGIBILITY_SQL = """(
     (
         listing.provider_code = 'EODDATA'
@@ -471,13 +572,30 @@ def _validate_page_size(page_size: object) -> None:
         )
 
 
+def _validate_optional_date_range(
+    *,
+    start_date: object,
+    end_date: object,
+) -> None:
+    if (start_date is None) != (end_date is None):
+        raise ValueError("start_date and end_date must be provided together.")
+    if start_date is None and end_date is None:
+        return
+    if type(start_date) is not date or type(end_date) is not date:
+        raise TypeError("start_date and end_date must be dates or None.")
+    if start_date > end_date:
+        raise ValueError("start_date must not be after end_date.")
+
+
 def _date_to_string(value: date | None) -> str | None:
     return None if value is None else value.isoformat()
 
 
 __all__ = [
+    "BenchmarkHistory",
     "EligibleListing",
     "iter_source_bar_pages",
+    "load_spx_benchmark_history",
     "resolve_spx_benchmark",
     "select_eligible_listings",
 ]

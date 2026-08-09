@@ -10,10 +10,14 @@ import pytest
 import empire_stonks_tech_indicators as public_api
 from empire_stonks_tech_indicators import (
     BenchmarkConfig,
+    BenchmarkHistory,
     EligibleListing,
+    ResolvedBenchmark,
+    SourceBar,
     TechIndicatorsScope,
     TechIndicatorsValidationError,
     iter_source_bar_pages,
+    load_spx_benchmark_history,
     resolve_spx_benchmark,
     select_eligible_listings,
 )
@@ -131,15 +135,84 @@ def _benchmark_row(**overrides: object) -> tuple[object, ...]:
     return tuple(values)
 
 
+def _resolved_benchmark() -> ResolvedBenchmark:
+    return ResolvedBenchmark(
+        provider_listing_id=BENCHMARK_ID,
+        provider_code="YAHOO",
+        market="XIDX",
+        ticker="SPX",
+        instrument_type_code="EQUITY_INDEX",
+        status="ACTIVE",
+        yahoo_ticker="^GSPC",
+    )
+
+
+def _benchmark_bar(
+    trading_date: date,
+    close: str,
+    *,
+    provider_listing_id: UUID = BENCHMARK_ID,
+) -> SourceBar:
+    close_value = Decimal(close)
+    return SourceBar(
+        provider_listing_id=provider_listing_id,
+        trading_date=trading_date,
+        open=close_value - 1,
+        high=close_value + 1,
+        low=close_value - 2,
+        close=close_value,
+        volume=Decimal("100"),
+    )
+
+
+def _benchmark_listing_row(
+    *,
+    first_trading_date: date | None,
+    last_trading_date: date | None,
+    source_observation_count: int,
+) -> tuple[object, ...]:
+    return (
+        BENCHMARK_ID,
+        "YAHOO",
+        "XIDX",
+        "SPX",
+        "EQUITY_INDEX",
+        "ACTIVE",
+        first_trading_date,
+        last_trading_date,
+        source_observation_count,
+    )
+
+
+def _benchmark_bar_row(trading_date: date, close: str) -> tuple[object, ...]:
+    bar = _benchmark_bar(trading_date, close)
+    return (
+        "YAHOO",
+        "XIDX",
+        "SPX",
+        bar.provider_listing_id,
+        bar.trading_date,
+        bar.open,
+        bar.high,
+        bar.low,
+        bar.close,
+        bar.volume,
+    )
+
+
 def test_query_api_is_explicitly_exported() -> None:
     assert queries_module.__all__ == [
+        "BenchmarkHistory",
         "EligibleListing",
         "iter_source_bar_pages",
+        "load_spx_benchmark_history",
         "resolve_spx_benchmark",
         "select_eligible_listings",
     ]
+    assert public_api.BenchmarkHistory is BenchmarkHistory
     assert public_api.EligibleListing is EligibleListing
     assert public_api.iter_source_bar_pages is iter_source_bar_pages
+    assert public_api.load_spx_benchmark_history is load_spx_benchmark_history
     assert public_api.resolve_spx_benchmark is resolve_spx_benchmark
     assert public_api.select_eligible_listings is select_eligible_listings
 
@@ -458,3 +531,163 @@ def test_resolve_spx_benchmark_rejects_invalid_boundary_types() -> None:
             cursor=FakeCursor([]),
             config=object(),  # type: ignore[arg-type]
         )
+
+
+def test_benchmark_history_preserves_exact_dates_without_filling_gaps() -> None:
+    first_date = date(2026, 1, 2)
+    last_date = date(2026, 1, 5)
+    first_bar = _benchmark_bar(first_date, "10")
+    last_bar = _benchmark_bar(last_date, "12")
+    history = BenchmarkHistory(
+        benchmark=_resolved_benchmark(),
+        bars=(first_bar, last_bar),
+    )
+
+    assert history.observation_count == 2
+    assert history.first_trading_date == first_date
+    assert history.last_trading_date == last_date
+    assert history.bar_on(first_date) is first_bar
+    assert history.bar_on(date(2026, 1, 3)) is None
+    assert history.close_by_date() == {
+        first_date: Decimal("10"),
+        last_date: Decimal("12"),
+    }
+    assert history.to_dict() == {
+        "benchmark": _resolved_benchmark().to_dict(),
+        "observation_count": 2,
+        "first_trading_date": "2026-01-02",
+        "last_trading_date": "2026-01-05",
+    }
+    json.dumps(history.to_dict())
+
+
+def test_benchmark_history_rejects_mixed_or_unordered_bars() -> None:
+    other_id = UUID("00000000-0000-4000-8000-000000000004")
+    with pytest.raises(ValueError, match="resolved listing ID"):
+        BenchmarkHistory(
+            benchmark=_resolved_benchmark(),
+            bars=(
+                _benchmark_bar(
+                    date(2026, 1, 2),
+                    "10",
+                    provider_listing_id=other_id,
+                ),
+            ),
+        )
+    with pytest.raises(ValueError, match="strictly chronological"):
+        BenchmarkHistory(
+            benchmark=_resolved_benchmark(),
+            bars=(
+                _benchmark_bar(date(2026, 1, 5), "12"),
+                _benchmark_bar(date(2026, 1, 2), "10"),
+            ),
+        )
+    with pytest.raises(TypeError, match="bars"):
+        BenchmarkHistory(
+            benchmark=_resolved_benchmark(),
+            bars=[],  # type: ignore[arg-type]
+        )
+
+
+def test_benchmark_history_requires_exact_date_lookup() -> None:
+    history = BenchmarkHistory(benchmark=_resolved_benchmark(), bars=())
+
+    with pytest.raises(TypeError, match="trading_date"):
+        history.bar_on("2026-01-02")  # type: ignore[arg-type]
+
+
+def test_benchmark_history_loader_resolves_and_reads_bounded_exact_bars() -> None:
+    first_date = date(2026, 1, 2)
+    last_date = date(2026, 1, 5)
+    cursor = SequencedCursor(
+        [
+            [_benchmark_row()],
+            [
+                _benchmark_listing_row(
+                    first_trading_date=first_date,
+                    last_trading_date=last_date,
+                    source_observation_count=2,
+                )
+            ],
+            [
+                _benchmark_bar_row(first_date, "10"),
+                _benchmark_bar_row(last_date, "12"),
+            ],
+        ]
+    )
+
+    history = load_spx_benchmark_history(
+        cursor=cursor,
+        config=BenchmarkConfig(),
+        start_date=first_date,
+        end_date=last_date,
+        page_size=1000,
+    )
+
+    assert history.benchmark == _resolved_benchmark()
+    assert [bar.trading_date for bar in history.bars] == [first_date, last_date]
+    assert history.bar_on(date(2026, 1, 3)) is None
+    assert len(cursor.executions) == 3
+    assert cursor.executions[0][1] == ("YAHOO", "XIDX", "SPX")
+    assert cursor.executions[1][1] == (
+        first_date,
+        last_date,
+        [BENCHMARK_ID],
+    )
+    assert cursor.executions[2][1] == (
+        [BENCHMARK_ID],
+        first_date,
+        last_date,
+        1000,
+    )
+
+
+def test_benchmark_history_loader_preserves_empty_exact_history() -> None:
+    cursor = SequencedCursor(
+        [
+            [_benchmark_row()],
+            [
+                _benchmark_listing_row(
+                    first_trading_date=None,
+                    last_trading_date=None,
+                    source_observation_count=0,
+                )
+            ],
+            [],
+        ]
+    )
+
+    history = load_spx_benchmark_history(
+        cursor=cursor,
+        config=BenchmarkConfig(),
+    )
+
+    assert history.bars == ()
+    assert history.first_trading_date is None
+    assert history.close_by_date() == {}
+
+
+@pytest.mark.parametrize(
+    ("start_date", "end_date", "exception", "message"),
+    [
+        (date(2026, 1, 2), None, ValueError, "provided together"),
+        ("2026-01-02", "2026-01-05", TypeError, "must be dates"),
+        (date(2026, 1, 5), date(2026, 1, 2), ValueError, "must not be after"),
+    ],
+)
+def test_benchmark_history_loader_rejects_invalid_date_ranges(
+    start_date: object,
+    end_date: object,
+    exception: type[Exception],
+    message: str,
+) -> None:
+    cursor = FakeCursor([])
+
+    with pytest.raises(exception, match=message):
+        load_spx_benchmark_history(
+            cursor=cursor,
+            config=BenchmarkConfig(),
+            start_date=start_date,  # type: ignore[arg-type]
+            end_date=end_date,  # type: ignore[arg-type]
+        )
+    assert cursor.sql == ""

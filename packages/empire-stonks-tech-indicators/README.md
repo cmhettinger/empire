@@ -92,6 +92,8 @@ The immutable domain-model API consists of:
   `iter_source_bar_pages()` for caller-transaction-owned P0.6 selection and
   bounded chronological OHLCV reads
 - `resolve_spx_benchmark()` for exact fail-closed `YAHOO/XIDX/SPX` resolution
+- `BenchmarkHistory` and `load_spx_benchmark_history()` for bounded exact-date
+  SPX OHLCV history and close lookup
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -121,6 +123,12 @@ requires exactly one row, and separately validates active status,
 `EQUITY_INDEX`, object metadata, and exact `YahooTicker=^GSPC`. Missing,
 duplicate, inactive, mistyped, or metadata-drifted state raises the package's
 validation exception; no UUID or proxy benchmark is hardcoded.
+
+Benchmark history is the V1 bounded cross-series input retained alongside one
+subject at a time. It is loaded through the same configured source pages,
+remains strictly chronological, and exposes only exact stored dates.
+`bar_on()` returns `None` for a missing date and `close_by_date()` contains no
+synthetic, nearest-date, or forward-filled keys.
 
 ## Development
 
