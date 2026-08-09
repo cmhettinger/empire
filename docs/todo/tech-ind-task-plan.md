@@ -159,7 +159,7 @@ and the proven incremental strategy.
 | S2.4 | [x] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
 | S2.5 | [x] | Add Flyway migration | Create both payload slots, publication/membership state, the `ohlcv_daily_tech_indicators` published view, any proven recurrence state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
 | S2.6 | [x] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
-| S2.7 | [ ] | Add OHLCV regression | Prove no provider-identity, provider-isolation, source-cleanup, or existing-writer regression. | S2.5-S2.6 |
+| S2.7 | [x] | Add OHLCV regression | Prove no provider-identity, provider-isolation, source-cleanup, or existing-writer regression. | S2.5-S2.6 |
 | S2.8 | [ ] | Add database documentation group | Add technical tables to Stonks docs, regenerate schema/ERD/diagrams, and verify no stale artifacts. | S2.5-S2.7 |
 
 Done: 2026-08-09 — froze the shared ordered 90-column slot/view DDL,
@@ -228,6 +228,17 @@ dependencies, lifecycle/view visibility, and delete/cascade assertions; it
 left zero fixture residue. The existing OHLCV contract suite passed; pytest
 passed 85 tests; Poetry lock/public import, Flyway validation (39 migrations),
 whitespace, transaction-boundary, and `git diff --check` audits passed.
+
+Done: 2026-08-09 — added rollback-only PostgreSQL compatibility coverage in
+`test_tech_indicators_ohlcv_regression_integration.py` under
+`packages/empire-stonks-ohlcv/tests`. Two tests prove exact
+case-sensitive provider identity, three-provider source/payload isolation,
+existing listing and daily-bar insert/unchanged/gap/correction/derived-repair
+writes with technical children, and source-row/provider cleanup cascades that
+leave unrelated providers intact. The focused regression passed 7 tests and
+the full database-enabled OHLCV suite passed 608; both schema contracts,
+Poetry lock/compile/public imports, Flyway validation (39 migrations),
+88-column/fixture-residue/`git diff --check` audits passed.
 
 ---
 
