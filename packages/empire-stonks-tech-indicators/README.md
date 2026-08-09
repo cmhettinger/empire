@@ -91,6 +91,7 @@ The immutable domain-model API consists of:
 - `EligibleListing`, `select_eligible_listings()`, and
   `iter_source_bar_pages()` for caller-transaction-owned P0.6 selection and
   bounded chronological OHLCV reads
+- `resolve_spx_benchmark()` for exact fail-closed `YAHOO/XIDX/SPX` resolution
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -114,6 +115,12 @@ provider/market/ticker/listing/date keyset pages of 1,000-50,000 rows. Each
 page preserves exact `Decimal` OHLCV, nullable volume, calendar gaps, and
 negative-capable source values. The package never commits, rolls back, closes,
 or changes transaction isolation on the injected cursor.
+
+SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
+requires exactly one row, and separately validates active status,
+`EQUITY_INDEX`, object metadata, and exact `YahooTicker=^GSPC`. Missing,
+duplicate, inactive, mistyped, or metadata-drifted state raises the package's
+validation exception; no UUID or proxy benchmark is hardcoded.
 
 ## Development
 

@@ -26,6 +26,7 @@ from empire_stonks_tech_indicators.models import (
 from empire_stonks_tech_indicators.queries import (
     EligibleListing,
     iter_source_bar_pages,
+    resolve_spx_benchmark,
     select_eligible_listings,
 )
 
@@ -40,6 +41,7 @@ __all__ = [
     "TechIndicatorsConfig",
     "EligibleListing",
     "iter_source_bar_pages",
+    "resolve_spx_benchmark",
     "select_eligible_listings",
     "FeatureCounts",
     "FeatureRow",

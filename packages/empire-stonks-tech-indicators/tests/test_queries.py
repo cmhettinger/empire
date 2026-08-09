@@ -9,9 +9,12 @@ import pytest
 
 import empire_stonks_tech_indicators as public_api
 from empire_stonks_tech_indicators import (
+    BenchmarkConfig,
     EligibleListing,
     TechIndicatorsScope,
+    TechIndicatorsValidationError,
     iter_source_bar_pages,
+    resolve_spx_benchmark,
     select_eligible_listings,
 )
 from empire_stonks_tech_indicators import queries as queries_module
@@ -19,6 +22,7 @@ from empire_stonks_tech_indicators import queries as queries_module
 
 ACTIVE_ID = UUID("00000000-0000-4000-8000-000000000001")
 INACTIVE_ID = UUID("00000000-0000-4000-8000-000000000002")
+BENCHMARK_ID = UUID("00000000-0000-4000-8000-000000000003")
 
 
 class FakeCursor:
@@ -103,14 +107,40 @@ def _bar_row(index: int) -> tuple[object, ...]:
     )
 
 
+def _benchmark_row(**overrides: object) -> tuple[object, ...]:
+    values: list[object] = [
+        BENCHMARK_ID,
+        "YAHOO",
+        "XIDX",
+        "SPX",
+        "EQUITY_INDEX",
+        "ACTIVE",
+        {"YahooTicker": "^GSPC", "ReviewedFact": "allowed"},
+    ]
+    positions = {
+        "provider_listing_id": 0,
+        "provider_code": 1,
+        "market": 2,
+        "ticker": 3,
+        "instrument_type_code": 4,
+        "status": 5,
+        "metadata": 6,
+    }
+    for name, value in overrides.items():
+        values[positions[name]] = value
+    return tuple(values)
+
+
 def test_query_api_is_explicitly_exported() -> None:
     assert queries_module.__all__ == [
         "EligibleListing",
         "iter_source_bar_pages",
+        "resolve_spx_benchmark",
         "select_eligible_listings",
     ]
     assert public_api.EligibleListing is EligibleListing
     assert public_api.iter_source_bar_pages is iter_source_bar_pages
+    assert public_api.resolve_spx_benchmark is resolve_spx_benchmark
     assert public_api.select_eligible_listings is select_eligible_listings
 
 
@@ -357,4 +387,74 @@ def test_source_bar_reader_rejects_unordered_or_drifted_rows() -> None:
                 scope=TechIndicatorsScope(provider_listing_ids=(ACTIVE_ID,)),
                 page_size=1000,
             )
+        )
+
+
+def test_resolve_spx_benchmark_returns_exact_reviewed_identity() -> None:
+    cursor = FakeCursor([_benchmark_row()])
+
+    benchmark = resolve_spx_benchmark(
+        cursor=cursor,
+        config=BenchmarkConfig(),
+    )
+
+    assert benchmark.to_dict() == {
+        "provider_listing_id": str(BENCHMARK_ID),
+        "provider_code": "YAHOO",
+        "market": "XIDX",
+        "ticker": "SPX",
+        "instrument_type_code": "EQUITY_INDEX",
+        "status": "ACTIVE",
+        "yahoo_ticker": "^GSPC",
+    }
+    assert "status =" not in cursor.sql
+    assert "instrument_type_code =" not in cursor.sql
+    assert "metadata" in cursor.sql
+    assert "LIMIT 2" in cursor.sql
+    assert cursor.parameters == ("YAHOO", "XIDX", "SPX")
+
+
+@pytest.mark.parametrize(
+    ("rows", "message"),
+    [
+        ([], "missing"),
+        ([_benchmark_row(), _benchmark_row()], "duplicated"),
+        ([_benchmark_row(status="INACTIVE")], "ACTIVE"),
+        (
+            [_benchmark_row(instrument_type_code="UNKNOWN")],
+            "instrument type has drifted",
+        ),
+        ([_benchmark_row(metadata=None)], "YahooTicker metadata has drifted"),
+        (
+            [_benchmark_row(metadata={"YahooTicker": 1})],
+            "YahooTicker metadata has drifted",
+        ),
+        (
+            [_benchmark_row(metadata={"YahooTicker": "SPX"})],
+            "YahooTicker metadata has drifted",
+        ),
+        (
+            [_benchmark_row(provider_listing_id="bad")],
+            "invalid contract data",
+        ),
+    ],
+)
+def test_resolve_spx_benchmark_fails_closed(
+    rows: list[tuple[object, ...]],
+    message: str,
+) -> None:
+    with pytest.raises(TechIndicatorsValidationError, match=message):
+        resolve_spx_benchmark(
+            cursor=FakeCursor(rows),
+            config=BenchmarkConfig(),
+        )
+
+
+def test_resolve_spx_benchmark_rejects_invalid_boundary_types() -> None:
+    with pytest.raises(TypeError, match="cursor"):
+        resolve_spx_benchmark(cursor=object(), config=BenchmarkConfig())
+    with pytest.raises(TypeError, match="BenchmarkConfig"):
+        resolve_spx_benchmark(
+            cursor=FakeCursor([]),
+            config=object(),  # type: ignore[arg-type]
         )

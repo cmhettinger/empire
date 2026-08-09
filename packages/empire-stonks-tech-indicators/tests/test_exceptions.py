@@ -35,6 +35,7 @@ def test_public_api_is_explicit() -> None:
         "TechIndicatorsConfig",
         "EligibleListing",
         "iter_source_bar_pages",
+        "resolve_spx_benchmark",
         "select_eligible_listings",
         "FeatureCounts",
         "FeatureRow",

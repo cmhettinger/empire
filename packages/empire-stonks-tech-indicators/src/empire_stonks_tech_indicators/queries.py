@@ -9,11 +9,19 @@ from typing import Any
 from uuid import UUID
 
 from empire_stonks_tech_indicators.config import (
+    BenchmarkConfig,
     DEFAULT_SOURCE_READ_PAGE_SIZE,
     MAX_SOURCE_READ_PAGE_SIZE,
     MIN_SOURCE_READ_PAGE_SIZE,
 )
-from empire_stonks_tech_indicators.models import SourceBar, TechIndicatorsScope
+from empire_stonks_tech_indicators.exceptions import (
+    TechIndicatorsValidationError,
+)
+from empire_stonks_tech_indicators.models import (
+    ResolvedBenchmark,
+    SourceBar,
+    TechIndicatorsScope,
+)
 
 
 @dataclass(frozen=True)
@@ -265,6 +273,44 @@ def iter_source_bar_pages(
             return
 
 
+def resolve_spx_benchmark(
+    *,
+    cursor: Any,
+    config: BenchmarkConfig,
+) -> ResolvedBenchmark:
+    """Resolve and validate the one frozen V1 Yahoo SPX benchmark row."""
+
+    _validate_cursor(cursor)
+    if not isinstance(config, BenchmarkConfig):
+        raise TypeError("config must be a BenchmarkConfig.")
+
+    cursor.execute(
+        """
+        SELECT
+            provider_listing_id,
+            provider_code,
+            market,
+            ticker,
+            instrument_type_code,
+            status,
+            metadata
+        FROM stonks.provider_listing
+        WHERE provider_code = %s
+          AND market = %s
+          AND ticker = %s
+        ORDER BY provider_listing_id
+        LIMIT 2
+        """,
+        (config.provider_code, config.market, config.ticker),
+    )
+    rows = cursor.fetchall()
+    if not rows:
+        raise TechIndicatorsValidationError("SPX benchmark listing is missing.")
+    if len(rows) != 1:
+        raise TechIndicatorsValidationError("SPX benchmark listing is duplicated.")
+    return _resolved_spx_benchmark(rows[0], config=config)
+
+
 _SOURCE_VALUE_ELIGIBILITY_SQL = """(
     (
         listing.provider_code = 'EODDATA'
@@ -358,6 +404,56 @@ def _source_bar_page(
     return tuple(bars), previous
 
 
+def _resolved_spx_benchmark(
+    row: object,
+    *,
+    config: BenchmarkConfig,
+) -> ResolvedBenchmark:
+    if not isinstance(row, (tuple, list)) or len(row) != 7:
+        raise TechIndicatorsValidationError(
+            "SPX benchmark query returned an invalid row."
+        )
+    (
+        provider_listing_id,
+        provider_code,
+        market,
+        ticker,
+        instrument_type_code,
+        status,
+        metadata,
+    ) = row
+    if status != "ACTIVE":
+        raise TechIndicatorsValidationError(
+            "SPX benchmark listing must be ACTIVE."
+        )
+    if instrument_type_code != config.instrument_type_code:
+        raise TechIndicatorsValidationError(
+            "SPX benchmark instrument type has drifted."
+        )
+    if (
+        not isinstance(metadata, dict)
+        or not isinstance(metadata.get("YahooTicker"), str)
+        or metadata["YahooTicker"] != config.yahoo_ticker
+    ):
+        raise TechIndicatorsValidationError(
+            "SPX benchmark YahooTicker metadata has drifted."
+        )
+    try:
+        return ResolvedBenchmark(
+            provider_listing_id=provider_listing_id,
+            provider_code=provider_code,
+            market=market,
+            ticker=ticker,
+            instrument_type_code=instrument_type_code,
+            status=status,
+            yahoo_ticker=metadata["YahooTicker"],
+        )
+    except (TypeError, ValueError) as exc:
+        raise TechIndicatorsValidationError(
+            "SPX benchmark query returned invalid contract data."
+        ) from exc
+
+
 def _validate_cursor(cursor: Any) -> None:
     if not callable(getattr(cursor, "execute", None)) or not callable(
         getattr(cursor, "fetchall", None)
@@ -382,5 +478,6 @@ def _date_to_string(value: date | None) -> str | None:
 __all__ = [
     "EligibleListing",
     "iter_source_bar_pages",
+    "resolve_spx_benchmark",
     "select_eligible_listings",
 ]

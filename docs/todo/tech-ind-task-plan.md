@@ -155,7 +155,7 @@ without coupling calculations to source runners or Airflow.
 |----|--------|------|---------------|------------|
 | I3.1 | [x] | Add eligible-listing queries | Implement provider/market/type/status/date selection from P0.6; cover active, inactive, insufficient-history, and explicit selections. | P0.6, B1.6, S2.5 |
 | I3.2 | [x] | Add chronological bar reader | Stream/page exact OHLCV in listing/date order without whole-universe memory load; cover null volume, gaps, negative-capable values, and ordering. | I3.1 |
-| I3.3 | [ ] | Add SPX resolver | Resolve exactly one reviewed active `YAHOO/XIDX/SPX` and fail closed on missing, duplicate, inactive, or metadata drift. | P0.5, I3.1 |
+| I3.3 | [x] | Add SPX resolver | Resolve exactly one reviewed active `YAHOO/XIDX/SPX` and fail closed on missing, duplicate, inactive, or metadata drift. | P0.5, I3.1 |
 | I3.4 | [ ] | Add benchmark bar reader | Load exact-date SPX history for ratio, relative return, beta, and correlation without forward fill. | I3.2-I3.3 |
 | I3.5 | [ ] | Add state-comparison queries | Detect missing rows, copied-source drift, version drift, and earliest changed dates needed by recalculation. | P0.7, S2.5, I3.2 |
 | I3.6 | [ ] | Add source-readiness decision | Decide effective-date readiness from OHLCV/SPX coverage and successful source evidence where required, not wall-clock ordering alone. | P0.5-P0.7, I3.3-I3.5 |
@@ -180,6 +180,17 @@ suite passed 2 tests, including the I3.2 reader, and the 1,002-row unit fixture
 crossed two pages. Wheel/sdist build, Poetry lock, compilation, public import,
 `pip check`, changed-Python 88-column scan, `git diff --check`, and Flyway
 validation of 39 migrations passed.
+
+Done: 2026-08-09 — added public fail-closed SPX resolution in
+`empire_stonks_tech_indicators/queries.py`, using injected frozen benchmark
+configuration for an exact bounded `YAHOO/XIDX/SPX` lookup and separately
+validating one row, active status, `EQUITY_INDEX`, object metadata, exact
+`YahooTicker=^GSPC`, and the generated UUID through `ResolvedBenchmark`.
+Package pytest passed 112 tests with 1 expected Core-runtime skip; the focused
+rollback-only PostgreSQL suite passed 3 tests, including live SPX success and
+inactive/type/metadata drift. Wheel/sdist build, Poetry lock, compilation,
+public import, `pip check`, changed-Python 88-column scan, `git diff --check`,
+and Flyway validation of 39 migrations passed.
 
 ---
 

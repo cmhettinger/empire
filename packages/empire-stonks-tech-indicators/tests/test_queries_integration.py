@@ -9,8 +9,11 @@ from uuid import UUID, uuid4
 import pytest
 
 from empire_stonks_tech_indicators import (
+    BenchmarkConfig,
     TechIndicatorsScope,
+    TechIndicatorsValidationError,
     iter_source_bar_pages,
+    resolve_spx_benchmark,
     select_eligible_listings,
 )
 
@@ -399,3 +402,63 @@ def test_source_bar_reader_preserves_order_gaps_nulls_and_negative_values(
         assert pages[0][0].volume is None
         assert pages[0][1].volume == Decimal("100.25000000")
         assert pages[0][2].volume == Decimal("0E-8")
+
+
+def test_spx_resolver_validates_live_identity_and_fails_closed_on_drift(
+    database_connection: object,
+) -> None:
+    config = BenchmarkConfig()
+
+    with database_connection.cursor() as cursor:  # type: ignore[union-attr]
+        resolved = resolve_spx_benchmark(cursor=cursor, config=config)
+        assert resolved.provider_code == "YAHOO"
+        assert resolved.market == "XIDX"
+        assert resolved.ticker == "SPX"
+
+        cursor.execute(
+            """
+            UPDATE stonks.provider_listing
+            SET status = 'INACTIVE'
+            WHERE provider_listing_id = %s
+            """,
+            (resolved.provider_listing_id,),
+        )
+        with pytest.raises(TechIndicatorsValidationError, match="ACTIVE"):
+            resolve_spx_benchmark(cursor=cursor, config=config)
+        cursor.execute(
+            """
+            UPDATE stonks.provider_listing
+            SET status = 'ACTIVE', instrument_type_code = 'UNKNOWN'
+            WHERE provider_listing_id = %s
+            """,
+            (resolved.provider_listing_id,),
+        )
+        with pytest.raises(
+            TechIndicatorsValidationError,
+            match="instrument type has drifted",
+        ):
+            resolve_spx_benchmark(cursor=cursor, config=config)
+        cursor.execute(
+            """
+            UPDATE stonks.provider_listing
+            SET
+                instrument_type_code = 'EQUITY_INDEX',
+                metadata = metadata || '{"YahooTicker": "^DRIFT"}'::jsonb
+            WHERE provider_listing_id = %s
+            """,
+            (resolved.provider_listing_id,),
+        )
+        with pytest.raises(
+            TechIndicatorsValidationError,
+            match="YahooTicker metadata has drifted",
+        ):
+            resolve_spx_benchmark(cursor=cursor, config=config)
+        cursor.execute(
+            """
+            UPDATE stonks.provider_listing
+            SET metadata = metadata || '{"YahooTicker": "^GSPC"}'::jsonb
+            WHERE provider_listing_id = %s
+            """,
+            (resolved.provider_listing_id,),
+        )
+        assert resolve_spx_benchmark(cursor=cursor, config=config) == resolved
