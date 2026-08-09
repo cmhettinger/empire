@@ -341,22 +341,14 @@ an epsilon to manufacture a zero variance or denominator. P0.5 must apply this
 same comparison function while freezing SPX correlation/beta details and must
 state any bound-specific canonicalization explicitly.
 
-## SPX Boundary
+## SPX Extension
 
-P0.4 freezes only the shared observation, exact-zero, finite-output, and
-numerical-equivalence rules that also apply to SPX calculations. P0.5 must
-freeze, without changing the non-SPX formulas above:
-
-- exact benchmark resolution and supported subject universe;
-- exact-date aligned observation construction;
-- price-ratio and ratio-SMA mechanics;
-- relative-return compounding;
-- sample covariance/variance and Pearson correlation mechanics;
-- complete aligned-window counts and unavailable behavior; and
-- correlation bound handling under the V1 tolerance.
-
-Until P0.5 is complete, SPX fields remain nullable under the frozen feature
-profile and are not an excuse to change non-SPX formula semantics.
+P0.5 freezes benchmark resolution, supported subjects, exact-date alignment,
+relative statistics, complete windows, correlation canonicalization, and
+unavailable behavior in
+[`tech-indicators-spx-contract-v1.md`](tech-indicators-spx-contract-v1.md).
+That extension applies this document's observation, exact-zero, finite-output,
+and numerical-equivalence rules without changing the non-SPX formulas above.
 
 ## Required Contract Tests
 

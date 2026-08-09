@@ -453,6 +453,12 @@ types make dollar-volume comparisons meaningful.
 
 ## SPX Benchmark Contract
 
+P0.5 freezes the executable benchmark, subject, alignment, statistic, and
+unavailable-behavior contract in
+[`tech-indicators-spx-contract-v1.md`](tech-indicators-spx-contract-v1.md).
+The formulas below are a design summary; the SPX contract is authoritative for
+implementation and tests.
+
 The initial broad benchmark is resolved by stable provider identity:
 
 ```text
@@ -466,8 +472,10 @@ The generated UUID and Yahoo request symbol are not hardcoded as identity.
 Resolution must find exactly one reviewed eligible provider listing and fail
 closed on absence, duplication, inactivity, or material metadata drift.
 
-Subject and SPX rows align only where both have the exact trading date. No
-forward fill, nearest date, synthetic holiday row, or calendar coercion is
+Subject and SPX closes first align on their exact shared trading dates. Returns
+are then calculated between consecutive aligned close pairs so both sides use
+the same start and end dates. No forward fill, nearest date, synthetic holiday
+row, calendar coercion, or independently joined mismatched return horizon is
 allowed.
 
 ```text
@@ -493,9 +501,11 @@ insufficient alignment yields null. Correlation must remain within `[-1, 1]`
 subject to an explicitly tested floating tolerance. Beta has no arbitrary
 database bound.
 
-SPX features are not automatically meaningful for every global index,
-currency, commodity, or futures series. Phase P0.5/P0.6 must freeze the initial
-eligible subject policy. Unsupported subjects retain null SPX fields.
+V1 supports SPX features only for exact EODData `NYSE`/`NASDAQ`/`AMEX` Equity
+metadata series and Stooq `nasdaq`/`nyse`/`nysemkt` stock partitions. Yahoo and
+all other subjects retain a null benchmark ID and null SPX fields. P0.6 may
+narrow the initially calculated source cohorts based on provider-native value
+semantics without changing this SPX-support predicate.
 
 Sector-relative features remain deferred until Empire owns point-in-time
 subject membership and benchmark mappings.
@@ -670,7 +680,8 @@ chats should resolve them rather than reopen the entire design:
 | Exact V1 field ownership, units, and logical nullability | P0.3 (frozen in `tech-indicators-feature-profile-v1.md`) |
 | Final DDL types and generated expressions | S2.1-S2.3 |
 | Formula, denominator, warm-up, estimator, z-score, and tolerance semantics | P0.4 (frozen in `tech-indicators-formula-spec-v1.md`) |
-| Eligible source and SPX subject universes | P0.5-P0.6 |
+| SPX identity, subjects, alignment, statistics, and unavailable behavior | P0.5 (frozen in `tech-indicators-spx-contract-v1.md`) |
+| Eligible source-value and adjustment/comparability policy | P0.6 |
 | TA-Lib/NumPy versions and Airflow packaging | B1.1 |
 | Recursive incremental/state-table strategy | B1.2, S2.2 |
 | Initial evidence-backed indexes | S2.4 |

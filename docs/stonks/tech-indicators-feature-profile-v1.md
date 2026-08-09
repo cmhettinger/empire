@@ -43,7 +43,7 @@ denominator behavior in
 |---|---|---|---|
 | `provider_listing_id` | source key | UUID for the source listing | `NOT NULL` |
 | `trading_date` | source key | provider trading date | `NOT NULL` |
-| `relative_strength_benchmark_provider_listing_id` | calculator lineage | UUID for the aligned SPX benchmark listing | nullable when the SPX family is unsupported or unavailable under P0.5 |
+| `relative_strength_benchmark_provider_listing_id` | calculator lineage | UUID for the aligned SPX benchmark listing | nullable when the subject is unsupported under the [`tech-indicators-spx-contract-v1.md`](tech-indicators-spx-contract-v1.md) contract |
 | `history_observation_count` | Python calculator | count of source observations available through this row | `NOT NULL`, positive integer |
 | `calculation_version` | calculator lineage | frozen implementation version; V1 is `TECH_INDICATORS_V1` | `NOT NULL` |
 | `run_id` | Core lineage | optional UUID of the last writing Core run | nullable for optional Core lineage and after `core.run` cleanup through `ON DELETE SET NULL` |
@@ -94,10 +94,10 @@ rules.
 
 The two streak fields are the only analytical fields that are logically
 `NOT NULL`; their initial and reset behavior is frozen by the formula
-specification. SPX-family
-fields remain nullable until P0.5's benchmark-support and alignment conditions
-are satisfied. Aligned-observation diagnostics belong to calculation/report
-diagnostics and are not additional persisted feature columns in V1.
+specification. SPX-family fields remain nullable until the SPX contract's
+benchmark-support and alignment conditions are satisfied. Aligned-observation
+diagnostics belong to calculation/report diagnostics and are not additional
+persisted feature columns in V1.
 
 ## Persisted PostgreSQL Generated Fields
 
@@ -149,8 +149,9 @@ ownership.
   and calculation version.
 - Missing volume propagates only into volume-dependent fields; it does not
   invalidate unrelated price fields or the row itself.
-- A missing, unsupported, or insufficiently aligned SPX benchmark leaves the
-  SPX family null; it never substitutes zeros or a different benchmark.
+- An unsupported or insufficiently aligned SPX relationship leaves the SPX
+  family null under the SPX contract; it never substitutes zeros or a different
+  benchmark. Invalid benchmark identity fails preflight for supported scopes.
 - Exact-zero denominators and zero-variance windows produce null where required
   by the formula specification.
 - `run_id` becoming null after Core retention cleanup does not alter feature
