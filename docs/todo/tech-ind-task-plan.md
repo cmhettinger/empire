@@ -158,7 +158,7 @@ without coupling calculations to source runners or Airflow.
 | I3.3 | [x] | Add SPX resolver | Resolve exactly one reviewed active `YAHOO/XIDX/SPX` and fail closed on missing, duplicate, inactive, or metadata drift. | P0.5, I3.1 |
 | I3.4 | [x] | Add benchmark bar reader | Load exact-date SPX history for ratio, relative return, beta, and correlation without forward fill. | I3.2-I3.3 |
 | I3.5 | [x] | Add state-comparison queries | Detect missing rows, copied-source drift, version drift, and earliest changed dates needed by recalculation. | P0.7, S2.5, I3.2 |
-| I3.6 | [ ] | Add source-readiness decision | Decide effective-date readiness from OHLCV/SPX coverage and successful source evidence where required, not wall-clock ordering alone. | P0.5-P0.7, I3.3-I3.5 |
+| I3.6 | [x] | Add source-readiness decision | Decide effective-date readiness from OHLCV/SPX coverage and successful source evidence where required, not wall-clock ordering alone. | P0.5-P0.7, I3.3-I3.5 |
 | I3.7 | [ ] | Verify large-read behavior | Exercise query plans, paging, transaction ownership, cancellation, and memory bounds at representative size. | P0.8, I3.1-I3.6 |
 
 Done: 2026-08-09 — added public caller-transaction-owned P0.6 selection and
@@ -213,6 +213,18 @@ rollback-only PostgreSQL suite passed 5 tests, including valid A-slot drift and
 equivalent rerun fixtures. Wheel/sdist build, Poetry check/lock, compilation,
 public import, `pip check`, changed-Python 88-column scan, `git diff --check`,
 and Flyway validation of 39 migrations passed.
+
+Done: 2026-08-09 — added public `SourceReadinessDecision` and
+`decide_source_readiness()` in
+`empire_stonks_tech_indicators/readiness.py`, combining exact eligible-scope
+OHLCV/SPX coverage with healthy benchmark resolution and effective-date-
+matched successful EODData/Yahoo Core evidence rather than task timing; Stooq
+remains coverage-driven. Package pytest passed 141 tests with 1 expected Core-
+runtime skip; the focused rollback-only PostgreSQL suite passed 6 tests,
+including live ready 2026-08-03 and same-listing wrong-date failure. Wheel/
+sdist build, Poetry check/lock, compilation, public import, `pip check`, wheel-
+content and changed-Python 88-column scans, `git diff --check`, and Flyway
+validation of 39 migrations passed.
 
 ---
 

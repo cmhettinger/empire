@@ -96,6 +96,8 @@ The immutable domain-model API consists of:
   SPX OHLCV history and close lookup
 - `ListingStateComparison` and `iter_state_comparison_pages()` for paged,
   set-based current-source versus published-state drift facts
+- `SourceReadinessDecision` and `decide_source_readiness()` for same-date
+  OHLCV, SPX, and successful-source evidence decisions
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -138,6 +140,17 @@ rows, compares copied OHLCV null-safely, detects observation-count and requested
 calculation-version drift, and exposes each reason's earliest date. A version
 drift conservatively promotes recalculation to the listing's first source date;
 the later affected-range planner owns suffix expansion and safe horizons.
+
+Source readiness is an effective-date input decision, not publication or model-
+input readiness. It combines current eligible-scope coverage with exact SPX
+identity/date requirements and same-date successful Core evidence from the
+automated EODData and Yahoo daily workflows. It does not infer readiness from
+task order, completion timestamps alone, or a later-dated source run. Stooq is
+coverage-driven because Empire has no contracted Stooq daily workflow.
+EODData evidence requires zero hard failures and missing exchange sessions;
+Yahoo evidence must represent the full seeded universe or explicitly include
+`SPX`, while exact SPX OHLCV coverage remains independently required whenever
+the selected effective date contains supported subject bars.
 
 ## Development
 

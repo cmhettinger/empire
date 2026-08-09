@@ -12,6 +12,7 @@ from empire_stonks_tech_indicators import (
     BenchmarkConfig,
     TechIndicatorsScope,
     TechIndicatorsValidationError,
+    decide_source_readiness,
     iter_source_bar_pages,
     iter_state_comparison_pages,
     load_spx_benchmark_history,
@@ -834,3 +835,71 @@ def test_state_comparison_detects_published_drift_and_earliest_restart(
         )
         assert equivalent_pages[0][0].is_equivalent is True
         assert equivalent_pages[0][0].earliest_recalculation_date is None
+
+
+def test_source_readiness_uses_same_date_live_coverage_and_core_evidence(
+    database_connection: object,
+) -> None:
+    effective_date = date(2026, 8, 3)
+
+    with database_connection.cursor() as cursor:  # type: ignore[union-attr]
+        cursor.execute(
+            """
+            SELECT listing.provider_listing_id
+            FROM stonks.provider_listing AS listing
+            INNER JOIN stonks.ohlcv_daily AS daily
+                ON daily.provider_listing_id = listing.provider_listing_id
+               AND daily.trading_date = %s
+            WHERE listing.provider_code = 'EODDATA'
+              AND listing.market = 'NASDAQ'
+              AND listing.status = 'ACTIVE'
+              AND jsonb_typeof(listing.metadata) = 'object'
+              AND jsonb_typeof(listing.metadata -> 'type') = 'string'
+              AND upper(btrim(listing.metadata ->> 'type')) = 'EQUITY'
+            ORDER BY listing.ticker, listing.provider_listing_id
+            LIMIT 1
+            """,
+            (effective_date,),
+        )
+        listing_id = cursor.fetchone()[0]
+        scope = TechIndicatorsScope(
+            provider_listing_ids=(listing_id,),
+            start_date=effective_date,
+            end_date=effective_date,
+        )
+
+        ready = decide_source_readiness(
+            cursor=cursor,
+            scope=scope,
+            effective_date=effective_date,
+            benchmark_config=BenchmarkConfig(),
+        )
+
+        assert ready.ready is True
+        assert ready.selected_listing_count == 1
+        assert ready.effective_date_bar_count == 1
+        assert ready.supported_subject_bar_count == 1
+        assert ready.benchmark_bar_present is True
+        assert ready.eoddata_source_run_id is not None
+        assert ready.yahoo_source_run_id is not None
+        assert ready.reasons == ()
+
+        unsupported_date = date(2099, 1, 5)
+        not_ready = decide_source_readiness(
+            cursor=cursor,
+            scope=TechIndicatorsScope(
+                provider_listing_ids=(listing_id,),
+                start_date=unsupported_date,
+                end_date=unsupported_date,
+            ),
+            effective_date=unsupported_date,
+            benchmark_config=BenchmarkConfig(),
+        )
+
+        assert not_ready.ready is False
+        assert not_ready.effective_date_bar_count == 0
+        assert not_ready.spx_bar_required is False
+        assert not_ready.yahoo_evidence_required is False
+        assert not_ready.reasons == (
+            "EODDATA_SOURCE_EVIDENCE_MISSING",
+        )
