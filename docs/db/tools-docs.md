@@ -161,6 +161,7 @@ security-identity
 security-master-core
 security-master
 security-reconciliation
+tech-indicators
 ```
 
 ## pg-diagram Images

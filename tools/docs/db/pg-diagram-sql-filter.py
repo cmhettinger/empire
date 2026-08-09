@@ -8,6 +8,40 @@ import re
 from pathlib import Path
 
 
+def remove_dollar_quoted_functions(sql: str) -> str:
+    """Remove complete function blocks before semicolon-based splitting."""
+
+    function_start = re.compile(
+        r"(?im)^[ \t]*CREATE(?:\s+OR\s+REPLACE)?\s+FUNCTION\b"
+    )
+    dollar_quote = re.compile(r"(?is)\bAS\s+(\$[A-Za-z0-9_]*\$)")
+    search_from = 0
+
+    while match := function_start.search(sql, search_from):
+        body_match = dollar_quote.search(sql, match.end())
+        first_semicolon = sql.find(";", match.end())
+        if body_match is None or (
+            first_semicolon >= 0 and first_semicolon < body_match.start()
+        ):
+            search_from = max(match.end(), first_semicolon + 1)
+            continue
+
+        delimiter = body_match.group(1)
+        body_end = sql.find(delimiter, body_match.end())
+        if body_end < 0:
+            raise SystemExit("ERROR: unterminated dollar-quoted function in schema SQL")
+
+        statement_end = body_end + len(delimiter)
+        terminator = re.match(r"[ \t]*;", sql[statement_end:])
+        if terminator is None:
+            raise SystemExit("ERROR: function block has no terminating semicolon")
+        statement_end += terminator.end()
+        sql = sql[: match.start()] + sql[statement_end:]
+        search_from = match.start()
+
+    return sql
+
+
 def load_tables(path: Path | None) -> set[str] | None:
     if path is None:
         return None
@@ -26,6 +60,7 @@ def load_tables(path: Path | None) -> set[str] | None:
 
 
 def sanitize_sql(sql: str) -> str:
+    sql = remove_dollar_quoted_functions(sql)
     sql = re.sub(r"(?m)^--.*$", "", sql)
     sql = re.sub(r"(?m)^\s*\\.*$", "", sql)
     sql = re.sub(

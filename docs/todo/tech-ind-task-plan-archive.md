@@ -206,3 +206,110 @@ lock, `pip check`, configuration-isolation scans, and `git diff --check`
 passed.
 
 ---
+
+## Phase 2: Implement The Database Contract
+
+Goal: create the smallest durable schema supporting fast current-state reads
+and the proven incremental strategy.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| S2.1 | [x] | Finalize payload/view columns | Translate the design-contract baseline into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, view projection, metadata, and comments; both payload slots share the exact 90-column profile and every column has one formula owner. | P0.3-P0.9, B1.2 |
+| S2.2 | [x] | Finalize auxiliary state schemas | Based on B1.2, explicitly reject or design minimal recurrence state, and translate P0.9's two slots, publication lifecycle, membership, and published view without generic markers or mixed visibility. | B1.2, P0.9, S2.1 |
+| S2.3 | [x] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
+| S2.4 | [x] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
+| S2.5 | [x] | Add Flyway migration | Create both payload slots, publication/membership state, the `ohlcv_daily_tech_indicators` published view, any proven recurrence state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
+| S2.6 | [x] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
+| S2.7 | [x] | Add OHLCV regression | Prove no provider-identity, provider-isolation, source-cleanup, or existing-writer regression. | S2.5-S2.6 |
+| S2.8 | [x] | Add database documentation group | Add technical tables to Stonks docs, regenerate schema/ERD/diagrams, and verify no stale artifacts. | S2.5-S2.7 |
+
+Done: 2026-08-09 — froze the shared ordered 90-column slot/view DDL,
+source-compatible copied types, all 23 `DOUBLE PRECISION` stored expressions,
+65-column writer boundary, metadata/default ownership, and SQL comment contract
+in `docs/stonks/tech-indicators-payload-schema-v1.md`; linked the design
+handoff. A rolled-back PostgreSQL temporary table compiled all expressions and
+matched nine representative generated values; pytest passed 85 tests; Poetry
+lock/public imports passed; independent profile/model/schema audits passed (90
+= 9 + 5 + 53 + 23, 65 writable fields, identical explicit view projection,
+23 generated owners, 90 comment mappings); `make db-validate` validated 38
+migrations; local-link, forbidden-field, and `git diff --check` scans passed.
+
+Done: 2026-08-09 — rejected V1 recurrence state and froze exact publication
+and membership columns, five unit kinds, three publication methods, six
+statuses, normalized scope/benchmark/count/report/resume facts,
+`PRESENT`/`REMOVE` per-listing slot
+membership, cleanup-safe evidence, and explicit 90-column A/B view SQL in
+`docs/stonks/tech-indicators-publication-schema-v1.md`; linked the payload,
+publication, and design contracts. Rolled-back PostgreSQL compilation and
+visibility fixtures passed; schema/view/lifecycle audits matched 41
+publication columns, 16 membership columns, and 90 columns per view arm;
+pytest (85), Poetry lock/public imports, `make db-validate` (38 migrations),
+local-link, forbidden-marker, whitespace, and `git diff --check` checks passed.
+
+Done: 2026-08-09 — froze payload, publication, and membership PKs/FKs/delete
+actions, version/source/streak/bounds/SPX/count/cursor/lifecycle checks, the
+one-active-membership integrity index, transition/cross-relation triggers, the
+existing single-credential grant boundary, and Python-owned exhaustive
+validation in `docs/stonks/tech-indicators-constraints-v1.md`; linked the
+payload, publication, and design contracts. Rolled-back PostgreSQL compilation,
+constraint/delete-action/lifecycle fixtures, and Core/report cleanup passed;
+pytest (85), Poetry lock/public imports, `make db-validate` (38 migrations),
+contract/link/whitespace, and `git diff --check` checks passed.
+
+Done: 2026-08-09 — froze exactly one date-leading B-tree per payload slot and
+no auxiliary or feature-specific access indexes in
+`docs/stonks/tech-indicators-indexes-v1.md`; primary keys retain listing
+history, backfill/resume, and correction ownership. Five-run read-only
+PostgreSQL 18.4 plans over 20,684,494 live OHLCV rows proved 16,238-row paged
+history, a 21,276-row latest slice/rank, 50,000-row backfill, and 50,000-row
+drift paths with no temporary I/O; the rank quicksort used 2,264 kB at 4 MB
+`work_mem`. Rolled-back index DDL/catalog checks, pytest (85), Poetry
+lock/public imports, `make db-validate` (38 migrations), contract, local-link,
+whitespace, fixture-residue, and `git diff --check` checks passed.
+
+Done: 2026-08-09 — added and applied
+`db/flyway/sql/V2026.08.09.0001__stonks_create_tech_indicators.sql` with both
+90-column/23-generated-column payload slots, 41-column publication and
+16-column membership state, exact constraints/delete actions, lifecycle
+triggers, three designed secondary/integrity indexes, comments, and the
+explicit non-updatable 90-column A/B published view; no recurrence state or
+extra grants/indexes were added. Catalog audits found zero slot/view signature
+drift, complete comments, 13 intended FKs, 35 checks, seven total indexes, and
+both triggers. A rolled-back A/B publish/deactivate/retire fixture passed with
+generated-value and visibility assertions; Flyway migrated and validated 39
+migrations, pytest passed 85 tests, Poetry lock/public imports and migration-
+source/whitespace/fixture-residue/`git diff --check` audits passed.
+
+Done: 2026-08-09 — added the rollback-only
+`db/tests/stonks/tech_indicators_schema_contract.sql` suite and
+`make db-test-tech-indicators-schema` target. The suite passed with 64 exact
+expected failures plus valid A/B rows, all 23 generated formulas, warm-up
+nulls, catalog shape, keys, duplicates, bounds, benchmark/Core/publication
+dependencies, lifecycle/view visibility, and delete/cascade assertions; it
+left zero fixture residue. The existing OHLCV contract suite passed; pytest
+passed 85 tests; Poetry lock/public import, Flyway validation (39 migrations),
+whitespace, transaction-boundary, and `git diff --check` audits passed.
+
+Done: 2026-08-09 — added rollback-only PostgreSQL compatibility coverage in
+`test_tech_indicators_ohlcv_regression_integration.py` under
+`packages/empire-stonks-ohlcv/tests`. Two tests prove exact
+case-sensitive provider identity, three-provider source/payload isolation,
+existing listing and daily-bar insert/unchanged/gap/correction/derived-repair
+writes with technical children, and source-row/provider cleanup cascades that
+leave unrelated providers intact. The focused regression passed 7 tests and
+the full database-enabled OHLCV suite passed 608; both schema contracts,
+Poetry lock/compile/public imports, Flyway validation (39 migrations),
+88-column/fixture-residue/`git diff --check` audits passed.
+
+Done: 2026-08-09 — added the nine-table `tech-indicators` Stonks database
+documentation group and inventory entry; regenerated canonical schema SQL,
+full/grouped Mermaid ERDs, and full/grouped pg-diagram SVG/PNG artifacts.
+Hardened the pg-diagram SQL filter to remove complete dollar-quoted functions
+before statement parsing. Inventory audits matched 12 definitions, 24 grouped
+Mermaid files, and 48 grouped images with no stale or empty artifacts; all 26
+PNG and 26 SVG files had valid signatures, and both new diagrams passed visual
+inspection. Flyway validated 39 migrations, both OHLCV and technical-indicator
+schema contracts passed (the latter with 64 expected failures), and filter
+compilation and `git diff --check` passed.
+
+---

@@ -1,0 +1,11 @@
+# Provider-native OHLCV source, technical payload slots, and publication state.
+
+provider
+instrument_type
+ohlcv_session_policy
+provider_listing
+ohlcv_daily
+ohlcv_daily_tech_indicators_a
+ohlcv_daily_tech_indicators_b
+tech_indicators_publication
+tech_indicators_publication_listing

@@ -19,6 +19,8 @@ flowchart LR
   listing["listing"]
   listing_symbol_history["listing_symbol_history"]
   ohlcv_daily["ohlcv_daily"]
+  ohlcv_daily_tech_indicators_a["ohlcv_daily_tech_indicators_a"]
+  ohlcv_daily_tech_indicators_b["ohlcv_daily_tech_indicators_b"]
   ohlcv_session_policy["ohlcv_session_policy"]
   provider["provider"]
   provider_evidence["provider_evidence"]
@@ -41,6 +43,8 @@ flowchart LR
   stg_iso3166_country["stg_iso3166_country"]
   stg_iso4217_currency["stg_iso4217_currency"]
   stg_sec_sic_classification_code["stg_sec_sic_classification_code"]
+  tech_indicators_publication["tech_indicators_publication"]
+  tech_indicators_publication_listing["tech_indicators_publication_listing"]
 
   classification_system -->|fk_classification_code_system| classification_code
   provider -->|fk_classification_system_provider| classification_system
@@ -71,6 +75,10 @@ flowchart LR
   listing -->|fk_listing_symbol_listing| listing_symbol_history
   provider -->|fk_listing_symbol_provider| listing_symbol_history
   provider_listing -->|fk_ohlcv_daily_provider_listing| ohlcv_daily
+  provider_listing -->|fk_tech_indicators_a_benchmark_listing| ohlcv_daily_tech_indicators_a
+  ohlcv_daily -->|fk_tech_indicators_a_source_bar| ohlcv_daily_tech_indicators_a
+  provider_listing -->|fk_tech_indicators_b_benchmark_listing| ohlcv_daily_tech_indicators_b
+  ohlcv_daily -->|fk_tech_indicators_b_source_bar| ohlcv_daily_tech_indicators_b
   security_event -->|fk_provider_evidence_event| provider_evidence
   issuer -->|fk_provider_evidence_issuer| provider_evidence
   listing -->|fk_provider_evidence_listing| provider_evidence
@@ -120,4 +128,8 @@ flowchart LR
   issuer -->|fk_security_successor_successor_issuer| security_successor_relationship
   listing -->|fk_security_successor_successor_listing| security_successor_relationship
   security -->|fk_security_successor_successor_security| security_successor_relationship
+  provider_listing -->|fk_tech_indicators_publication_benchmark| tech_indicators_publication
+  provider_listing -->|fk_tech_indicators_membership_benchmark| tech_indicators_publication_listing
+  provider_listing -->|fk_tech_indicators_membership_listing| tech_indicators_publication_listing
+  tech_indicators_publication -->|fk_tech_indicators_membership_publication| tech_indicators_publication_listing
 ```
