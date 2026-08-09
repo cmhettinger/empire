@@ -5,9 +5,10 @@ Status: frozen implementation contract for P0.3 as of 2026-08-09.
 This document converts the ratified tech-indicators inventory into the
 exact V1 row profile. It is authoritative for field presence, ownership,
 units, and logical nullability. The design contract remains authoritative for
-architecture and rollout sequencing; P0.4 remains authoritative for exact
-formulas, complete-window mechanics, TA-Lib warm-up normalization, tolerance,
-and denominator behavior.
+architecture and rollout sequencing. P0.4 freezes exact formulas,
+complete-window mechanics, TA-Lib warm-up normalization, tolerance, and
+denominator behavior in
+[`tech-indicators-formula-spec-v1.md`](tech-indicators-formula-spec-v1.md).
 
 ## Profile Rules
 
@@ -26,8 +27,8 @@ and denominator behavior.
 - `rsi_14`, `plus_di_14`, `minus_di_14`, and `adx_14` use TA-Lib's point scale,
   conventionally 0 through 100, rather than decimal ratios.
 - Return volatility is the non-annualized dispersion of one-observation
-  decimal returns. P0.4 must still freeze the estimator and exact window
-  mechanics.
+  decimal returns; the formula specification freezes its sample estimator and
+  exact window mechanics.
 - Expected warm-up, missing-input, zero-denominator, zero-variance, or
   unsupported-benchmark conditions are represented by SQL `NULL`, never by a
   sentinel zero. Unexpected invalid calculator output fails validation rather
@@ -92,7 +93,8 @@ rules.
 | `spx_correlation_60d`, `spx_correlation_252d` | dimensionless correlations | nullable |
 
 The two streak fields are the only analytical fields that are logically
-`NOT NULL`; their initial and reset behavior is frozen by P0.4. SPX-family
+`NOT NULL`; their initial and reset behavior is frozen by the formula
+specification. SPX-family
 fields remain nullable until P0.5's benchmark-support and alignment conditions
 are satisfied. Aligned-observation diagnostics belong to calculation/report
 diagnostics and are not additional persisted feature columns in V1.
@@ -101,8 +103,8 @@ diagnostics and are not additional persisted feature columns in V1.
 
 Every field in this section is a PostgreSQL `GENERATED ALWAYS AS (...) STORED`
 column. All are logically nullable because either an input can be null or a
-valid same-row denominator can be zero. P0.4 freezes the expression semantics;
-S2.1 maps them to exact PostgreSQL DDL and types.
+valid same-row denominator can be zero. The formula specification freezes the
+expression semantics; S2.1 maps them to exact PostgreSQL DDL and types.
 
 | Columns | Unit / meaning |
 |---|---|
@@ -149,8 +151,8 @@ ownership.
   invalidate unrelated price fields or the row itself.
 - A missing, unsupported, or insufficiently aligned SPX benchmark leaves the
   SPX family null; it never substitutes zeros or a different benchmark.
-- Zero denominators and zero-variance windows produce null according to the
-  exact P0.4 formula rules.
+- Exact-zero denominators and zero-variance windows produce null where required
+  by the formula specification.
 - `run_id` becoming null after Core retention cleanup does not alter feature
   values, row identity, or `calculation_version`.
 - Source-bar deletion remains ownership-driven through the source foreign key;

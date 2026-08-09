@@ -336,8 +336,11 @@ amendment before migration implementation.
 
 ## Formula Baseline
 
-Phase 0 must turn these definitions into exact tests. It should not choose a
-different feature concept without updating this contract.
+P0.4 freezes the exact executable V1 semantics in
+[`tech-indicators-formula-spec-v1.md`](tech-indicators-formula-spec-v1.md).
+The formulas below are a design summary; the formula-specification document is
+authoritative for implementation and tests. A different feature concept or
+semantic rule requires an explicit contract and calculation-version update.
 
 ### Observation Windows And Returns
 
@@ -358,8 +361,10 @@ daily_range_pct = (high(t) - low(t)) / abs(close(t))
 close_location_1d = (close(t) - low(t)) / (high(t) - low(t))
 ```
 
-Zero denominators yield null. An unchanged close resets both streaks to zero;
-otherwise the current date is included in the applicable streak.
+Exact-zero denominators yield null; negative and arbitrarily small nonzero
+denominators remain valid. An unchanged close resets both streaks to zero;
+otherwise the current date is included in the applicable streak. Both streaks
+start at zero on the first observation.
 
 ### Moving Averages And Trend Distances
 
@@ -372,8 +377,9 @@ sma_N_change_20d_pct =
     sma_N(t) / sma_N(t-20 observations) - 1
 ```
 
-SMA periods are 20, 50, and 200. EMA periods are 12, 20, 26, and 50. TA-Lib
-initialization and unstable-period behavior are pinned by calculation version.
+SMA periods are 20, 50, and 200. EMA periods are 12, 20, 26, and 50. V1 uses
+TA-Lib default compatibility and zero configured unstable periods; the formula
+specification freezes the exact initialization and null prefixes.
 
 ### Recent High And Low Relationships
 
@@ -397,13 +403,14 @@ contract. ATR percentage is:
 atr_pct_14 = atr_14 / abs(close)
 ```
 
-Return volatility uses rolling one-observation returns. P0.3 freezes the unit
-as non-annualized decimal-return dispersion. Phase P0.4 must select sample
-versus population deviation and freeze the exact complete-window calculation.
+Return volatility is the non-annualized sample standard deviation of complete
+rolling windows of 20 or 60 one-observation returns, including the current
+return.
 
-The z-score columns use a 20-observation reference distribution. P0.4 must
-freeze whether the current return participates in that distribution. Zero
-standard deviation yields null.
+The z-score columns compare the current 1- or 3-observation return with the
+previous 20 corresponding returns. The current return is excluded from the
+sample-standard-deviation reference distribution. Zero standard deviation
+yields null.
 
 Bollinger uses the pinned TA-Lib 20-observation, 2-standard-deviation contract:
 
@@ -662,8 +669,7 @@ chats should resolve them rather than reopen the entire design:
 | Exact naming/version/report/object conventions | P0.2 (frozen above) |
 | Exact V1 field ownership, units, and logical nullability | P0.3 (frozen in `tech-indicators-feature-profile-v1.md`) |
 | Final DDL types and generated expressions | S2.1-S2.3 |
-| Sample/population volatility estimator and window mechanics | P0.4 |
-| Z-score reference inclusion | P0.4 |
+| Formula, denominator, warm-up, estimator, z-score, and tolerance semantics | P0.4 (frozen in `tech-indicators-formula-spec-v1.md`) |
 | Eligible source and SPX subject universes | P0.5-P0.6 |
 | TA-Lib/NumPy versions and Airflow packaging | B1.1 |
 | Recursive incremental/state-table strategy | B1.2, S2.2 |

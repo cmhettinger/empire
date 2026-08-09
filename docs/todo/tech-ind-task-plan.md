@@ -93,7 +93,8 @@ scope locking across daily, backfill, CLI, and Airflow entry points; Airflow
 scheduler limits are not the concurrency boundary.
 
 Lookbacks count chronological observations, never future rows. TA-Lib warm-up
-and unstable periods are versioned; non-finite output becomes null, never zero.
+and unstable periods are versioned; expected pre-lookback non-finite output
+becomes null, while post-lookback non-finite output fails calculation.
 Subject/SPX observations align by exact date without forward fill. Adjustment
 semantics remain provider-native and are disclosed. Backtest consumers still
 own point-in-time universes, survivorship, execution timing, slippage, and
@@ -155,7 +156,7 @@ or calculation code is committed.
 | P0.1 | [x] | Ratify the design contract | Audit the existing design contract against live OHLCV/Core/reporting conventions, resolve contradictions without reopening settled scope, and mark it as the authoritative V1 baseline. | — |
 | P0.2 | [x] | Freeze naming conventions | Select package/import, table/state-table, calculation version, Core jobs, storage keys, object kinds, report IDs, CLI names, and DAG ID. | P0.1 |
 | P0.3 | [x] | Freeze feature profile V1 | Convert the contract inventory into the exact persisted/generated/query-time profile, resolving only its named open units, nullability, and ownership decisions. | P0.1 |
-| P0.4 | [ ] | Freeze formula semantics | Turn the contract formulas into executable specifications and resolve its named volatility, z-score, TA-Lib warm-up, tolerance, and denominator decisions. | P0.3 |
+| P0.4 | [x] | Freeze formula semantics | Turn the contract formulas into executable specifications and resolve its named volatility, z-score, TA-Lib warm-up, tolerance, and denominator decisions. | P0.3 |
 | P0.5 | [ ] | Define SPX contract | Define `YAHOO/XIDX/SPX` resolution, eligible subjects, exact alignment, relative return, beta/correlation, complete windows, and unavailable behavior. | P0.3-P0.4 |
 | P0.6 | [ ] | Define source-value policy | Audit EODData, Stooq, and Yahoo adjustment/corporate-action semantics and select initially eligible provider listings without claiming normalization. | P0.1, OHLCV V10.11 |
 | P0.7 | [ ] | Define recalculation semantics | Specify daily append, missing row, source correction, SPX correction, version change, inactive listing, and deletion behavior with full/incremental equivalence. | P0.4-P0.6 |
@@ -186,6 +187,15 @@ ownership, units, and logical nullability from the design contract. Independent
 `python3` design/profile set comparison passed (`9 + 5 + 53 + 23 = 90`, no
 duplicates or inventory drift); P0.2/P0.3/P0.4 status, forbidden alternate
 identifier `rg` checks, and `git diff --check` passed.
+
+Done: 2026-08-09 — froze executable V1 observation, formula, denominator,
+sample-volatility, prior-reference z-score, TA-Lib warm-up, and numerical-
+tolerance semantics in `docs/stonks/tech-indicators-formula-spec-v1.md`, with
+design/profile links and P0.5 SPX boundaries. `python3` coverage and statistical
+fixture assertions passed (42 non-SPX Python fields, 23 generated fields, 11
+SPX fields deferred; no missing formulas; sample SD `5.916079783099616`,
+excluded-current z-score `1.7748239349298849`); local-link, P0.3/P0.4/P0.5
+status, alternate-identifier `rg`, and `git diff --check` checks passed.
 
 ---
 
