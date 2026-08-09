@@ -265,6 +265,9 @@ units; the payload schema is authoritative for its DDL translation.
   vendor input and invalid values are not silently changed to null.
 - PostgreSQL retains structural integrity: PK/FKs, delete actions, calculation
   version shape, basic bounds, streak shape, and relative-field dependencies.
+- S2.3 freezes those exact keys, checks, lifecycle triggers, delete actions,
+  and the Python-owned exhaustive validation boundary in
+  [`tech-indicators-constraints-v1.md`](tech-indicators-constraints-v1.md).
 - The migration does not need one enormous constraint repeating every float
   column for `NaN` and infinities.
 

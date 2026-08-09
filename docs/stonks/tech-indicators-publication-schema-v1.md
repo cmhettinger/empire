@@ -10,6 +10,8 @@ frozen in
 [`tech-indicators-payload-schema-v1.md`](tech-indicators-payload-schema-v1.md).
 S2.3 owns keys, FKs, delete actions, and checks; S2.4 owns indexes; S2.5 creates
 the relations and view without changing this schema.
+Those S2.3 rules and the Python-validation boundary are frozen in
+[`tech-indicators-constraints-v1.md`](tech-indicators-constraints-v1.md).
 
 ## Recurrence State Is Rejected
 

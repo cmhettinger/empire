@@ -155,7 +155,7 @@ and the proven incremental strategy.
 |----|--------|------|---------------|------------|
 | S2.1 | [x] | Finalize payload/view columns | Translate the design-contract baseline into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, view projection, metadata, and comments; both payload slots share the exact 90-column profile and every column has one formula owner. | P0.3-P0.9, B1.2 |
 | S2.2 | [x] | Finalize auxiliary state schemas | Based on B1.2, explicitly reject or design minimal recurrence state, and translate P0.9's two slots, publication lifecycle, membership, and published view without generic markers or mixed visibility. | B1.2, P0.9, S2.1 |
-| S2.3 | [ ] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
+| S2.3 | [x] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
 | S2.4 | [ ] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
 | S2.5 | [ ] | Add Flyway migration | Create both payload slots, publication/membership state, the `ohlcv_daily_tech_indicators` published view, any proven recurrence state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
 | S2.6 | [ ] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
@@ -184,6 +184,16 @@ visibility fixtures passed; schema/view/lifecycle audits matched 41
 publication columns, 16 membership columns, and 90 columns per view arm;
 pytest (85), Poetry lock/public imports, `make db-validate` (38 migrations),
 local-link, forbidden-marker, whitespace, and `git diff --check` checks passed.
+
+Done: 2026-08-09 — froze payload, publication, and membership PKs/FKs/delete
+actions, version/source/streak/bounds/SPX/count/cursor/lifecycle checks, the
+one-active-membership integrity index, transition/cross-relation triggers, the
+existing single-credential grant boundary, and Python-owned exhaustive
+validation in `docs/stonks/tech-indicators-constraints-v1.md`; linked the
+payload, publication, and design contracts. Rolled-back PostgreSQL compilation,
+constraint/delete-action/lifecycle fixtures, and Core/report cleanup passed;
+pytest (85), Poetry lock/public imports, `make db-validate` (38 migrations),
+contract/link/whitespace, and `git diff --check` checks passed.
 
 ---
 
