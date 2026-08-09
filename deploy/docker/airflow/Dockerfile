@@ -45,6 +45,10 @@ COPY packages/empire-stonks-ohlcv /opt/empire/packages/empire-stonks-ohlcv
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-stonks-ohlcv
 
+COPY packages/empire-stonks-tech-indicators /opt/empire/packages/empire-stonks-tech-indicators
+
+RUN pip install --no-cache-dir /opt/empire/packages/empire-stonks-tech-indicators
+
 COPY packages/empire-youtube /opt/empire/packages/empire-youtube
 
 RUN pip install --no-cache-dir /opt/empire/packages/empire-youtube

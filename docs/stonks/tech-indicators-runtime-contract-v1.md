@@ -1,12 +1,12 @@
 # Tech-Indicators Runtime Contract V1
 
-Status: frozen dependency and packaging contract for B1.1 as of 2026-08-09.
+Status: frozen dependency and packaging contract for B1.1, amended by B1.7 on
+2026-08-09.
 
 This contract pins the native calculation runtime selected for
 `TECH_INDICATORS_V1`. It extends the
 [`technical-indicators-design-contract.md`](technical-indicators-design-contract.md)
-and does not scaffold the package, select an incremental recurrence strategy,
-or install the future package into Airflow ahead of B1.3 and B1.7.
+and does not change formula or recursive-replay semantics.
 
 ## Selected Versions
 
@@ -65,6 +65,20 @@ The probe proves installation, import, native extension loading, version
 identity, and representative Function API execution. It does not replace B1.2
 recursive-equivalence work or later independent formula and golden tests.
 
+## Airflow Package Installation
+
+B1.7 installs `empire-stonks-tech-indicators` from its repository package
+directory in the Airflow image after the shared requirements and the
+`empire-stonks-ohlcv` package. The shared requirements resolve exact binary
+NumPy and TA-Lib wheels first; installing the Empire package then verifies its
+matching exact metadata requirements without selecting another calculation
+runtime. The package does not depend on or import Airflow.
+
+The final image must import `empire_stonks_tech_indicators`, NumPy, TA-Lib,
+`empire_core`, `empire_reports`, and `empire_stonks_ohlcv` in one process. It
+must also pass `pip check` and the package-independent calculation smoke. DAG,
+CLI, and environment passthrough remain owned by later tasks.
+
 ## License Review
 
 - The TA-Lib Python wrapper is BSD-2-Clause.
@@ -88,11 +102,12 @@ Primary review sources:
 
 ## Rollback
 
-B1.1 changes no database state and publishes no calculated rows. To roll back,
-remove the two exact pins from the Airflow requirements file, rebuild the prior
-Airflow image, and leave B1.1 incomplete. After B1.3, package rollback must
-instead restore the last reviewed exact pair in both package metadata/lock and
-Airflow requirements, rebuild both runtimes, and rerun this smoke contract.
+B1.1 and B1.7 change no database state and publish no calculated rows. To roll
+back only B1.7, remove the package copy/install steps from the Airflow
+Dockerfile and rebuild the prior image while retaining the reviewed B1.1 pins.
+To roll back the calculation runtime, restore the last reviewed exact pair in
+both package metadata/lock and Airflow requirements, rebuild both runtimes,
+and rerun this smoke contract.
 
 A library downgrade or upgrade after technical rows exist is a calculation
 runtime change: do not mix outputs under one calculation version. Restore the

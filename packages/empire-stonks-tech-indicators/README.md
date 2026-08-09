@@ -109,3 +109,8 @@ poetry build
 The committed `poetry.lock` resolves the exact calculation runtime and the
 development test dependency. Build output contains both a wheel and source
 distribution.
+
+The Airflow image installs the exact binary calculation runtime first, then
+installs this package after Empire Core, reports, and OHLCV. The package remains
+runtime-agnostic: Airflow only provides an installed execution environment and
+later thin orchestration.

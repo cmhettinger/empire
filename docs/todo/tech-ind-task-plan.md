@@ -158,7 +158,7 @@ every runtime before building around it.
 | B1.4 | [x] | Add exceptions and exports | Add a small public exception hierarchy and explicit API without exposing TA-Lib or persistence internals. | B1.3 |
 | B1.5 | [x] | Add environment config | Add environment-only typed config for version, benchmark, batches, storage key, and limits; package code never loads `.env`. | P0.2, B1.3 |
 | B1.6 | [x] | Add typed base models | Add immutable source-bar, feature-row, scope, benchmark, issue, count, summary, and run-result models with bounded JSON-ready forms. | P0.3-P0.7, B1.4 |
-| B1.7 | [ ] | Install in Airflow image | Install in dependency-safe order and prove tech-indicators, TA-Lib, NumPy, Core, and OHLCV imports coexist in the built image. | B1.1, B1.3 |
+| B1.7 | [x] | Install in Airflow image | Install in dependency-safe order and prove tech-indicators, TA-Lib, NumPy, Core, and OHLCV imports coexist in the built image. | B1.1, B1.3 |
 | B1.8 | [ ] | Add runtime settings plumbing | Add non-secret example/local settings and Compose passthrough without embedding configuration in images or DAGs. | B1.5, B1.7 |
 
 Done: 2026-08-09 — pinned wheel-only TA-Lib 0.7.1/C 0.7.1 and NumPy
@@ -216,6 +216,15 @@ Pytest passed 85 tests; an independent P0.3 audit matched all 53 Python fields,
 and Poetry/dependency checks, JSON/non-finite validation, compilation,
 wheel/sdist build, dependency-free isolated-wheel import, local links, dotenv
 scan, and `git diff --check` passed.
+
+Done: 2026-08-09 — installed `empire-stonks-tech-indicators` after the pinned
+binary calculation runtime and OHLCV package in
+`deploy/docker/airflow/Dockerfile`; amended the runtime contract and README.
+`make airflow-build` completed 21 steps, and final CPython 3.13.13/Airflow
+3.2.1 one-offs proved technical-indicators 0.1.0, Core 0.1.0, reports 0.1.0,
+OHLCV 0.1.0, NumPy 2.4.6, and TA-Lib/C 0.7.1 coexist; the 65-column model,
+calculation smoke, `pip check`, bundled-native `ldd`, Airflow CLI, local-link,
+and `git diff --check` checks passed.
 
 ---
 
