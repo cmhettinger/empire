@@ -155,7 +155,7 @@ every runtime before building around it.
 | B1.1 | [x] | Prove TA-Lib runtime support | Pin a reviewed TA-Lib/NumPy combination and prove local Poetry and Airflow-image installation/import. Record wheel/native-library behavior, license, Python compatibility, and rollback. | P0.4, P0.8 |
 | B1.2 | [x] | Prototype recursive equivalence | Compare full-series output with append and historical-correction suffix strategies for EMA, RSI, ATR, ADX, and MACD. Decide whether exact updates require state, bounded replay, or full replay. | B1.1, P0.7 |
 | B1.3 | [x] | Scaffold Poetry package | Create `packages/empire-stonks-tech-indicators` version `0.1.0` with `src/` layout, README, tests, minimum dependencies, isolated import, lock, and build. | B1.1 |
-| B1.4 | [ ] | Add exceptions and exports | Add a small public exception hierarchy and explicit API without exposing TA-Lib or persistence internals. | B1.3 |
+| B1.4 | [x] | Add exceptions and exports | Add a small public exception hierarchy and explicit API without exposing TA-Lib or persistence internals. | B1.3 |
 | B1.5 | [ ] | Add environment config | Add environment-only typed config for version, benchmark, batches, storage key, and limits; package code never loads `.env`. | P0.2, B1.3 |
 | B1.6 | [ ] | Add typed base models | Add immutable source-bar, feature-row, scope, benchmark, issue, count, summary, and run-result models with bounded JSON-ready forms. | P0.3-P0.7, B1.4 |
 | B1.7 | [ ] | Install in Airflow image | Install in dependency-safe order and prove tech-indicators, TA-Lib, NumPy, Core, and OHLCV imports coexist in the built image. | B1.1, B1.3 |
@@ -189,6 +189,14 @@ boundary, README, and package test; runtime metadata contains only exact NumPy
 2.4.6 and TA-Lib 0.7.1 pins. `poetry check --lock`, pytest (1 passed), package
 and isolated wheel imports, both `pip check` runs, wheel/sdist build and content
 inspection, local-link validation, compilation, and `git diff --check` passed.
+
+Done: 2026-08-09 — added the public base plus configuration, calculation,
+validation, persistence, and workflow exceptions in
+`empire_stonks_tech_indicators/exceptions.py`, with exact package-root exports
+and README guidance. Pytest passed 8 tests; cold Poetry and isolated-wheel
+imports exposed only the declared API and loaded no NumPy, TA-Lib, psycopg, or
+persistence implementation, while build, compilation, lock, dependency,
+local-link, and diff checks passed.
 
 ---
 

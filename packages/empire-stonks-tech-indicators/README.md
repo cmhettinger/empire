@@ -42,6 +42,23 @@ migrations under `db/` own the eventual technical-indicator schema. Core run
 lifecycle, JSON/PDF reports, package commands, and Airflow orchestration are
 introduced only by their assigned implementation tasks.
 
+## Public API
+
+The package root explicitly exports one base exception and five stable failure
+categories:
+
+- `EmpireStonksTechIndicatorsError`
+- `TechIndicatorsConfigError`
+- `TechIndicatorsCalculationError`
+- `TechIndicatorsValidationError`
+- `TechIndicatorsPersistenceError`
+- `TechIndicatorsWorkflowError`
+
+Callers may catch the package base or the narrow category they can handle. The
+public exceptions contain no TA-Lib values, SQL, database-driver exceptions,
+connection details, or persistence implementation types. Additional public
+models and capabilities are added only by their assigned tasks.
+
 ## Development
 
 From this directory:
