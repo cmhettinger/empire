@@ -154,7 +154,7 @@ without coupling calculations to source runners or Airflow.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | I3.1 | [x] | Add eligible-listing queries | Implement provider/market/type/status/date selection from P0.6; cover active, inactive, insufficient-history, and explicit selections. | P0.6, B1.6, S2.5 |
-| I3.2 | [ ] | Add chronological bar reader | Stream/page exact OHLCV in listing/date order without whole-universe memory load; cover null volume, gaps, negative-capable values, and ordering. | I3.1 |
+| I3.2 | [x] | Add chronological bar reader | Stream/page exact OHLCV in listing/date order without whole-universe memory load; cover null volume, gaps, negative-capable values, and ordering. | I3.1 |
 | I3.3 | [ ] | Add SPX resolver | Resolve exactly one reviewed active `YAHOO/XIDX/SPX` and fail closed on missing, duplicate, inactive, or metadata drift. | P0.5, I3.1 |
 | I3.4 | [ ] | Add benchmark bar reader | Load exact-date SPX history for ratio, relative return, beta, and correlation without forward fill. | I3.2-I3.3 |
 | I3.5 | [ ] | Add state-comparison queries | Detect missing rows, copied-source drift, version drift, and earliest changed dates needed by recalculation. | P0.7, S2.5, I3.2 |
@@ -169,6 +169,17 @@ Package pytest passed 96 tests with 1 expected Core-runtime skip; the focused
 rollback-only PostgreSQL test passed 1 test. Wheel/sdist build, Poetry lock,
 compilation, public import, `pip check`, 88-column scan, `git diff --check`, and
 Flyway validation of 39 migrations passed.
+
+Done: 2026-08-09 — added public keyset-paged chronological OHLCV reads in
+`empire_stonks_tech_indicators/queries.py`, reusing I3.1 selection and the
+configured 1,000-50,000 page bounds while preserving exact `Decimal` values,
+null/zero volume, negative prices, calendar gaps, and deterministic provider/
+listing/date order without transaction mutation. Package pytest passed 102
+tests with 1 expected Core-runtime skip; the focused rollback-only PostgreSQL
+suite passed 2 tests, including the I3.2 reader, and the 1,002-row unit fixture
+crossed two pages. Wheel/sdist build, Poetry lock, compilation, public import,
+`pip check`, changed-Python 88-column scan, `git diff --check`, and Flyway
+validation of 39 migrations passed.
 
 ---
 

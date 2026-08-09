@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import date
+from decimal import Decimal
 from typing import Iterator
 from uuid import UUID, uuid4
 
@@ -9,6 +10,7 @@ import pytest
 
 from empire_stonks_tech_indicators import (
     TechIndicatorsScope,
+    iter_source_bar_pages,
     select_eligible_listings,
 )
 
@@ -89,6 +91,59 @@ def _insert_bar(cursor: object, provider_listing_id: UUID, trading_date: date) -
         )
         """,
         (provider_listing_id, trading_date),
+    )
+
+
+def _insert_exact_bar(
+    cursor: object,
+    *,
+    provider_listing_id: UUID,
+    trading_date: date,
+    open_value: Decimal,
+    high_value: Decimal,
+    low_value: Decimal,
+    close_value: Decimal,
+    volume: Decimal | None,
+) -> None:
+    cursor.execute(  # type: ignore[union-attr]
+        """
+        INSERT INTO stonks.ohlcv_daily (
+            provider_listing_id,
+            trading_date,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            change,
+            changepct,
+            typ,
+            hl_range,
+            oc_range
+        )
+        VALUES (
+            %s, %s, %s, %s, %s, %s, %s, NULL, NULL,
+            round((%s + %s + %s) / 3, 8),
+            round(%s - %s, 8),
+            round(%s - %s, 8)
+        )
+        """,
+        (
+            provider_listing_id,
+            trading_date,
+            open_value,
+            high_value,
+            low_value,
+            close_value,
+            volume,
+            high_value,
+            low_value,
+            close_value,
+            high_value,
+            low_value,
+            close_value,
+            open_value,
+        ),
     )
 
 
@@ -260,3 +315,87 @@ def test_eligible_listing_query_enforces_policy_status_dates_and_history(
         assert spx[0].ticker == "SPX"
         assert spx[0].instrument_type_code == "EQUITY_INDEX"
         assert spx[0].source_observation_count == 0
+
+
+def test_source_bar_reader_preserves_order_gaps_nulls_and_negative_values(
+    database_connection: object,
+) -> None:
+    marker = uuid4().hex[:12].upper()
+    first_date = date(2026, 1, 2)
+    gap_date = date(2026, 1, 6)
+    other_date = date(2026, 1, 5)
+
+    with database_connection.cursor() as cursor:  # type: ignore[union-attr]
+        first_listing_id = _insert_listing(
+            cursor,
+            provider_code="EODDATA",
+            market="NASDAQ",
+            ticker=f"I32A{marker}",
+            metadata_json='{"type": "Equity"}',
+        )
+        second_listing_id = _insert_listing(
+            cursor,
+            provider_code="EODDATA",
+            market="NASDAQ",
+            ticker=f"I32B{marker}",
+            metadata_json='{"type": "Equity"}',
+        )
+        _insert_exact_bar(
+            cursor,
+            provider_listing_id=first_listing_id,
+            trading_date=first_date,
+            open_value=Decimal("-3"),
+            high_value=Decimal("-1"),
+            low_value=Decimal("-4"),
+            close_value=Decimal("-2"),
+            volume=None,
+        )
+        _insert_exact_bar(
+            cursor,
+            provider_listing_id=first_listing_id,
+            trading_date=gap_date,
+            open_value=Decimal("10"),
+            high_value=Decimal("12"),
+            low_value=Decimal("9"),
+            close_value=Decimal("11"),
+            volume=Decimal("100.25"),
+        )
+        _insert_exact_bar(
+            cursor,
+            provider_listing_id=second_listing_id,
+            trading_date=other_date,
+            open_value=Decimal("20"),
+            high_value=Decimal("21"),
+            low_value=Decimal("18"),
+            close_value=Decimal("19"),
+            volume=Decimal("0"),
+        )
+
+        pages = list(
+            iter_source_bar_pages(
+                cursor=cursor,
+                scope=TechIndicatorsScope(
+                    provider_listing_ids=(
+                        second_listing_id,
+                        first_listing_id,
+                    ),
+                    start_date=first_date,
+                    end_date=gap_date,
+                ),
+                page_size=1000,
+            )
+        )
+
+        assert len(pages) == 1
+        assert [
+            (bar.provider_listing_id, bar.trading_date) for bar in pages[0]
+        ] == [
+            (first_listing_id, first_date),
+            (first_listing_id, gap_date),
+            (second_listing_id, other_date),
+        ]
+        assert pages[0][0].open == Decimal("-3.0000000000")
+        assert pages[0][0].close == Decimal("-2.0000000000")
+        assert pages[0][0].volume is None
+        assert pages[0][1].volume == Decimal("100.25000000")
+        assert pages[0][2].volume == Decimal("0E-8")

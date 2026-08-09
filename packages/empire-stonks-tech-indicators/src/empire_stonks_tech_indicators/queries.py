@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
 from uuid import UUID
 
-from empire_stonks_tech_indicators.models import TechIndicatorsScope
+from empire_stonks_tech_indicators.config import (
+    DEFAULT_SOURCE_READ_PAGE_SIZE,
+    MAX_SOURCE_READ_PAGE_SIZE,
+    MIN_SOURCE_READ_PAGE_SIZE,
+)
+from empire_stonks_tech_indicators.models import SourceBar, TechIndicatorsScope
 
 
 @dataclass(frozen=True)
@@ -164,6 +170,101 @@ def select_eligible_listings(
     return tuple(_eligible_listing(row) for row in cursor.fetchall())
 
 
+def iter_source_bar_pages(
+    *,
+    cursor: Any,
+    scope: TechIndicatorsScope,
+    page_size: int = DEFAULT_SOURCE_READ_PAGE_SIZE,
+) -> Iterator[tuple[SourceBar, ...]]:
+    """Yield exact OHLCV pages in provider/listing/date order.
+
+    Eligible listings are resolved once through :func:`select_eligible_listings`.
+    Each bounded SQL query advances with a strict composite keyset, so neither
+    this reader nor its caller must materialize the full source universe. The
+    caller owns transaction isolation, cancellation, commit, rollback, and
+    cursor lifetime.
+    """
+
+    _validate_cursor(cursor)
+    if not isinstance(scope, TechIndicatorsScope):
+        raise TypeError("scope must be a TechIndicatorsScope.")
+    _validate_page_size(page_size)
+
+    listings = select_eligible_listings(cursor=cursor, scope=scope)
+    if not listings:
+        return
+
+    listing_ids = [item.provider_listing_id for item in listings]
+    listing_identity = {
+        item.provider_listing_id: (item.provider_code, item.market, item.ticker)
+        for item in listings
+    }
+    after: tuple[str, str, str, UUID, date] | None = None
+
+    while True:
+        where_conditions = [
+            "daily.provider_listing_id = ANY(%s::uuid[])",
+        ]
+        parameters: list[object] = [listing_ids]
+        if scope.start_date is not None and scope.end_date is not None:
+            where_conditions.append("daily.trading_date BETWEEN %s AND %s")
+            parameters.extend((scope.start_date, scope.end_date))
+        if after is not None:
+            where_conditions.append(
+                """ROW(
+                    listing.provider_code,
+                    listing.market,
+                    listing.ticker,
+                    listing.provider_listing_id,
+                    daily.trading_date
+                ) > ROW(%s, %s, %s, %s, %s)"""
+            )
+            parameters.extend(after)
+        parameters.append(page_size)
+
+        cursor.execute(
+            f"""
+            SELECT
+                listing.provider_code,
+                listing.market,
+                listing.ticker,
+                listing.provider_listing_id,
+                daily.trading_date,
+                daily.open,
+                daily.high,
+                daily.low,
+                daily.close,
+                daily.volume
+            FROM stonks.ohlcv_daily AS daily
+            JOIN stonks.provider_listing AS listing
+              ON listing.provider_listing_id = daily.provider_listing_id
+            WHERE {' AND '.join(where_conditions)}
+            ORDER BY
+                listing.provider_code,
+                listing.market,
+                listing.ticker,
+                listing.provider_listing_id,
+                daily.trading_date
+            LIMIT %s
+            """,
+            tuple(parameters),
+        )
+        rows = cursor.fetchall()
+        if len(rows) > page_size:
+            raise ValueError("Source-bar query returned more than one page.")
+        if not rows:
+            return
+
+        bars, after = _source_bar_page(
+            rows,
+            listing_identity=listing_identity,
+            after=after,
+        )
+        yield bars
+        if len(rows) < page_size:
+            return
+
+
 _SOURCE_VALUE_ELIGIBILITY_SQL = """(
     (
         listing.provider_code = 'EODDATA'
@@ -209,6 +310,54 @@ def _eligible_listing(row: object) -> EligibleListing:
         ) from exc
 
 
+def _source_bar_page(
+    rows: object,
+    *,
+    listing_identity: dict[UUID, tuple[str, str, str]],
+    after: tuple[str, str, str, UUID, date] | None,
+) -> tuple[tuple[SourceBar, ...], tuple[str, str, str, UUID, date]]:
+    if not isinstance(rows, list):
+        raise ValueError("Source-bar query returned an invalid page.")
+
+    bars: list[SourceBar] = []
+    previous = after
+    for row in rows:
+        if not isinstance(row, (tuple, list)) or len(row) != 10:
+            raise ValueError("Source-bar query returned an invalid row.")
+        provider_code, market, ticker, provider_listing_id, trading_date = row[:5]
+        key = (provider_code, market, ticker, provider_listing_id, trading_date)
+        if (
+            not isinstance(provider_listing_id, UUID)
+            or listing_identity.get(provider_listing_id)
+            != (provider_code, market, ticker)
+            or type(trading_date) is not date
+        ):
+            raise ValueError("Source-bar query returned identity drift.")
+        if previous is not None and key <= previous:
+            raise ValueError("Source-bar query returned unordered rows.")
+        try:
+            bars.append(
+                SourceBar(
+                    provider_listing_id=provider_listing_id,
+                    trading_date=trading_date,
+                    open=row[5],
+                    high=row[6],
+                    low=row[7],
+                    close=row[8],
+                    volume=row[9],
+                )
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "Source-bar query returned invalid OHLCV contract data."
+            ) from exc
+        previous = key
+
+    if previous is None:
+        raise ValueError("Source-bar query returned an empty page.")
+    return tuple(bars), previous
+
+
 def _validate_cursor(cursor: Any) -> None:
     if not callable(getattr(cursor, "execute", None)) or not callable(
         getattr(cursor, "fetchall", None)
@@ -216,8 +365,22 @@ def _validate_cursor(cursor: Any) -> None:
         raise TypeError("cursor must provide execute and fetchall methods.")
 
 
+def _validate_page_size(page_size: object) -> None:
+    if type(page_size) is not int:
+        raise TypeError("page_size must be an integer.")
+    if not MIN_SOURCE_READ_PAGE_SIZE <= page_size <= MAX_SOURCE_READ_PAGE_SIZE:
+        raise ValueError(
+            "page_size must be between "
+            f"{MIN_SOURCE_READ_PAGE_SIZE} and {MAX_SOURCE_READ_PAGE_SIZE}."
+        )
+
+
 def _date_to_string(value: date | None) -> str | None:
     return None if value is None else value.isoformat()
 
 
-__all__ = ["EligibleListing", "select_eligible_listings"]
+__all__ = [
+    "EligibleListing",
+    "iter_source_bar_pages",
+    "select_eligible_listings",
+]

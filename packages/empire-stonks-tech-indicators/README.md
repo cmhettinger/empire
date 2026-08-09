@@ -88,8 +88,9 @@ The immutable domain-model API consists of:
 - `ReasonCount` and `FeatureCounts` for deterministic aggregate ledgers
 - `TechIndicatorsSummary` for counts and at most 100 issue samples
 - `TechIndicatorsRunResult` for compact runner output
-- `EligibleListing` and `select_eligible_listings()` for caller-transaction-
-  owned P0.6 source selection and scoped source-history coverage
+- `EligibleListing`, `select_eligible_listings()`, and
+  `iter_source_bar_pages()` for caller-transaction-owned P0.6 selection and
+  bounded chronological OHLCV reads
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -107,6 +108,12 @@ active listings. Inactive listings require exact listing IDs plus
 facts; zero- and short-history listings remain visible so callers can apply an
 explicit minimum without confusing source-value support with history
 sufficiency.
+
+Chronological reads resolve that eligible listing set once, then use strict
+provider/market/ticker/listing/date keyset pages of 1,000-50,000 rows. Each
+page preserves exact `Decimal` OHLCV, nullable volume, calendar gaps, and
+negative-capable source values. The package never commits, rolls back, closes,
+or changes transaction isolation on the injected cursor.
 
 ## Development
 
