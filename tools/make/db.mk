@@ -1,4 +1,4 @@
-.PHONY: db-up db-down db-ps db-logs db-migrate db-info db-validate db-clean db-psql db-test-ohlcv-schema db-test-yahoo-seed db-test-eoddata-session-policy db-data-remediation
+.PHONY: db-up db-down db-ps db-logs db-migrate db-info db-validate db-clean db-psql db-test-ohlcv-schema db-test-tech-indicators-schema db-test-yahoo-seed db-test-eoddata-session-policy db-data-remediation
 
 db-up: ## Start postgres and pgbouncer
 	$(COMPOSE) up -d postgres pgbouncer
@@ -32,6 +32,9 @@ db-psql: ## Open psql against Postgres
 
 db-test-ohlcv-schema: ## Run transactional Stonks OHLCV schema contract tests
 	$(COMPOSE) exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < db/tests/stonks/ohlcv_schema_contract.sql
+
+db-test-tech-indicators-schema: ## Run transactional tech-indicators schema contract tests
+	$(COMPOSE) exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < db/tests/stonks/tech_indicators_schema_contract.sql
 
 db-test-yahoo-seed: ## Run transactional Yahoo listing/session-policy seed tests
 	$(COMPOSE) exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' < db/tests/stonks/yahoo_seed_contract.sql

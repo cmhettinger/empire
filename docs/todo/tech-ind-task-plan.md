@@ -158,7 +158,7 @@ and the proven incremental strategy.
 | S2.3 | [x] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
 | S2.4 | [x] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
 | S2.5 | [x] | Add Flyway migration | Create both payload slots, publication/membership state, the `ohlcv_daily_tech_indicators` published view, any proven recurrence state, comments, constraints, and indexes; migrate and validate successfully. | S2.1-S2.4 |
-| S2.6 | [ ] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
+| S2.6 | [x] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
 | S2.7 | [ ] | Add OHLCV regression | Prove no provider-identity, provider-isolation, source-cleanup, or existing-writer regression. | S2.5-S2.6 |
 | S2.8 | [ ] | Add database documentation group | Add technical tables to Stonks docs, regenerate schema/ERD/diagrams, and verify no stale artifacts. | S2.5-S2.7 |
 
@@ -218,6 +218,16 @@ both triggers. A rolled-back A/B publish/deactivate/retire fixture passed with
 generated-value and visibility assertions; Flyway migrated and validated 39
 migrations, pytest passed 85 tests, Poetry lock/public imports and migration-
 source/whitespace/fixture-residue/`git diff --check` audits passed.
+
+Done: 2026-08-09 — added the rollback-only
+`db/tests/stonks/tech_indicators_schema_contract.sql` suite and
+`make db-test-tech-indicators-schema` target. The suite passed with 64 exact
+expected failures plus valid A/B rows, all 23 generated formulas, warm-up
+nulls, catalog shape, keys, duplicates, bounds, benchmark/Core/publication
+dependencies, lifecycle/view visibility, and delete/cascade assertions; it
+left zero fixture residue. The existing OHLCV contract suite passed; pytest
+passed 85 tests; Poetry lock/public import, Flyway validation (39 migrations),
+whitespace, transaction-boundary, and `git diff --check` audits passed.
 
 ---
 
