@@ -154,7 +154,7 @@ or calculation code is committed.
 |----|--------|------|---------------|------------|
 | P0.1 | [x] | Ratify the design contract | Audit the existing design contract against live OHLCV/Core/reporting conventions, resolve contradictions without reopening settled scope, and mark it as the authoritative V1 baseline. | — |
 | P0.2 | [x] | Freeze naming conventions | Select package/import, table/state-table, calculation version, Core jobs, storage keys, object kinds, report IDs, CLI names, and DAG ID. | P0.1 |
-| P0.3 | [ ] | Freeze feature profile V1 | Convert the contract inventory into the exact persisted/generated/query-time profile, resolving only its named open units, nullability, and ownership decisions. | P0.1 |
+| P0.3 | [x] | Freeze feature profile V1 | Convert the contract inventory into the exact persisted/generated/query-time profile, resolving only its named open units, nullability, and ownership decisions. | P0.1 |
 | P0.4 | [ ] | Freeze formula semantics | Turn the contract formulas into executable specifications and resolve its named volatility, z-score, TA-Lib warm-up, tolerance, and denominator decisions. | P0.3 |
 | P0.5 | [ ] | Define SPX contract | Define `YAHOO/XIDX/SPX` resolution, eligible subjects, exact alignment, relative return, beta/correlation, complete windows, and unavailable behavior. | P0.3-P0.4 |
 | P0.6 | [ ] | Define source-value policy | Audit EODData, Stooq, and Yahoo adjustment/corporate-action semantics and select initially eligible provider listings without claiming normalization. | P0.1, OHLCV V10.11 |
@@ -178,6 +178,14 @@ state tables, `TECH_INDICATORS_V1`, Core jobs, environment/storage names,
 report artifacts/IDs, four CLIs, and Airflow DAG/task. Identifier syntax,
 length, uniqueness, and forbidden-legacy-name scans passed; `make db-validate`
 validated 38 migrations, and `git diff --check` passed.
+
+Done: 2026-08-09 — froze the exact 90-column V1 persisted, Python-computed,
+PostgreSQL-generated, and query-time profile in
+`docs/stonks/tech-indicators-feature-profile-v1.md`; linked its field
+ownership, units, and logical nullability from the design contract. Independent
+`python3` design/profile set comparison passed (`9 + 5 + 53 + 23 = 90`, no
+duplicates or inventory drift); P0.2/P0.3/P0.4 status, forbidden alternate
+identifier `rg` checks, and `git diff --check` passed.
 
 ---
 

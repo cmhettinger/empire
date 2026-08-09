@@ -246,10 +246,14 @@ Cheap deterministic same-row arithmetic may use PostgreSQL `STORED` generated
 columns. This keeps reads fast and prevents Python from persisting inconsistent
 copies of formulas derivable from the same row.
 
-## Column Ownership Baseline
+## Frozen V1 Feature Profile
 
-The exact Flyway DDL is finalized in Phase 2, but tasks should begin from this
-ownership split.
+The exact P0.3 field presence, units, logical nullability, and ownership
+contract is frozen in
+[`tech-indicators-feature-profile-v1.md`](tech-indicators-feature-profile-v1.md).
+The categories below are a design summary; the feature-profile document is
+authoritative when implementing the migration, calculator, repository, CLI,
+reports, or DAG.
 
 ### Identity And Metadata
 
@@ -302,10 +306,11 @@ spx_beta_60d, spx_correlation_60d
 spx_beta_252d, spx_correlation_252d
 ```
 
-Phase 1 may move a recursive output between Python-calculated and generated
-ownership only if the pinned TA-Lib equivalence proof supports it.
+Phase 1 may select a recurrence strategy, but it may not silently move a V1
+field between Python-calculated and generated ownership. Any ownership change
+requires an explicit feature-profile amendment.
 
-### Stored Same-Row Derived Candidates
+### Persisted PostgreSQL Stored Generated Values
 
 ```text
 dollar_volume
@@ -325,9 +330,9 @@ macd_12_26_pct
 macd_histogram_12_26_9_pct
 ```
 
-These should be `STORED` generated columns when PostgreSQL supports the exact
-agreed expression cleanly. Otherwise Python may write them, but the choice must
-be explicit and formula-tested.
+These are PostgreSQL `STORED` generated columns in V1. There is no implicit
+Python fallback; any required ownership change needs an explicit profile
+amendment before migration implementation.
 
 ## Formula Baseline
 
@@ -392,9 +397,9 @@ contract. ATR percentage is:
 atr_pct_14 = atr_14 / abs(close)
 ```
 
-Return volatility uses rolling one-observation returns. Phase P0.4 must select
-sample versus population deviation and confirm whether values remain daily or
-are annualized; the selected column names must make that unit unambiguous.
+Return volatility uses rolling one-observation returns. P0.3 freezes the unit
+as non-annualized decimal-return dispersion. Phase P0.4 must select sample
+versus population deviation and freeze the exact complete-window calculation.
 
 The z-score columns use a 20-observation reference distribution. P0.4 must
 freeze whether the current return participates in that distribution. Zero
@@ -655,8 +660,9 @@ chats should resolve them rather than reopen the entire design:
 | Decision | Owning tasks |
 |----------|--------------|
 | Exact naming/version/report/object conventions | P0.2 (frozen above) |
-| Final generated-column ownership and DDL types | S2.1-S2.3 |
-| Sample/population and annualized/daily volatility | P0.4 |
+| Exact V1 field ownership, units, and logical nullability | P0.3 (frozen in `tech-indicators-feature-profile-v1.md`) |
+| Final DDL types and generated expressions | S2.1-S2.3 |
+| Sample/population volatility estimator and window mechanics | P0.4 |
 | Z-score reference inclusion | P0.4 |
 | Eligible source and SPX subject universes | P0.5-P0.6 |
 | TA-Lib/NumPy versions and Airflow packaging | B1.1 |
