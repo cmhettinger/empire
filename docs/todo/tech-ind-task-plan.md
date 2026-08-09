@@ -152,7 +152,7 @@ every runtime before building around it.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| B1.1 | [ ] | Prove TA-Lib runtime support | Pin a reviewed TA-Lib/NumPy combination and prove local Poetry and Airflow-image installation/import. Record wheel/native-library behavior, license, Python compatibility, and rollback. | P0.4, P0.8 |
+| B1.1 | [x] | Prove TA-Lib runtime support | Pin a reviewed TA-Lib/NumPy combination and prove local Poetry and Airflow-image installation/import. Record wheel/native-library behavior, license, Python compatibility, and rollback. | P0.4, P0.8 |
 | B1.2 | [ ] | Prototype recursive equivalence | Compare full-series output with append and historical-correction suffix strategies for EMA, RSI, ATR, ADX, and MACD. Decide whether exact updates require state, bounded replay, or full replay. | B1.1, P0.7 |
 | B1.3 | [ ] | Scaffold Poetry package | Create `packages/empire-stonks-tech-indicators` version `0.1.0` with `src/` layout, README, tests, minimum dependencies, isolated import, lock, and build. | B1.1 |
 | B1.4 | [ ] | Add exceptions and exports | Add a small public exception hierarchy and explicit API without exposing TA-Lib or persistence internals. | B1.3 |
@@ -160,6 +160,16 @@ every runtime before building around it.
 | B1.6 | [ ] | Add typed base models | Add immutable source-bar, feature-row, scope, benchmark, issue, count, summary, and run-result models with bounded JSON-ready forms. | P0.3-P0.7, B1.4 |
 | B1.7 | [ ] | Install in Airflow image | Install in dependency-safe order and prove tech-indicators, TA-Lib, NumPy, Core, and OHLCV imports coexist in the built image. | B1.1, B1.3 |
 | B1.8 | [ ] | Add runtime settings plumbing | Add non-secret example/local settings and Compose passthrough without embedding configuration in images or DAGs. | B1.5, B1.7 |
+
+Done: 2026-08-09 — pinned wheel-only TA-Lib 0.7.1/C 0.7.1 and NumPy
+2.4.6 in `deploy/docker/airflow/airflow-requirements.txt`; added
+`docs/stonks/tech-indicators-runtime-contract-v1.md` and
+`tools/tech-indicators/runtime-smoke.py`. A clean CPython 3.14.6 Poetry env
+passed lock, exact-version calculation smoke, native-link/license inspection,
+and `pip check`; `make airflow-build` completed 19 steps, and final CPython
+3.13.13 Airflow one-offs passed the same smoke, Airflow/Core/OHLCV coexistence
+imports, and `pip check`. Compilation, local-link, and `git diff --check`
+passed.
 
 ---
 

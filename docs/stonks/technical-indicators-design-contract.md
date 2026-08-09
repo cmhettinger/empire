@@ -603,6 +603,10 @@ formula code and are fast over contiguous arrays. Empire still owns input
 ordering, formula parameters, warm-up interpretation, versioning, validation,
 persistence, and independent regression tests.
 
+B1.1 freezes TA-Lib 0.7.1, its bundled C library 0.7.1, and NumPy 2.4.6,
+including wheel, Python, license, verification, and rollback behavior, in
+[`tech-indicators-runtime-contract-v1.md`](tech-indicators-runtime-contract-v1.md).
+
 ## Publication, Readiness, And Concurrency Contract
 
 Calculation completion and feature publication are separate concepts. A
