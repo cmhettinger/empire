@@ -245,6 +245,12 @@ exact and performant EMA, RSI, ATR, ADX, or MACD updates.
 
 ## Type And Validation Decisions
 
+S2.1 freezes the exact payload and published-view names, order, PostgreSQL
+types, generated expressions, defaults, ownership, and comments in
+[`tech-indicators-payload-schema-v1.md`](tech-indicators-payload-schema-v1.md).
+The feature profile remains authoritative for logical field presence and
+units; the payload schema is authoritative for its DDL translation.
+
 - Copied OHLCV values retain source-compatible exact `NUMERIC` types.
 - Derived analytical features normally use `DOUBLE PRECISION` for TA-Lib,
   NumPy, comparison, sorting, and storage performance.

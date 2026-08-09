@@ -153,7 +153,7 @@ and the proven incremental strategy.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| S2.1 | [ ] | Finalize payload/view columns | Translate the design-contract baseline into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, view projection, metadata, and comments; both payload slots share the exact 90-column profile and every column has one formula owner. | P0.3-P0.9, B1.2 |
+| S2.1 | [x] | Finalize payload/view columns | Translate the design-contract baseline into exact PostgreSQL names, types, generated expressions, nullability, copied OHLCV, view projection, metadata, and comments; both payload slots share the exact 90-column profile and every column has one formula owner. | P0.3-P0.9, B1.2 |
 | S2.2 | [ ] | Finalize auxiliary state schemas | Based on B1.2, explicitly reject or design minimal recurrence state, and translate P0.9's two slots, publication lifecycle, membership, and published view without generic markers or mixed visibility. | B1.2, P0.9, S2.1 |
 | S2.3 | [ ] | Finalize keys and constraints | Define PK/source FK, benchmark/Core/publication FKs, delete actions, version checks, basic bounds, streak/relative row shape, and Python-owned validation boundary. | S2.1-S2.2 |
 | S2.4 | [ ] | Design initial indexes | Use representative latest-date scans, listing history, backfill, rankings, and correction queries to select minimal indexes with `EXPLAIN` evidence. | P0.8, S2.1-S2.3 |
@@ -161,6 +161,17 @@ and the proven incremental strategy.
 | S2.6 | [ ] | Add schema contract tests | Add rollback-only SQL tests for keys, cascades, generated formulas, warm-up nulls, bounds, benchmark/publication dependencies, duplicates, and valid rows. | S2.5 |
 | S2.7 | [ ] | Add OHLCV regression | Prove no provider-identity, provider-isolation, source-cleanup, or existing-writer regression. | S2.5-S2.6 |
 | S2.8 | [ ] | Add database documentation group | Add technical tables to Stonks docs, regenerate schema/ERD/diagrams, and verify no stale artifacts. | S2.5-S2.7 |
+
+Done: 2026-08-09 — froze the shared ordered 90-column slot/view DDL,
+source-compatible copied types, all 23 `DOUBLE PRECISION` stored expressions,
+65-column writer boundary, metadata/default ownership, and SQL comment contract
+in `docs/stonks/tech-indicators-payload-schema-v1.md`; linked the design
+handoff. A rolled-back PostgreSQL temporary table compiled all expressions and
+matched nine representative generated values; pytest passed 85 tests; Poetry
+lock/public imports passed; independent profile/model/schema audits passed (90
+= 9 + 5 + 53 + 23, 65 writable fields, identical explicit view projection,
+23 generated owners, 90 comment mappings); `make db-validate` validated 38
+migrations; local-link, forbidden-field, and `git diff --check` scans passed.
 
 ---
 
