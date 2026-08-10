@@ -9,6 +9,8 @@ from reportlab.lib.colors import HexColor
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
+from empire_reports.assets import AssetRegistry
+
 
 EMPIRE_PRIMARY_RED: Final[str] = "#8B0000"
 EMPIRE_ACCENT_RED: Final[str] = "#C1121F"
@@ -23,24 +25,18 @@ class BrandingConfig:
     root: Path
 
     @classmethod
-    def discover(cls, start: Path | None = None) -> "BrandingConfig":
+    def discover(
+        cls,
+        start: Path | None = None,
+        *,
+        assets: AssetRegistry | None = None,
+    ) -> "BrandingConfig":
         env_root = os.environ.get("EMPIRE_BRANDING_ROOT")
         if env_root:
             return cls(root=Path(env_root).expanduser().resolve())
 
-        start_path = Path(start or Path.cwd()).expanduser().resolve()
-        for candidate in (start_path, *start_path.parents):
-            branding_root = candidate / "resources" / "branding"
-            if branding_root.exists():
-                return cls(root=branding_root)
-
-        package_root = Path(__file__).resolve()
-        for candidate in package_root.parents:
-            branding_root = candidate / "resources" / "branding"
-            if branding_root.exists():
-                return cls(root=branding_root)
-
-        return cls(root=(start_path / "resources" / "branding").resolve())
+        asset_registry = assets or AssetRegistry.discover(start)
+        return cls(root=asset_registry.branding_dir)
 
     @property
     def fonts_dir(self) -> Path:

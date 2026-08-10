@@ -12,6 +12,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import Flowable, Image, Paragraph, Spacer
 
+from empire_reports.assets import AssetRegistry
 from empire_reports.branding import BrandingConfig, ReportTheme
 from empire_reports.renderers.pdf.styles import ReportStyles
 
@@ -279,6 +280,7 @@ class ProfessionalLetterDisclaimerPage(Flowable):
         warning_text: str = (
             "This system is currently in development and not intended for live trading"
         ),
+        assets: AssetRegistry | None = None,
         branding: BrandingConfig | None = None,
         theme: ReportTheme | None = None,
         quote_image_path: Path | None = None,
@@ -287,10 +289,11 @@ class ProfessionalLetterDisclaimerPage(Flowable):
         self.header_text = header_text
         self.footer_text = footer_text
         self.warning_text = warning_text
-        self.branding = branding or BrandingConfig.discover()
+        self.assets = assets or AssetRegistry.discover()
+        self.branding = branding or BrandingConfig.discover(assets=self.assets)
         self.theme = theme or ReportTheme()
-        self.quote_image_path = quote_image_path or (
-            self.branding.root / "images" / "buffett-no-crying.png"
+        self.quote_image_path = quote_image_path or self.assets.image_path(
+            "buffett-no-crying.png"
         )
 
     def wrap(
@@ -400,6 +403,7 @@ def professional_letter_disclaimer_page(
     warning_text: str = (
         "This system is currently in development and not intended for live trading"
     ),
+    assets: AssetRegistry | None = None,
     branding: BrandingConfig | None = None,
     theme: ReportTheme | None = None,
     quote_image_path: Path | None = None,
@@ -409,6 +413,7 @@ def professional_letter_disclaimer_page(
             header_text=header_text,
             footer_text=footer_text,
             warning_text=warning_text,
+            assets=assets,
             branding=branding,
             theme=theme,
             quote_image_path=quote_image_path,

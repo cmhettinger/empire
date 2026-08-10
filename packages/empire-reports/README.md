@@ -10,6 +10,7 @@ Belongs in `empire-reports`:
 
 - Shared render contracts and artifact models
 - Output path helpers
+- Shared report asset discovery and validated image/icon paths
 - Empire branding and ReportLab font registration
 - Common PDF document, page template, header/footer, style, table, image, and chart helpers
 - Small generic writers such as JSON output
@@ -75,6 +76,25 @@ result = renderer.render(
 
 By default, `BrandingConfig.discover()` looks for the repository root and uses `resources/branding`. Runtimes can set `EMPIRE_BRANDING_ROOT` to point at a different branding bundle. The package registers the Source Sans 3, Cinzel, and Source Code Pro fonts when the files are available, while falling back to ReportLab built-in fonts when they are not.
 
+## Report Assets
+
+`AssetRegistry` discovers the shared `resources` directory. Local repository runs
+are discovered automatically; deployed runtimes should set
+`EMPIRE_RESOURCES_ROOT`. Image and icon lookups validate that the requested file
+exists and remains inside its expected directory:
+
+```python
+from empire_reports import AssetRegistry
+
+assets = AssetRegistry.discover()
+quote_image = assets.image_path("buffett-no-crying.png")
+chart_icon = assets.icon_path("bar-chart-1.svg")
+```
+
+`PdfRenderer` exposes the same registry as `renderer.assets`, so domain report
+templates can resolve shared assets without constructing repository-relative
+paths. Branding remains separately overridable through `EMPIRE_BRANDING_ROOT`.
+
 ## Future Render Targets
 
 The package exposes a stable `OutputFormat` enum and renderer contract for PDF, audio, video, JSON, XLSX, HTML, and email. Only PDF and a minimal JSON writer are implemented in this first version. Audio, video, and XLSX directories exist so future domain reports can adopt the same target-specific layout without changing the common contracts.
@@ -92,6 +112,7 @@ The main package concepts are:
 - `ReportArtifact`: a rendered file plus structured metadata such as format, media type, logical name, and optional object key.
 - `RenderResult`: the report metadata, generated artifacts, and generation timestamp.
 - `OutputFormat`: shared format vocabulary for `pdf`, `audio`, `video`, `json`, `xlsx`, `html`, and `email`.
+- `AssetRegistry`: discovers shared report resources from `resources` or `EMPIRE_RESOURCES_ROOT` and validates image/icon paths.
 - `BrandingConfig`: discovers Empire branding assets from `resources/branding` or `EMPIRE_BRANDING_ROOT`.
 - `ReportTheme`: centralizes brand colors and ReportLab font names.
 - `PdfRenderer`: builds PDF artifacts from ReportLab flowables.

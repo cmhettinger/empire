@@ -84,6 +84,7 @@ def render_yahoo_daily_benchmark_pdf(
         *professional_letter_disclaimer_page(
             header_text=HEADER_TEXT,
             footer_text=FOOTER_TEXT,
+            assets=renderer.assets,
             branding=renderer.branding,
             theme=renderer.theme,
         ),

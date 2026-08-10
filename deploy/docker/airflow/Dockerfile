@@ -25,9 +25,10 @@ COPY deploy/docker/airflow/airflow-requirements.txt /requirements.txt
 
 RUN pip install --no-cache-dir -r /requirements.txt
 
-COPY resources/branding /opt/empire/resources/branding
+COPY resources /opt/empire/resources
 
-ENV EMPIRE_BRANDING_ROOT=/opt/empire/resources/branding
+ENV EMPIRE_RESOURCES_ROOT=/opt/empire/resources \
+    EMPIRE_BRANDING_ROOT=/opt/empire/resources/branding
 
 COPY packages/empire-mail /opt/empire/packages/empire-mail
 

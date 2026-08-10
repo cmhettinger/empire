@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Sequence
 
 from empire_reports.artifacts import ReportArtifact
+from empire_reports.assets import AssetRegistry
 from empire_reports.branding import BrandingConfig, register_brand_fonts
 from empire_reports.contracts import OutputFormat, RenderContext, RenderResult, ReportMetadata
 from empire_reports.paths import default_output_path
@@ -27,10 +28,12 @@ class PdfRenderer:
         metadata: ReportMetadata,
         context: RenderContext,
         branding: BrandingConfig | None = None,
+        assets: AssetRegistry | None = None,
     ) -> None:
         self.metadata = metadata
         self.context = context
-        self.branding = branding or BrandingConfig.discover()
+        self.assets = assets or AssetRegistry.discover()
+        self.branding = branding or BrandingConfig.discover(assets=self.assets)
         self.theme = register_brand_fonts(self.branding)
         self.styles = make_report_styles(self.theme)
 

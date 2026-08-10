@@ -88,6 +88,7 @@ def test_professional_disclaimer_page_uses_brand_assets(tmp_path: Path) -> None:
         context=RenderContext(output_dir=tmp_path),
     )
     story = professional_letter_disclaimer_page(
+        assets=renderer.assets,
         branding=renderer.branding,
         theme=renderer.theme,
     )
