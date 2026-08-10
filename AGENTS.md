@@ -1,297 +1,197 @@
 # Empire Monorepo Instructions
 
-## Project Overview
+## Project Identity
 
-Empire is a local-first research, automation, and AI platform.
+Empire is a local-first research, automation, and AI platform focused on
+correctness, reproducibility, and explicit system design.
 
-Empire is intentionally designed as a reusable platform rather than a collection of tightly coupled scripts or framework-specific implementations.
+Empire owns reusable capabilities. Frameworks and runtimes consume them.
 
-The platform foundation includes:
+The platform is Python-first and uses PostgreSQL, PgBouncer, Flyway, Airflow,
+Redis, Docker Compose, Poetry, and Make-driven workflows.
 
-- PostgreSQL
-- PgBouncer
-- Flyway
-- Airflow
-- Redis
-- Docker Compose
-- Poetry
-- Makefile-driven workflows
-
-Empire is Python-first.
-
----
-
-## Architecture Philosophy
+## Design Priorities
 
 When making implementation decisions, prioritize:
 
-1. Reusable packages over framework-specific code
-2. Explicit/simple designs over clever abstractions
-3. Platform ownership over framework ownership
-4. Real implementation over throwaway/prototype code
-5. Minimal dependencies unless clearly justified
+1. Correctness and reproducibility
+2. Reusable packages over framework-specific code
+3. Explicit, simple designs over clever abstractions
+4. Clear ownership and modular boundaries
+5. Working end-to-end increments over unfinished infrastructure
+6. Maintainability over short-term convenience
 
-Avoid overengineering early.
+Choose the simplest implementation that fully meets the current requirements.
+Build the smallest clean version that works end to end, then add capabilities in
+layers without trading away a working system for speculative complexity.
 
-Build the smallest clean version that can grow naturally.
+Avoid deep abstraction layers, premature plugin systems, overly generic
+factories, heavy dependency injection, hidden behavior, and magic configuration.
 
-Prefer maintainable and understandable code.
-
----
-
-## Ownership Boundaries
-
-Empire owns business logic and reusable capabilities.
-
-Frameworks consume Empire.
-
-### Good
-
-Airflow DAG calls reusable package logic:
-
-```python
-from empire_mail import send_report_email
-
-send_report_email(...)
-```
-
-### Bad
-
-Business logic embedded directly inside DAG files:
-
-```python
-def airflow_task():
-    smtp = smtplib.SMTP(...)
-```
-
-Airflow should orchestrate only.
-
-Reusable logic belongs under `packages/`.
-
----
-
-## Monorepo Structure
-
-Expected repository layout:
+## Repository Ownership
 
 ```text
-apps/       runnable applications/services
-packages/   reusable shared libraries
-db/         flyway migrations and schema
-deploy/     docker/compose/env
-dags/       airflow orchestration only
-bin/        operational scripts
-tools/      build tooling
-resources/  prompts/assets/etc
+apps/          runnable applications and services
+packages/      reusable shared libraries and business capabilities
+db/            Flyway migrations, schema assets, seeds, and remediations
+deploy/        Docker Compose, images, and runtime configuration
+dags/          thin Airflow orchestration
+bin/           operational entry points and workflows
+tools/         build, documentation, and developer tooling
+docs/          canonical repository and domain documentation
+resources/     versioned prompts, branding, samples, and static assets
+object-store/  local runtime storage; only versioned configuration is committed
+output/        local generated output, not canonical source
+tmp/           disposable local artifacts, caches, and generator intermediates
 ```
 
-Guidelines:
+Place reusable logic in `packages/`. Keep `apps/`, `dags/`, and `bin/` focused on
+runtime composition, orchestration, and operator-facing entry points.
 
-- `apps/` = runnable systems
-- `packages/` = reusable libraries
-- `dags/` = orchestration only
-- `db/` = database ownership
-- `deploy/` = runtime configuration
+Before changing established behavior, read the relevant package `README.md` and
+domain documentation under `docs/`. Treat documented contracts as intentional
+unless the task explicitly changes them.
 
-If code may be reused, it belongs in `packages/`.
+## Python and Package Standards
 
----
+Reusable Python packages should:
 
-## Environment Configuration
+- Use Poetry and a `src/` layout.
+- Prefer explicit typing and small, focused modules.
+- Use dataclasses for simple models and configuration when appropriate.
+- Expose simple interfaces without depending on repository paths or a specific
+  runtime such as Airflow.
+- Keep dependencies focused and declared in the owning package.
 
-Empire uses shared environment files under `deploy/env/`. For local development,
-the active file is:
+Before writing a new implementation or adding a dependency, inspect existing
+Empire packages and installed dependencies. Check their documentation, public
+APIs, and types rather than assuming a capability is missing.
+
+Prefer established, well-maintained libraries when they reduce total complexity
+or improve reliability. Otherwise prefer the standard library. Add a dependency
+only when its value clearly outweighs its operational and maintenance cost.
+
+## Configuration and Secrets
+
+The local runtime loads configuration from:
 
 ```text
 deploy/env/local.env
 ```
 
-### Rules
+The committed template is `deploy/env/local.example.env`. Never commit secrets or
+real environment files.
 
-Reusable packages MUST:
+Reusable packages must:
 
-- Read configuration from `os.environ`
-- Be environment-driven
-- Remain runtime agnostic
+- Read configuration from `os.environ` or accept it explicitly from callers.
+- Remain environment-driven and runtime agnostic.
+- Use consistent `EMPIRE_*` names for Empire-owned settings.
 
-Reusable packages MUST NOT:
+Reusable packages must not:
 
-- Load `.env` files internally
-- Use `python-dotenv`
-- Assume paths to files under `deploy/env/`
-- Depend on repo filesystem structure
-- Own environment loading
+- Load `.env` files or use `python-dotenv`.
+- Assume the location of `deploy/env/` or any repository-relative file.
+- Own environment loading.
 
-Environment loading belongs to the runtime:
+Environment loading belongs to Docker Compose, shell entry points, CLIs,
+Airflow, APIs, and other runtimes.
 
-- Docker Compose
-- Shell scripts
-- CLI execution
-- Airflow containers
-- APIs
+## Database and Data Ownership
 
-### Good
+PostgreSQL schemas and persisted data are compatibility boundaries. Change them
+deliberately and provide forward migration or transition handling.
 
-```python
-import os
+- Add forward Flyway migrations for schema and versioned seed changes.
+- Do not rewrite an already-applied versioned migration to change current
+  behavior.
+- Keep one-off, opt-in data fixes under `db/data-remediations/`; do not add that
+  directory to Flyway migration locations.
+- Preserve lineage, auditability, and deterministic behavior in ingestion and
+  reconciliation workflows.
+- Put reusable database access and domain logic in the owning package, not in a
+  DAG or shell script.
 
-db_host = os.environ["EMPIRE_DB_HOST"]
-```
+Use the Make targets and scripts documented by the repository rather than
+constructing ad hoc database commands when an established workflow exists.
 
-### Bad
+## Airflow and Operational Boundaries
 
-```python
-from dotenv import load_dotenv
+Airflow is orchestration only. DAGs should call reusable package APIs, remain
+thin, and avoid embedding business logic, provider clients, SQL workflows, or
+report construction.
 
-load_dotenv()
-load_dotenv("deploy/env/local.env")
-```
+Operational scripts under `bin/` should parse operator input, load runtime
+configuration, call package logic, and return clear exit status and diagnostics.
+Do not duplicate package behavior in shell or DAG code.
 
----
+## Documentation and Generated Artifacts
 
-## Python Standards
+The `docs/` tree is canonical documentation. Update relevant documentation when
+behavior, configuration, contracts, or operator workflows change.
 
-Empire is Python-first.
+Files under `docs/db/*/generated/` are tool-owned. Do not edit them by hand;
+change migrations, documentation group definitions, or generator code and then
+regenerate them with the documented Make targets.
 
-### Package Standards
+Do not treat `tmp/`, `output/`, caches, runtime object-store data, or other
+generated artifacts as canonical source.
 
-- Use Poetry
-- Prefer `src/` layout
-- Prefer explicit typing
-- Prefer dataclasses for simple models/config
-- Keep dependencies minimal
-- Use stdlib when practical
+## Compatibility and Incremental Change
 
-### Dependency Philosophy
+Do not preserve obsolete internal paths merely out of habit. Remove dead code
+when its removal is within scope, and do not add compatibility layers without an
+identified consumer or migration need.
 
-Ask:
+Treat these as compatibility boundaries unless the task explicitly changes
+them:
 
-> Does this dependency meaningfully reduce complexity?
+- Database schemas and persisted data
+- Public package APIs
+- CLI arguments, exit behavior, and machine-readable output
+- Report and payload contracts
+- Object-store keys, layouts, and retention behavior
+- Documented operational workflows
 
-If not, prefer stdlib.
+When changing a compatibility boundary, update its consumers, tests,
+documentation, and migration or transition path together.
 
-Avoid unnecessary frameworks.
+Avoid knowingly disposable stopgaps. If temporary work is explicitly required,
+isolate it, document the limitation and removal condition, and do not let it
+become an implicit architecture.
 
----
+## Safety
 
-## Code Style Preferences
+Never run destructive database, object-store, filesystem, or remediation
+operations as routine validation. Commands such as `db-clean`, purge/nuke
+scripts, and opt-in data remediations require explicit task scope and careful
+target verification.
 
-Prefer:
+Preserve unrelated user changes in the worktree. Do not overwrite, reset, or
+clean files outside the task.
 
-- Explicit code
-- Small focused modules
-- Readability over cleverness
-- Clear names
-- Simple interfaces
+## Validation and Completion
 
-Avoid:
+Before finishing an implementation:
 
-- Deep abstraction layers
-- Premature plugin systems
-- Overly generic factories
-- Heavy dependency injection
-- Magic behavior
-
-Simple > clever.
-
----
-
-## Configuration Philosophy
-
-Empire capabilities should be configured via environment variables.
-
-Example naming:
-
-```text
-EMPIRE_DB_HOST
-EMPIRE_DB_PORT
-
-EMPIRE_MAIL_SMTP_HOST
-EMPIRE_MAIL_USERNAME
-
-EMPIRE_AI_MODEL
-```
-
-Configuration should be:
-
-- Explicit
-- Environment-driven
-- Consistent
-- Shared across Empire
-
----
-
-## Airflow Standards
-
-Airflow is orchestration only.
-
-DAGs should:
-
-- Call reusable package logic
-- Remain thin
-- Avoid embedding business logic
-
-### Good
-
-```python
-from empire_mail import send_report_email
-
-@task
-def send():
-    send_report_email(...)
-```
-
-### Bad
-
-```python
-@task
-def send():
-    smtp = smtplib.SMTP(...)
-```
-
-Empire owns capabilities.
-
-Airflow consumes them.
-
----
-
-## Before Completing Work
-
-Before finishing any implementation:
-
-1. Run formatting if configured
-2. Run linting if configured
-3. Run tests for changed code
-4. Verify imports work
-5. Summarize changes made
-6. Explain non-obvious design decisions
+1. Inspect the owning package's `pyproject.toml` and `README.md` for its actual
+   commands and contracts.
+2. Run the narrowest relevant tests, normally `poetry run pytest` from each
+   changed package.
+3. Run relevant PostgreSQL integration or Make-based schema tests when database
+   behavior changes and the required services are available.
+4. Run formatting or linting only where configured; do not claim checks that the
+   repository does not define.
+5. Verify imports, CLI entry points, generated artifacts, and documentation as
+   appropriate to the change.
+6. Report what was validated and clearly identify anything not run.
+7. Summarize changes and explain non-obvious design decisions.
 
 Do not stop after generating code without validation.
-
----
-
-## Versioning
-
-Reusable packages should use semantic versioning.
-
-During early development:
-
-```text
-0.x.y
-```
-
-Example:
-
-```text
-0.1.0
-```
-
-until APIs stabilize.
-
----
 
 ## General Decision Rule
 
 When uncertain, ask:
 
-> What is the simplest reusable solution that fits Empire architecture without overengineering?
+> What is the simplest reusable solution that fits Empire's architecture,
+> preserves its intentional contracts, and works cleanly end to end?
