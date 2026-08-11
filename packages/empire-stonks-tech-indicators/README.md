@@ -86,6 +86,8 @@ It also exports the two immutable configuration types:
 The immutable domain-model API consists of:
 
 - `SourceBar` for one exact provider-native source observation
+- `CalculationArrays` and `normalize_source_bars()` for strict chronological,
+  contiguous source normalization with explicit nullable-volume masks
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -126,6 +128,14 @@ provider/market/ticker/listing/date keyset pages of 1,000-50,000 rows. Each
 page preserves exact `Decimal` OHLCV, nullable volume, calendar gaps, and
 negative-capable source values. The package never commits, rolls back, closes,
 or changes transaction isolation on the injected cursor.
+
+Calculation normalization accepts exactly one non-empty provider-listing
+series in already strict `trading_date` order; it never sorts, deduplicates, or
+creates calendar observations. Exact source records remain attached for later
+copy validation, while OHLCV values convert directly to read-only,
+C-contiguous `float64` arrays. Missing volume is represented by `NaN` plus an
+authoritative Boolean null mask, and zero volume remains zero. A finite source
+value that cannot remain finite after `float64` conversion fails calculation.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,

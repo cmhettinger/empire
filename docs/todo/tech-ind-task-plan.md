@@ -152,7 +152,7 @@ Goal: calculate non-TA-Lib features as pure, independently tested operations.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| C4.1 | [ ] | Normalize calculation arrays | Convert ordered source values to contiguous arrays with null masks and no silent reorder, zero fill, or look-ahead. | B1.6, I3.2 |
+| C4.1 | [x] | Normalize calculation arrays | Convert ordered source values to contiguous arrays with null masks and no silent reorder, zero fill, or look-ahead. | B1.6, I3.2 |
 | C4.2 | [ ] | Calculate returns | Implement 1/2/3/5/10/20/63/126/252-observation returns with agreed zero-denominator and warm-up behavior. | P0.4, C4.1 |
 | C4.3 | [ ] | Calculate bar structure | Implement gap, intraday return, range, close location, dollar volume, and copied source values; cover zero range and null volume. | P0.4, C4.1 |
 | C4.4 | [ ] | Calculate range relationships | Implement 20/50/252 highs and 20/50 lows without forward leakage. | P0.4, C4.1 |
@@ -160,6 +160,16 @@ Goal: calculate non-TA-Lib features as pure, independently tested operations.
 | C4.6 | [ ] | Calculate streak state | Implement up/down streaks with unchanged close resetting both; prove append/rebuild equivalence. | P0.4, C4.1 |
 | C4.7 | [ ] | Calculate return statistics | Implement 20/60 return volatility and defined 1d/3d 20-observation z-scores with zero-variance behavior. | P0.4, C4.1-C4.2 |
 | C4.8 | [ ] | Add core golden fixtures | Compare independent formulas, trustworthy legacy examples, gaps, discontinuities, short histories, and randomized invariants. | C4.2-C4.7 |
+
+Done: 2026-08-11 — added public lazy-loaded `CalculationArrays` and
+`normalize_source_bars()` in `empire_stonks_tech_indicators/arrays.py` with
+strict single-listing/date-order checks, exact attached source bars, read-only
+contiguous `float64` OHLCV, explicit nullable-volume masks, and finite-
+conversion failure; documented and tested gaps, prefix independence, negative/
+zero values, missing volume, tampering, mixed/reversed input, and overflow.
+Package pytest passed 155 tests with 1 expected Core-runtime skip; Poetry lock,
+`pip check`, wheel/sdist build, compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime
+smoke, public/cold imports, and `git diff --check` passed.
 
 ---
 
