@@ -88,6 +88,8 @@ The immutable domain-model API consists of:
 - `SourceBar` for one exact provider-native source observation
 - `CalculationArrays` and `normalize_source_bars()` for strict chronological,
   contiguous source normalization with explicit nullable-volume masks
+- `MaskedFloatArray`, `ReturnArrays`, and `calculate_returns()` for the nine
+  fixed V1 observation-return fields and their exact null masks
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -136,6 +138,13 @@ copy validation, while OHLCV values convert directly to read-only,
 C-contiguous `float64` arrays. Missing volume is represented by `NaN` plus an
 authoritative Boolean null mask, and zero volume remains zero. A finite source
 value that cannot remain finite after `float64` conversion fails calculation.
+
+V1 returns use lags of 1, 2, 3, 5, 10, 20, 63, 126, and 252 stored
+observations, never calendar offsets. Each field is null through its lag;
+afterward it is `close[i] / close[i-N] - 1` unless the converted prior close is
+exactly zero. Negative and arbitrarily small nonzero denominators remain
+eligible, valid zero returns remain zero, and non-finite calculated output
+fails the calculation rather than becoming null.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,

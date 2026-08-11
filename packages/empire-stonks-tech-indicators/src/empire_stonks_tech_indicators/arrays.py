@@ -60,6 +60,51 @@ def _volume_null_mask(bars: tuple[SourceBar, ...]) -> NullMask:
 
 
 @dataclass(frozen=True, eq=False)
+class MaskedFloatArray:
+    """One nullable calculated feature with an explicit null mask."""
+
+    values: FloatArray
+    null_mask: NullMask
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.values, np.ndarray):
+            raise TypeError("values must be a NumPy array.")
+        if self.values.dtype != np.dtype(np.float64):
+            raise TypeError("values must use float64 values.")
+        if self.values.ndim != 1:
+            raise ValueError("values must be one-dimensional.")
+        if not self.values.flags.c_contiguous:
+            raise ValueError("values must be C-contiguous.")
+        if self.values.flags.writeable:
+            raise ValueError("values must be read-only.")
+        if not isinstance(self.null_mask, np.ndarray):
+            raise TypeError("null_mask must be a NumPy array.")
+        if self.null_mask.dtype != np.dtype(np.bool_):
+            raise TypeError("null_mask must use boolean values.")
+        if self.null_mask.shape != self.values.shape:
+            raise ValueError("null_mask must match the values shape.")
+        if not self.null_mask.flags.c_contiguous:
+            raise ValueError("null_mask must be C-contiguous.")
+        if self.null_mask.flags.writeable:
+            raise ValueError("null_mask must be read-only.")
+        if not np.isnan(self.values[self.null_mask]).all():
+            raise ValueError("null positions must contain NaN.")
+        if not np.isfinite(self.values[~self.null_mask]).all():
+            raise ValueError("populated positions must contain finite values.")
+
+    def value_at(self, index: int) -> float | None:
+        """Return one Python value while preserving null rather than NaN."""
+
+        if type(index) is not int:
+            raise TypeError("index must be an integer.")
+        if index < 0 or index >= len(self.values):
+            raise IndexError("calculation array index is out of range.")
+        if self.null_mask[index]:
+            return None
+        return float(self.values[index])
+
+
+@dataclass(frozen=True, eq=False)
 class CalculationArrays:
     """One strictly chronological provider listing as calculation arrays.
 
@@ -203,4 +248,4 @@ def normalize_source_bars(source_bars: Iterable[SourceBar]) -> CalculationArrays
     )
 
 
-__all__ = ["CalculationArrays", "normalize_source_bars"]
+__all__ = ["CalculationArrays", "MaskedFloatArray", "normalize_source_bars"]

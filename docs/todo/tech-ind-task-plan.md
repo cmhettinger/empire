@@ -153,7 +153,7 @@ Goal: calculate non-TA-Lib features as pure, independently tested operations.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | C4.1 | [x] | Normalize calculation arrays | Convert ordered source values to contiguous arrays with null masks and no silent reorder, zero fill, or look-ahead. | B1.6, I3.2 |
-| C4.2 | [ ] | Calculate returns | Implement 1/2/3/5/10/20/63/126/252-observation returns with agreed zero-denominator and warm-up behavior. | P0.4, C4.1 |
+| C4.2 | [x] | Calculate returns | Implement 1/2/3/5/10/20/63/126/252-observation returns with agreed zero-denominator and warm-up behavior. | P0.4, C4.1 |
 | C4.3 | [ ] | Calculate bar structure | Implement gap, intraday return, range, close location, dollar volume, and copied source values; cover zero range and null volume. | P0.4, C4.1 |
 | C4.4 | [ ] | Calculate range relationships | Implement 20/50/252 highs and 20/50 lows without forward leakage. | P0.4, C4.1 |
 | C4.5 | [ ] | Calculate volume and liquidity | Implement 20/60 average volume and 20 average dollar volume with missing-volume and complete-window rules. | P0.4, C4.1, C4.3 |
@@ -170,6 +170,19 @@ zero values, missing volume, tampering, mixed/reversed input, and overflow.
 Package pytest passed 155 tests with 1 expected Core-runtime skip; Poetry lock,
 `pip check`, wheel/sdist build, compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime
 smoke, public/cold imports, and `git diff --check` passed.
+
+Done: 2026-08-11 — added public lazy-loaded `MaskedFloatArray`,
+`ReturnArrays`, and `calculate_returns()` in
+`empire_stonks_tech_indicators/{arrays,returns}.py` for all nine V1 observation
+lags with exact warm-up masks, exact-zero prior-close nulls, negative/tiny
+nonzero denominator support, finite-output failure, and read-only contiguous
+arrays. Tests cover every first-valid index, gaps, zero recovery, unchanged and
+negative closes, tiny denominators, prefix independence, masks, dtypes, and
+overflow. Package pytest passed 172 tests with 1 expected Core-runtime skip;
+Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
+compileall, NumPy
+2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and `git diff --check`
+passed.
 
 ---
 

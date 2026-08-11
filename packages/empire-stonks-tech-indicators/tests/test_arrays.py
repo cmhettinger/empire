@@ -44,8 +44,13 @@ def _bar(
 
 
 def test_array_api_is_explicitly_exported() -> None:
-    assert arrays_module.__all__ == ["CalculationArrays", "normalize_source_bars"]
+    assert arrays_module.__all__ == [
+        "CalculationArrays",
+        "MaskedFloatArray",
+        "normalize_source_bars",
+    ]
     assert public_api.CalculationArrays is CalculationArrays
+    assert public_api.MaskedFloatArray is arrays_module.MaskedFloatArray
     assert public_api.normalize_source_bars is normalize_source_bars
 
 

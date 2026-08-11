@@ -47,20 +47,43 @@ from empire_stonks_tech_indicators.state import (
 if TYPE_CHECKING:
     from empire_stonks_tech_indicators.arrays import (
         CalculationArrays,
+        MaskedFloatArray,
         normalize_source_bars,
+    )
+    from empire_stonks_tech_indicators.returns import (
+        ReturnArrays,
+        calculate_returns,
     )
 
 
 def __getattr__(name: str) -> object:
-    if name in {"CalculationArrays", "normalize_source_bars"}:
+    if name in {
+        "CalculationArrays",
+        "MaskedFloatArray",
+        "normalize_source_bars",
+    }:
         from empire_stonks_tech_indicators.arrays import (
             CalculationArrays,
+            MaskedFloatArray,
             normalize_source_bars,
         )
 
         exports = {
             "CalculationArrays": CalculationArrays,
+            "MaskedFloatArray": MaskedFloatArray,
             "normalize_source_bars": normalize_source_bars,
+        }
+        globals().update(exports)
+        return exports[name]
+    if name in {"ReturnArrays", "calculate_returns"}:
+        from empire_stonks_tech_indicators.returns import (
+            ReturnArrays,
+            calculate_returns,
+        )
+
+        exports = {
+            "ReturnArrays": ReturnArrays,
+            "calculate_returns": calculate_returns,
         }
         globals().update(exports)
         return exports[name]
@@ -76,12 +99,15 @@ __all__ = [
     "BenchmarkConfig",
     "TechIndicatorsConfig",
     "CalculationArrays",
+    "MaskedFloatArray",
+    "ReturnArrays",
     "BenchmarkHistory",
     "EligibleListing",
     "EODDATA_DAILY_JOB_NAME",
     "ListingStateComparison",
     "SourceReadinessDecision",
     "YAHOO_DAILY_JOB_NAME",
+    "calculate_returns",
     "decide_source_readiness",
     "iter_source_bar_pages",
     "iter_state_comparison_pages",
