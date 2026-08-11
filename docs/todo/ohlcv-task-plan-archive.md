@@ -801,9 +801,7 @@ warning/failure, and native-semantics sections. The runner now stores durable
 and successful CLI output. JSON remains authoritative for the complete bounded
 sample. Unit tests cover rendering, metadata, Core storage, success wiring, and
 partial reports; PostgreSQL tests cover successful, failed-chunk, and replay
-storage. The real H7.8 JSON report was rendered to
-`output/pdf/stooq-history-backfill-report.pdf` and all four pages passed visual
-inspection after Poppler rendering.
+storage.
 
 ## Phase 8: Yahoo Daily End-To-End Vertical Slice
 

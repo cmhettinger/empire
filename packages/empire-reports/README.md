@@ -91,7 +91,7 @@ needed:
 
 ```bash
 bin/report-playground \
-  --output output/pdf/my-report-playground.pdf \
+  --output "$EMPIRE_TEMP_DIR/my-report-playground.pdf" \
   --date 2026-08-11
 ```
 

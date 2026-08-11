@@ -41,7 +41,6 @@ tools/         build, documentation, and developer tooling
 docs/          canonical repository and domain documentation
 resources/     versioned prompts, branding, samples, and static assets
 object-store/  local runtime storage; only versioned configuration is committed
-output/        local generated output, not canonical source
 tmp/           disposable local artifacts, caches, and generator intermediates
 ```
 
@@ -134,8 +133,10 @@ Files under `docs/db/*/generated/` are tool-owned. Do not edit them by hand;
 change migrations, documentation group definitions, or generator code and then
 regenerate them with the documented Make targets.
 
-Do not treat `tmp/`, `output/`, caches, runtime object-store data, or other
-generated artifacts as canonical source.
+Do not treat `tmp/`, caches, runtime object-store data, or other generated
+artifacts as canonical source. Throwaway report renders belong under
+`EMPIRE_TEMP_DIR`; durable reports belong in the object store with an explicit
+retention or purge policy.
 
 ## Compatibility and Incremental Change
 
