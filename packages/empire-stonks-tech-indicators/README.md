@@ -92,6 +92,8 @@ The immutable domain-model API consists of:
   fixed V1 observation-return fields and their exact null masks
 - `BarStructureArrays` and `calculate_bar_structure()` for gap, same-bar
   generated-column references, and exact copied-source values
+- `RangeRelationshipArrays` and `calculate_range_relationships()` for complete
+  trailing 20/50/252-observation highs and 20/50-observation lows
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -156,6 +158,12 @@ The result retains the exact `SourceBar` records for later payload assembly.
 Only gap is Python-written: the four same-row series are calculation references
 for validating their PostgreSQL stored generated columns and are never added to
 the Python write payload.
+
+Range relationships include the current observation and populate only after a
+complete stored-observation window exists. Calendar gaps create no rows, short
+histories remain null, and the calculation never reads a later high or low.
+The resulting price levels feed the PostgreSQL-generated close-distance fields
+without moving those distance formulas into the Python write payload.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,

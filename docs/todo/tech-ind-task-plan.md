@@ -155,7 +155,7 @@ Goal: calculate non-TA-Lib features as pure, independently tested operations.
 | C4.1 | [x] | Normalize calculation arrays | Convert ordered source values to contiguous arrays with null masks and no silent reorder, zero fill, or look-ahead. | B1.6, I3.2 |
 | C4.2 | [x] | Calculate returns | Implement 1/2/3/5/10/20/63/126/252-observation returns with agreed zero-denominator and warm-up behavior. | P0.4, C4.1 |
 | C4.3 | [x] | Calculate bar structure | Implement gap, intraday return, range, close location, dollar volume, and copied source values; cover zero range and null volume. | P0.4, C4.1 |
-| C4.4 | [ ] | Calculate range relationships | Implement 20/50/252 highs and 20/50 lows without forward leakage. | P0.4, C4.1 |
+| C4.4 | [x] | Calculate range relationships | Implement 20/50/252 highs and 20/50 lows without forward leakage. | P0.4, C4.1 |
 | C4.5 | [ ] | Calculate volume and liquidity | Implement 20/60 average volume and 20 average dollar volume with missing-volume and complete-window rules. | P0.4, C4.1, C4.3 |
 | C4.6 | [ ] | Calculate streak state | Implement up/down streaks with unchanged close resetting both; prove append/rebuild equivalence. | P0.4, C4.1 |
 | C4.7 | [ ] | Calculate return statistics | Implement 20/60 return volatility and defined 1d/3d 20-observation z-scores with zero-variance behavior. | P0.4, C4.1-C4.2 |
@@ -194,6 +194,19 @@ denominators/range/volume, null volume, negative prices, `abs(close)` dollar
 volume, recovery, copied `Decimal` values, prefix equivalence, masks, overflow,
 and ownership. Package pytest passed 181 tests with 1 expected Core-runtime
 skip; Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
+compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and
+`git diff --check` passed.
+
+Done: 2026-08-11 — added public lazy-loaded `RangeRelationshipArrays` and
+`calculate_range_relationships()` in
+`empire_stonks_tech_indicators/range_relationships.py` for complete trailing
+`hh_20`, `hh_50`, `hh_252`, `ll_20`, and `ll_50` observation windows using
+current-bar-inclusive NumPy extrema and explicit read-only null masks. Tests
+compare every eligible value with independent Python extrema and cover each
+warm-up boundary, negative values, calendar gaps, short history, current-bar
+participation, future-extreme prefix isolation, dtypes, masks, and invalid
+inputs. Package pytest passed 192 tests with 1 expected Core-runtime skip;
+Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
 compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and
 `git diff --check` passed.
 
