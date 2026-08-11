@@ -107,6 +107,8 @@ The immutable domain-model API consists of:
 - `MovingAverageTrendArrays` and `calculate_moving_average_trends()` for the
   two persisted 20-observation SMA changes and eight generated-distance
   reference series
+- `RsiAtrArrays` and `calculate_rsi_atr()` for pinned Wilder RSI 14 and ATR 14
+  from the complete source prefix
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -236,6 +238,13 @@ close-versus-average distances and three generated SMA-spread distances, using
 the database contract's exact-zero denominator rule. Those eight references
 support later row validation but remain excluded from the Python write payload.
 Inputs must be the exact moving averages for the normalized source series.
+
+RSI and ATR use explicit TA-Lib period-14 calls with default compatibility and
+zero unstable periods. Both first populate at observation 14. RSI uses Wilder
+smoothed gains and losses on close changes; ATR uses Wilder-smoothed true range
+from provider-native high, low, and prior close. Recursive correction work
+always recalculates the complete source prefix and writes only the affected
+suffix. The generated `atr_pct_14` ratio remains PostgreSQL-owned.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,
