@@ -104,6 +104,9 @@ The immutable domain-model API consists of:
   runtime identity, process-global setting checks, and warm-up normalization
 - `MovingAverageArrays` and `calculate_moving_averages()` for TA-Lib SMA
   20/50/200 and EMA 12/20/26/50 from the complete source prefix
+- `MovingAverageTrendArrays` and `calculate_moving_average_trends()` for the
+  two persisted 20-observation SMA changes and eight generated-distance
+  reference series
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -224,6 +227,15 @@ pinned TA-Lib initialization: the first complete-window SMA seed followed by
 recalculates an affected listing from its earliest source observation, then an
 append or correction workflow may retain the unchanged prefix and write only
 the affected suffix; it never restarts EMA from a bounded suffix.
+
+Moving-average trends calculate `sma_50_change_20d_pct` and
+`sma_200_change_20d_pct` from the current average and its value 20 stored
+observations earlier. Incomplete inputs and exact-zero lagged averages remain
+null. The same result provides reference values for the five generated
+close-versus-average distances and three generated SMA-spread distances, using
+the database contract's exact-zero denominator rule. Those eight references
+support later row validation but remain excluded from the Python write payload.
+Inputs must be the exact moving averages for the normalized source series.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,

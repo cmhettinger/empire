@@ -155,7 +155,7 @@ explicit warm-up and version semantics.
 |----|--------|------|---------------|------------|
 | T5.1 | [x] | Add TA-Lib adapter | Accept normalized arrays, record library/version, convert non-finite warm-up output to null masks, and hide TA-Lib types. | B1.1-B1.2, C4.1 |
 | T5.2 | [x] | Calculate SMA and EMA | Implement SMA 20/50/200 and EMA 12/20/26/50 with agreed initialization and full/incremental equivalence. | P0.4, T5.1 |
-| T5.3 | [ ] | Calculate average changes | Implement 20-observation SMA 50/200 changes and inputs for generated price/average distances. | C4.2, T5.2 |
+| T5.3 | [x] | Calculate average changes | Implement 20-observation SMA 50/200 changes and inputs for generated price/average distances. | C4.2, T5.2 |
 | T5.4 | [ ] | Calculate RSI and ATR | Implement Wilder RSI 14 and ATR 14 with independent references and correction replay. | P0.4, T5.1 |
 | T5.5 | [ ] | Calculate Bollinger state | Implement price standard deviation, `%b`, and BandWidth for the fixed 20/2 contract; do not store redundant bands. | P0.4, T5.1-T5.2 |
 | T5.6 | [ ] | Calculate ADX and DMI | Implement +DI 14, -DI 14, and ADX 14 with Wilder smoothing and unstable-period policy. | P0.4, T5.1, T5.4 |
@@ -182,6 +182,18 @@ suffix composition passed in 44 focused tests; package pytest passed 268 tests
 with 1 expected Core-runtime skip. Poetry lock, `pip check`, wheel/sdist build
 and content inspection, compileall, pinned runtime smoke, cold lazy-import,
 88-column, and `git diff --check` checks passed.
+
+Done: 2026-08-11 — added public lazy-loaded `MovingAverageTrendArrays` and
+`calculate_moving_average_trends()` in
+`empire_stonks_tech_indicators/moving_average_trends.py` for the persisted
+20-observation SMA 50/200 changes and eight PostgreSQL-generated close/average
+and SMA-spread reference series, with exact-zero/null rules and strict
+normalized-source/moving-average alignment. Independent formulas, all first-
+valid boundaries, short/zero/negative-capable histories, prefix isolation,
+tampering, and overflow passed in 61 focused tests; package pytest passed 285
+tests with 1 expected Core-runtime skip. Poetry lock, `pip check`, wheel/sdist
+build and content inspection, compileall, pinned runtime smoke, cold lazy-
+import, 88-column, and `git diff --check` checks passed.
 
 ---
 

@@ -78,6 +78,10 @@ if TYPE_CHECKING:
         MovingAverageArrays,
         calculate_moving_averages,
     )
+    from empire_stonks_tech_indicators.moving_average_trends import (
+        MovingAverageTrendArrays,
+        calculate_moving_average_trends,
+    )
     from empire_stonks_tech_indicators.talib_adapter import (
         TALibAdapter,
         TALibRuntimeInfo,
@@ -187,6 +191,18 @@ def __getattr__(name: str) -> object:
         }
         globals().update(exports)
         return exports[name]
+    if name in {"MovingAverageTrendArrays", "calculate_moving_average_trends"}:
+        from empire_stonks_tech_indicators.moving_average_trends import (
+            MovingAverageTrendArrays,
+            calculate_moving_average_trends,
+        )
+
+        exports = {
+            "MovingAverageTrendArrays": MovingAverageTrendArrays,
+            "calculate_moving_average_trends": calculate_moving_average_trends,
+        }
+        globals().update(exports)
+        return exports[name]
     if name in {"TALibAdapter", "TALibRuntimeInfo"}:
         from empire_stonks_tech_indicators.talib_adapter import (
             TALibAdapter,
@@ -221,6 +237,7 @@ __all__ = [
     "EODDATA_DAILY_JOB_NAME",
     "ListingStateComparison",
     "MovingAverageArrays",
+    "MovingAverageTrendArrays",
     "SourceReadinessDecision",
     "StreakArrays",
     "TALibAdapter",
@@ -229,6 +246,7 @@ __all__ = [
     "YAHOO_DAILY_JOB_NAME",
     "calculate_bar_structure",
     "calculate_moving_averages",
+    "calculate_moving_average_trends",
     "calculate_range_relationships",
     "calculate_return_statistics",
     "calculate_returns",
