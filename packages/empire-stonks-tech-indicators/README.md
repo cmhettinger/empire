@@ -109,6 +109,8 @@ The immutable domain-model API consists of:
   reference series
 - `RsiAtrArrays` and `calculate_rsi_atr()` for pinned Wilder RSI 14 and ATR 14
   from the complete source prefix
+- `BollingerStateArrays` and `calculate_bollinger_state()` for population
+  price deviation 20 and generated `%b`/BandWidth reference values
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -245,6 +247,14 @@ smoothed gains and losses on close changes; ATR uses Wilder-smoothed true range
 from provider-native high, low, and prior close. Recursive correction work
 always recalculates the complete source prefix and writes only the affected
 suffix. The generated `atr_pct_14` ratio remains PostgreSQL-owned.
+
+Bollinger state uses `STDDEV(close, timeperiod=20, nbdev=1.0)`, preserving the
+pinned library's population variance and observation-19 warm-up boundary. It
+reconstructs the fixed two-deviation upper and lower levels only long enough to
+calculate reference `%b` and BandWidth values under the database's exact-zero
+rules. Only `price_stddev_20` enters the Python write payload; `%b` and
+BandWidth remain generated, and redundant upper/lower band arrays are neither
+returned nor persisted.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,

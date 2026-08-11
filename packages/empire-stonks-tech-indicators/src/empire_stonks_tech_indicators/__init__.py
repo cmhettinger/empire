@@ -66,6 +66,10 @@ if TYPE_CHECKING:
         BarStructureArrays,
         calculate_bar_structure,
     )
+    from empire_stonks_tech_indicators.bollinger import (
+        BollingerStateArrays,
+        calculate_bollinger_state,
+    )
     from empire_stonks_tech_indicators.range_relationships import (
         RangeRelationshipArrays,
         calculate_range_relationships,
@@ -159,6 +163,18 @@ def __getattr__(name: str) -> object:
         }
         globals().update(exports)
         return exports[name]
+    if name in {"BollingerStateArrays", "calculate_bollinger_state"}:
+        from empire_stonks_tech_indicators.bollinger import (
+            BollingerStateArrays,
+            calculate_bollinger_state,
+        )
+
+        exports = {
+            "BollingerStateArrays": BollingerStateArrays,
+            "calculate_bollinger_state": calculate_bollinger_state,
+        }
+        globals().update(exports)
+        return exports[name]
     if name in {"RangeRelationshipArrays", "calculate_range_relationships"}:
         from empire_stonks_tech_indicators.range_relationships import (
             RangeRelationshipArrays,
@@ -243,6 +259,7 @@ __all__ = [
     "BenchmarkConfig",
     "TechIndicatorsConfig",
     "BarStructureArrays",
+    "BollingerStateArrays",
     "CalculationArrays",
     "MaskedFloatArray",
     "RangeRelationshipArrays",
@@ -262,6 +279,7 @@ __all__ = [
     "VolumeLiquidityArrays",
     "YAHOO_DAILY_JOB_NAME",
     "calculate_bar_structure",
+    "calculate_bollinger_state",
     "calculate_moving_averages",
     "calculate_moving_average_trends",
     "calculate_range_relationships",

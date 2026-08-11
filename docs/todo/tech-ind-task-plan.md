@@ -157,7 +157,7 @@ explicit warm-up and version semantics.
 | T5.2 | [x] | Calculate SMA and EMA | Implement SMA 20/50/200 and EMA 12/20/26/50 with agreed initialization and full/incremental equivalence. | P0.4, T5.1 |
 | T5.3 | [x] | Calculate average changes | Implement 20-observation SMA 50/200 changes and inputs for generated price/average distances. | C4.2, T5.2 |
 | T5.4 | [x] | Calculate RSI and ATR | Implement Wilder RSI 14 and ATR 14 with independent references and correction replay. | P0.4, T5.1 |
-| T5.5 | [ ] | Calculate Bollinger state | Implement price standard deviation, `%b`, and BandWidth for the fixed 20/2 contract; do not store redundant bands. | P0.4, T5.1-T5.2 |
+| T5.5 | [x] | Calculate Bollinger state | Implement price standard deviation, `%b`, and BandWidth for the fixed 20/2 contract; do not store redundant bands. | P0.4, T5.1-T5.2 |
 | T5.6 | [ ] | Calculate ADX and DMI | Implement +DI 14, -DI 14, and ADX 14 with Wilder smoothing and unstable-period policy. | P0.4, T5.1, T5.4 |
 | T5.7 | [ ] | Calculate MACD | Implement 12/26/9 line, signal, histogram, and normalized values with fixed scale and zero handling. | P0.4, T5.1-T5.2 |
 | T5.8 | [ ] | Add combined TA-Lib regression | Compare pinned-library fixtures, edge cases, trustworthy legacy examples, and an independent reference per family. | T5.2-T5.7 |
@@ -205,6 +205,18 @@ suffix composition passed in 37 focused tests; package pytest passed 295 tests
 with 1 expected Core-runtime skip. Poetry lock, `pip check`, wheel/sdist build
 and content inspection, compileall, pinned runtime smoke, cold lazy-import,
 88-column, and `git diff --check` checks passed.
+
+Done: 2026-08-11 — added public lazy-loaded `BollingerStateArrays` and
+`calculate_bollinger_state()` in
+`empire_stonks_tech_indicators/bollinger.py` for TA-Lib population
+`STDDEV(20, 1.0)` plus PostgreSQL-generated fixed-20/2 `%b` and BandWidth
+references, with strict SMA-20 alignment and no retained upper/lower bands.
+Independent population/band formulas, warm-up, flat positive/negative/zero
+middle and width rules, prefix isolation, ownership, and tampering passed in 54
+focused tests; package pytest passed 305 tests with 1 expected Core-runtime
+skip. Poetry lock, `pip check`, wheel/sdist build and content inspection,
+compileall, pinned runtime smoke, cold lazy-import, 88-column, and
+`git diff --check` checks passed.
 
 ---
 
