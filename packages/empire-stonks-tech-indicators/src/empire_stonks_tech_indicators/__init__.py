@@ -62,6 +62,10 @@ if TYPE_CHECKING:
         RangeRelationshipArrays,
         calculate_range_relationships,
     )
+    from empire_stonks_tech_indicators.volume_liquidity import (
+        VolumeLiquidityArrays,
+        calculate_volume_liquidity,
+    )
 
 
 def __getattr__(name: str) -> object:
@@ -119,6 +123,18 @@ def __getattr__(name: str) -> object:
         }
         globals().update(exports)
         return exports[name]
+    if name in {"VolumeLiquidityArrays", "calculate_volume_liquidity"}:
+        from empire_stonks_tech_indicators.volume_liquidity import (
+            VolumeLiquidityArrays,
+            calculate_volume_liquidity,
+        )
+
+        exports = {
+            "VolumeLiquidityArrays": VolumeLiquidityArrays,
+            "calculate_volume_liquidity": calculate_volume_liquidity,
+        }
+        globals().update(exports)
+        return exports[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
@@ -140,10 +156,12 @@ __all__ = [
     "EODDATA_DAILY_JOB_NAME",
     "ListingStateComparison",
     "SourceReadinessDecision",
+    "VolumeLiquidityArrays",
     "YAHOO_DAILY_JOB_NAME",
     "calculate_bar_structure",
     "calculate_range_relationships",
     "calculate_returns",
+    "calculate_volume_liquidity",
     "decide_source_readiness",
     "iter_source_bar_pages",
     "iter_state_comparison_pages",

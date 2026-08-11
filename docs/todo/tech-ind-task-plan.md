@@ -156,7 +156,7 @@ Goal: calculate non-TA-Lib features as pure, independently tested operations.
 | C4.2 | [x] | Calculate returns | Implement 1/2/3/5/10/20/63/126/252-observation returns with agreed zero-denominator and warm-up behavior. | P0.4, C4.1 |
 | C4.3 | [x] | Calculate bar structure | Implement gap, intraday return, range, close location, dollar volume, and copied source values; cover zero range and null volume. | P0.4, C4.1 |
 | C4.4 | [x] | Calculate range relationships | Implement 20/50/252 highs and 20/50 lows without forward leakage. | P0.4, C4.1 |
-| C4.5 | [ ] | Calculate volume and liquidity | Implement 20/60 average volume and 20 average dollar volume with missing-volume and complete-window rules. | P0.4, C4.1, C4.3 |
+| C4.5 | [x] | Calculate volume and liquidity | Implement 20/60 average volume and 20 average dollar volume with missing-volume and complete-window rules. | P0.4, C4.1, C4.3 |
 | C4.6 | [ ] | Calculate streak state | Implement up/down streaks with unchanged close resetting both; prove append/rebuild equivalence. | P0.4, C4.1 |
 | C4.7 | [ ] | Calculate return statistics | Implement 20/60 return volatility and defined 1d/3d 20-observation z-scores with zero-variance behavior. | P0.4, C4.1-C4.2 |
 | C4.8 | [ ] | Add core golden fixtures | Compare independent formulas, trustworthy legacy examples, gaps, discontinuities, short histories, and randomized invariants. | C4.2-C4.7 |
@@ -207,6 +207,19 @@ warm-up boundary, negative values, calendar gaps, short history, current-bar
 participation, future-extreme prefix isolation, dtypes, masks, and invalid
 inputs. Package pytest passed 192 tests with 1 expected Core-runtime skip;
 Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
+compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and
+`git diff --check` passed.
+
+Done: 2026-08-11 — added public lazy-loaded `VolumeLiquidityArrays` and
+`calculate_volume_liquidity()` in
+`empire_stonks_tech_indicators/volume_liquidity.py` for complete
+20/60-observation volume averages and the 20-observation nominal dollar-volume
+average, consuming C4.3's exactly aligned dollar-volume reference. Tests compare
+all windows with independent averages and cover warm-up, calendar gaps, null
+window/recovery, zero and fractional-capable volume, negative closes, short
+history, prefix isolation, source mismatch/tampering, masks, dtypes, overflow,
+and invalid inputs. Package pytest passed 203 tests with 1 expected Core-runtime
+skip; Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
 compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and
 `git diff --check` passed.
 

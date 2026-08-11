@@ -94,6 +94,8 @@ The immutable domain-model API consists of:
   generated-column references, and exact copied-source values
 - `RangeRelationshipArrays` and `calculate_range_relationships()` for complete
   trailing 20/50/252-observation highs and 20/50-observation lows
+- `VolumeLiquidityArrays` and `calculate_volume_liquidity()` for complete
+  20/60-observation volume and 20-observation nominal dollar-volume averages
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -164,6 +166,14 @@ complete stored-observation window exists. Calendar gaps create no rows, short
 histories remain null, and the calculation never reads a later high or low.
 The resulting price levels feed the PostgreSQL-generated close-distance fields
 without moving those distance formulas into the Python write payload.
+
+Volume and liquidity averages require complete stored-observation windows and
+consume bar structure's validated `abs(close) * volume` reference. Any null
+volume makes its 20- or 60-observation window null until that observation ages
+out; zero volume remains populated and participates in the average. Inputs must
+carry the exact same source bars and dollar-volume values, preventing positional
+drift between calculation families. Dollar-volume output remains nominal
+provider-native price-times-volume, not a USD or cross-listing liquidity claim.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,
