@@ -159,7 +159,7 @@ Goal: calculate non-TA-Lib features as pure, independently tested operations.
 | C4.5 | [x] | Calculate volume and liquidity | Implement 20/60 average volume and 20 average dollar volume with missing-volume and complete-window rules. | P0.4, C4.1, C4.3 |
 | C4.6 | [x] | Calculate streak state | Implement up/down streaks with unchanged close resetting both; prove append/rebuild equivalence. | P0.4, C4.1 |
 | C4.7 | [x] | Calculate return statistics | Implement 20/60 return volatility and defined 1d/3d 20-observation z-scores with zero-variance behavior. | P0.4, C4.1-C4.2 |
-| C4.8 | [ ] | Add core golden fixtures | Compare independent formulas, trustworthy legacy examples, gaps, discontinuities, short histories, and randomized invariants. | C4.2-C4.7 |
+| C4.8 | [x] | Add core golden fixtures | Compare independent formulas, trustworthy legacy examples, gaps, discontinuities, short histories, and randomized invariants. | C4.2-C4.7 |
 
 Done: 2026-08-11 — added public lazy-loaded `CalculationArrays` and
 `normalize_source_bars()` in `empire_stonks_tech_indicators/arrays.py` with
@@ -246,6 +246,18 @@ overflow, and invalid inputs. Focused pytest passed 36 tests; package pytest
 passed 223 tests with 1 expected Core-runtime skip. Poetry lock, `pip check`,
 wheel/sdist build and content inspection, compileall, NumPy 2.4.6/TA-Lib 0.7.1
 runtime smoke, public/cold imports, and `git diff --check` passed.
+
+Done: 2026-08-11 — added `tests/fixtures/core_features_v1.json` and
+`tests/test_core_golden.py` as the combined C4.2-C4.7 regression gate. The
+committed goldens preserve the legacy Stonks engine's 260-bar overlap for
+`hh_20`, `ll_20`, and `volume_avg_20` plus an unadjusted discontinuity/calendar
+gap; an independent standard-library scalar oracle checks every core value and
+null mask across four short histories and 840 seeded randomized bars under the
+frozen tolerance, with whole-family future-prefix isolation. Focused pytest
+passed 9 tests; package pytest passed 232 tests with 1 expected Core-runtime
+skip. Poetry lock, `pip check`, wheel/sdist build and content inspection,
+compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime smoke, and `git diff --check`
+passed.
 
 ---
 

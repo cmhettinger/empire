@@ -1,0 +1,135 @@
+{
+  "schema_version": "TECH_INDICATORS_CORE_GOLDEN_V1",
+  "provenance": {
+    "legacy_repository": "github.com/cmhettinger/stonks.git",
+    "legacy_commit": "b2bf08fc2e7b097460d216517cf18394a8c454c8",
+    "legacy_fixture": "apps/stonks-engine/tests/derive/test_tech_apply.py::_make_ohlcv_df",
+    "legacy_fixture_blob": "4fe714309f1f951096407ab4578847bf4d23adf3",
+    "legacy_implementation": "apps/stonks-engine/src/stonks_engine/derive/tech/apply.py::compute_tech_frame",
+    "legacy_implementation_blob": "0f26dd8467cc139fe8a3aebdf1150a750845feba",
+    "legacy_overlap": [
+      "hh_20",
+      "ll_20",
+      "volume_avg_20"
+    ],
+    "note": "Expected values were frozen from the documented formulas using Python scalar arithmetic and statistics.stdev, independently of the NumPy implementation."
+  },
+  "cases": {
+    "legacy_linear_260": {
+      "generator": {
+        "observations": 260,
+        "start_date": "2024-01-01",
+        "business_days": true,
+        "close_start": 100.0,
+        "close_step": 1.0,
+        "open_offset": -0.5,
+        "high_offset": 1.0,
+        "low_offset": -1.0,
+        "volume_start": 1000000.0,
+        "volume_step": 1000.0
+      },
+      "expected": {
+        "0": {
+          "gap_1d_pct": null,
+          "intraday_return_1d_pct": 0.005025125628140614,
+          "daily_range_pct": 0.02,
+          "close_location_1d": 0.5,
+          "dollar_volume": 100000000.0,
+          "consecutive_up_days": 0,
+          "consecutive_down_days": 0
+        },
+        "14": {
+          "return_10d_pct": 0.09615384615384626,
+          "gap_1d_pct": 0.004424778761061843,
+          "hh_20": null,
+          "volume_avg_20": null,
+          "consecutive_up_days": 14
+        },
+        "19": {
+          "hh_20": 120.0,
+          "ll_20": 99.0,
+          "volume_avg_20": 1009500.0,
+          "dollar_volume_avg_20": 110573500.0
+        },
+        "23": {
+          "return_20d_pct": 0.1941747572815533,
+          "return_volatility_20d_pct": 0.0004701513530685484,
+          "return_1d_zscore_20d": -1.6629136110225322,
+          "return_3d_zscore_20d": -1.6609500176824563
+        },
+        "60": {
+          "hh_50": 161.0,
+          "ll_50": 110.0,
+          "volume_avg_60": 1030500.0,
+          "return_volatility_60d_pct": 0.0010842282523791551
+        },
+        "126": {
+          "return_63d_pct": 0.38650306748466257,
+          "return_126d_pct": 1.2599999999999998
+        },
+        "252": {
+          "return_252d_pct": 2.52,
+          "hh_252": 353.0
+        },
+        "259": {
+          "return_1d_pct": 0.0027932960893854997,
+          "return_2d_pct": 0.0056022408963585235,
+          "return_3d_pct": 0.008426966292134797,
+          "return_5d_pct": 0.01412429378531077,
+          "return_10d_pct": 0.02865329512893977,
+          "return_20d_pct": 0.05899705014749257,
+          "return_63d_pct": 0.21283783783783794,
+          "return_126d_pct": 0.5407725321888412,
+          "return_252d_pct": 2.3551401869158877,
+          "hh_20": 360.0,
+          "hh_50": 360.0,
+          "hh_252": 360.0,
+          "ll_20": 339.0,
+          "ll_50": 309.0,
+          "volume_avg_20": 1249500.0,
+          "volume_avg_60": 1229500.0,
+          "dollar_volume_avg_20": 436733500.0,
+          "consecutive_up_days": 259,
+          "consecutive_down_days": 0
+        }
+      }
+    },
+    "provider_native_discontinuity": {
+      "generator": {
+        "observations": 30,
+        "start_date": "2024-01-01",
+        "gap_before_index": 15,
+        "gap_days": 30,
+        "split_index": 15,
+        "split_factor": 0.5,
+        "open_offset": -0.5,
+        "high_offset": 1.0,
+        "low_offset": -1.0,
+        "volume_start": 1000.0,
+        "volume_step": 10.0
+      },
+      "expected": {
+        "15": {
+          "return_1d_pct": -0.4956140350877193,
+          "gap_1d_pct": -0.5,
+          "consecutive_up_days": 0,
+          "consecutive_down_days": 1
+        },
+        "16": {
+          "return_1d_pct": 0.008695652173912993,
+          "consecutive_up_days": 1,
+          "consecutive_down_days": 0
+        },
+        "19": {
+          "hh_20": 115.0,
+          "ll_20": 56.5
+        },
+        "29": {
+          "return_20d_pct": -0.40825688073394495,
+          "hh_20": 115.0,
+          "ll_20": 56.5
+        }
+      }
+    }
+  }
+}

@@ -195,6 +195,14 @@ the complete source prefix, so repeated append runs and full rebuilds produce
 the same read-only nonnegative integer arrays without persisted recurrence
 state.
 
+The combined core regression in `tests/test_core_golden.py` checks every
+C4.2-C4.7 output against a standard-library scalar oracle under the frozen
+numerical-equivalence tolerance. Its committed fixture preserves the prior
+Stonks engine's linear 260-bar example for the overlapping 20-observation high,
+low, and volume-average formulas, plus a provider-native discontinuity and
+calendar gap. Deterministic randomized series cover null and zero volume,
+short histories, all lookbacks, and future-mutation prefix isolation.
+
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,
 `EQUITY_INDEX`, object metadata, and exact `YahooTicker=^GSPC`. Missing,
