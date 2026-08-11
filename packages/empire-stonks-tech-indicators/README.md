@@ -100,6 +100,8 @@ The immutable domain-model API consists of:
   20/60-observation volume and 20-observation nominal dollar-volume averages
 - `StreakArrays` and `calculate_streaks()` for non-null consecutive close-up
   and close-down observation counts
+- `TALibAdapter` and `TALibRuntimeInfo` for the pinned native-library boundary,
+  runtime identity, process-global setting checks, and warm-up normalization
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -202,6 +204,16 @@ Stonks engine's linear 260-bar example for the overlapping 20-observation high,
 low, and volume-average formulas, plus a provider-native discontinuity and
 calendar gap. Deterministic randomized series cover null and zero volume,
 short histories, all lookbacks, and future-mutation prefix isolation.
+
+TA-Lib calculations enter through `TALibAdapter`, which accepts only a
+validated `CalculationArrays` series and exposes only Empire-owned
+`MaskedFloatArray` results. The adapter records the exact NumPy, Python-wrapper,
+and bundled C-library versions, rejects non-default compatibility or nonzero
+unstable periods, turns only the documented pre-lookback non-finite prefix into
+an explicit null mask, and fails on finite warm-up values or any non-finite
+post-lookback output. It provides explicit reviewed function calls for later
+feature-family calculators without exposing TA-Lib arrays, functions, or
+exceptions through the package API.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,

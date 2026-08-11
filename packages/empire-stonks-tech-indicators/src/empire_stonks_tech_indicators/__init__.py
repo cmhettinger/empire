@@ -74,6 +74,10 @@ if TYPE_CHECKING:
         StreakArrays,
         calculate_streaks,
     )
+    from empire_stonks_tech_indicators.talib_adapter import (
+        TALibAdapter,
+        TALibRuntimeInfo,
+    )
 
 
 def __getattr__(name: str) -> object:
@@ -167,6 +171,18 @@ def __getattr__(name: str) -> object:
         }
         globals().update(exports)
         return exports[name]
+    if name in {"TALibAdapter", "TALibRuntimeInfo"}:
+        from empire_stonks_tech_indicators.talib_adapter import (
+            TALibAdapter,
+            TALibRuntimeInfo,
+        )
+
+        exports = {
+            "TALibAdapter": TALibAdapter,
+            "TALibRuntimeInfo": TALibRuntimeInfo,
+        }
+        globals().update(exports)
+        return exports[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
@@ -190,6 +206,8 @@ __all__ = [
     "ListingStateComparison",
     "SourceReadinessDecision",
     "StreakArrays",
+    "TALibAdapter",
+    "TALibRuntimeInfo",
     "VolumeLiquidityArrays",
     "YAHOO_DAILY_JOB_NAME",
     "calculate_bar_structure",

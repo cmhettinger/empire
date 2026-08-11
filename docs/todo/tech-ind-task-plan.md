@@ -153,7 +153,7 @@ explicit warm-up and version semantics.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| T5.1 | [ ] | Add TA-Lib adapter | Accept normalized arrays, record library/version, convert non-finite warm-up output to null masks, and hide TA-Lib types. | B1.1-B1.2, C4.1 |
+| T5.1 | [x] | Add TA-Lib adapter | Accept normalized arrays, record library/version, convert non-finite warm-up output to null masks, and hide TA-Lib types. | B1.1-B1.2, C4.1 |
 | T5.2 | [ ] | Calculate SMA and EMA | Implement SMA 20/50/200 and EMA 12/20/26/50 with agreed initialization and full/incremental equivalence. | P0.4, T5.1 |
 | T5.3 | [ ] | Calculate average changes | Implement 20-observation SMA 50/200 changes and inputs for generated price/average distances. | C4.2, T5.2 |
 | T5.4 | [ ] | Calculate RSI and ATR | Implement Wilder RSI 14 and ATR 14 with independent references and correction replay. | P0.4, T5.1 |
@@ -161,6 +161,16 @@ explicit warm-up and version semantics.
 | T5.6 | [ ] | Calculate ADX and DMI | Implement +DI 14, -DI 14, and ADX 14 with Wilder smoothing and unstable-period policy. | P0.4, T5.1, T5.4 |
 | T5.7 | [ ] | Calculate MACD | Implement 12/26/9 line, signal, histogram, and normalized values with fixed scale and zero handling. | P0.4, T5.1-T5.2 |
 | T5.8 | [ ] | Add combined TA-Lib regression | Compare pinned-library fixtures, edge cases, trustworthy legacy examples, and an independent reference per family. | T5.2-T5.7 |
+
+Done: 2026-08-11 — added public lazy-loaded `TALibAdapter` and
+`TALibRuntimeInfo` in `empire_stonks_tech_indicators/talib_adapter.py` for the
+exact NumPy 2.4.6/TA-Lib Python and C 0.7.1 runtime, normalized-array-only
+inputs, default/zero global-setting enforcement, explicit reviewed calls, and
+Empire-owned warm-up masks with hard post-lookback non-finite failure. Focused
+pytest passed 27 tests; package pytest passed 251 tests with 1 expected
+Core-runtime skip. Poetry lock, `pip check`, wheel/sdist build and content
+inspection, compileall, pinned runtime smoke, cold lazy-import, 88-column, and
+`git diff --check` checks passed.
 
 ---
 

@@ -45,6 +45,8 @@ def test_public_api_is_explicit() -> None:
         "ListingStateComparison",
         "SourceReadinessDecision",
         "StreakArrays",
+        "TALibAdapter",
+        "TALibRuntimeInfo",
         "VolumeLiquidityArrays",
         "YAHOO_DAILY_JOB_NAME",
         "calculate_bar_structure",
