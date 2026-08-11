@@ -72,6 +72,35 @@ result = renderer.render(
 )
 ```
 
+## Report Playground
+
+The package includes a developer playground that renders shared PDF components
+with representative options and a short explanation of each component. Use it
+to prototype or visually review reusable components without adding them to a
+production report:
+
+```bash
+bin/report-playground
+```
+
+The wrapper loads `deploy/env/local.env` when `EMPIRE_TEMP_DIR` is not already
+set. The default artifact is `$EMPIRE_TEMP_DIR/report-playground.pdf`. Direct
+module use falls back to `/tmp/report-playground.pdf` when the variable is
+unset. Override the path or the date displayed by date-aware components when
+needed:
+
+```bash
+bin/report-playground \
+  --output output/pdf/my-report-playground.pdf \
+  --date 2026-08-11
+```
+
+The page registry lives in `empire_reports.playground.playground_pages()`. To add
+a shared component, implement a focused page builder and append one
+`PlaygroundPage` entry. Standard entries automatically receive a title,
+description, and options summary; full-page components can provide their own
+presentation and select the title-page template.
+
 ## Branding
 
 By default, `BrandingConfig.discover()` looks for the repository root and uses `resources/branding`. Runtimes can set `EMPIRE_BRANDING_ROOT` to point at a different branding bundle. The package registers the Source Sans 3, Cinzel, and Source Code Pro fonts when the files are available, while falling back to ReportLab built-in fonts when they are not.
