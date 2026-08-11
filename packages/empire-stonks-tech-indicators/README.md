@@ -90,6 +90,8 @@ The immutable domain-model API consists of:
   contiguous source normalization with explicit nullable-volume masks
 - `MaskedFloatArray`, `ReturnArrays`, and `calculate_returns()` for the nine
   fixed V1 observation-return fields and their exact null masks
+- `BarStructureArrays` and `calculate_bar_structure()` for gap, same-bar
+  generated-column references, and exact copied-source values
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -145,6 +147,15 @@ afterward it is `close[i] / close[i-N] - 1` unless the converted prior close is
 exactly zero. Negative and arbitrarily small nonzero denominators remain
 eligible, valid zero returns remain zero, and non-finite calculated output
 fails the calculation rather than becoming null.
+
+Bar structure calculates `gap_1d_pct` from the prior stored observation and
+same-row intraday return, range, close location, and nominal dollar volume from
+the normalized source arrays. Exact-zero denominators and null volume produce
+null; zero volume remains a valid zero and dollar volume uses `abs(close)`.
+The result retains the exact `SourceBar` records for later payload assembly.
+Only gap is Python-written: the four same-row series are calculation references
+for validating their PostgreSQL stored generated columns and are never added to
+the Python write payload.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,

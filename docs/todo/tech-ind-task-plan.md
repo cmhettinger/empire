@@ -154,7 +154,7 @@ Goal: calculate non-TA-Lib features as pure, independently tested operations.
 |----|--------|------|---------------|------------|
 | C4.1 | [x] | Normalize calculation arrays | Convert ordered source values to contiguous arrays with null masks and no silent reorder, zero fill, or look-ahead. | B1.6, I3.2 |
 | C4.2 | [x] | Calculate returns | Implement 1/2/3/5/10/20/63/126/252-observation returns with agreed zero-denominator and warm-up behavior. | P0.4, C4.1 |
-| C4.3 | [ ] | Calculate bar structure | Implement gap, intraday return, range, close location, dollar volume, and copied source values; cover zero range and null volume. | P0.4, C4.1 |
+| C4.3 | [x] | Calculate bar structure | Implement gap, intraday return, range, close location, dollar volume, and copied source values; cover zero range and null volume. | P0.4, C4.1 |
 | C4.4 | [ ] | Calculate range relationships | Implement 20/50/252 highs and 20/50 lows without forward leakage. | P0.4, C4.1 |
 | C4.5 | [ ] | Calculate volume and liquidity | Implement 20/60 average volume and 20 average dollar volume with missing-volume and complete-window rules. | P0.4, C4.1, C4.3 |
 | C4.6 | [ ] | Calculate streak state | Implement up/down streaks with unchanged close resetting both; prove append/rebuild equivalence. | P0.4, C4.1 |
@@ -183,6 +183,19 @@ Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
 compileall, NumPy
 2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and `git diff --check`
 passed.
+
+Done: 2026-08-11 — added public lazy-loaded `BarStructureArrays` and
+`calculate_bar_structure()` in
+`empire_stonks_tech_indicators/bar_structure.py`, retaining exact source bars,
+calculating Python-owned gap plus four PostgreSQL-generated-column reference
+series, and preserving exact-zero/null and finite-output rules without changing
+writer ownership. Tests cover first-row warm-up, calendar gaps, zero
+denominators/range/volume, null volume, negative prices, `abs(close)` dollar
+volume, recovery, copied `Decimal` values, prefix equivalence, masks, overflow,
+and ownership. Package pytest passed 181 tests with 1 expected Core-runtime
+skip; Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
+compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and
+`git diff --check` passed.
 
 ---
 

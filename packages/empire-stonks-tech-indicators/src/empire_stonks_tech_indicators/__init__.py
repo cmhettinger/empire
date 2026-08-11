@@ -54,6 +54,10 @@ if TYPE_CHECKING:
         ReturnArrays,
         calculate_returns,
     )
+    from empire_stonks_tech_indicators.bar_structure import (
+        BarStructureArrays,
+        calculate_bar_structure,
+    )
 
 
 def __getattr__(name: str) -> object:
@@ -87,6 +91,18 @@ def __getattr__(name: str) -> object:
         }
         globals().update(exports)
         return exports[name]
+    if name in {"BarStructureArrays", "calculate_bar_structure"}:
+        from empire_stonks_tech_indicators.bar_structure import (
+            BarStructureArrays,
+            calculate_bar_structure,
+        )
+
+        exports = {
+            "BarStructureArrays": BarStructureArrays,
+            "calculate_bar_structure": calculate_bar_structure,
+        }
+        globals().update(exports)
+        return exports[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
@@ -98,6 +114,7 @@ __all__ = [
     "TechIndicatorsWorkflowError",
     "BenchmarkConfig",
     "TechIndicatorsConfig",
+    "BarStructureArrays",
     "CalculationArrays",
     "MaskedFloatArray",
     "ReturnArrays",
@@ -107,6 +124,7 @@ __all__ = [
     "ListingStateComparison",
     "SourceReadinessDecision",
     "YAHOO_DAILY_JOB_NAME",
+    "calculate_bar_structure",
     "calculate_returns",
     "decide_source_readiness",
     "iter_source_bar_pages",
