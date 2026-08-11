@@ -96,6 +96,8 @@ The immutable domain-model API consists of:
   trailing 20/50/252-observation highs and 20/50-observation lows
 - `VolumeLiquidityArrays` and `calculate_volume_liquidity()` for complete
   20/60-observation volume and 20-observation nominal dollar-volume averages
+- `StreakArrays` and `calculate_streaks()` for non-null consecutive close-up
+  and close-down observation counts
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -174,6 +176,13 @@ out; zero volume remains populated and participates in the average. Inputs must
 carry the exact same source bars and dollar-volume values, preventing positional
 drift between calculation families. Dollar-volume output remains nominal
 provider-native price-times-volume, not a USD or cross-listing liquidity claim.
+
+Streaks start at zero on the first stored observation and include the current
+observation after each strict close increase or decrease. An unchanged close
+resets both counts to zero; calendar gaps do not. V1 recalculates streaks from
+the complete source prefix, so repeated append runs and full rebuilds produce
+the same read-only nonnegative integer arrays without persisted recurrence
+state.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,

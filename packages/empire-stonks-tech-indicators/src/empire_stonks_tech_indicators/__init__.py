@@ -66,6 +66,10 @@ if TYPE_CHECKING:
         VolumeLiquidityArrays,
         calculate_volume_liquidity,
     )
+    from empire_stonks_tech_indicators.streaks import (
+        StreakArrays,
+        calculate_streaks,
+    )
 
 
 def __getattr__(name: str) -> object:
@@ -135,6 +139,18 @@ def __getattr__(name: str) -> object:
         }
         globals().update(exports)
         return exports[name]
+    if name in {"StreakArrays", "calculate_streaks"}:
+        from empire_stonks_tech_indicators.streaks import (
+            StreakArrays,
+            calculate_streaks,
+        )
+
+        exports = {
+            "StreakArrays": StreakArrays,
+            "calculate_streaks": calculate_streaks,
+        }
+        globals().update(exports)
+        return exports[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
@@ -156,11 +172,13 @@ __all__ = [
     "EODDATA_DAILY_JOB_NAME",
     "ListingStateComparison",
     "SourceReadinessDecision",
+    "StreakArrays",
     "VolumeLiquidityArrays",
     "YAHOO_DAILY_JOB_NAME",
     "calculate_bar_structure",
     "calculate_range_relationships",
     "calculate_returns",
+    "calculate_streaks",
     "calculate_volume_liquidity",
     "decide_source_readiness",
     "iter_source_bar_pages",
