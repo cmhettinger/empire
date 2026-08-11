@@ -112,6 +112,11 @@ def test_return_arrays_are_read_only_contiguous_float64_with_boolean_masks() -> 
     returns = _calculate(["1", "2", "4"])
 
     assert returns.observation_count == 3
+    assert tuple(bar.close for bar in returns.source_bars) == (
+        Decimal("1"),
+        Decimal("2"),
+        Decimal("4"),
+    )
     for field_name, _ in returns_module.RETURN_FIELDS:
         series = getattr(returns, field_name)
         assert series.values.dtype == np.dtype("float64")

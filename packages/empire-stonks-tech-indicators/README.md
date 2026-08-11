@@ -90,6 +90,8 @@ The immutable domain-model API consists of:
   contiguous source normalization with explicit nullable-volume masks
 - `MaskedFloatArray`, `ReturnArrays`, and `calculate_returns()` for the nine
   fixed V1 observation-return fields and their exact null masks
+- `ReturnStatisticArrays` and `calculate_return_statistics()` for 20/60-return
+  sample volatility and prior-20-reference 1/3-return z-scores
 - `BarStructureArrays` and `calculate_bar_structure()` for gap, same-bar
   generated-column references, and exact copied-source values
 - `RangeRelationshipArrays` and `calculate_range_relationships()` for complete
@@ -153,6 +155,15 @@ afterward it is `close[i] / close[i-N] - 1` unless the converted prior close is
 exactly zero. Negative and arbitrarily small nonzero denominators remain
 eligible, valid zero returns remain zero, and non-finite calculated output
 fails the calculation rather than becoming null.
+
+Return volatility is the nonannualized sample standard deviation (`N-1`) of
+complete trailing 20- or 60-observation one-observation returns, including the
+current return. Return z-scores test the current one- or three-observation
+return against the previous 20 corresponding returns, excluding the tested
+return. Incomplete windows and exact-zero reference standard deviation remain
+null; non-finite calculated statistics fail calculation. Inputs retain and
+validate their exact normalized source bars and return values so independently
+constructed or positionally drifted series cannot be combined.
 
 Bar structure calculates `gap_1d_pct` from the prior stored observation and
 same-row intraday return, range, close location, and nominal dollar volume from

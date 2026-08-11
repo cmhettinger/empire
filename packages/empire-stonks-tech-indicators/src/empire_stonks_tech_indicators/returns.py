@@ -13,6 +13,7 @@ from empire_stonks_tech_indicators.arrays import (
 from empire_stonks_tech_indicators.exceptions import (
     TechIndicatorsCalculationError,
 )
+from empire_stonks_tech_indicators.models import SourceBar
 
 
 RETURN_PERIODS = (1, 2, 3, 5, 10, 20, 63, 126, 252)
@@ -62,6 +63,7 @@ def _return_series(
 class ReturnArrays:
     """The nine V1 observation-return fields in source observation order."""
 
+    source_bars: tuple[SourceBar, ...]
     return_1d_pct: MaskedFloatArray
     return_2d_pct: MaskedFloatArray
     return_3d_pct: MaskedFloatArray
@@ -73,6 +75,12 @@ class ReturnArrays:
     return_252d_pct: MaskedFloatArray
 
     def __post_init__(self) -> None:
+        if not isinstance(self.source_bars, tuple):
+            raise TypeError("source_bars must be a tuple.")
+        if not self.source_bars:
+            raise ValueError("source_bars must not be empty.")
+        if any(not isinstance(bar, SourceBar) for bar in self.source_bars):
+            raise TypeError("source_bars must contain only SourceBar records.")
         lengths: set[int] = set()
         for field_name, _ in RETURN_FIELDS:
             series = getattr(self, field_name)
@@ -81,10 +89,14 @@ class ReturnArrays:
             lengths.add(len(series.values))
         if len(lengths) != 1:
             raise ValueError("return arrays must have one common observation count.")
+        if lengths != {len(self.source_bars)}:
+            raise ValueError(
+                "return arrays must match the source observation count."
+            )
 
     @property
     def observation_count(self) -> int:
-        return len(self.return_1d_pct.values)
+        return len(self.source_bars)
 
 
 def calculate_returns(calculation_arrays: CalculationArrays) -> ReturnArrays:
@@ -94,6 +106,7 @@ def calculate_returns(calculation_arrays: CalculationArrays) -> ReturnArrays:
         raise TypeError("calculation_arrays must be CalculationArrays.")
 
     return ReturnArrays(
+        source_bars=calculation_arrays.source_bars,
         **{
             field_name: _return_series(
                 calculation_arrays,

@@ -158,7 +158,7 @@ Goal: calculate non-TA-Lib features as pure, independently tested operations.
 | C4.4 | [x] | Calculate range relationships | Implement 20/50/252 highs and 20/50 lows without forward leakage. | P0.4, C4.1 |
 | C4.5 | [x] | Calculate volume and liquidity | Implement 20/60 average volume and 20 average dollar volume with missing-volume and complete-window rules. | P0.4, C4.1, C4.3 |
 | C4.6 | [x] | Calculate streak state | Implement up/down streaks with unchanged close resetting both; prove append/rebuild equivalence. | P0.4, C4.1 |
-| C4.7 | [ ] | Calculate return statistics | Implement 20/60 return volatility and defined 1d/3d 20-observation z-scores with zero-variance behavior. | P0.4, C4.1-C4.2 |
+| C4.7 | [x] | Calculate return statistics | Implement 20/60 return volatility and defined 1d/3d 20-observation z-scores with zero-variance behavior. | P0.4, C4.1-C4.2 |
 | C4.8 | [ ] | Add core golden fixtures | Compare independent formulas, trustworthy legacy examples, gaps, discontinuities, short histories, and randomized invariants. | C4.2-C4.7 |
 
 Done: 2026-08-11 — added public lazy-loaded `CalculationArrays` and
@@ -233,6 +233,19 @@ runs, and independent append-state equivalence at every split. Package pytest
 passed 211 tests with 1 expected Core-runtime skip; Poetry lock, `pip check`,
 wheel/sdist build, wheel-content inspection, compileall, NumPy 2.4.6/TA-Lib
 0.7.1 runtime smoke, public/cold imports, and `git diff --check` passed.
+
+Done: 2026-08-11 — added public lazy-loaded `ReturnStatisticArrays` and
+`calculate_return_statistics()` in
+`empire_stonks_tech_indicators/return_statistics.py` for nonannualized
+20/60-return sample volatility and current-excluded, prior-20-reference 1d/3d
+return z-scores, with complete-window masks, exact-zero-variance nulls,
+finite-output failure, and exact normalized-source/return alignment. Tests use
+independent sample estimators and cover every warm-up, calendar gaps, null
+window recovery, constant returns, prefix isolation, tampering, dtypes, masks,
+overflow, and invalid inputs. Focused pytest passed 36 tests; package pytest
+passed 223 tests with 1 expected Core-runtime skip. Poetry lock, `pip check`,
+wheel/sdist build and content inspection, compileall, NumPy 2.4.6/TA-Lib 0.7.1
+runtime smoke, public/cold imports, and `git diff --check` passed.
 
 ---
 

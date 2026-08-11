@@ -54,6 +54,10 @@ if TYPE_CHECKING:
         ReturnArrays,
         calculate_returns,
     )
+    from empire_stonks_tech_indicators.return_statistics import (
+        ReturnStatisticArrays,
+        calculate_return_statistics,
+    )
     from empire_stonks_tech_indicators.bar_structure import (
         BarStructureArrays,
         calculate_bar_structure,
@@ -100,6 +104,18 @@ def __getattr__(name: str) -> object:
         exports = {
             "ReturnArrays": ReturnArrays,
             "calculate_returns": calculate_returns,
+        }
+        globals().update(exports)
+        return exports[name]
+    if name in {"ReturnStatisticArrays", "calculate_return_statistics"}:
+        from empire_stonks_tech_indicators.return_statistics import (
+            ReturnStatisticArrays,
+            calculate_return_statistics,
+        )
+
+        exports = {
+            "ReturnStatisticArrays": ReturnStatisticArrays,
+            "calculate_return_statistics": calculate_return_statistics,
         }
         globals().update(exports)
         return exports[name]
@@ -167,6 +183,7 @@ __all__ = [
     "MaskedFloatArray",
     "RangeRelationshipArrays",
     "ReturnArrays",
+    "ReturnStatisticArrays",
     "BenchmarkHistory",
     "EligibleListing",
     "EODDATA_DAILY_JOB_NAME",
@@ -177,6 +194,7 @@ __all__ = [
     "YAHOO_DAILY_JOB_NAME",
     "calculate_bar_structure",
     "calculate_range_relationships",
+    "calculate_return_statistics",
     "calculate_returns",
     "calculate_streaks",
     "calculate_volume_liquidity",
