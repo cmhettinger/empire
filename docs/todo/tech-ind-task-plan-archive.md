@@ -408,3 +408,118 @@ Poetry check/build, compilation, `pip check`, `git diff --check`, and Flyway
 validation of 39 migrations passed.
 
 ---
+
+## Phase 4: Implement Deterministic Core Features
+
+Goal: calculate non-TA-Lib features as pure, independently tested operations.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| C4.1 | [x] | Normalize calculation arrays | Convert ordered source values to contiguous arrays with null masks and no silent reorder, zero fill, or look-ahead. | B1.6, I3.2 |
+| C4.2 | [x] | Calculate returns | Implement 1/2/3/5/10/20/63/126/252-observation returns with agreed zero-denominator and warm-up behavior. | P0.4, C4.1 |
+| C4.3 | [x] | Calculate bar structure | Implement gap, intraday return, range, close location, dollar volume, and copied source values; cover zero range and null volume. | P0.4, C4.1 |
+| C4.4 | [x] | Calculate range relationships | Implement 20/50/252 highs and 20/50 lows without forward leakage. | P0.4, C4.1 |
+| C4.5 | [x] | Calculate volume and liquidity | Implement 20/60 average volume and 20 average dollar volume with missing-volume and complete-window rules. | P0.4, C4.1, C4.3 |
+| C4.6 | [x] | Calculate streak state | Implement up/down streaks with unchanged close resetting both; prove append/rebuild equivalence. | P0.4, C4.1 |
+| C4.7 | [x] | Calculate return statistics | Implement 20/60 return volatility and defined 1d/3d 20-observation z-scores with zero-variance behavior. | P0.4, C4.1-C4.2 |
+| C4.8 | [x] | Add core golden fixtures | Compare independent formulas, trustworthy legacy examples, gaps, discontinuities, short histories, and randomized invariants. | C4.2-C4.7 |
+
+Done: 2026-08-11 — added public lazy-loaded `CalculationArrays` and
+`normalize_source_bars()` in `empire_stonks_tech_indicators/arrays.py` with
+strict single-listing/date-order checks, exact attached source bars, read-only
+contiguous `float64` OHLCV, explicit nullable-volume masks, and finite-
+conversion failure; documented and tested gaps, prefix independence, negative/
+zero values, missing volume, tampering, mixed/reversed input, and overflow.
+Package pytest passed 155 tests with 1 expected Core-runtime skip; Poetry lock,
+`pip check`, wheel/sdist build, compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime
+smoke, public/cold imports, and `git diff --check` passed.
+
+Done: 2026-08-11 — added public lazy-loaded `MaskedFloatArray`,
+`ReturnArrays`, and `calculate_returns()` in
+`empire_stonks_tech_indicators/{arrays,returns}.py` for all nine V1 observation
+lags with exact warm-up masks, exact-zero prior-close nulls, negative/tiny
+nonzero denominator support, finite-output failure, and read-only contiguous
+arrays. Tests cover every first-valid index, gaps, zero recovery, unchanged and
+negative closes, tiny denominators, prefix independence, masks, dtypes, and
+overflow. Package pytest passed 172 tests with 1 expected Core-runtime skip;
+Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
+compileall, NumPy
+2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and `git diff --check`
+passed.
+
+Done: 2026-08-11 — added public lazy-loaded `BarStructureArrays` and
+`calculate_bar_structure()` in
+`empire_stonks_tech_indicators/bar_structure.py`, retaining exact source bars,
+calculating Python-owned gap plus four PostgreSQL-generated-column reference
+series, and preserving exact-zero/null and finite-output rules without changing
+writer ownership. Tests cover first-row warm-up, calendar gaps, zero
+denominators/range/volume, null volume, negative prices, `abs(close)` dollar
+volume, recovery, copied `Decimal` values, prefix equivalence, masks, overflow,
+and ownership. Package pytest passed 181 tests with 1 expected Core-runtime
+skip; Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
+compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and
+`git diff --check` passed.
+
+Done: 2026-08-11 — added public lazy-loaded `RangeRelationshipArrays` and
+`calculate_range_relationships()` in
+`empire_stonks_tech_indicators/range_relationships.py` for complete trailing
+`hh_20`, `hh_50`, `hh_252`, `ll_20`, and `ll_50` observation windows using
+current-bar-inclusive NumPy extrema and explicit read-only null masks. Tests
+compare every eligible value with independent Python extrema and cover each
+warm-up boundary, negative values, calendar gaps, short history, current-bar
+participation, future-extreme prefix isolation, dtypes, masks, and invalid
+inputs. Package pytest passed 192 tests with 1 expected Core-runtime skip;
+Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
+compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and
+`git diff --check` passed.
+
+Done: 2026-08-11 — added public lazy-loaded `VolumeLiquidityArrays` and
+`calculate_volume_liquidity()` in
+`empire_stonks_tech_indicators/volume_liquidity.py` for complete
+20/60-observation volume averages and the 20-observation nominal dollar-volume
+average, consuming C4.3's exactly aligned dollar-volume reference. Tests compare
+all windows with independent averages and cover warm-up, calendar gaps, null
+window/recovery, zero and fractional-capable volume, negative closes, short
+history, prefix isolation, source mismatch/tampering, masks, dtypes, overflow,
+and invalid inputs. Package pytest passed 203 tests with 1 expected Core-runtime
+skip; Poetry lock, `pip check`, wheel/sdist build, wheel-content inspection,
+compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime smoke, public/cold imports, and
+`git diff --check` passed.
+
+Done: 2026-08-11 — added public lazy-loaded `StreakArrays` and
+`calculate_streaks()` in `empire_stonks_tech_indicators/streaks.py` with
+non-null read-only `int64` up/down counts, zero initialization, strict close
+direction, and unchanged-close reset semantics over the complete source prefix.
+Tests cover positive/negative/unchanged transitions, calendar gaps, long
+streaks, mutual exclusivity, dtypes, immutability, repeated full-prefix append
+runs, and independent append-state equivalence at every split. Package pytest
+passed 211 tests with 1 expected Core-runtime skip; Poetry lock, `pip check`,
+wheel/sdist build, wheel-content inspection, compileall, NumPy 2.4.6/TA-Lib
+0.7.1 runtime smoke, public/cold imports, and `git diff --check` passed.
+
+Done: 2026-08-11 — added public lazy-loaded `ReturnStatisticArrays` and
+`calculate_return_statistics()` in
+`empire_stonks_tech_indicators/return_statistics.py` for nonannualized
+20/60-return sample volatility and current-excluded, prior-20-reference 1d/3d
+return z-scores, with complete-window masks, exact-zero-variance nulls,
+finite-output failure, and exact normalized-source/return alignment. Tests use
+independent sample estimators and cover every warm-up, calendar gaps, null
+window recovery, constant returns, prefix isolation, tampering, dtypes, masks,
+overflow, and invalid inputs. Focused pytest passed 36 tests; package pytest
+passed 223 tests with 1 expected Core-runtime skip. Poetry lock, `pip check`,
+wheel/sdist build and content inspection, compileall, NumPy 2.4.6/TA-Lib 0.7.1
+runtime smoke, public/cold imports, and `git diff --check` passed.
+
+Done: 2026-08-11 — added `tests/fixtures/core_features_v1.json` and
+`tests/test_core_golden.py` as the combined C4.2-C4.7 regression gate. The
+committed goldens preserve the legacy Stonks engine's 260-bar overlap for
+`hh_20`, `ll_20`, and `volume_avg_20` plus an unadjusted discontinuity/calendar
+gap; an independent standard-library scalar oracle checks every core value and
+null mask across four short histories and 840 seeded randomized bars under the
+frozen tolerance, with whole-family future-prefix isolation. Focused pytest
+passed 9 tests; package pytest passed 232 tests with 1 expected Core-runtime
+skip. Poetry lock, `pip check`, wheel/sdist build and content inspection,
+compileall, NumPy 2.4.6/TA-Lib 0.7.1 runtime smoke, and `git diff --check`
+passed.
+
+---
