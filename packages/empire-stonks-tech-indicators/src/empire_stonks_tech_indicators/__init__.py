@@ -74,6 +74,10 @@ if TYPE_CHECKING:
         StreakArrays,
         calculate_streaks,
     )
+    from empire_stonks_tech_indicators.moving_averages import (
+        MovingAverageArrays,
+        calculate_moving_averages,
+    )
     from empire_stonks_tech_indicators.talib_adapter import (
         TALibAdapter,
         TALibRuntimeInfo,
@@ -171,6 +175,18 @@ def __getattr__(name: str) -> object:
         }
         globals().update(exports)
         return exports[name]
+    if name in {"MovingAverageArrays", "calculate_moving_averages"}:
+        from empire_stonks_tech_indicators.moving_averages import (
+            MovingAverageArrays,
+            calculate_moving_averages,
+        )
+
+        exports = {
+            "MovingAverageArrays": MovingAverageArrays,
+            "calculate_moving_averages": calculate_moving_averages,
+        }
+        globals().update(exports)
+        return exports[name]
     if name in {"TALibAdapter", "TALibRuntimeInfo"}:
         from empire_stonks_tech_indicators.talib_adapter import (
             TALibAdapter,
@@ -204,6 +220,7 @@ __all__ = [
     "EligibleListing",
     "EODDATA_DAILY_JOB_NAME",
     "ListingStateComparison",
+    "MovingAverageArrays",
     "SourceReadinessDecision",
     "StreakArrays",
     "TALibAdapter",
@@ -211,6 +228,7 @@ __all__ = [
     "VolumeLiquidityArrays",
     "YAHOO_DAILY_JOB_NAME",
     "calculate_bar_structure",
+    "calculate_moving_averages",
     "calculate_range_relationships",
     "calculate_return_statistics",
     "calculate_returns",

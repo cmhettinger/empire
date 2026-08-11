@@ -154,7 +154,7 @@ explicit warm-up and version semantics.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | T5.1 | [x] | Add TA-Lib adapter | Accept normalized arrays, record library/version, convert non-finite warm-up output to null masks, and hide TA-Lib types. | B1.1-B1.2, C4.1 |
-| T5.2 | [ ] | Calculate SMA and EMA | Implement SMA 20/50/200 and EMA 12/20/26/50 with agreed initialization and full/incremental equivalence. | P0.4, T5.1 |
+| T5.2 | [x] | Calculate SMA and EMA | Implement SMA 20/50/200 and EMA 12/20/26/50 with agreed initialization and full/incremental equivalence. | P0.4, T5.1 |
 | T5.3 | [ ] | Calculate average changes | Implement 20-observation SMA 50/200 changes and inputs for generated price/average distances. | C4.2, T5.2 |
 | T5.4 | [ ] | Calculate RSI and ATR | Implement Wilder RSI 14 and ATR 14 with independent references and correction replay. | P0.4, T5.1 |
 | T5.5 | [ ] | Calculate Bollinger state | Implement price standard deviation, `%b`, and BandWidth for the fixed 20/2 contract; do not store redundant bands. | P0.4, T5.1-T5.2 |
@@ -171,6 +171,17 @@ pytest passed 27 tests; package pytest passed 251 tests with 1 expected
 Core-runtime skip. Poetry lock, `pip check`, wheel/sdist build and content
 inspection, compileall, pinned runtime smoke, cold lazy-import, 88-column, and
 `git diff --check` checks passed.
+
+Done: 2026-08-11 — added public lazy-loaded `MovingAverageArrays` and
+`calculate_moving_averages()` in
+`empire_stonks_tech_indicators/moving_averages.py` for exact TA-Lib SMA
+20/50/200 and EMA 12/20/26/50 calls from the complete source prefix, preserving
+the frozen SMA seed, EMA recursion, and null boundaries without adding T5.3
+distances or changes. Independent scalar references plus append and correction
+suffix composition passed in 44 focused tests; package pytest passed 268 tests
+with 1 expected Core-runtime skip. Poetry lock, `pip check`, wheel/sdist build
+and content inspection, compileall, pinned runtime smoke, cold lazy-import,
+88-column, and `git diff --check` checks passed.
 
 ---
 

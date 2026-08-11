@@ -102,6 +102,8 @@ The immutable domain-model API consists of:
   and close-down observation counts
 - `TALibAdapter` and `TALibRuntimeInfo` for the pinned native-library boundary,
   runtime identity, process-global setting checks, and warm-up normalization
+- `MovingAverageArrays` and `calculate_moving_averages()` for TA-Lib SMA
+  20/50/200 and EMA 12/20/26/50 from the complete source prefix
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -214,6 +216,14 @@ an explicit null mask, and fails on finite warm-up values or any non-finite
 post-lookback output. It provides explicit reviewed function calls for later
 feature-family calculators without exposing TA-Lib arrays, functions, or
 exceptions through the package API.
+
+Moving-average calculation uses explicit reviewed adapter calls for the seven
+fixed V1 periods. SMA begins with the first complete close window. EMA uses the
+pinned TA-Lib initialization: the first complete-window SMA seed followed by
+`alpha = 2 / (N + 1)` recursion. Every earlier observation remains null. V1
+recalculates an affected listing from its earliest source observation, then an
+append or correction workflow may retain the unchanged prefix and write only
+the affected suffix; it never restarts EMA from a bounded suffix.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,
