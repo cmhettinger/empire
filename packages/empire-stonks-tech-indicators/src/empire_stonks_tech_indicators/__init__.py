@@ -74,6 +74,10 @@ if TYPE_CHECKING:
         RangeRelationshipArrays,
         calculate_range_relationships,
     )
+    from empire_stonks_tech_indicators.directional_movement import (
+        DirectionalMovementArrays,
+        calculate_directional_movement,
+    )
     from empire_stonks_tech_indicators.volume_liquidity import (
         VolumeLiquidityArrays,
         calculate_volume_liquidity,
@@ -187,6 +191,18 @@ def __getattr__(name: str) -> object:
         }
         globals().update(exports)
         return exports[name]
+    if name in {"DirectionalMovementArrays", "calculate_directional_movement"}:
+        from empire_stonks_tech_indicators.directional_movement import (
+            DirectionalMovementArrays,
+            calculate_directional_movement,
+        )
+
+        exports = {
+            "DirectionalMovementArrays": DirectionalMovementArrays,
+            "calculate_directional_movement": calculate_directional_movement,
+        }
+        globals().update(exports)
+        return exports[name]
     if name in {"VolumeLiquidityArrays", "calculate_volume_liquidity"}:
         from empire_stonks_tech_indicators.volume_liquidity import (
             VolumeLiquidityArrays,
@@ -261,6 +277,7 @@ __all__ = [
     "BarStructureArrays",
     "BollingerStateArrays",
     "CalculationArrays",
+    "DirectionalMovementArrays",
     "MaskedFloatArray",
     "RangeRelationshipArrays",
     "ReturnArrays",
@@ -280,6 +297,7 @@ __all__ = [
     "YAHOO_DAILY_JOB_NAME",
     "calculate_bar_structure",
     "calculate_bollinger_state",
+    "calculate_directional_movement",
     "calculate_moving_averages",
     "calculate_moving_average_trends",
     "calculate_range_relationships",

@@ -111,6 +111,8 @@ The immutable domain-model API consists of:
   from the complete source prefix
 - `BollingerStateArrays` and `calculate_bollinger_state()` for population
   price deviation 20 and generated `%b`/BandWidth reference values
+- `DirectionalMovementArrays` and `calculate_directional_movement()` for
+  pinned Wilder +DI 14, -DI 14, and ADX 14
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -255,6 +257,13 @@ calculate reference `%b` and BandWidth values under the database's exact-zero
 rules. Only `price_stddev_20` enters the Python write payload; `%b` and
 BandWidth remain generated, and redundant upper/lower band arrays are neither
 returned nor persisted.
+
+Directional movement applies TA-Lib's strict one-observation +DM/-DM selection,
+14-observation Wilder smoothing, true-range normalization, and DX-to-ADX
+recurrence. +DI and -DI first populate at observation 14; ADX first populates
+at observation 27 after 14 DX values. Default compatibility and zero unstable
+periods are asserted by the adapter before every call. Corrections recalculate
+the complete source prefix before affected-suffix writes.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,

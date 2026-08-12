@@ -158,7 +158,7 @@ explicit warm-up and version semantics.
 | T5.3 | [x] | Calculate average changes | Implement 20-observation SMA 50/200 changes and inputs for generated price/average distances. | C4.2, T5.2 |
 | T5.4 | [x] | Calculate RSI and ATR | Implement Wilder RSI 14 and ATR 14 with independent references and correction replay. | P0.4, T5.1 |
 | T5.5 | [x] | Calculate Bollinger state | Implement price standard deviation, `%b`, and BandWidth for the fixed 20/2 contract; do not store redundant bands. | P0.4, T5.1-T5.2 |
-| T5.6 | [ ] | Calculate ADX and DMI | Implement +DI 14, -DI 14, and ADX 14 with Wilder smoothing and unstable-period policy. | P0.4, T5.1, T5.4 |
+| T5.6 | [x] | Calculate ADX and DMI | Implement +DI 14, -DI 14, and ADX 14 with Wilder smoothing and unstable-period policy. | P0.4, T5.1, T5.4 |
 | T5.7 | [ ] | Calculate MACD | Implement 12/26/9 line, signal, histogram, and normalized values with fixed scale and zero handling. | P0.4, T5.1-T5.2 |
 | T5.8 | [ ] | Add combined TA-Lib regression | Compare pinned-library fixtures, edge cases, trustworthy legacy examples, and an independent reference per family. | T5.2-T5.7 |
 
@@ -216,6 +216,18 @@ middle and width rules, prefix isolation, ownership, and tampering passed in 54
 focused tests; package pytest passed 305 tests with 1 expected Core-runtime
 skip. Poetry lock, `pip check`, wheel/sdist build and content inspection,
 compileall, pinned runtime smoke, cold lazy-import, 88-column, and
+`git diff --check` checks passed.
+
+Done: 2026-08-11 — added public lazy-loaded `DirectionalMovementArrays` and
+`calculate_directional_movement()` in
+`empire_stonks_tech_indicators/directional_movement.py` for exact TA-Lib
+Wilder +DI 14, -DI 14, and ADX 14 calls from the complete source prefix with
+zero unstable-period enforcement. An independent DM/TR/DI/DX/ADX recurrence,
+14/27 warm-up boundaries, negative-capable gaps, tied/up/down/zero movement,
+append isolation, correction suffix composition, and unstable-period failure
+passed in 48 focused tests; package pytest passed 316 tests with 1 expected
+Core-runtime skip. Poetry lock, `pip check`, wheel/sdist build and content
+inspection, compileall, pinned runtime smoke, cold lazy-import, 88-column, and
 `git diff --check` checks passed.
 
 ---
