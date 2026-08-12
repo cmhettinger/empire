@@ -94,6 +94,10 @@ if TYPE_CHECKING:
         MovingAverageTrendArrays,
         calculate_moving_average_trends,
     )
+    from empire_stonks_tech_indicators.macd import (
+        MacdArrays,
+        calculate_macd,
+    )
     from empire_stonks_tech_indicators.talib_adapter import (
         TALibAdapter,
         TALibRuntimeInfo,
@@ -251,6 +255,18 @@ def __getattr__(name: str) -> object:
         }
         globals().update(exports)
         return exports[name]
+    if name in {"MacdArrays", "calculate_macd"}:
+        from empire_stonks_tech_indicators.macd import (
+            MacdArrays,
+            calculate_macd,
+        )
+
+        exports = {
+            "MacdArrays": MacdArrays,
+            "calculate_macd": calculate_macd,
+        }
+        globals().update(exports)
+        return exports[name]
     if name in {"TALibAdapter", "TALibRuntimeInfo"}:
         from empire_stonks_tech_indicators.talib_adapter import (
             TALibAdapter,
@@ -287,6 +303,7 @@ __all__ = [
     "EligibleListing",
     "EODDATA_DAILY_JOB_NAME",
     "ListingStateComparison",
+    "MacdArrays",
     "MovingAverageArrays",
     "MovingAverageTrendArrays",
     "SourceReadinessDecision",
@@ -298,6 +315,7 @@ __all__ = [
     "calculate_bar_structure",
     "calculate_bollinger_state",
     "calculate_directional_movement",
+    "calculate_macd",
     "calculate_moving_averages",
     "calculate_moving_average_trends",
     "calculate_range_relationships",

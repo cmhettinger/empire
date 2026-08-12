@@ -113,6 +113,8 @@ The immutable domain-model API consists of:
   price deviation 20 and generated `%b`/BandWidth reference values
 - `DirectionalMovementArrays` and `calculate_directional_movement()` for
   pinned Wilder +DI 14, -DI 14, and ADX 14
+- `MacdArrays` and `calculate_macd()` for the pinned 12/26/9 line, signal,
+  histogram, and generated normalized reference values
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -264,6 +266,14 @@ recurrence. +DI and -DI first populate at observation 14; ADX first populates
 at observation 27 after 14 DX values. Default compatibility and zero unstable
 periods are asserted by the adapter before every call. Corrections recalculate
 the complete source prefix before affected-suffix writes.
+
+MACD uses one explicit `MACD(close, fastperiod=12, slowperiod=26,
+signalperiod=9)` call. Its line, signal, and histogram share observation 33 as
+their first populated position; the line is never reconstructed from the
+separately stored EMA arrays. The generated `macd_12_26_pct` reference divides
+the line by `abs(ema_26)`, while `macd_histogram_12_26_9_pct` divides the
+histogram by `abs(close)`. Missing inputs and exact-zero denominators remain
+null. Only the three raw MACD outputs enter the Python write payload.
 
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,

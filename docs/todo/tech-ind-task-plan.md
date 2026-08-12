@@ -159,7 +159,7 @@ explicit warm-up and version semantics.
 | T5.4 | [x] | Calculate RSI and ATR | Implement Wilder RSI 14 and ATR 14 with independent references and correction replay. | P0.4, T5.1 |
 | T5.5 | [x] | Calculate Bollinger state | Implement price standard deviation, `%b`, and BandWidth for the fixed 20/2 contract; do not store redundant bands. | P0.4, T5.1-T5.2 |
 | T5.6 | [x] | Calculate ADX and DMI | Implement +DI 14, -DI 14, and ADX 14 with Wilder smoothing and unstable-period policy. | P0.4, T5.1, T5.4 |
-| T5.7 | [ ] | Calculate MACD | Implement 12/26/9 line, signal, histogram, and normalized values with fixed scale and zero handling. | P0.4, T5.1-T5.2 |
+| T5.7 | [x] | Calculate MACD | Implement 12/26/9 line, signal, histogram, and normalized values with fixed scale and zero handling. | P0.4, T5.1-T5.2 |
 | T5.8 | [ ] | Add combined TA-Lib regression | Compare pinned-library fixtures, edge cases, trustworthy legacy examples, and an independent reference per family. | T5.2-T5.7 |
 
 Done: 2026-08-11 — added public lazy-loaded `TALibAdapter` and
@@ -229,6 +229,17 @@ passed in 48 focused tests; package pytest passed 316 tests with 1 expected
 Core-runtime skip. Poetry lock, `pip check`, wheel/sdist build and content
 inspection, compileall, pinned runtime smoke, cold lazy-import, 88-column, and
 `git diff --check` checks passed.
+
+Done: 2026-08-11 — added public lazy-loaded `MacdArrays` and
+`calculate_macd()` in `empire_stonks_tech_indicators/macd.py` for one exact
+TA-Lib MACD 12/26/9 call plus PostgreSQL-generated line/EMA-26 and
+histogram/close normalized references, preserving the shared observation-33
+mask and exact-zero denominator nulls without reconstructing the line from
+stored EMAs. Fixed-call, scale, warm-up, flat positive/negative/zero, prefix,
+correction suffix, ownership, and tampering checks passed in 56 focused tests;
+package pytest passed 328 tests with 1 expected Core-runtime skip. Poetry lock,
+`pip check`, wheel/sdist build and content inspection, compileall, runtime
+smoke, cold lazy-import, 88-column, and `git diff --check` checks passed.
 
 ---
 
