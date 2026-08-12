@@ -160,7 +160,7 @@ explicit warm-up and version semantics.
 | T5.5 | [x] | Calculate Bollinger state | Implement price standard deviation, `%b`, and BandWidth for the fixed 20/2 contract; do not store redundant bands. | P0.4, T5.1-T5.2 |
 | T5.6 | [x] | Calculate ADX and DMI | Implement +DI 14, -DI 14, and ADX 14 with Wilder smoothing and unstable-period policy. | P0.4, T5.1, T5.4 |
 | T5.7 | [x] | Calculate MACD | Implement 12/26/9 line, signal, histogram, and normalized values with fixed scale and zero handling. | P0.4, T5.1-T5.2 |
-| T5.8 | [ ] | Add combined TA-Lib regression | Compare pinned-library fixtures, edge cases, trustworthy legacy examples, and an independent reference per family. | T5.2-T5.7 |
+| T5.8 | [x] | Add combined TA-Lib regression | Compare pinned-library fixtures, edge cases, trustworthy legacy examples, and an independent reference per family. | T5.2-T5.7 |
 
 Done: 2026-08-11 — added public lazy-loaded `TALibAdapter` and
 `TALibRuntimeInfo` in `empire_stonks_tech_indicators/talib_adapter.py` for the
@@ -240,6 +240,19 @@ correction suffix, ownership, and tampering checks passed in 56 focused tests;
 package pytest passed 328 tests with 1 expected Core-runtime skip. Poetry lock,
 `pip check`, wheel/sdist build and content inspection, compileall, runtime
 smoke, cold lazy-import, 88-column, and `git diff --check` checks passed.
+
+Done: 2026-08-11 — added
+`tests/{test_talib_golden.py,fixtures/talib_features_v1.json}` as the combined
+T5.2-T5.7 regression gate for all 30 raw and generated-reference outputs. The
+committed NumPy 2.4.6/TA-Lib 0.7.1 goldens preserve the trustworthy seven-field
+legacy 260-bar overlap and a provider-native discontinuity; independent
+standard-library SMA/EMA, Wilder RSI/ATR/DMI/ADX, population-deviation, MACD,
+and generated-expression references cover seeded gaps, negative/tiny values,
+and flat positive/negative/zero histories. Focused pytest passed 104 tests;
+package pytest passed 336 tests with 1 expected Core-runtime skip. Poetry lock,
+`pip check`, wheel/sdist build and content inspection, compileall, pinned
+runtime smoke, cold lazy-import, 88-column, and `git diff --check` checks
+passed.
 
 ---
 

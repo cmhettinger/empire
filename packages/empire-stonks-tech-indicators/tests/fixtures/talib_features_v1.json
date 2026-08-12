@@ -1,0 +1,207 @@
+{
+  "schema_version": "TECH_INDICATORS_TALIB_GOLDEN_V1",
+  "runtime": {
+    "numpy": "2.4.6",
+    "talib_python": "0.7.1",
+    "talib_c": "0.7.1",
+    "compatibility": "DEFAULT",
+    "unstable_period": 0
+  },
+  "provenance": {
+    "legacy_repository": "github.com/cmhettinger/stonks.git",
+    "legacy_commit": "b2bf08fc2e7b097460d216517cf18394a8c454c8",
+    "legacy_fixture": "apps/stonks-engine/tests/derive/test_tech_apply.py::_make_ohlcv_df",
+    "legacy_fixture_blob": "4fe714309f1f951096407ab4578847bf4d23adf3",
+    "legacy_implementation": "apps/stonks-engine/src/stonks_engine/derive/tech/apply.py::compute_tech_frame",
+    "legacy_implementation_blob": "0f26dd8467cc139fe8a3aebdf1150a750845feba",
+    "legacy_overlap": [
+      "sma_20",
+      "sma_50",
+      "sma_200",
+      "ema_20",
+      "ema_50",
+      "rsi_14",
+      "atr_14"
+    ],
+    "note": "Expected raw values were frozen from the reviewed pinned Function API. Standard-library scalar recurrences independently validate every family."
+  },
+  "cases": {
+    "legacy_linear_260": {
+      "generator": {
+        "observations": 260,
+        "start_date": "2024-01-01",
+        "business_days": true,
+        "close_start": 100.0,
+        "close_step": 1.0,
+        "open_offset": -0.5,
+        "high_offset": 1.0,
+        "low_offset": -1.0,
+        "volume_start": 1000000.0,
+        "volume_step": 1000.0
+      },
+      "expected": {
+        "14": {
+          "ema_12": 108.5,
+          "rsi_14": 100.0,
+          "atr_14": 2.0,
+          "plus_di_14": 50.0,
+          "minus_di_14": 0.0
+        },
+        "19": {
+          "sma_20": 109.5,
+          "ema_12": 113.5,
+          "ema_20": 109.5,
+          "rsi_14": 100.0,
+          "atr_14": 2.0,
+          "price_stddev_20": 5.766281297335398,
+          "plus_di_14": 50.0,
+          "minus_di_14": 0.0
+        },
+        "27": {
+          "sma_20": 117.5,
+          "ema_12": 121.5,
+          "ema_20": 117.5,
+          "ema_26": 114.5,
+          "rsi_14": 100.0,
+          "atr_14": 2.0,
+          "price_stddev_20": 5.766281297335398,
+          "plus_di_14": 50.0,
+          "minus_di_14": 0.0,
+          "adx_14": 100.0
+        },
+        "33": {
+          "sma_20": 123.5,
+          "ema_12": 127.5,
+          "ema_20": 123.5,
+          "ema_26": 120.5,
+          "rsi_14": 100.0,
+          "atr_14": 2.0,
+          "price_stddev_20": 5.766281297335398,
+          "plus_di_14": 50.0,
+          "minus_di_14": 0.0,
+          "adx_14": 100.0,
+          "macd_12_26": 7.0,
+          "macd_signal_12_26_9": 7.0,
+          "macd_histogram_12_26_9": 0.0
+        },
+        "49": {
+          "sma_20": 139.5,
+          "sma_50": 124.5,
+          "ema_12": 143.5,
+          "ema_20": 139.5,
+          "ema_26": 136.5,
+          "ema_50": 124.5,
+          "rsi_14": 100.0,
+          "atr_14": 2.0,
+          "price_stddev_20": 5.766281297335398,
+          "plus_di_14": 50.0,
+          "minus_di_14": 0.0,
+          "adx_14": 100.0,
+          "macd_12_26": 7.0,
+          "macd_signal_12_26_9": 7.0,
+          "macd_histogram_12_26_9": 0.0
+        },
+        "199": {
+          "sma_20": 289.5,
+          "sma_50": 274.5,
+          "sma_200": 199.5,
+          "ema_12": 293.5,
+          "ema_20": 289.5,
+          "ema_26": 286.5,
+          "ema_50": 274.5,
+          "rsi_14": 100.0,
+          "atr_14": 2.0,
+          "price_stddev_20": 5.766281297335398,
+          "plus_di_14": 50.0,
+          "minus_di_14": 0.0,
+          "adx_14": 100.0,
+          "macd_12_26": 7.0,
+          "macd_signal_12_26_9": 7.0,
+          "macd_histogram_12_26_9": 0.0
+        },
+        "259": {
+          "sma_20": 349.5,
+          "sma_50": 334.5,
+          "sma_200": 259.5,
+          "ema_12": 353.5,
+          "ema_20": 349.5,
+          "ema_26": 346.5,
+          "ema_50": 334.5,
+          "rsi_14": 100.0,
+          "atr_14": 2.0,
+          "price_stddev_20": 5.766281297335398,
+          "plus_di_14": 50.0,
+          "minus_di_14": 0.0,
+          "adx_14": 100.0,
+          "macd_12_26": 7.0,
+          "macd_signal_12_26_9": 7.0,
+          "macd_histogram_12_26_9": 0.0
+        }
+      }
+    },
+    "provider_native_discontinuity": {
+      "generator": {
+        "observations": 80,
+        "start_date": "2024-01-01",
+        "gap_before_index": 40,
+        "gap_days": 30,
+        "split_index": 40,
+        "split_factor": 0.5,
+        "open_offset": -0.5,
+        "high_offset": 1.0,
+        "low_offset": -1.0,
+        "volume_start": 1000.0,
+        "volume_step": 10.0
+      },
+      "expected": {
+        "40": {
+          "sma_20": 127.0,
+          "ema_12": 123.73076923076923,
+          "ema_20": 123.83333333333333,
+          "ema_26": 122.31481481481481,
+          "rsi_14": 15.853658536585366,
+          "atr_14": 6.857142857142857,
+          "price_stddev_20": 14.124446891825535,
+          "plus_di_14": 13.438676866419637,
+          "minus_di_14": 72.0780370347727,
+          "adx_14": 97.75504589297564,
+          "macd_12_26": 1.4159544159544168,
+          "macd_signal_12_26_9": 5.883190883190883,
+          "macd_histogram_12_26_9": -4.467236467236466
+        },
+        "41": {
+          "sma_20": 124.475,
+          "ema_12": 115.5414201183432,
+          "ema_20": 118.75396825396825,
+          "ema_26": 118.47668038408779,
+          "rsi_14": 16.402609506057782,
+          "atr_14": 6.5102040816326525,
+          "price_stddev_20": 18.733309237825576,
+          "plus_di_14": 13.693074501375053,
+          "minus_di_14": 70.4920176888887,
+          "adx_14": 95.59176566851674,
+          "macd_12_26": -2.9352602657445885,
+          "macd_signal_12_26_9": 4.119500653403788,
+          "macd_histogram_12_26_9": -7.054760919148377
+        },
+        "79": {
+          "sma_20": 84.75,
+          "sma_50": 90.7,
+          "ema_12": 86.83364203374599,
+          "ema_20": 85.93198515336528,
+          "ema_26": 86.1614565312436,
+          "ema_50": 91.64477942742585,
+          "rsi_14": 65.66818047719701,
+          "atr_14": 2.2698846756544513,
+          "price_stddev_20": 2.883140648667699,
+          "plus_di_14": 23.063914208810115,
+          "minus_di_14": 12.070354037121849,
+          "adx_14": 27.094413051759233,
+          "macd_12_26": 0.6721855025023871,
+          "macd_signal_12_26_9": -0.49457011563887515,
+          "macd_histogram_12_26_9": 1.1667556181412622
+        }
+      }
+    }
+  }
+}

@@ -275,6 +275,13 @@ the line by `abs(ema_26)`, while `macd_histogram_12_26_9_pct` divides the
 histogram by `abs(close)`. Missing inputs and exact-zero denominators remain
 null. Only the three raw MACD outputs enter the Python write payload.
 
+The combined TA-Lib regression in `tests/test_talib_golden.py` checks every
+T5.2-T5.7 raw and generated-reference output against standard-library scalar
+formulas under the frozen tolerance. Its committed fixture pins the reviewed
+NumPy/TA-Lib runtime, preserves the trustworthy seven-field overlap with the
+legacy Stonks engine's 260-bar example, and records a provider-native
+discontinuity without claiming adjusted or cross-provider semantics.
+
 SPX resolution queries only the exact configured `YAHOO/XIDX/SPX` identity,
 requires exactly one row, and separately validates active status,
 `EQUITY_INDEX`, object metadata, and exact `YahooTicker=^GSPC`. Missing,
