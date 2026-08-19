@@ -58,6 +58,10 @@ if TYPE_CHECKING:
         AlignedReturnArrays,
         calculate_aligned_returns,
     )
+    from empire_stonks_tech_indicators.spx_beta import (
+        SpxBetaArrays,
+        calculate_spx_beta,
+    )
     from empire_stonks_tech_indicators.spx_price_ratio import (
         SpxPriceRatioArrays,
         calculate_spx_price_ratios,
@@ -156,6 +160,18 @@ def __getattr__(name: str) -> object:
         exports = {
             "AlignedReturnArrays": AlignedReturnArrays,
             "calculate_aligned_returns": calculate_aligned_returns,
+        }
+        globals().update(exports)
+        return exports[name]
+    if name in {"SpxBetaArrays", "calculate_spx_beta"}:
+        from empire_stonks_tech_indicators.spx_beta import (
+            SpxBetaArrays,
+            calculate_spx_beta,
+        )
+
+        exports = {
+            "SpxBetaArrays": SpxBetaArrays,
+            "calculate_spx_beta": calculate_spx_beta,
         }
         globals().update(exports)
         return exports[name]
@@ -356,6 +372,7 @@ __all__ = [
     "MovingAverageArrays",
     "MovingAverageTrendArrays",
     "SourceReadinessDecision",
+    "SpxBetaArrays",
     "SpxPriceRatioArrays",
     "SpxRelativeReturnArrays",
     "StreakArrays",
@@ -364,6 +381,7 @@ __all__ = [
     "VolumeLiquidityArrays",
     "YAHOO_DAILY_JOB_NAME",
     "calculate_aligned_returns",
+    "calculate_spx_beta",
     "calculate_spx_price_ratios",
     "calculate_spx_relative_returns",
     "calculate_bar_structure",

@@ -99,6 +99,8 @@ The immutable domain-model API consists of:
   subject/SPX close ratios and complete 20/50-aligned-observation ratio trends
 - `SpxRelativeReturnArrays` and `calculate_spx_relative_returns()` for complete
   compounded 20/63/126/252-pair SPX-relative returns
+- `SpxBetaArrays` and `calculate_spx_beta()` for complete 60/252-pair sample
+  covariance divided by sample SPX variance
 - `BarStructureArrays` and `calculate_bar_structure()` for gap, same-bar
   generated-column references, and exact copied-source values
 - `RangeRelationshipArrays` and `calculate_range_relationships()` for complete
@@ -323,6 +325,12 @@ They first populate after one more aligned close than the requested return
 count. A null pair invalidates the complete window without pulling in an older
 pair, an exactly zero SPX gross leaves the result null, and non-finite products
 fail calculation.
+
+SPX beta uses complete 60/252 aligned-return windows and the frozen sample
+covariance and sample-variance estimators with `N-1` denominators. Exact-zero
+SPX variance leaves beta null; nonzero variance is never epsilon-rounded to
+zero, and finite beta has no arbitrary bound. Invalid pairs and subject-only
+dates remain null in native subject-row output.
 
 State comparison uses the atomic published view and the full chronological
 source prefix. It distinguishes ordinary tail appends from historical missing

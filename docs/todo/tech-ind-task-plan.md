@@ -157,7 +157,7 @@ canonical identity mapping.
 | X6.1 | [x] | Build aligned returns | Align subject/SPX one-day returns by exact date, preserve gaps, and expose aligned counts. | P0.5, I3.4, C4.2 |
 | X6.2 | [x] | Calculate SPX price ratio | Implement `rel_spx` and 20/50 ratio-trend distances with denominator and warm-up rules. | P0.5, X6.1, T5.2 |
 | X6.3 | [x] | Calculate relative returns | Implement compounded SPX-relative returns for 20/63/126/252 aligned observations. | P0.5, X6.1 |
-| X6.4 | [ ] | Calculate rolling beta | Implement 60/252 sample-covariance beta; null incomplete windows and zero SPX variance. | P0.5, X6.1 |
+| X6.4 | [x] | Calculate rolling beta | Implement 60/252 sample-covariance beta; null incomplete windows and zero SPX variance. | P0.5, X6.1 |
 | X6.5 | [ ] | Calculate rolling correlation | Implement 60/252 Pearson correlation with complete windows and bounded tolerance. | P0.5, X6.1 |
 | X6.6 | [ ] | Enforce eligible subjects | Populate SPX features only for approved subjects; leave unsupported global/index/futures/commodity/currency series null with bounded reasons. | P0.5-P0.6, X6.2-X6.5 |
 | X6.7 | [ ] | Test benchmark corrections | Prove inserted, changed, missing, or deleted SPX bars recalculate required subject dates without unrelated mutation. | P0.7, X6.2-X6.6 |
@@ -192,6 +192,16 @@ passed 369 tests with 1 expected Core-runtime skip. Poetry lock/dependency
 checks, compileall, pinned runtime smoke, wheel/sdist build and wheel-content
 inspection, public import, changed-Python 88-column scan, and `git diff --check`
 passed.
+
+Done: 2026-08-19 — added public lazy-loaded `SpxBetaArrays` and
+`calculate_spx_beta()` in `empire_stonks_tech_indicators/spx_beta.py` for
+complete 60/252 aligned-return windows using sample covariance and sample SPX
+variance, with subject-row output, exact-zero variance nulls, invalid-window
+recovery, unbounded finite beta, and non-finite statistic failure. Focused
+pytest passed 29 tests; package pytest passed 381 tests with 1 expected
+Core-runtime skip. Poetry lock/dependency checks, compileall, pinned runtime
+smoke, wheel/sdist build and wheel-content inspection, public import,
+changed-Python 88-column scan, and `git diff --check` passed.
 
 ---
 
