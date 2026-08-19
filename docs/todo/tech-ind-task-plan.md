@@ -154,14 +154,33 @@ canonical identity mapping.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| X6.1 | [ ] | Build aligned returns | Align subject/SPX one-day returns by exact date, preserve gaps, and expose aligned counts. | P0.5, I3.4, C4.2 |
-| X6.2 | [ ] | Calculate SPX price ratio | Implement `rel_spx` and 20/50 ratio-trend distances with denominator and warm-up rules. | P0.5, X6.1, T5.2 |
+| X6.1 | [x] | Build aligned returns | Align subject/SPX one-day returns by exact date, preserve gaps, and expose aligned counts. | P0.5, I3.4, C4.2 |
+| X6.2 | [x] | Calculate SPX price ratio | Implement `rel_spx` and 20/50 ratio-trend distances with denominator and warm-up rules. | P0.5, X6.1, T5.2 |
 | X6.3 | [ ] | Calculate relative returns | Implement compounded SPX-relative returns for 20/63/126/252 aligned observations. | P0.5, X6.1 |
 | X6.4 | [ ] | Calculate rolling beta | Implement 60/252 sample-covariance beta; null incomplete windows and zero SPX variance. | P0.5, X6.1 |
 | X6.5 | [ ] | Calculate rolling correlation | Implement 60/252 Pearson correlation with complete windows and bounded tolerance. | P0.5, X6.1 |
 | X6.6 | [ ] | Enforce eligible subjects | Populate SPX features only for approved subjects; leave unsupported global/index/futures/commodity/currency series null with bounded reasons. | P0.5-P0.6, X6.2-X6.5 |
 | X6.7 | [ ] | Test benchmark corrections | Prove inserted, changed, missing, or deleted SPX bars recalculate required subject dates without unrelated mutation. | P0.7, X6.2-X6.6 |
 | X6.8 | [ ] | Add SPX golden regression | Compare ratio, relative returns, beta, and correlation against independent aligned fixtures covering gaps and low variance. | X6.2-X6.7 |
+
+Done: 2026-08-19 — added public lazy-loaded `AlignedReturnArrays` and
+`calculate_aligned_returns()` in `empire_stonks_tech_indicators/spx_alignment.py`
+for compact exact-date subject/SPX closes, common-endpoint one-observation
+returns, native-subject aligned-close counts, and trailing valid-pair counts
+without fill. Focused pytest passed 17 tests; package pytest passed 346 tests
+with 1 expected Core-runtime skip. Poetry lock/dependency checks, compileall,
+pinned runtime smoke, wheel/sdist build and wheel-content inspection, public
+import, changed-Python 88-column scan, and `git diff --check` passed.
+
+Done: 2026-08-19 — added public lazy-loaded `SpxPriceRatioArrays` and
+`calculate_spx_price_ratios()` in
+`empire_stonks_tech_indicators/spx_price_ratio.py` for subject-row `rel_spx`
+and complete current-inclusive 20/50-aligned-observation ratio trends, with
+exact-zero SPX/mean denominators, null-window recovery, and no date filling.
+Focused pytest passed 27 tests; package pytest passed 356 tests with 1 expected
+Core-runtime skip. Poetry lock/dependency checks, compileall, pinned runtime
+smoke, wheel/sdist build and wheel-content inspection, public import,
+changed-Python 88-column scan, and `git diff --check` passed.
 
 ---
 

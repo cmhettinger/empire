@@ -92,6 +92,11 @@ The immutable domain-model API consists of:
   fixed V1 observation-return fields and their exact null masks
 - `ReturnStatisticArrays` and `calculate_return_statistics()` for 20/60-return
   sample volatility and prior-20-reference 1/3-return z-scores
+- `AlignedReturnArrays` and `calculate_aligned_returns()` for exact-date
+  subject/SPX closes, common-horizon one-observation returns, and aligned-count
+  diagnostics without filling provider gaps
+- `SpxPriceRatioArrays` and `calculate_spx_price_ratios()` for exact
+  subject/SPX close ratios and complete 20/50-aligned-observation ratio trends
 - `BarStructureArrays` and `calculate_bar_structure()` for gap, same-bar
   generated-column references, and exact copied-source values
 - `RangeRelationshipArrays` and `calculate_range_relationships()` for complete
@@ -293,6 +298,22 @@ subject at a time. It is loaded through the same configured source pages,
 remains strictly chronological, and exposes only exact stored dates.
 `bar_on()` returns `None` for a missing date and `close_by_date()` contains no
 synthetic, nearest-date, or forward-filled keys.
+
+SPX alignment intersects normalized subject bars with benchmark history on the
+exact stored trading date. Its compact aligned sequence retains calendar gaps
+and calculates both one-observation returns across the same two shared dates;
+if either prior close is exactly zero, the whole return pair is null. Native
+subject-row diagnostics expose cumulative aligned-close counts and consecutive
+valid aligned-return counts. A subject date without SPX remains present in
+those diagnostics with a zero trailing count and never receives a filled
+benchmark value.
+
+SPX price ratios are returned in native subject-row order. `rel_spx` is
+populated only when the current subject date is exactly aligned and the SPX
+close is nonzero. Its 20/50 trends use complete current-inclusive windows of
+aligned ratios, not subject observations or calendar days. A null ratio in the
+window or an exactly zero ratio mean leaves the trend null until a complete
+eligible aligned window exists again.
 
 State comparison uses the atomic published view and the full chronological
 source prefix. It distinguishes ordinary tail appends from historical missing

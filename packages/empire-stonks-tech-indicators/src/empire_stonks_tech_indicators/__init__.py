@@ -54,6 +54,14 @@ if TYPE_CHECKING:
         ReturnArrays,
         calculate_returns,
     )
+    from empire_stonks_tech_indicators.spx_alignment import (
+        AlignedReturnArrays,
+        calculate_aligned_returns,
+    )
+    from empire_stonks_tech_indicators.spx_price_ratio import (
+        SpxPriceRatioArrays,
+        calculate_spx_price_ratios,
+    )
     from empire_stonks_tech_indicators.return_statistics import (
         ReturnStatisticArrays,
         calculate_return_statistics,
@@ -132,6 +140,30 @@ def __getattr__(name: str) -> object:
         exports = {
             "ReturnArrays": ReturnArrays,
             "calculate_returns": calculate_returns,
+        }
+        globals().update(exports)
+        return exports[name]
+    if name in {"AlignedReturnArrays", "calculate_aligned_returns"}:
+        from empire_stonks_tech_indicators.spx_alignment import (
+            AlignedReturnArrays,
+            calculate_aligned_returns,
+        )
+
+        exports = {
+            "AlignedReturnArrays": AlignedReturnArrays,
+            "calculate_aligned_returns": calculate_aligned_returns,
+        }
+        globals().update(exports)
+        return exports[name]
+    if name in {"SpxPriceRatioArrays", "calculate_spx_price_ratios"}:
+        from empire_stonks_tech_indicators.spx_price_ratio import (
+            SpxPriceRatioArrays,
+            calculate_spx_price_ratios,
+        )
+
+        exports = {
+            "SpxPriceRatioArrays": SpxPriceRatioArrays,
+            "calculate_spx_price_ratios": calculate_spx_price_ratios,
         }
         globals().update(exports)
         return exports[name]
@@ -290,6 +322,7 @@ __all__ = [
     "TechIndicatorsWorkflowError",
     "BenchmarkConfig",
     "TechIndicatorsConfig",
+    "AlignedReturnArrays",
     "BarStructureArrays",
     "BollingerStateArrays",
     "CalculationArrays",
@@ -307,11 +340,14 @@ __all__ = [
     "MovingAverageArrays",
     "MovingAverageTrendArrays",
     "SourceReadinessDecision",
+    "SpxPriceRatioArrays",
     "StreakArrays",
     "TALibAdapter",
     "TALibRuntimeInfo",
     "VolumeLiquidityArrays",
     "YAHOO_DAILY_JOB_NAME",
+    "calculate_aligned_returns",
+    "calculate_spx_price_ratios",
     "calculate_bar_structure",
     "calculate_bollinger_state",
     "calculate_directional_movement",
