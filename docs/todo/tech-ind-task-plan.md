@@ -159,7 +159,7 @@ canonical identity mapping.
 | X6.3 | [x] | Calculate relative returns | Implement compounded SPX-relative returns for 20/63/126/252 aligned observations. | P0.5, X6.1 |
 | X6.4 | [x] | Calculate rolling beta | Implement 60/252 sample-covariance beta; null incomplete windows and zero SPX variance. | P0.5, X6.1 |
 | X6.5 | [x] | Calculate rolling correlation | Implement 60/252 Pearson correlation with complete windows and bounded tolerance. | P0.5, X6.1 |
-| X6.6 | [ ] | Enforce eligible subjects | Populate SPX features only for approved subjects; leave unsupported global/index/futures/commodity/currency series null with bounded reasons. | P0.5-P0.6, X6.2-X6.5 |
+| X6.6 | [x] | Enforce eligible subjects | Populate SPX features only for approved subjects; leave unsupported global/index/futures/commodity/currency series null with bounded reasons. | P0.5-P0.6, X6.2-X6.5 |
 | X6.7 | [ ] | Test benchmark corrections | Prove inserted, changed, missing, or deleted SPX bars recalculate required subject dates without unrelated mutation. | P0.7, X6.2-X6.6 |
 | X6.8 | [ ] | Add SPX golden regression | Compare ratio, relative returns, beta, and correlation against independent aligned fixtures covering gaps and low variance. | X6.2-X6.7 |
 
@@ -213,6 +213,18 @@ passed 399 tests with 1 expected Core-runtime skip. Poetry lock/dependency
 checks, compileall, pinned runtime smoke, wheel/sdist build and wheel-content
 inspection, isolated public import, changed-Python 88-column scan, and
 `git diff --check` passed.
+
+Done: 2026-08-19 — added public lazy-loaded `SpxFeatureArrays`,
+`calculate_spx_features()`, and `is_spx_supported_subject()` in
+`empire_stonks_tech_indicators/spx_features.py` to compose all 11 SPX fields
+only for exact P0.5 EODData/Stooq subject markets. Unsupported Yahoo/global/
+index/futures/commodity/currency identities receive a null benchmark, 11
+read-only null arrays, and one row-counted `SUBJECT_UNSUPPORTED` reason without
+benchmark calculation. Focused pytest passed 92 tests; package pytest passed
+421 tests with 1 expected Core-runtime skip. Poetry lock/dependency checks,
+compileall, pinned runtime smoke, wheel/sdist build and wheel-content inspection,
+isolated public import, changed-Python 88-column scan, and `git diff --check`
+passed.
 
 ---
 

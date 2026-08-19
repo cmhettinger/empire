@@ -66,6 +66,11 @@ if TYPE_CHECKING:
         SpxCorrelationArrays,
         calculate_spx_correlation,
     )
+    from empire_stonks_tech_indicators.spx_features import (
+        SpxFeatureArrays,
+        calculate_spx_features,
+        is_spx_supported_subject,
+    )
     from empire_stonks_tech_indicators.spx_price_ratio import (
         SpxPriceRatioArrays,
         calculate_spx_price_ratios,
@@ -188,6 +193,24 @@ def __getattr__(name: str) -> object:
         exports = {
             "SpxCorrelationArrays": SpxCorrelationArrays,
             "calculate_spx_correlation": calculate_spx_correlation,
+        }
+        globals().update(exports)
+        return exports[name]
+    if name in {
+        "SpxFeatureArrays",
+        "calculate_spx_features",
+        "is_spx_supported_subject",
+    }:
+        from empire_stonks_tech_indicators.spx_features import (
+            SpxFeatureArrays,
+            calculate_spx_features,
+            is_spx_supported_subject,
+        )
+
+        exports = {
+            "SpxFeatureArrays": SpxFeatureArrays,
+            "calculate_spx_features": calculate_spx_features,
+            "is_spx_supported_subject": is_spx_supported_subject,
         }
         globals().update(exports)
         return exports[name]
@@ -390,6 +413,7 @@ __all__ = [
     "SourceReadinessDecision",
     "SpxBetaArrays",
     "SpxCorrelationArrays",
+    "SpxFeatureArrays",
     "SpxPriceRatioArrays",
     "SpxRelativeReturnArrays",
     "StreakArrays",
@@ -400,6 +424,7 @@ __all__ = [
     "calculate_aligned_returns",
     "calculate_spx_beta",
     "calculate_spx_correlation",
+    "calculate_spx_features",
     "calculate_spx_price_ratios",
     "calculate_spx_relative_returns",
     "calculate_bar_structure",
@@ -416,6 +441,7 @@ __all__ = [
     "calculate_volume_liquidity",
     "decide_source_readiness",
     "iter_source_bar_pages",
+    "is_spx_supported_subject",
     "iter_state_comparison_pages",
     "load_spx_benchmark_history",
     "normalize_source_bars",

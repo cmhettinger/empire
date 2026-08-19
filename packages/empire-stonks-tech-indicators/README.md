@@ -104,6 +104,10 @@ The immutable domain-model API consists of:
 - `SpxCorrelationArrays` and `calculate_spx_correlation()` for complete
   60/252-pair sample Pearson correlation with exact-zero variance nulls and
   bounded floating-point canonicalization at -1 and 1
+- `SpxFeatureArrays`, `calculate_spx_features()`, and
+  `is_spx_supported_subject()` for the P0.5 eligibility boundary that composes
+  all 11 SPX fields for selected U.S. cash equities and returns null fields
+  with aggregate `SUBJECT_UNSUPPORTED` coverage for other identities
 - `BarStructureArrays` and `calculate_bar_structure()` for gap, same-bar
   generated-column references, and exact copied-source values
 - `RangeRelationshipArrays` and `calculate_range_relationships()` for complete
@@ -334,6 +338,21 @@ covariance and sample-variance estimators with `N-1` denominators. Exact-zero
 SPX variance leaves beta null; nonzero variance is never epsilon-rounded to
 zero, and finite beta has no arbitrary bound. Invalid pairs and subject-only
 dates remain null in native subject-row output.
+
+SPX correlation uses the same complete 60/252 sample windows. Exact-zero
+subject or SPX variance leaves correlation null. Finite results inside
+`[-1, 1]` are retained; only a floating-point excursion no greater than
+`1e-12` beyond either boundary is canonicalized to that boundary, and a larger
+excursion fails calculation.
+
+SPX feature composition supports only P0.6-selected EODData equities in exact
+`NYSE`/`NASDAQ`/`AMEX` markets and Stooq stocks in exact
+`nasdaq`/`nyse`/`nysemkt` markets. The P0.6 query has already validated the
+required EODData metadata type. A supported subject requires benchmark history
+and receives its resolved benchmark UUID. Any other identity, including Yahoo
+SPX itself, returns a null benchmark UUID, exactly 11 read-only null feature
+arrays, and one aggregate `SUBJECT_UNSUPPORTED` reason counted by subject row.
+Other P0.6-unsupported provider listings remain omitted by source selection.
 
 State comparison uses the atomic published view and the full chronological
 source prefix. It distinguishes ordinary tail appends from historical missing
