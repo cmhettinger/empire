@@ -101,6 +101,9 @@ The immutable domain-model API consists of:
   compounded 20/63/126/252-pair SPX-relative returns
 - `SpxBetaArrays` and `calculate_spx_beta()` for complete 60/252-pair sample
   covariance divided by sample SPX variance
+- `SpxCorrelationArrays` and `calculate_spx_correlation()` for complete
+  60/252-pair sample Pearson correlation with exact-zero variance nulls and
+  bounded floating-point canonicalization at -1 and 1
 - `BarStructureArrays` and `calculate_bar_structure()` for gap, same-bar
   generated-column references, and exact copied-source values
 - `RangeRelationshipArrays` and `calculate_range_relationships()` for complete
