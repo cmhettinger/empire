@@ -97,6 +97,8 @@ The immutable domain-model API consists of:
   diagnostics without filling provider gaps
 - `SpxPriceRatioArrays` and `calculate_spx_price_ratios()` for exact
   subject/SPX close ratios and complete 20/50-aligned-observation ratio trends
+- `SpxRelativeReturnArrays` and `calculate_spx_relative_returns()` for complete
+  compounded 20/63/126/252-pair SPX-relative returns
 - `BarStructureArrays` and `calculate_bar_structure()` for gap, same-bar
   generated-column references, and exact copied-source values
 - `RangeRelationshipArrays` and `calculate_range_relationships()` for complete
@@ -314,6 +316,13 @@ close is nonzero. Its 20/50 trends use complete current-inclusive windows of
 aligned ratios, not subject observations or calendar days. A null ratio in the
 window or an exactly zero ratio mean leaves the trend null until a complete
 eligible aligned window exists again.
+
+SPX-relative returns compound subject and benchmark gross returns in
+chronological aligned-pair order over complete 20/63/126/252-return windows.
+They first populate after one more aligned close than the requested return
+count. A null pair invalidates the complete window without pulling in an older
+pair, an exactly zero SPX gross leaves the result null, and non-finite products
+fail calculation.
 
 State comparison uses the atomic published view and the full chronological
 source prefix. It distinguishes ordinary tail appends from historical missing

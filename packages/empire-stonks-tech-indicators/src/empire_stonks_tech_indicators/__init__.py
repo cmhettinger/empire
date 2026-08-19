@@ -62,6 +62,10 @@ if TYPE_CHECKING:
         SpxPriceRatioArrays,
         calculate_spx_price_ratios,
     )
+    from empire_stonks_tech_indicators.spx_relative_returns import (
+        SpxRelativeReturnArrays,
+        calculate_spx_relative_returns,
+    )
     from empire_stonks_tech_indicators.return_statistics import (
         ReturnStatisticArrays,
         calculate_return_statistics,
@@ -164,6 +168,18 @@ def __getattr__(name: str) -> object:
         exports = {
             "SpxPriceRatioArrays": SpxPriceRatioArrays,
             "calculate_spx_price_ratios": calculate_spx_price_ratios,
+        }
+        globals().update(exports)
+        return exports[name]
+    if name in {"SpxRelativeReturnArrays", "calculate_spx_relative_returns"}:
+        from empire_stonks_tech_indicators.spx_relative_returns import (
+            SpxRelativeReturnArrays,
+            calculate_spx_relative_returns,
+        )
+
+        exports = {
+            "SpxRelativeReturnArrays": SpxRelativeReturnArrays,
+            "calculate_spx_relative_returns": calculate_spx_relative_returns,
         }
         globals().update(exports)
         return exports[name]
@@ -341,6 +357,7 @@ __all__ = [
     "MovingAverageTrendArrays",
     "SourceReadinessDecision",
     "SpxPriceRatioArrays",
+    "SpxRelativeReturnArrays",
     "StreakArrays",
     "TALibAdapter",
     "TALibRuntimeInfo",
@@ -348,6 +365,7 @@ __all__ = [
     "YAHOO_DAILY_JOB_NAME",
     "calculate_aligned_returns",
     "calculate_spx_price_ratios",
+    "calculate_spx_relative_returns",
     "calculate_bar_structure",
     "calculate_bollinger_state",
     "calculate_directional_movement",
