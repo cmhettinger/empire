@@ -633,3 +633,107 @@ runtime smoke, cold lazy-import, 88-column, and `git diff --check` checks
 passed.
 
 ---
+
+## Phase 6: Implement SPX-Relative Features
+
+Goal: add exact-date cross-provider market comparison without implying a
+canonical identity mapping.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| X6.1 | [x] | Build aligned returns | Align subject/SPX one-day returns by exact date, preserve gaps, and expose aligned counts. | P0.5, I3.4, C4.2 |
+| X6.2 | [x] | Calculate SPX price ratio | Implement `rel_spx` and 20/50 ratio-trend distances with denominator and warm-up rules. | P0.5, X6.1, T5.2 |
+| X6.3 | [x] | Calculate relative returns | Implement compounded SPX-relative returns for 20/63/126/252 aligned observations. | P0.5, X6.1 |
+| X6.4 | [x] | Calculate rolling beta | Implement 60/252 sample-covariance beta; null incomplete windows and zero SPX variance. | P0.5, X6.1 |
+| X6.5 | [x] | Calculate rolling correlation | Implement 60/252 Pearson correlation with complete windows and bounded tolerance. | P0.5, X6.1 |
+| X6.6 | [x] | Enforce eligible subjects | Populate SPX features only for approved subjects; leave unsupported global/index/futures/commodity/currency series null with bounded reasons. | P0.5-P0.6, X6.2-X6.5 |
+| X6.7 | [x] | Test benchmark corrections | Prove inserted, changed, missing, or deleted SPX bars recalculate required subject dates without unrelated mutation. | P0.7, X6.2-X6.6 |
+| X6.8 | [x] | Add SPX golden regression | Compare ratio, relative returns, beta, and correlation against independent aligned fixtures covering gaps and low variance. | X6.2-X6.7 |
+
+Done: 2026-08-19 — added public lazy-loaded `AlignedReturnArrays` and
+`calculate_aligned_returns()` in `empire_stonks_tech_indicators/spx_alignment.py`
+for compact exact-date subject/SPX closes, common-endpoint one-observation
+returns, native-subject aligned-close counts, and trailing valid-pair counts
+without fill. Focused pytest passed 17 tests; package pytest passed 346 tests
+with 1 expected Core-runtime skip. Poetry lock/dependency checks, compileall,
+pinned runtime smoke, wheel/sdist build and wheel-content inspection, public
+import, changed-Python 88-column scan, and `git diff --check` passed.
+
+Done: 2026-08-19 — added public lazy-loaded `SpxPriceRatioArrays` and
+`calculate_spx_price_ratios()` in
+`empire_stonks_tech_indicators/spx_price_ratio.py` for subject-row `rel_spx`
+and complete current-inclusive 20/50-aligned-observation ratio trends, with
+exact-zero SPX/mean denominators, null-window recovery, and no date filling.
+Focused pytest passed 27 tests; package pytest passed 356 tests with 1 expected
+Core-runtime skip. Poetry lock/dependency checks, compileall, pinned runtime
+smoke, wheel/sdist build and wheel-content inspection, public import,
+changed-Python 88-column scan, and `git diff --check` passed.
+
+Done: 2026-08-19 — added public lazy-loaded `SpxRelativeReturnArrays` and
+`calculate_spx_relative_returns()` in
+`empire_stonks_tech_indicators/spx_relative_returns.py` for chronological
+compounding over complete 20/63/126/252 aligned-return pairs, subject-row
+output, exact-zero SPX gross denominators, invalid-window recovery, and
+non-finite product failure. Focused pytest passed 30 tests; package pytest
+passed 369 tests with 1 expected Core-runtime skip. Poetry lock/dependency
+checks, compileall, pinned runtime smoke, wheel/sdist build and wheel-content
+inspection, public import, changed-Python 88-column scan, and `git diff --check`
+passed.
+
+Done: 2026-08-19 — added public lazy-loaded `SpxBetaArrays` and
+`calculate_spx_beta()` in `empire_stonks_tech_indicators/spx_beta.py` for
+complete 60/252 aligned-return windows using sample covariance and sample SPX
+variance, with subject-row output, exact-zero variance nulls, invalid-window
+recovery, unbounded finite beta, and non-finite statistic failure. Focused
+pytest passed 29 tests; package pytest passed 381 tests with 1 expected
+Core-runtime skip. Poetry lock/dependency checks, compileall, pinned runtime
+smoke, wheel/sdist build and wheel-content inspection, public import,
+changed-Python 88-column scan, and `git diff --check` passed.
+
+Done: 2026-08-19 — added public lazy-loaded `SpxCorrelationArrays` and
+`calculate_spx_correlation()` in
+`empire_stonks_tech_indicators/spx_correlation.py` for complete 60/252
+aligned-return Pearson windows, with subject-row output, exact-zero variance
+nulls, invalid-window recovery, non-finite failure, and the contract's `1e-12`
+boundary-only canonicalization. Focused pytest passed 35 tests; package pytest
+passed 399 tests with 1 expected Core-runtime skip. Poetry lock/dependency
+checks, compileall, pinned runtime smoke, wheel/sdist build and wheel-content
+inspection, isolated public import, changed-Python 88-column scan, and
+`git diff --check` passed.
+
+Done: 2026-08-19 — added public lazy-loaded `SpxFeatureArrays`,
+`calculate_spx_features()`, and `is_spx_supported_subject()` in
+`empire_stonks_tech_indicators/spx_features.py` to compose all 11 SPX fields
+only for exact P0.5 EODData/Stooq subject markets. Unsupported Yahoo/global/
+index/futures/commodity/currency identities receive a null benchmark, 11
+read-only null arrays, and one row-counted `SUBJECT_UNSUPPORTED` reason without
+benchmark calculation. Focused pytest passed 92 tests; package pytest passed
+421 tests with 1 expected Core-runtime skip. Poetry lock/dependency checks,
+compileall, pinned runtime smoke, wheel/sdist build and wheel-content inspection,
+isolated public import, changed-Python 88-column scan, and `git diff --check`
+passed.
+
+Done: 2026-08-19 — added `tests/test_spx_corrections.py` full-prefix
+regressions for inserted and changed SPX bars, missing current dates, and
+first/middle/final deletions across all 11 SPX fields. Exact pre-correction
+prefixes remain unchanged, conservative suffix replacement equals a fresh
+rebuild, unsupported subjects and nonoverlapping supported coverage remain
+identical, and source rows are not mutated; W7.5 retains work-range planning.
+Focused pytest passed 93 tests; package pytest passed 429 tests with 1 expected
+Core-runtime skip. Poetry lock/dependency checks, compileall, pinned runtime
+smoke, wheel/sdist build and wheel-content inspection, isolated public import,
+changed-Python 88-column scan, and `git diff --check` passed.
+
+Done: 2026-08-19 — added
+`tests/{test_spx_golden.py,fixtures/spx_features_v1.json}` as the combined
+X6.2-X6.7 regression gate for all 11 SPX outputs. Committed exact-date-gap and
+low-nonzero-variance cases are anchored by snapshots, while independent
+standard-library scalar alignment, ratio, compounding, sample covariance/
+variance, beta, and Pearson formulas compare every value and null mask under
+the frozen tolerance. Focused pytest passed 104 tests; package pytest passed
+433 tests with 1 expected Core-runtime skip. Fixture JSON validation, Poetry
+lock/dependency checks, compileall, pinned runtime smoke, wheel/sdist build and
+wheel-content inspection, isolated public import, changed-Python 88-column
+scan, and `git diff --check` passed.
+
+---

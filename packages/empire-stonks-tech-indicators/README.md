@@ -363,6 +363,12 @@ without fill. Unsupported subjects and supported subjects whose persisted
 coverage cannot intersect the changed benchmark date remain unchanged. W7.5
 owns conversion of these proven boundaries into database work ranges.
 
+The combined SPX golden gate uses committed exact-date-gap and low-nonzero-
+variance fixtures. Independent standard-library scalar alignment, ratio,
+compounding, sample covariance/variance, beta, and Pearson formulas compare
+every value and null mask for all 11 fields under the frozen numerical
+tolerance; committed snapshots anchor warm-up boundaries and 252-return output.
+
 State comparison uses the atomic published view and the full chronological
 source prefix. It distinguishes ordinary tail appends from historical missing
 rows, compares copied OHLCV null-safely, detects observation-count and requested
