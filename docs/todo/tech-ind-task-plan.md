@@ -160,7 +160,7 @@ canonical identity mapping.
 | X6.4 | [x] | Calculate rolling beta | Implement 60/252 sample-covariance beta; null incomplete windows and zero SPX variance. | P0.5, X6.1 |
 | X6.5 | [x] | Calculate rolling correlation | Implement 60/252 Pearson correlation with complete windows and bounded tolerance. | P0.5, X6.1 |
 | X6.6 | [x] | Enforce eligible subjects | Populate SPX features only for approved subjects; leave unsupported global/index/futures/commodity/currency series null with bounded reasons. | P0.5-P0.6, X6.2-X6.5 |
-| X6.7 | [ ] | Test benchmark corrections | Prove inserted, changed, missing, or deleted SPX bars recalculate required subject dates without unrelated mutation. | P0.7, X6.2-X6.6 |
+| X6.7 | [x] | Test benchmark corrections | Prove inserted, changed, missing, or deleted SPX bars recalculate required subject dates without unrelated mutation. | P0.7, X6.2-X6.6 |
 | X6.8 | [ ] | Add SPX golden regression | Compare ratio, relative returns, beta, and correlation against independent aligned fixtures covering gaps and low variance. | X6.2-X6.7 |
 
 Done: 2026-08-19 — added public lazy-loaded `AlignedReturnArrays` and
@@ -225,6 +225,17 @@ benchmark calculation. Focused pytest passed 92 tests; package pytest passed
 compileall, pinned runtime smoke, wheel/sdist build and wheel-content inspection,
 isolated public import, changed-Python 88-column scan, and `git diff --check`
 passed.
+
+Done: 2026-08-19 — added `tests/test_spx_corrections.py` full-prefix
+regressions for inserted and changed SPX bars, missing current dates, and
+first/middle/final deletions across all 11 SPX fields. Exact pre-correction
+prefixes remain unchanged, conservative suffix replacement equals a fresh
+rebuild, unsupported subjects and nonoverlapping supported coverage remain
+identical, and source rows are not mutated; W7.5 retains work-range planning.
+Focused pytest passed 93 tests; package pytest passed 429 tests with 1 expected
+Core-runtime skip. Poetry lock/dependency checks, compileall, pinned runtime
+smoke, wheel/sdist build and wheel-content inspection, isolated public import,
+changed-Python 88-column scan, and `git diff --check` passed.
 
 ---
 

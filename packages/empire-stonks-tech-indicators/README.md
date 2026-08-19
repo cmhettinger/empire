@@ -354,6 +354,15 @@ SPX itself, returns a null benchmark UUID, exactly 11 read-only null feature
 arrays, and one aggregate `SUBJECT_UNSUPPORTED` reason counted by subject row.
 Other P0.6-unsupported provider listings remain omitted by source selection.
 
+Benchmark-correction regression coverage uses full-prefix recalculation as the
+reference required by P0.7. An inserted or changed SPX bar and a first, middle,
+or final SPX deletion leave every earlier subject value and null mask exactly
+unchanged; replacing the conservative correction-date suffix matches a fresh
+rebuild across all 11 fields. A missing current benchmark date remains null
+without fill. Unsupported subjects and supported subjects whose persisted
+coverage cannot intersect the changed benchmark date remain unchanged. W7.5
+owns conversion of these proven boundaries into database work ranges.
+
 State comparison uses the atomic published view and the full chronological
 source prefix. It distinguishes ordinary tail appends from historical missing
 rows, compares copied OHLCV null-safely, detects observation-count and requested
