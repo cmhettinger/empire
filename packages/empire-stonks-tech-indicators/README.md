@@ -167,6 +167,19 @@ The immutable domain-model API consists of:
   an explicit physical slot with tolerance-aware no-change handling
 - `FeatureRowKey` and `copy_feature_rows_between_slots()` for fail-closed,
   exact slot-to-slot copies that retain source calculation and lifecycle fields
+- `PublishedFeatureCoverage` and `select_published_feature_coverage()` for
+  view-backed per-listing date/count, calculation/update freshness, version,
+  and benchmark facts, including eligible listings with no published rows
+- `PublishedFeatureFreshness` and `select_published_feature_freshness()` for
+  as-of-bounded latest dates, raw calendar age, calculation/update timestamps,
+  versions, and benchmark facts without imposing a stale threshold
+- `PublishedFeatureRankingRow` and `select_published_feature_ranking()` for a
+  bounded date slice ordered by one allowlisted V1 derived field, without
+  accepting SQL fragments, source-price ranks, or strategy thresholds
+- `PublishedReadinessToken`, `PublishedModelInputRow`,
+  `PublishedModelInputSnapshot`, and `read_published_model_inputs()` for
+  fail-closed readiness and allowlisted projection in one package-owned
+  `REPEATABLE READ READ ONLY` transaction
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -204,6 +217,19 @@ masks. Integer streaks compare exactly and floats use the frozen `1e-12`
 absolute and `1e-10` relative tolerances. Equivalent prefix rows retain their
 existing run and calculation lifecycle fields; version rebuild writes every
 source row and cannot leave a mixed-version image.
+
+Published coverage and ranking calls use an injected cursor and leave its
+transaction to the caller. Model-input reads instead require a dedicated idle
+connection: the package starts one read-only repeatable-read transaction,
+revalidates source and SPX source images, active memberships, publication
+status, complete coverage/counts, version, benchmark identity/contract, and
+effective-date view keys, then reads at most 25,000 projected rows before
+rolling the transaction back. Any bounded readiness reason returns no token or
+rows. A ready token hashes the exact scope, date, version, benchmark contract,
+and sorted active listing/publication/slot set observed in that snapshot; it is
+descriptive evidence and cannot be supplied to a later transaction. Dynamic
+projections and rankings accept only the frozen numeric V1 allowlists and do
+not encode screening thresholds or persist cross-sectional ranks.
 
 Callers may catch the package base or the narrow category they can handle. The
 public exceptions contain no TA-Lib values, SQL, database-driver exceptions,

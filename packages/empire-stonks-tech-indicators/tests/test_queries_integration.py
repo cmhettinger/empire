@@ -16,8 +16,12 @@ from empire_stonks_tech_indicators import (
     iter_source_bar_pages,
     iter_state_comparison_pages,
     load_spx_benchmark_history,
+    read_published_model_inputs,
     resolve_spx_benchmark,
     select_eligible_listings,
+    select_published_feature_coverage,
+    select_published_feature_freshness,
+    select_published_feature_ranking,
 )
 
 
@@ -373,6 +377,81 @@ def _publish_drifted_state(
         """,
         (publication_id, provider_listing_id),
     )
+
+
+def test_published_coverage_and_ranking_read_only_the_active_view(
+    database_connection: object,
+) -> None:
+    marker = uuid4().hex[:12].upper()
+    first_date = date(2026, 1, 2)
+    second_date = date(2026, 1, 5)
+
+    with database_connection.cursor() as cursor:  # type: ignore[union-attr]
+        listing_id = _insert_listing(
+            cursor,
+            provider_code="EODDATA",
+            market="NASDAQ",
+            ticker=f"W77{marker}",
+            metadata_json='{"type": "Equity"}',
+        )
+        _insert_bar(cursor, listing_id, first_date)
+        _insert_bar(cursor, listing_id, second_date)
+        _publish_drifted_state(
+            cursor,
+            provider_listing_id=listing_id,
+            first_date=first_date,
+            drift_date=second_date,
+            marker=f"w77:{marker}",
+        )
+
+        scope = TechIndicatorsScope(provider_listing_ids=(listing_id,))
+        coverage = select_published_feature_coverage(
+            cursor=cursor,
+            scope=scope,
+        )
+        freshness = select_published_feature_freshness(
+            cursor=cursor,
+            scope=scope,
+            as_of_date=second_date,
+        )
+        ranking = select_published_feature_ranking(
+            cursor=cursor,
+            scope=scope,
+            trading_date=first_date,
+            feature_name="consecutive_up_days",
+        )
+
+    assert len(coverage) == 1
+    assert coverage[0].published_first_trading_date == first_date
+    assert coverage[0].published_last_trading_date == second_date
+    assert coverage[0].published_row_count == 2
+    assert coverage[0].calculation_versions == (
+        "TECH_INDICATORS_OLD",
+        "TECH_INDICATORS_V1",
+    )
+    assert freshness[0].latest_trading_date == second_date
+    assert freshness[0].calendar_age_days == 0
+    assert len(ranking) == 1
+    assert ranking[0].provider_listing_id == listing_id
+    assert ranking[0].feature_value == 0
+
+
+def test_model_input_empty_scope_fails_closed_in_owned_database_snapshot(
+    database_connection: object,
+) -> None:
+    snapshot = read_published_model_inputs(
+        connection=database_connection,
+        scope=TechIndicatorsScope(provider_listing_ids=(uuid4(),)),
+        effective_date=date(2026, 1, 5),
+        calculation_version="TECH_INDICATORS_V1",
+        benchmark_config=BenchmarkConfig(),
+        feature_names=("close", "rsi_14"),
+    )
+
+    assert snapshot.ready is False
+    assert snapshot.reasons == ("SCOPE_MISMATCH",)
+    assert snapshot.token is None
+    assert snapshot.rows == ()
 
 
 def test_eligible_listing_query_enforces_policy_status_dates_and_history(
