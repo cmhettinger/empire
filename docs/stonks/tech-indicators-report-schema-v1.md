@@ -1,6 +1,6 @@
 # Tech-Indicators Report Schema V1
 
-Status: frozen implementation contract for R8.1 as of 2026-08-22.
+Status: frozen implementation contract for R8.1 and R8.3 as of 2026-08-22.
 
 This document defines the machine-readable facts shared by the daily and
 backfill `report.json` artifacts for `empire-stonks-tech-indicators`. It extends
@@ -321,6 +321,7 @@ date
   payload_last_date            date or null
   effective_date_source_rows   integer
   effective_date_payload_rows  integer
+  effective_date_published_rows integer
 versions[]
   calculation_version          string
   listing_count                integer
@@ -421,9 +422,25 @@ database
   longest_write_transaction_seconds number or null
 ```
 
-Phase rows sort by the frozen R8.3 phase order and contain no overlapping
-double-counted duration. Throughput denominators are explicit. A rate is null
-when elapsed time is zero; it is never infinity. `persisted_rows` is
+Phase rows sort by this frozen R8.3 order and contain no overlapping
+double-counted duration:
+
+```text
+LOCK
+SCOPE_RESOLUTION
+SOURCE_READINESS
+PLANNING
+SOURCE_READ
+CALCULATION
+VALIDATION
+PERSISTENCE
+PUBLICATION_PREPARATION
+SUMMARY_QUERIES
+REPORT_FACTS
+```
+
+Throughput denominators are explicit. A rate is null when elapsed time is
+zero; it is never infinity. `persisted_rows` is
 `inserted + updated` and excludes equivalent, copied, unchanged, and deleted
 rows. Peak RSS may be null when the runtime cannot measure it safely.
 
@@ -445,6 +462,33 @@ sample_ids                     sorted diagnostic sample IDs
 Warning and failure rows sort by code. `PASS` and `NO_OP` have no warnings or
 failures. `WARN` has warnings and no failures. `FAIL` has at least one failure.
 `PARTIAL` has at least one warning or failure explaining why work stopped.
+
+R8.3 freezes these aggregate codes and messages. The serializer derives the
+message from the code; callers cannot provide free-form aggregate text.
+
+| Code | Message |
+|---|---|
+| `BACKFILL_INCOMPLETE` | Backfill work remains safely resumable and unpublished. |
+| `BENCHMARK_COVERAGE_WARNING` | Benchmark coverage requires operator review. |
+| `CALCULATION_FAILED` | Technical-indicator calculation failed validation. |
+| `CANCELLED` | The workflow was cancelled before publication. |
+| `CORE_LIFECYCLE_FAILED` | The Core run lifecycle did not complete safely. |
+| `LOCK_LOST` | The package-owned writer lock was lost during the workflow. |
+| `PERSISTENCE_FAILED` | Technical-indicator persistence failed safely. |
+| `PUBLICATION_NOT_READY` | The candidate publication is not ready. |
+| `REPORT_VALIDATION_FAILED` | Report facts failed schema validation. |
+| `SOURCE_COVERAGE_WARNING` | Source coverage requires operator review. |
+| `SOURCE_NOT_READY` | Required source evidence is not ready. |
+| `UNEXPECTED_NULL` | A required post-warm-up feature value is null. |
+| `VALIDATION_FAILED` | Technical-indicator output validation failed. |
+| `WRITE_RECONCILIATION_FAILED` | Write outcome counts did not reconcile. |
+
+Readiness-only diagnostic samples additionally use their fixed reason-code
+messages: `BENCHMARK_MISMATCH`, `BENCHMARK_UNAVAILABLE`,
+`COVERAGE_INCOMPLETE`, `EODDATA_SOURCE_EVIDENCE_MISSING`,
+`NO_ACTIVE_PUBLICATION`, `NO_ELIGIBLE_LISTINGS`, `SCOPE_MISMATCH`,
+`SOURCE_DRIFT`, `SPX_COVERAGE_INCOMPLETE`, `VERSION_MISMATCH`, and
+`YAHOO_SOURCE_EVIDENCE_MISSING`.
 
 The root `diagnostic_samples` array contains at most 100 entries across the
 entire JSON report. Every sample is referenced by at least one warning,
@@ -501,9 +545,10 @@ CROSS_PROVIDER_VALUES_NOT_NORMALIZED
 
 Disclosure codes, not free-form provider text, identify the reviewed EODData,
 Stooq, and Yahoo adjustment/volume/currency limitations from the frozen source
-policy. R8.3 maps each code to reviewed human text for JSON/PDF display. Reports
-must not imply USD liquidity, adjusted comparability, canonical identity,
-investment advice, targets, or recommendations.
+policy. R8.3 exposes one fixed reviewed message for every code so renderers do
+not accept free-form disclosure text. Reports must not imply USD liquidity,
+adjusted comparability, canonical identity, investment advice, targets, or
+recommendations.
 
 ## Secret-Safety And Boundedness
 

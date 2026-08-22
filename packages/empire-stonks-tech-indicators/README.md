@@ -74,9 +74,10 @@ introduced only by their assigned implementation tasks.
 The V1 domain report facts are frozen in the
 [report schema contract](../../docs/stonks/tech-indicators-report-schema-v1.md).
 It defines one bounded, secret-safe immutable fact shape shared by daily and
-backfill JSON/PDF outputs. R8.2 and later tasks own aggregation, typed models,
-rendering, Core storage, and runners; this package does not yet expose a report
-builder.
+backfill JSON/PDF outputs. R8.2 supplies count-only database facts and R8.3
+provides immutable typed report models plus deterministic JSON rendering. Core
+storage, PDF presentation, runners, CLIs, and Airflow remain owned by their
+later tasks.
 
 ## Public API
 
@@ -192,6 +193,13 @@ The immutable domain-model API consists of:
   `PublishedModelInputSnapshot`, and `read_published_model_inputs()` for
   fail-closed readiness and allowlisted projection in one package-owned
   `REPEATABLE READ READ ONLY` transaction
+- `TechIndicatorsReport` and its frozen `Report*` section models for the exact
+  V1 daily/backfill report facts and cross-section validation
+- `ReportCounts.from_database_summary()` and
+  `ReportCoverage.from_database_summary()` for combining R8.2 database facts
+  with runner-owned eligible/evaluated counts without payload serialization
+- `make_report_diagnostic_samples()` for stable bounded sample ordering and
+  `render_tech_indicators_report_json()` for compact sorted UTF-8 JSON
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -564,3 +572,13 @@ plan probe and evidence are
 [`tools/tech-indicators/report-summary-benchmark.py`](../../tools/tech-indicators/report-summary-benchmark.py)
 and
 [`docs/stonks/tech-indicators-report-summary-evidence-r8.2.md`](../../docs/stonks/tech-indicators-report-summary-evidence-r8.2.md).
+
+`TechIndicatorsReport` validates identity, workflow, date shape, source and
+publication readiness, lock status, all count equations, benchmark semantics,
+write reconciliation, coverage, backfill progress, timing, outcome, and the
+global 100-sample ceiling before serialization. Rendering accepts only the
+typed immutable model, emits sorted compact UTF-8 JSON with one trailing
+newline, rejects non-finite or unsupported values, and enforces the 2 MiB
+artifact limit. Fixed phase, reason, issue-message, diagnostic-message, and
+provider-native disclosure vocabularies are exported for later package-owned
+runners and the paired PDF renderer.
