@@ -75,10 +75,15 @@ introduced only by their assigned implementation tasks.
 The V1 domain report facts are frozen in the
 [report schema contract](../../docs/stonks/tech-indicators-report-schema-v1.md).
 It defines one bounded, secret-safe immutable fact shape shared by daily and
-backfill JSON/PDF outputs. R8.2 supplies count-only database facts, R8.3
-provides immutable typed report models plus deterministic JSON rendering, and
-R8.4 stores durable JSON through an injected Empire Core object store. PDF
-presentation, runners, CLIs, and Airflow remain owned by their later tasks.
+backfill JSON/PDF outputs.
+The companion professional PDF presentation, including its Empire cover,
+disclaimer, section order, feature-family rollups, deterministic compaction,
+and methodology language, is frozen in the
+[PDF design contract](../../docs/stonks/tech-indicators-pdf-design-v1.md).
+R8.2 supplies count-only database facts, R8.3 provides immutable typed report
+models plus deterministic JSON rendering, and R8.4 stores durable JSON through
+an injected Empire Core object store. PDF rendering, runners, CLIs, and Airflow
+remain owned by their later tasks.
 
 ## Public API
 

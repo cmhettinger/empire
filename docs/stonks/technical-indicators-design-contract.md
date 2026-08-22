@@ -678,8 +678,11 @@ persistence paths are proven.
 R8.1 freezes the exact shared JSON facts, enums, null/count invariants,
 diagnostic bounds, and secret-safe Core metadata allowlist in
 [`tech-indicators-report-schema-v1.md`](tech-indicators-report-schema-v1.md).
-Later report tasks may implement queries and renderers without changing that
-contract implicitly.
+R8.5 freezes the companion presentation, branding, accessibility, deterministic
+compaction, and methodology rules in
+[`tech-indicators-pdf-design-v1.md`](tech-indicators-pdf-design-v1.md).
+Later report tasks may implement renderers without changing either contract
+implicitly.
 
 Every substantive run produces durable:
 

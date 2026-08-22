@@ -12,8 +12,10 @@ the [publication contract](tech-indicators-publication-contract-v1.md), and the
 
 R8.2 owns the aggregate queries that supply these facts. R8.3 owns typed report
 models, validation, and deterministic serialization. R8.4 owns Core storage.
-R8.5-R8.8 own the PDF presentation and paired-artifact checks. This task does
-not implement those later concerns.
+R8.5 freezes the PDF presentation in
+[`tech-indicators-pdf-design-v1.md`](tech-indicators-pdf-design-v1.md).
+R8.6-R8.8 own its implementation, visual verification, storage, and
+paired-artifact checks.
 
 ## Identity And Compatibility
 
@@ -638,7 +640,9 @@ R8.3 must enforce at least these V1 invariants before bytes are produced:
 - R8.4 stores durable JSON through an injected Core object store using the
   frozen names, path, metadata allowlist, active-run relationship, and no
   expiration.
-- R8.5-R8.7 design, render, and visually verify a professional PDF from the
-  same immutable facts with P0.8's smaller PDF sample and page bounds.
+- R8.5 freezes the professional PDF design in
+  [`tech-indicators-pdf-design-v1.md`](tech-indicators-pdf-design-v1.md);
+  R8.6-R8.7 render and visually verify it from the same immutable facts with
+  P0.8's smaller PDF sample and page bounds.
 - R8.8 stores the PDF and proves JSON, PDF, Core metadata, and publication facts
   agree without parsing feature payloads.
