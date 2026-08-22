@@ -141,83 +141,9 @@ completed phases to the
 
 ## Completed Phase Archive
 
-Phases 0-7 are archived there with task IDs P0.1-P0.10, B1.1-B1.8,
-S2.1-S2.8, I3.1-I3.7, C4.1-C4.8, T5.1-T5.8, X6.1-X6.8, and W7.1-W7.10,
-together with their `Done:` notes.
-
----
-
-## Phase 8: Build JSON And Professional PDF Reports
-
-Goal: make every run operationally inspectable before production runners.
-
-| ID | Status | Goal | Complete When | Depends On |
-|----|--------|------|---------------|------------|
-| R8.1 | [x] | Define report schema V1 | Define secret-safe JSON for identity, scope, versions, source/publication readiness, lock outcome, provider/market/listing counts, writes, warm-up/null/benchmark coverage, warnings, timing, throughput, and bounded samples. | P0.2, P0.8-P0.10, W7.7 |
-| R8.2 | [x] | Add summary queries | Implement provider/market/type/date/version quality and coverage aggregations without serializing feature payloads; plans meet P0.8. | W7.7-W7.9, R8.1 |
-| R8.3 | [x] | Build JSON report | Produce deterministic versioned JSON for success, warning, no-op, resumed/partial backfill, and failure. | R8.1-R8.2 |
-| R8.4 | [x] | Store JSON report | Store durable `report.json` through Core with approved kind, logical name, metadata, retention, and run relationship. | R8.3 |
-| R8.5 | [x] | Design professional PDF | Define Empire cover/disclaimer, status, scope, coverage, formula/library versions, benchmark health, quality, performance, warnings, and methodology without recommendations. | R8.1-R8.3 |
-| R8.6 | [x] | Implement PDF renderer | Use reusable `empire-reports` components, bounded tables/charts, deterministic pagination, and accessible labels. | R8.5 |
-| R8.7 | [x] | Visually verify PDF | Render success, warning, no-op, and large-scope reports; inspect every page for clipping, overflow, sparse layouts, charts, and branding. | R8.6 |
-| R8.8 | [ ] | Store PDF report | Store durable `report.pdf` with matching Core lineage/metadata and prove JSON/PDF facts agree. | R8.4, R8.7 |
-
-Done: 2026-08-22 — froze the shared daily/backfill JSON fact shape, outcomes,
-readiness/lock/publication semantics, count equations, coverage/null reasons,
-performance denominators, 100-sample ceiling, disclosures, and Core metadata
-allowlist in `docs/stonks/tech-indicators-report-schema-v1.md`; linked the
-design contract and package README. Contract marker/count/schema checks,
-documentation links, package pytest (514 passed, 3 skipped), Poetry lock/build,
-`pip check`, compileall, public import, Flyway validation (39 migrations),
-whitespace,
-and `git diff --check` passed.
-
-Done: 2026-08-22 — added count-only active/candidate summaries in
-`reporting_queries.py`, PostgreSQL/unit coverage, README guidance, and the
-repeatable R8.2 probe/evidence. Verified `519 passed, 3 skipped`; query
-integration `9 passed`; wheel/sdist build and public import; 1,000,000-row
-five-run plans at `481.562 ms` median / `495.921 ms` maximum with zero temp I/O
-(`9.91 s` / `10.21 s` linear P0.8 full-scope projections).
-
-Done: 2026-08-22 — added immutable schema-V1 models, fixed vocabularies,
-R8.2 fact adapters, cross-section validation, and bounded deterministic JSON in
-`reports.py`, with public API/contract/README updates. Verified focused
-`18 passed`; full package `530 passed, 3 skipped`; wheel/sdist build, public
-import, wheel contents, and `git diff --check`.
-
-Done: 2026-08-22 — added Core-backed durable JSON storage in
-`report_storage.py`, exact run/date keys, logical names, metadata allowlist,
-active-run validation, Core dependency, public API, docs, and tests. Verified
-focused `11 passed`; full package `541 passed, 16 skipped`; Poetry lock/check,
-`pip check`, wheel/sdist dependency/content and public import, compilation,
-88-column scan, and `git diff --check`.
-
-Done: 2026-08-22 — froze the Empire PDF presentation, accessibility, fixed
-section order, ten-family/76-feature quality rollup, benchmark/performance
-language, bounded diagnostics, compaction, and methodology in
-`docs/stonks/tech-indicators-pdf-design-v1.md`; linked the report/design
-contracts and package README. Verified contract mapping (76 unique fields, 10
-families, 5 outcomes), links (4 files), tech report/storage tests (`22 passed`),
-shared PDF/branding/contracts tests (`10 passed`), and `git diff --check`.
-
-Done: 2026-08-22 — added the typed professional renderer in `report_pdf.py`,
-ten-family chart/table rollups, bounded exceptions/diagnostics, fixed outcome
-and methodology language, public API/dependency wiring, and reusable page/byte
-bounds plus long-title fitting in `empire-reports`. Verified tech package `550
-passed, 16 skipped`; reports package `21 passed`; wheel/sdist build, dependency
-metadata/content, public import, compileall, Poetry lock/check, `pip check`, and
-`git diff --check`; rendered and inspected an 11-page, 174,224-byte PASS PDF
-with nine numbered/headered body pages.
-
-Done: 2026-08-22 — rendered PASS, WARN, NO_OP, FAIL, resumed PARTIAL backfill,
-and 100-sample maximum fixtures; recorded R8.7 evidence and a maximum-sample
-regression. Poppler/pypdf verified six Letter PDFs, 68/68 visually inspected
-pages, 11/11/11/11/12/12 pages, 174,224/174,285/174,207/174,257/175,387/
-177,374 bytes, all 56 body headers/footers/page numbers, fixed section/status/
-resume text, repeated diagnostic headers, and the 25-page/5-MiB bounds; focused
-PDF tests passed 10, report/PDF/exception tests passed 28, full tech package
-passed 551 with 16 environment-gated skips, full reports package passed 21,
-and `git diff --check` passed.
+Phases 0-8 are archived there with task IDs P0.1-P0.10, B1.1-B1.8,
+S2.1-S2.8, I3.1-I3.7, C4.1-C4.8, T5.1-T5.8, X6.1-X6.8, W7.1-W7.10,
+and R8.1-R8.8, together with their `Done:` notes.
 
 ---
 

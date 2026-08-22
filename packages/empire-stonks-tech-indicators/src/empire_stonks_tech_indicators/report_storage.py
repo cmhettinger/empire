@@ -1,8 +1,10 @@
-"""Core storage for durable schema-V1 technical-indicator JSON reports."""
+"""Core storage for durable schema-V1 technical-indicator reports."""
 
 from __future__ import annotations
 
+import os
 import re
+from pathlib import Path
 from types import MappingProxyType
 
 from empire_core import ObjectStore, RunContext, StoredObject
@@ -15,6 +17,9 @@ from empire_stonks_tech_indicators.reports import (
     WorkflowKind,
     render_tech_indicators_report_json,
 )
+from empire_stonks_tech_indicators.report_pdf import (
+    render_tech_indicators_report_pdf,
+)
 
 
 DEFAULT_REPORT_STORAGE_ROOT = "global"
@@ -23,11 +28,23 @@ JSON_REPORT_CONTENT_TYPE = "application/json"
 JSON_REPORT_OBJECT_KIND = "stonks_tech_indicators_report"
 DAILY_JSON_REPORT_LOGICAL_NAME = "tech_indicators_daily_report"
 BACKFILL_JSON_REPORT_LOGICAL_NAME = "tech_indicators_backfill_report"
+PDF_REPORT_FILENAME = "report.pdf"
+PDF_REPORT_CONTENT_TYPE = "application/pdf"
+PDF_REPORT_OBJECT_KIND = "stonks_tech_indicators_pdf_report"
+DAILY_PDF_REPORT_LOGICAL_NAME = "tech_indicators_daily_pdf_report"
+BACKFILL_PDF_REPORT_LOGICAL_NAME = "tech_indicators_backfill_pdf_report"
 
 JSON_REPORT_LOGICAL_NAMES = MappingProxyType(
     {
         WorkflowKind.DAILY: DAILY_JSON_REPORT_LOGICAL_NAME,
         WorkflowKind.BACKFILL: BACKFILL_JSON_REPORT_LOGICAL_NAME,
+    }
+)
+
+PDF_REPORT_LOGICAL_NAMES = MappingProxyType(
+    {
+        WorkflowKind.DAILY: DAILY_PDF_REPORT_LOGICAL_NAME,
+        WorkflowKind.BACKFILL: BACKFILL_PDF_REPORT_LOGICAL_NAME,
     }
 )
 
@@ -122,6 +139,59 @@ def store_tech_indicators_json_report(
     )
 
 
+def store_tech_indicators_pdf_report(
+    *,
+    object_store: ObjectStore,
+    run_context: RunContext,
+    config: TechIndicatorsConfig,
+    report: TechIndicatorsReport,
+    storage_root: str = DEFAULT_REPORT_STORAGE_ROOT,
+    output_dir: str | Path | None = None,
+) -> StoredObject:
+    """Render and store one non-expiring report.pdf under its Core run."""
+
+    if not isinstance(object_store, ObjectStore):
+        raise TypeError("object_store must be a Core ObjectStore.")
+    if not isinstance(config, TechIndicatorsConfig):
+        raise TypeError("config must be a TechIndicatorsConfig.")
+    if not isinstance(report, TechIndicatorsReport):
+        raise TypeError("report must be a TechIndicatorsReport.")
+    _validate_storage_root(storage_root)
+    _validate_report_run_relationship(run_context, report, config)
+
+    render_root = Path(output_dir or os.environ.get("EMPIRE_TEMP_DIR", "/tmp"))
+    render_dir = (
+        render_root
+        / "empire"
+        / "stonks-tech-indicators"
+        / str(run_context.run_id)
+        / "reports"
+    )
+    result = render_tech_indicators_report_pdf(
+        report,
+        output_dir=render_dir,
+        filename=PDF_REPORT_FILENAME,
+    )
+    return object_store.put_file(
+        run_context=run_context,
+        object_scope="run",
+        domain="stonks",
+        logical_name=PDF_REPORT_LOGICAL_NAMES[report.workflow_kind],
+        storage_root=storage_root,
+        object_key=build_tech_indicators_report_object_key(
+            storage_key=config.storage_key,
+            run_context=run_context,
+        ),
+        filename=PDF_REPORT_FILENAME,
+        source_path=result.primary_artifact.path,
+        move=False,
+        content_type=PDF_REPORT_CONTENT_TYPE,
+        object_kind=PDF_REPORT_OBJECT_KIND,
+        expires_at=None,
+        metadata=tech_indicators_report_metadata(report),
+    )
+
+
 def _validate_report_run_relationship(
     run_context: RunContext,
     report: TechIndicatorsReport,
@@ -170,14 +240,21 @@ def _validate_storage_root(storage_root: object) -> None:
 
 
 __all__ = [
+    "BACKFILL_PDF_REPORT_LOGICAL_NAME",
     "BACKFILL_JSON_REPORT_LOGICAL_NAME",
+    "DAILY_PDF_REPORT_LOGICAL_NAME",
     "DAILY_JSON_REPORT_LOGICAL_NAME",
     "DEFAULT_REPORT_STORAGE_ROOT",
     "JSON_REPORT_CONTENT_TYPE",
     "JSON_REPORT_FILENAME",
     "JSON_REPORT_LOGICAL_NAMES",
     "JSON_REPORT_OBJECT_KIND",
+    "PDF_REPORT_CONTENT_TYPE",
+    "PDF_REPORT_FILENAME",
+    "PDF_REPORT_LOGICAL_NAMES",
+    "PDF_REPORT_OBJECT_KIND",
     "build_tech_indicators_report_object_key",
     "store_tech_indicators_json_report",
+    "store_tech_indicators_pdf_report",
     "tech_indicators_report_metadata",
 ]

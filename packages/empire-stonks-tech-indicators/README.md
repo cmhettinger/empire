@@ -86,8 +86,10 @@ an injected Empire Core object store. R8.6 renders those same facts through
 `render_tech_indicators_report_pdf(...)` with shared `empire-reports` branding,
 cover/disclaimer and page templates. The package-owned PDF uses deterministic
 tables, a directly labeled feature-family chart, bounded exception/diagnostic
-rows, explicit empty states, and hard 25-page/5-MiB output checks. PDF storage,
-runners, CLIs, and Airflow remain owned by their later tasks. R8.7's six-
+rows, explicit empty states, and hard 25-page/5-MiB output checks. R8.8 stores
+the PDF through the same Core run key and nine-field metadata allowlist as JSON,
+with its frozen PDF object kind and logical name. Runners, CLIs, and Airflow
+remain owned by their later tasks. R8.7's six-
 variant, 68-page visual acceptance result is recorded in the
 [PDF visual evidence](../../docs/stonks/tech-indicators-pdf-visual-evidence-r8.7.md).
 
@@ -215,7 +217,8 @@ The immutable domain-model API consists of:
 - `build_tech_indicators_report_object_key()`,
   `tech_indicators_report_metadata()`, and
   `store_tech_indicators_json_report()` for the validated durable Core JSON
-  boundary
+  boundary, plus `store_tech_indicators_pdf_report()` for its non-expiring PDF
+  companion rendered from the same immutable report
 - `TECH_INDICATORS_PDF_FEATURE_FAMILIES`,
   `roll_up_pdf_feature_coverage()`, and
   `render_tech_indicators_report_pdf()` for the bounded professional PDF
@@ -613,3 +616,11 @@ artifact has no expiration or overwrite behavior. Its metadata is exactly the
 nine-field schema/report/workflow/outcome/date/version/scope/publication/time
 allowlist; Core remains authoritative for object ID, run relationship, byte
 size, and checksum.
+
+PDF storage applies the same validation and key, renders into the injected
+output directory or `EMPIRE_TEMP_DIR`, and stores `report.pdf` without moving
+the render scratch file. Daily and backfill use
+`tech_indicators_daily_pdf_report` and
+`tech_indicators_backfill_pdf_report`; both use
+`stonks_tech_indicators_pdf_report`, `application/pdf`, the same exact
+nine-field metadata, and no expiration.
