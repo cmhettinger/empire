@@ -33,12 +33,12 @@ from empire_stonks_tech_indicators.spx_relative_returns import (
     SPX_RELATIVE_RETURN_FIELDS,
     calculate_spx_relative_returns,
 )
+from empire_stonks_tech_indicators.subject_policy import (
+    SPX_SUPPORTED_SUBJECT_MARKETS,
+    is_spx_supported_subject,
+)
 
 
-SPX_SUPPORTED_SUBJECT_MARKETS = {
-    "EODDATA": frozenset({"NYSE", "NASDAQ", "AMEX"}),
-    "STOOQ": frozenset({"nasdaq", "nyse", "nysemkt"}),
-}
 SPX_FEATURE_FIELDS = (
     *SPX_PRICE_RATIO_FIELDS,
     *(field_name for field_name, _ in SPX_RELATIVE_RETURN_FIELDS),
@@ -46,20 +46,6 @@ SPX_FEATURE_FIELDS = (
     *(field_name for field_name, _ in SPX_CORRELATION_FIELDS),
 )
 SUBJECT_UNSUPPORTED_REASON = "SUBJECT_UNSUPPORTED"
-
-
-def is_spx_supported_subject(subject: EligibleListing) -> bool:
-    """Return the P0.5 subject decision for a P0.6-selected listing.
-
-    ``EligibleListing`` is produced only after the P0.6 SQL predicate has
-    validated EODData's metadata type. The remaining P0.5 decision is the
-    exact provider and market pair; instrument type and ticker are not inferred.
-    """
-
-    if not isinstance(subject, EligibleListing):
-        raise TypeError("subject must be an EligibleListing.")
-    markets = SPX_SUPPORTED_SUBJECT_MARKETS.get(subject.provider_code)
-    return markets is not None and subject.market in markets
 
 
 def _null_series(observation_count: int) -> MaskedFloatArray:

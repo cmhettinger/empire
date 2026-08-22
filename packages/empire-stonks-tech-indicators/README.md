@@ -151,6 +151,10 @@ The immutable domain-model API consists of:
   SPX OHLCV history and close lookup
 - `ListingStateComparison` and `iter_state_comparison_pages()` for paged,
   set-based current-source versus published-state drift facts
+- `AffectedRangeReason`, `AffectedRange`, `AffectedRangePlan`, and
+  `plan_affected_ranges()` for deterministic full-prefix calculation context,
+  collapsed affected suffixes, safe-horizon expansion, and bounded reason
+  summaries across local, version, explicit, and SPX-driven work
 - `SourceReadinessDecision` and `decide_source_readiness()` for same-date
   OHLCV, SPX, and successful-source evidence decisions
 - `validate_feature_rows()` for strict full-prefix, pre-SQL validation of
@@ -179,6 +183,18 @@ Copied rows report as unchanged/equivalent even when populating or repairing an
 inactive physical slot; they are never counted as recalculation writes.
 Both APIs leave commit, rollback, cursor lifetime, and transaction isolation to
 the caller.
+
+Affected-range planning consumes the exact listing facts and state comparisons
+from the package read APIs. Each listing produces at most one range in stable
+provider/market/ticker/UUID order. Calculation always starts at the listing's
+first current source observation; the write range starts at the earliest
+uncertainty and continues through the requested horizon. If that uncertainty
+could affect technical rows already persisted after a narrowed request, the
+write end expands through the existing tail. Version drift always writes from
+the first source row. SPX drift propagates only to supported subject coverage
+overlapping the changed benchmark date; benchmark-only inactive maintenance is
+capped to existing technical coverage. The planner never mutates source,
+technical, publication, or workflow state.
 
 Callers may catch the package base or the narrow category they can handle. The
 public exceptions contain no TA-Lib values, SQL, database-driver exceptions,

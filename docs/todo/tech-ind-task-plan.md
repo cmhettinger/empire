@@ -158,7 +158,7 @@ preserving caller transaction ownership.
 | W7.2 | [x] | Assemble complete rows | Merge core, TA-Lib, and SPX outputs without positional drift; every V1 field is intentionally populated or null. | W7.1 |
 | W7.3 | [x] | Implement slot bulk upsert | Write bounded active/inactive-slot batches, omit generated columns, preserve copied-equivalent rows, count inserted/updated/unchanged, and avoid no-change updates. | S2.5, W7.2 |
 | W7.4 | [x] | Persist optional recurrence state | If S2.2 approved state, write it atomically and prevent advancement without its feature row; otherwise record no writer is needed. | S2.2, W7.3 |
-| W7.5 | [ ] | Implement affected-range planner | Convert missing rows, source/SPX corrections, and version drift into deterministic work ranges with required prefix and suffix propagation. | I3.5, X6.7, W7.3-W7.4 |
+| W7.5 | [x] | Implement affected-range planner | Convert missing rows, source/SPX corrections, and version drift into deterministic work ranges with required prefix and suffix propagation. | I3.5, X6.7, W7.3-W7.4 |
 | W7.6 | [ ] | Prove rebuild equivalence | Compare full rebuild, append, resume, source correction, SPX correction, and version rebuild within approved tolerance. | B1.2, W7.3-W7.5 |
 | W7.7 | [ ] | Add published feature queries | Add view-backed date/listing coverage, freshness, version, benchmark, ranking, readiness-token, and one-snapshot model-input reads without strategy thresholds. | S2.4, W7.3 |
 | W7.8 | [ ] | Add PostgreSQL integration | Cover slot/view visibility, rollback, generated values, idempotency, correction propagation, provider/benchmark isolation, and repeated runs. | W7.3-W7.7 |
@@ -201,6 +201,18 @@ EMA/RSI/ATR/ADX/MACD. Package pytest passed 472 with 2 expected Core-runtime
 skips; Flyway validated 39 migrations, the schema contract passed with 64
 expected failures and an absent state relation, repository scans found no
 state writer/schema, and `git diff --check` passed.
+
+Done: 2026-08-22 — added public deterministic affected-range planning in
+`empire_stonks_tech_indicators/affected_ranges.py`, shared lightweight SPX
+subject policy, README/API integration, and `tests/test_affected_ranges.py`.
+The planner collapses local/SPX/version/explicit reasons per listing, separates
+full-prefix calculation from suffix writes, expands unsafe narrowed horizons,
+and caps benchmark-only inactive maintenance. Focused pytest passed 24; package
+pytest passed 496 with 2 expected Core-runtime skips. Poetry lock, `pip check`,
+compileall, pinned runtime smoke, wheel/sdist build and isolated lazy planner
+import, changed-Python 88-column/whitespace/`git diff --check`, Flyway
+validation of 39 migrations, and the schema contract with 64 expected failures
+passed.
 
 ---
 

@@ -52,6 +52,12 @@ from empire_stonks_tech_indicators.state import (
 )
 
 if TYPE_CHECKING:
+    from empire_stonks_tech_indicators.affected_ranges import (
+        AffectedRange,
+        AffectedRangePlan,
+        AffectedRangeReason,
+        plan_affected_ranges,
+    )
     from empire_stonks_tech_indicators.assembly import assemble_feature_rows
     from empire_stonks_tech_indicators.arrays import (
         CalculationArrays,
@@ -139,6 +145,27 @@ if TYPE_CHECKING:
 
 
 def __getattr__(name: str) -> object:
+    if name in {
+        "AffectedRange",
+        "AffectedRangePlan",
+        "AffectedRangeReason",
+        "plan_affected_ranges",
+    }:
+        from empire_stonks_tech_indicators.affected_ranges import (
+            AffectedRange,
+            AffectedRangePlan,
+            AffectedRangeReason,
+            plan_affected_ranges,
+        )
+
+        exports = {
+            "AffectedRange": AffectedRange,
+            "AffectedRangePlan": AffectedRangePlan,
+            "AffectedRangeReason": AffectedRangeReason,
+            "plan_affected_ranges": plan_affected_ranges,
+        }
+        globals().update(exports)
+        return exports[name]
     if name == "assemble_feature_rows":
         from empire_stonks_tech_indicators.assembly import assemble_feature_rows
 
@@ -440,6 +467,9 @@ __all__ = [
     "TALibRuntimeInfo",
     "VolumeLiquidityArrays",
     "YAHOO_DAILY_JOB_NAME",
+    "AffectedRange",
+    "AffectedRangePlan",
+    "AffectedRangeReason",
     "assemble_feature_rows",
     "calculate_aligned_returns",
     "calculate_spx_beta",
@@ -465,6 +495,7 @@ __all__ = [
     "iter_state_comparison_pages",
     "load_spx_benchmark_history",
     "normalize_source_bars",
+    "plan_affected_ranges",
     "resolve_spx_benchmark",
     "select_eligible_listings",
     "validate_feature_rows",
