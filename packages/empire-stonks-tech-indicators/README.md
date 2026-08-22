@@ -196,6 +196,15 @@ overlapping the changed benchmark date; benchmark-only inactive maintenance is
 capped to existing technical coverage. The planner never mutates source,
 technical, publication, or workflow state.
 
+The complete-row equivalence regression applies those ranges to the production
+65-column assembly output. Full rebuild, append, replay-safe resume, source
+correction, SPX correction, and version rebuild must converge on identical
+keys, copied source, observation counts, versions, benchmark lineage, and null
+masks. Integer streaks compare exactly and floats use the frozen `1e-12`
+absolute and `1e-10` relative tolerances. Equivalent prefix rows retain their
+existing run and calculation lifecycle fields; version rebuild writes every
+source row and cannot leave a mixed-version image.
+
 Callers may catch the package base or the narrow category they can handle. The
 public exceptions contain no TA-Lib values, SQL, database-driver exceptions,
 connection details, or persistence implementation types. Additional public
