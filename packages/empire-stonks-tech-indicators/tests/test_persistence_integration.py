@@ -120,7 +120,7 @@ def test_slot_upsert_and_exact_copy_against_postgresql(
 ) -> None:
     cursor = database_connection.cursor()  # type: ignore[union-attr]
     provider_listing_id, trading_date = _insert_source_bar(cursor)
-    first_calculated_at = datetime(2026, 8, 22, 12, tzinfo=timezone.utc)
+    first_calculated_at = datetime.now(timezone.utc)
     first = _row(
         provider_listing_id=provider_listing_id,
         trading_date=trading_date,
@@ -560,7 +560,7 @@ def test_phase_7_postgresql_vertical_converges_without_cross_series_leakage(
     marker = uuid4().hex[:12].upper()
     first_date = date(2098, 1, 6)
     second_date = date(2098, 1, 7)
-    calculated_at = datetime(2026, 8, 22, 14, tzinfo=timezone.utc)
+    calculated_at = datetime.now(timezone.utc)
     cursor = database_connection.cursor()  # type: ignore[union-attr]
     eoddata_id = _insert_listing(
         cursor,

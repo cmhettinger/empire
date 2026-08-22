@@ -504,3 +504,13 @@ The Airflow image installs the exact binary calculation runtime first, then
 installs this package after Empire Core, reports, and OHLCV. The package remains
 runtime-agnostic: Airflow only provides an installed execution environment and
 later thin orchestration.
+
+The W7.9 persistence benchmark and recorded local evidence live in
+[`tools/tech-indicators/persistence-benchmark.py`](../../tools/tech-indicators/persistence-benchmark.py)
+and
+[`docs/stonks/tech-indicators-persistence-evidence-w7.9.md`](../../docs/stonks/tech-indicators-persistence-evidence-w7.9.md).
+The probe uses an automatically removed logged scratch schema and never targets
+the production payload slots. Its million-row result retains the 5,000-row
+write default and both existing indexes. Future wide payload-history readers
+should keyset-page at 1,000 rows; the independently measured narrow source
+reader remains at 10,000.

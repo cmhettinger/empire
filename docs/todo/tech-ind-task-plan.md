@@ -162,7 +162,7 @@ preserving caller transaction ownership.
 | W7.6 | [x] | Prove rebuild equivalence | Compare full rebuild, append, resume, source correction, SPX correction, and version rebuild within approved tolerance. | B1.2, W7.3-W7.5 |
 | W7.7 | [x] | Add published feature queries | Add view-backed date/listing coverage, freshness, version, benchmark, ranking, readiness-token, and one-snapshot model-input reads without strategy thresholds. | S2.4, W7.3 |
 | W7.8 | [x] | Add PostgreSQL integration | Cover slot/view visibility, rollback, generated values, idempotency, correction propagation, provider/benchmark isolation, and repeated runs. | W7.3-W7.7 |
-| W7.9 | [ ] | Benchmark persistence | Measure batches, upserts, index cost, memory, and latest-date latency; adjust only with evidence against P0.8. | P0.8, W7.8 |
+| W7.9 | [x] | Benchmark persistence | Measure batches, upserts, index cost, memory, and latest-date latency; adjust only with evidence against P0.8. | P0.8, W7.8 |
 | W7.10 | [ ] | Implement atomic publication | Implement P0.9's bounded in-place finalizer, inactive-slot build/membership flip, recovery, and fail-closed readiness/model-input queries; prove readers never observe partial dates, mixed versions, incomplete benchmark output, or failed/cancelled work. | P0.9, S2.5, W7.3-W7.6 |
 
 Done: 2026-08-22 — added public full-prefix pre-SQL row validation in
@@ -240,6 +240,19 @@ package pytest passed 514 with 2 expected Core-runtime skips; focused OHLCV
 regression passed 2. Poetry lock, `pip check`, compileall, wheel/sdist build,
 88-column/`git diff --check`, Flyway validation of 39 migrations, and the schema
 contract with 64 expected failures passed.
+
+Done: 2026-08-22 — added the disposable logged-schema benchmark in
+`tools/tech-indicators/persistence-benchmark.py`, canonical W7.9 evidence, and
+README guidance. The 100-listing/1,000,000-row pilot sustained 1,049.65
+calculated/validated/persisted rows/s with 400.73 MiB peak RSS and a 0.636 s
+maximum 5,000-row transaction; two slots project to 35.87 GiB. Five-run
+history/slice/rank/coverage plans passed, the 25,000-row rank used 2,526 KiB
+with no temp I/O, and no index or write-batch change was justified. Package
+pytest passed 514 with 2 expected Core-runtime skips; PostgreSQL integration
+passed 10 and OHLCV regression passed 2. Poetry lock, `pip check`, compileall,
+wheel/sdist build, harness smoke/zero-residue checks, 88-column/
+`git diff --check`, Flyway validation of 39 migrations, and the schema contract
+with 64 expected failures passed.
 
 ---
 
