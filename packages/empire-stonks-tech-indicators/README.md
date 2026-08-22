@@ -167,6 +167,11 @@ The immutable domain-model API consists of:
   an explicit physical slot with tolerance-aware no-change handling
 - `FeatureRowKey` and `copy_feature_rows_between_slots()` for fail-closed,
   exact slot-to-slot copies that retain source calculation and lifecycle fields
+- `InPlaceSlotChanges`, `PublicationFinalizationResult`,
+  `finalize_publication()`, `PublicationRecoveryDecision`,
+  `inspect_publication_recovery()`, `select_inactive_payload_slots()`, and
+  `fail_unpublished_publication()` for deterministic inactive-slot selection,
+  lock-protected P0.9 terminal publication, and recovery
 - `PublishedFeatureCoverage` and `select_published_feature_coverage()` for
   view-backed per-listing date/count, calculation/update freshness, version,
   and benchmark facts, including eligible listings with no published rows
@@ -196,6 +201,23 @@ Copied rows report as unchanged/equivalent even when populating or repairing an
 inactive physical slot; they are never counted as recalculation writes.
 Both APIs leave commit, rollback, cursor lifetime, and transaction isolation to
 the caller.
+
+Atomic finalization also leaves commit and rollback to the caller and must run
+on the dedicated transaction that already holds P0.10's frozen advisory lock.
+It locks and revalidates the prepared record, exact listing scope, successful
+Core run, complete non-deleted JSON/PDF evidence, current benchmark facts,
+membership counts, and complete slot images against current source. Staged
+work uses slot A for an initial image and otherwise selects only the slot
+opposite each listing's current membership. In-place work accepts at
+most 25,000 retained mutations, must finish its package finalization within 60
+seconds, and reconciles actual insert/update/delete/equivalent counts before
+visibility changes. The final status and all old/new membership activity change
+in the same caller transaction; an already-published recovery is idempotent.
+Building and prepared recovery remains invisible, and failed, abandoned,
+cancelled, source-drifted, version-mixed, report-incomplete, and benchmark-
+incomplete candidates cannot activate. Model consumers still use
+`read_published_model_inputs()` so source changes after publication fail closed
+in one read-only repeatable-read snapshot.
 
 Affected-range planning consumes the exact listing facts and state comparisons
 from the package read APIs. Each listing produces at most one range in stable

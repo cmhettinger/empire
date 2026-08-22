@@ -737,3 +737,124 @@ wheel-content inspection, isolated public import, changed-Python 88-column
 scan, and `git diff --check` passed.
 
 ---
+
+## Phase 7: Validate And Persist Current Feature State
+
+Goal: write complete validated rows efficiently and idempotently while
+preserving caller transaction ownership.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| W7.1 | [x] | Add strict row validation | Validate finite values, copied source, bounds, warm-up nulls, dependencies, benchmark, observation counts, and generated inputs before SQL. | C4.8, T5.8, X6.8 |
+| W7.2 | [x] | Assemble complete rows | Merge core, TA-Lib, and SPX outputs without positional drift; every V1 field is intentionally populated or null. | W7.1 |
+| W7.3 | [x] | Implement slot bulk upsert | Write bounded active/inactive-slot batches, omit generated columns, preserve copied-equivalent rows, count inserted/updated/unchanged, and avoid no-change updates. | S2.5, W7.2 |
+| W7.4 | [x] | Persist optional recurrence state | If S2.2 approved state, write it atomically and prevent advancement without its feature row; otherwise record no writer is needed. | S2.2, W7.3 |
+| W7.5 | [x] | Implement affected-range planner | Convert missing rows, source/SPX corrections, and version drift into deterministic work ranges with required prefix and suffix propagation. | I3.5, X6.7, W7.3-W7.4 |
+| W7.6 | [x] | Prove rebuild equivalence | Compare full rebuild, append, resume, source correction, SPX correction, and version rebuild within approved tolerance. | B1.2, W7.3-W7.5 |
+| W7.7 | [x] | Add published feature queries | Add view-backed date/listing coverage, freshness, version, benchmark, ranking, readiness-token, and one-snapshot model-input reads without strategy thresholds. | S2.4, W7.3 |
+| W7.8 | [x] | Add PostgreSQL integration | Cover slot/view visibility, rollback, generated values, idempotency, correction propagation, provider/benchmark isolation, and repeated runs. | W7.3-W7.7 |
+| W7.9 | [x] | Benchmark persistence | Measure batches, upserts, index cost, memory, and latest-date latency; adjust only with evidence against P0.8. | P0.8, W7.8 |
+| W7.10 | [x] | Implement atomic publication | Implement P0.9's bounded in-place finalizer, inactive-slot build/membership flip, recovery, and fail-closed readiness/model-input queries; prove readers never observe partial dates, mixed versions, incomplete benchmark output, or failed/cancelled work. | P0.9, S2.5, W7.3-W7.6 |
+
+Done: 2026-08-22 — added public full-prefix pre-SQL row validation in
+`empire_stonks_tech_indicators/validation.py`, lazy export/README guidance,
+and focused coverage in `tests/test_validation.py`. Focused pytest passed 14;
+package pytest passed 447 with 1 expected Core-runtime skip. Poetry lock,
+`pip check`, compileall, pinned runtime smoke, wheel/sdist build and isolated
+lazy wheel import, 88-column/whitespace/`git diff --check`, Flyway validation
+of 39 migrations, and the technical schema contract with 64 expected failures
+passed.
+
+Done: 2026-08-22 — added public single-pass complete-row assembly in
+`empire_stonks_tech_indicators/assembly.py`, shared immutable calculation-state
+validation, lazy export/README guidance, and `tests/test_assembly.py`. Focused
+assembly/validation/API pytest passed 30; package pytest passed 456 with 1
+expected Core-runtime skip. Poetry lock, `pip check`, compileall, pinned
+runtime smoke, wheel/sdist build and isolated lazy wheel import,
+88-column/whitespace/`git diff --check`, Flyway validation of 39 migrations,
+and the technical schema contract with 64 expected failures passed.
+
+Done: 2026-08-22 — added bounded A/B-slot `MERGE` upserts and exact
+copied-equivalent slot transfers in
+`empire_stonks_tech_indicators/persistence.py`, public API/README integration,
+and focused unit/PostgreSQL coverage. Focused pytest passed 16; package pytest
+passed 472 with 2 expected Core-runtime skips; the rollback-only PostgreSQL
+integration passed 1. Poetry lock, `pip check`, compileall, pinned runtime
+smoke, wheel/sdist build and isolated wheel import,
+88-column/whitespace/`git diff --check`, Flyway validation of 39 migrations,
+and the technical schema contract with 64 expected failures passed.
+
+Done: 2026-08-22 — recorded the ratified B1.2/S2.2 V1 no-recurrence-state
+decision in the package README; no state model, table, configuration, or writer
+is required or added. The 20,000-row typical/high-offset equivalence prototype
+passed with full-prefix output equivalent and bounded replay rejected across
+EMA/RSI/ATR/ADX/MACD. Package pytest passed 472 with 2 expected Core-runtime
+skips; Flyway validated 39 migrations, the schema contract passed with 64
+expected failures and an absent state relation, repository scans found no
+state writer/schema, and `git diff --check` passed.
+
+Done: 2026-08-22 — added public deterministic affected-range planning in
+`empire_stonks_tech_indicators/affected_ranges.py`, shared lightweight SPX
+subject policy, README/API integration, and `tests/test_affected_ranges.py`.
+The planner collapses local/SPX/version/explicit reasons per listing, separates
+full-prefix calculation from suffix writes, expands unsafe narrowed horizons,
+and caps benchmark-only inactive maintenance. Focused pytest passed 24; package
+pytest passed 496 with 2 expected Core-runtime skips. Poetry lock, `pip check`,
+compileall, pinned runtime smoke, wheel/sdist build and isolated lazy planner
+import, changed-Python 88-column/whitespace/`git diff --check`, Flyway
+validation of 39 migrations, and the schema contract with 64 expected failures
+passed.
+
+Done: 2026-08-22 — added complete 65-column rebuild-equivalence coverage in
+`tests/test_rebuild_equivalence.py` plus README guidance for full rebuild,
+append, replay-safe resume, source/SPX correction, and version rebuild. Focused
+pytest passed 6; planner/assembly/persistence integration pytest passed 55;
+package pytest passed 502 with 2 expected Core-runtime skips. Poetry lock,
+`pip check`, compileall, pinned runtime smoke, wheel/sdist build, isolated lazy
+wheel import, changed-Python 88-column/`git diff --check`, Flyway validation of
+39 migrations, and the schema contract with 64 expected failures passed.
+
+Done: 2026-08-22 — added public published-view coverage, threshold-free
+freshness/ranking, and fail-closed one-snapshot model-input reads in
+`empire_stonks_tech_indicators/published_queries.py`, with API/README and unit/
+PostgreSQL coverage. Focused pytest passed 67; package pytest passed 514 with 2
+expected Core-runtime skips; rollback-only PostgreSQL query integration passed
+8. Poetry lock, `pip check`, compileall, calculation-lazy runtime/wheel import,
+wheel/sdist build, changed-Python 88-column/`git diff --check`, Flyway validation
+of 39 migrations, and the schema contract with 64 expected failures passed.
+
+Done: 2026-08-22 — added the rollback-only Phase 7 PostgreSQL vertical in
+`tests/test_persistence_integration.py`, covering mixed A/B publication,
+generated values, rollback, subject/SPX correction suffixes, provider/benchmark
+isolation, and repeat-write convergence. Phase 7 PostgreSQL pytest passed 10;
+package pytest passed 514 with 2 expected Core-runtime skips; focused OHLCV
+regression passed 2. Poetry lock, `pip check`, compileall, wheel/sdist build,
+88-column/`git diff --check`, Flyway validation of 39 migrations, and the schema
+contract with 64 expected failures passed.
+
+Done: 2026-08-22 — added the disposable logged-schema benchmark in
+`tools/tech-indicators/persistence-benchmark.py`, canonical W7.9 evidence, and
+README guidance. The 100-listing/1,000,000-row pilot sustained 1,049.65
+calculated/validated/persisted rows/s with 400.73 MiB peak RSS and a 0.636 s
+maximum 5,000-row transaction; two slots project to 35.87 GiB. Five-run
+history/slice/rank/coverage plans passed, the 25,000-row rank used 2,526 KiB
+with no temp I/O, and no index or write-batch change was justified. Package
+pytest passed 514 with 2 expected Core-runtime skips; PostgreSQL integration
+passed 10 and OHLCV regression passed 2. Poetry lock, `pip check`, compileall,
+wheel/sdist build, harness smoke/zero-residue checks, 88-column/
+`git diff --check`, Flyway validation of 39 migrations, and the schema contract
+with 64 expected failures passed.
+
+Done: 2026-08-22 — added lock-transaction-owned atomic finalization and
+recovery in `empire_stonks_tech_indicators/publication.py`, public API/README
+integration, and `tests/test_publication_integration.py`. Focused PostgreSQL
+pytest passed 5, including staged/in-place flips, partial-date/mixed-version/
+benchmark/cancelled rejection, idempotent recovery, and three-connection MVCC;
+the Phase 7 PostgreSQL suite passed 15 with zero fixture residue. Package pytest
+passed 514 with 3 expected integration/Core-runtime skips; focused OHLCV
+regression passed 2. Poetry lock, `pip check`, compileall, wheel/sdist build and
+isolated wheel import, changed-Python 88-column/`git diff --check`, Flyway
+validation of 39 migrations, and the schema contract with 64 expected failures
+passed.
+
+---
