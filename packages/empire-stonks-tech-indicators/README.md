@@ -71,6 +71,13 @@ migrations under `db/` own the eventual technical-indicator schema. Core run
 lifecycle, JSON/PDF reports, package commands, and Airflow orchestration are
 introduced only by their assigned implementation tasks.
 
+The V1 domain report facts are frozen in the
+[report schema contract](../../docs/stonks/tech-indicators-report-schema-v1.md).
+It defines one bounded, secret-safe immutable fact shape shared by daily and
+backfill JSON/PDF outputs. R8.2 and later tasks own aggregation, typed models,
+rendering, Core storage, and runners; this package does not yet expose a report
+builder.
+
 ## Public API
 
 The package root explicitly exports one base exception and five stable failure

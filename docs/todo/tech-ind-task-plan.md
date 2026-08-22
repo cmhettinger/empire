@@ -153,7 +153,7 @@ Goal: make every run operationally inspectable before production runners.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| R8.1 | [ ] | Define report schema V1 | Define secret-safe JSON for identity, scope, versions, source/publication readiness, lock outcome, provider/market/listing counts, writes, warm-up/null/benchmark coverage, warnings, timing, throughput, and bounded samples. | P0.2, P0.8-P0.10, W7.7 |
+| R8.1 | [x] | Define report schema V1 | Define secret-safe JSON for identity, scope, versions, source/publication readiness, lock outcome, provider/market/listing counts, writes, warm-up/null/benchmark coverage, warnings, timing, throughput, and bounded samples. | P0.2, P0.8-P0.10, W7.7 |
 | R8.2 | [ ] | Add summary queries | Implement provider/market/type/date/version quality and coverage aggregations without serializing feature payloads; plans meet P0.8. | W7.7-W7.9, R8.1 |
 | R8.3 | [ ] | Build JSON report | Produce deterministic versioned JSON for success, warning, no-op, resumed/partial backfill, and failure. | R8.1-R8.2 |
 | R8.4 | [ ] | Store JSON report | Store durable `report.json` through Core with approved kind, logical name, metadata, retention, and run relationship. | R8.3 |
@@ -161,6 +161,16 @@ Goal: make every run operationally inspectable before production runners.
 | R8.6 | [ ] | Implement PDF renderer | Use reusable `empire-reports` components, bounded tables/charts, deterministic pagination, and accessible labels. | R8.5 |
 | R8.7 | [ ] | Visually verify PDF | Render success, warning, no-op, and large-scope reports; inspect every page for clipping, overflow, sparse layouts, charts, and branding. | R8.6 |
 | R8.8 | [ ] | Store PDF report | Store durable `report.pdf` with matching Core lineage/metadata and prove JSON/PDF facts agree. | R8.4, R8.7 |
+
+Done: 2026-08-22 — froze the shared daily/backfill JSON fact shape, outcomes,
+readiness/lock/publication semantics, count equations, coverage/null reasons,
+performance denominators, 100-sample ceiling, disclosures, and Core metadata
+allowlist in `docs/stonks/tech-indicators-report-schema-v1.md`; linked the
+design contract and package README. Contract marker/count/schema checks,
+documentation links, package pytest (514 passed, 3 skipped), Poetry lock/build,
+`pip check`, compileall, public import, Flyway validation (39 migrations),
+whitespace,
+and `git diff --check` passed.
 
 ---
 

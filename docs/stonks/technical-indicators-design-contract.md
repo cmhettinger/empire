@@ -675,6 +675,12 @@ The package provides daily and historical-backfill Core runners, package
 commands, `bin/` wrappers, and a thin Airflow DAG after the calculation and
 persistence paths are proven.
 
+R8.1 freezes the exact shared JSON facts, enums, null/count invariants,
+diagnostic bounds, and secret-safe Core metadata allowlist in
+[`tech-indicators-report-schema-v1.md`](tech-indicators-report-schema-v1.md).
+Later report tasks may implement queries and renderers without changing that
+contract implicitly.
+
 Every substantive run produces durable:
 
 ```text
