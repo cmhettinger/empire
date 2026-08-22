@@ -159,7 +159,7 @@ Goal: make every run operationally inspectable before production runners.
 | R8.4 | [x] | Store JSON report | Store durable `report.json` through Core with approved kind, logical name, metadata, retention, and run relationship. | R8.3 |
 | R8.5 | [x] | Design professional PDF | Define Empire cover/disclaimer, status, scope, coverage, formula/library versions, benchmark health, quality, performance, warnings, and methodology without recommendations. | R8.1-R8.3 |
 | R8.6 | [x] | Implement PDF renderer | Use reusable `empire-reports` components, bounded tables/charts, deterministic pagination, and accessible labels. | R8.5 |
-| R8.7 | [ ] | Visually verify PDF | Render success, warning, no-op, and large-scope reports; inspect every page for clipping, overflow, sparse layouts, charts, and branding. | R8.6 |
+| R8.7 | [x] | Visually verify PDF | Render success, warning, no-op, and large-scope reports; inspect every page for clipping, overflow, sparse layouts, charts, and branding. | R8.6 |
 | R8.8 | [ ] | Store PDF report | Store durable `report.pdf` with matching Core lineage/metadata and prove JSON/PDF facts agree. | R8.4, R8.7 |
 
 Done: 2026-08-22 — froze the shared daily/backfill JSON fact shape, outcomes,
@@ -208,6 +208,16 @@ passed, 16 skipped`; reports package `21 passed`; wheel/sdist build, dependency
 metadata/content, public import, compileall, Poetry lock/check, `pip check`, and
 `git diff --check`; rendered and inspected an 11-page, 174,224-byte PASS PDF
 with nine numbered/headered body pages.
+
+Done: 2026-08-22 — rendered PASS, WARN, NO_OP, FAIL, resumed PARTIAL backfill,
+and 100-sample maximum fixtures; recorded R8.7 evidence and a maximum-sample
+regression. Poppler/pypdf verified six Letter PDFs, 68/68 visually inspected
+pages, 11/11/11/11/12/12 pages, 174,224/174,285/174,207/174,257/175,387/
+177,374 bytes, all 56 body headers/footers/page numbers, fixed section/status/
+resume text, repeated diagnostic headers, and the 25-page/5-MiB bounds; focused
+PDF tests passed 10, report/PDF/exception tests passed 28, full tech package
+passed 551 with 16 environment-gated skips, full reports package passed 21,
+and `git diff --check` passed.
 
 ---
 

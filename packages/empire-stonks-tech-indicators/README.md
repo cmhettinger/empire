@@ -87,7 +87,9 @@ an injected Empire Core object store. R8.6 renders those same facts through
 cover/disclaimer and page templates. The package-owned PDF uses deterministic
 tables, a directly labeled feature-family chart, bounded exception/diagnostic
 rows, explicit empty states, and hard 25-page/5-MiB output checks. PDF storage,
-runners, CLIs, and Airflow remain owned by their later tasks.
+runners, CLIs, and Airflow remain owned by their later tasks. R8.7's six-
+variant, 68-page visual acceptance result is recorded in the
+[PDF visual evidence](../../docs/stonks/tech-indicators-pdf-visual-evidence-r8.7.md).
 
 ## Public API
 

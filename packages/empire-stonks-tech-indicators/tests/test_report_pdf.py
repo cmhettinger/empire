@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 from pypdf import PdfReader
@@ -148,6 +149,49 @@ def test_diagnostic_compaction_is_stable_and_bounded() -> None:
         f"S{index:03d}" for index in range(1, 11)
     )
     assert omitted["Failure"] == 10
+
+
+def test_largest_bounded_samples_render_with_repeated_table_header(
+    tmp_path: Path,
+) -> None:
+    message = REPORT_DIAGNOSTIC_MESSAGE_CATALOG["CALCULATION_FAILED"]
+    samples = tuple(
+        ReportDiagnosticSample(
+            sample_id=f"S{index:03d}",
+            code="CALCULATION_FAILED",
+            message=message,
+            provider_listing_id=UUID(
+                f"00000000-0000-4000-8000-{index:012d}"
+            ),
+            provider_code="EODDATA",
+            market="NYSE",
+            ticker=f"T{index:03d}",
+            field_name="return_1d_pct",
+        )
+        for index in range(1, 101)
+    )
+    report = replace(
+        _failure(),
+        failures=(
+            ReportIssueAggregate(
+                "CALCULATION_FAILED",
+                len(samples),
+                tuple(sample.sample_id for sample in samples),
+            ),
+        ),
+        diagnostic_samples=samples,
+    )
+
+    result = render_tech_indicators_report_pdf(report, output_dir=tmp_path)
+
+    artifact = result.primary_artifact.resolved_path()
+    reader = PdfReader(artifact)
+    text = _pdf_text(artifact)
+    assert len(reader.pages) <= PDF_MAXIMUM_PAGES
+    assert artifact.stat().st_size <= PDF_MAXIMUM_BYTES
+    assert "Showing 10 rows; 90 additional rows were omitted" in text
+    assert text.count("Listing UUID") >= 2
+    assert "S100" in text
 
 
 def test_pdf_renderer_rejects_invalid_input_and_filename(tmp_path: Path) -> None:
