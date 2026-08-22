@@ -1,6 +1,7 @@
 # Tech-Indicators Report Schema V1
 
-Status: frozen implementation contract for R8.1 and R8.3 as of 2026-08-22.
+Status: frozen implementation contract for R8.1, R8.3, and R8.4 as of
+2026-08-22.
 
 This document defines the machine-readable facts shared by the daily and
 backfill `report.json` artifacts for `empire-stonks-tech-indicators`. It extends
@@ -30,6 +31,19 @@ The two report identities are:
 Both use Core domain `stonks`, filename `report.json`, object kind
 `stonks_tech_indicators_report`, media type `application/json`, and the frozen
 run-scoped reports path. Reports are durable and have no expiration date.
+
+R8.4 stores the already validated R8.3 bytes with Core `ObjectStore.put_bytes`
+under storage root `global` and this exact key:
+
+```text
+<configured-storage-key>/runs/YYYY/MM/DD/<run_id>/reports
+```
+
+The date and run ID come from an active `stonks` Core `RunContext`. Storage
+fails before writing unless its run ID, frozen daily/backfill job, subject key,
+and effective date agree with the immutable report identity. Run-scoped JSON
+does not use overwrite and sets `expires_at` to null. Core owns the resulting
+object ID, run FK, byte size, checksum, and physical storage transaction.
 
 `generated_at` and every other timestamp are timezone-aware UTC RFC 3339 text
 with a `Z` suffix. UUIDs use lowercase canonical text. Dates use ISO
@@ -621,8 +635,9 @@ R8.3 must enforce at least these V1 invariants before bytes are produced:
 - R8.3 defines immutable report models, freezes phase/disclosure/reason
   vocabularies, validates every invariant above, and emits deterministic JSON
   for all five outcomes.
-- R8.4 stores durable JSON through Core using the frozen names, path, metadata
-  allowlist, and no expiration.
+- R8.4 stores durable JSON through an injected Core object store using the
+  frozen names, path, metadata allowlist, active-run relationship, and no
+  expiration.
 - R8.5-R8.7 design, render, and visually verify a professional PDF from the
   same immutable facts with P0.8's smaller PDF sample and page bounds.
 - R8.8 stores the PDF and proves JSON, PDF, Core metadata, and publication facts

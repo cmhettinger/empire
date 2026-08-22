@@ -156,7 +156,7 @@ Goal: make every run operationally inspectable before production runners.
 | R8.1 | [x] | Define report schema V1 | Define secret-safe JSON for identity, scope, versions, source/publication readiness, lock outcome, provider/market/listing counts, writes, warm-up/null/benchmark coverage, warnings, timing, throughput, and bounded samples. | P0.2, P0.8-P0.10, W7.7 |
 | R8.2 | [x] | Add summary queries | Implement provider/market/type/date/version quality and coverage aggregations without serializing feature payloads; plans meet P0.8. | W7.7-W7.9, R8.1 |
 | R8.3 | [x] | Build JSON report | Produce deterministic versioned JSON for success, warning, no-op, resumed/partial backfill, and failure. | R8.1-R8.2 |
-| R8.4 | [ ] | Store JSON report | Store durable `report.json` through Core with approved kind, logical name, metadata, retention, and run relationship. | R8.3 |
+| R8.4 | [x] | Store JSON report | Store durable `report.json` through Core with approved kind, logical name, metadata, retention, and run relationship. | R8.3 |
 | R8.5 | [ ] | Design professional PDF | Define Empire cover/disclaimer, status, scope, coverage, formula/library versions, benchmark health, quality, performance, warnings, and methodology without recommendations. | R8.1-R8.3 |
 | R8.6 | [ ] | Implement PDF renderer | Use reusable `empire-reports` components, bounded tables/charts, deterministic pagination, and accessible labels. | R8.5 |
 | R8.7 | [ ] | Visually verify PDF | Render success, warning, no-op, and large-scope reports; inspect every page for clipping, overflow, sparse layouts, charts, and branding. | R8.6 |
@@ -184,6 +184,13 @@ R8.2 fact adapters, cross-section validation, and bounded deterministic JSON in
 `reports.py`, with public API/contract/README updates. Verified focused
 `18 passed`; full package `530 passed, 3 skipped`; wheel/sdist build, public
 import, wheel contents, and `git diff --check`.
+
+Done: 2026-08-22 — added Core-backed durable JSON storage in
+`report_storage.py`, exact run/date keys, logical names, metadata allowlist,
+active-run validation, Core dependency, public API, docs, and tests. Verified
+focused `11 passed`; full package `541 passed, 16 skipped`; Poetry lock/check,
+`pip check`, wheel/sdist dependency/content and public import, compilation,
+88-column scan, and `git diff --check`.
 
 ---
 

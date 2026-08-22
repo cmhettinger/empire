@@ -8,6 +8,7 @@ packages = [{ include = "empire_stonks_tech_indicators", from = "src" }]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
+empire-core = { path = "../empire-core" }
 numpy = "2.4.6"
 TA-Lib = "0.7.1"
 
@@ -20,4 +21,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "../empire-core/src"]

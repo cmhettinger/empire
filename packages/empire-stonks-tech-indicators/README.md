@@ -11,8 +11,9 @@ package boundary; later tasks add those capabilities incrementally.
 
 ## Runtime contract
 
-The initial package version is `0.1.0` and supports Python `>=3.11,<4.0`. Its
-only runtime dependencies are the exact calculation pair frozen by B1.1:
+The initial package version is `0.1.0` and supports Python `>=3.11,<4.0`. It
+depends on `empire-core` for the injected R8.4 object-storage boundary and on
+the exact calculation pair frozen by B1.1:
 
 ```text
 numpy==2.4.6
@@ -74,10 +75,10 @@ introduced only by their assigned implementation tasks.
 The V1 domain report facts are frozen in the
 [report schema contract](../../docs/stonks/tech-indicators-report-schema-v1.md).
 It defines one bounded, secret-safe immutable fact shape shared by daily and
-backfill JSON/PDF outputs. R8.2 supplies count-only database facts and R8.3
-provides immutable typed report models plus deterministic JSON rendering. Core
-storage, PDF presentation, runners, CLIs, and Airflow remain owned by their
-later tasks.
+backfill JSON/PDF outputs. R8.2 supplies count-only database facts, R8.3
+provides immutable typed report models plus deterministic JSON rendering, and
+R8.4 stores durable JSON through an injected Empire Core object store. PDF
+presentation, runners, CLIs, and Airflow remain owned by their later tasks.
 
 ## Public API
 
@@ -200,6 +201,10 @@ The immutable domain-model API consists of:
   with runner-owned eligible/evaluated counts without payload serialization
 - `make_report_diagnostic_samples()` for stable bounded sample ordering and
   `render_tech_indicators_report_json()` for compact sorted UTF-8 JSON
+- `build_tech_indicators_report_object_key()`,
+  `tech_indicators_report_metadata()`, and
+  `store_tech_indicators_json_report()` for the validated durable Core JSON
+  boundary
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -582,3 +587,14 @@ newline, rejects non-finite or unsupported values, and enforces the 2 MiB
 artifact limit. Fixed phase, reason, issue-message, diagnostic-message, and
 provider-native disclosure vocabularies are exported for later package-owned
 runners and the paired PDF renderer.
+
+JSON storage accepts only an active Core `RunContext`, `ObjectStore`, validated
+`TechIndicatorsConfig`, and immutable `TechIndicatorsReport`. The report and
+Core run must agree on run ID, daily/backfill job, subject key, and effective
+date. Storage uses the configured `stonks/tech-indicators` prefix, `global`
+root, run/date-partitioned `reports` key, `report.json`, workflow-specific
+logical name, `stonks_tech_indicators_report`, and `application/json`. The
+artifact has no expiration or overwrite behavior. Its metadata is exactly the
+nine-field schema/report/workflow/outcome/date/version/scope/publication/time
+allowlist; Core remains authoritative for object ID, run relationship, byte
+size, and checksum.
