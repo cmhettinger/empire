@@ -67,6 +67,16 @@ from empire_stonks_tech_indicators.queries import (
     resolve_spx_benchmark,
     select_eligible_listings,
 )
+from empire_stonks_tech_indicators.reporting_queries import (
+    REPORT_FEATURE_FIELDS,
+    ReportBenchmarkCoverage,
+    ReportDatabaseSummary,
+    ReportDateCoverage,
+    ReportDimensionCoverage,
+    ReportFeatureCoverage,
+    ReportVersionCoverage,
+    select_report_database_summary,
+)
 from empire_stonks_tech_indicators.readiness import (
     EODDATA_DAILY_JOB_NAME,
     SourceReadinessDecision,
@@ -505,6 +515,13 @@ __all__ = [
     "PublishedModelInputRow",
     "PublishedModelInputSnapshot",
     "PublishedReadinessToken",
+    "REPORT_FEATURE_FIELDS",
+    "ReportBenchmarkCoverage",
+    "ReportDatabaseSummary",
+    "ReportDateCoverage",
+    "ReportDimensionCoverage",
+    "ReportFeatureCoverage",
+    "ReportVersionCoverage",
     "assemble_feature_rows",
     "calculate_aligned_returns",
     "calculate_spx_beta",
@@ -536,6 +553,7 @@ __all__ = [
     "select_published_feature_coverage",
     "select_published_feature_freshness",
     "select_published_feature_ranking",
+    "select_report_database_summary",
     "select_eligible_listings",
     "validate_feature_rows",
     "FeatureRowKey",

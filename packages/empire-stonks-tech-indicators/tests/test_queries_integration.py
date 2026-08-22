@@ -22,6 +22,7 @@ from empire_stonks_tech_indicators import (
     select_published_feature_coverage,
     select_published_feature_freshness,
     select_published_feature_ranking,
+    select_report_database_summary,
 )
 
 
@@ -164,7 +165,7 @@ def _publish_drifted_state(
     first_date: date,
     drift_date: date,
     marker: str,
-) -> None:
+) -> UUID:
     cursor.execute(  # type: ignore[union-attr]
         """
         INSERT INTO stonks.ohlcv_daily_tech_indicators_a (
@@ -377,6 +378,7 @@ def _publish_drifted_state(
         """,
         (publication_id, provider_listing_id),
     )
+    return publication_id
 
 
 def test_published_coverage_and_ranking_read_only_the_active_view(
@@ -434,6 +436,73 @@ def test_published_coverage_and_ranking_read_only_the_active_view(
     assert len(ranking) == 1
     assert ranking[0].provider_listing_id == listing_id
     assert ranking[0].feature_value == 0
+
+
+def test_report_database_summary_aggregates_published_rows_in_postgresql(
+    database_connection: object,
+) -> None:
+    marker = uuid4().hex[:12].upper()
+    first_date = date(2026, 1, 2)
+    effective_date = date(2026, 1, 5)
+
+    with database_connection.cursor() as cursor:  # type: ignore[union-attr]
+        listing_id = _insert_listing(
+            cursor,
+            provider_code="EODDATA",
+            market="NASDAQ",
+            ticker=f"R82{marker}",
+            metadata_json='{"type": "Equity"}',
+        )
+        _insert_bar(cursor, listing_id, first_date)
+        _insert_bar(cursor, listing_id, effective_date)
+        publication_id = _publish_drifted_state(
+            cursor,
+            provider_listing_id=listing_id,
+            first_date=first_date,
+            drift_date=effective_date,
+            marker=f"r82:{marker}",
+        )
+
+        summary = select_report_database_summary(
+            cursor=cursor,
+            scope=TechIndicatorsScope(provider_listing_ids=(listing_id,)),
+            effective_date=effective_date,
+        )
+        candidate = select_report_database_summary(
+            cursor=cursor,
+            scope=TechIndicatorsScope(provider_listing_ids=(listing_id,)),
+            effective_date=effective_date,
+            publication_id=publication_id,
+        )
+
+    assert summary.selected_listing_count == 1
+    assert summary.source_row_count == 2
+    assert summary.payload_row_count == 2
+    assert summary.published_row_count == 2
+    assert candidate.payload_row_count == summary.payload_row_count
+    assert candidate.published_row_count == summary.published_row_count
+    assert candidate.features == summary.features
+    assert summary.dates.effective_date_source_rows == 1
+    assert summary.dates.effective_date_payload_rows == 1
+    assert summary.dates.effective_date_published_rows == 1
+    assert tuple(item.calculation_version for item in summary.versions) == (
+        "TECH_INDICATORS_OLD",
+        "TECH_INDICATORS_V1",
+    )
+    assert summary.providers[0].code == "EODDATA"
+    assert summary.markets[0].code == "NASDAQ"
+    assert summary.instrument_types[0].code == "UNKNOWN"
+    assert summary.benchmark.supported_listing_count == 1
+    assert summary.benchmark.benchmark_unlinked_row_count == 2
+    rsi = next(item for item in summary.features if item.feature_name == "rsi_14")
+    assert rsi.null_count == 2
+    assert rsi.warmup_null_count == 1
+    assert rsi.unexpected_null_count == 1
+    relative = next(
+        item for item in summary.features if item.feature_name == "rel_spx"
+    )
+    assert relative.unsupported_null_count == 0
+    assert relative.dependency_null_count == 2
 
 
 def test_model_input_empty_scope_fails_closed_in_owned_database_snapshot(

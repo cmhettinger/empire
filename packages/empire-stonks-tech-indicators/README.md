@@ -543,3 +543,24 @@ the production payload slots. Its million-row result retains the 5,000-row
 write default and both existing indexes. Future wide payload-history readers
 should keyset-page at 1,000 rows; the independently measured narrow source
 reader remains at 10,000.
+
+Report construction uses `select_report_database_summary(...)` with an injected
+cursor and the same `TechIndicatorsScope` as calculation. With no publication
+ID it summarizes the active published view; a publication ID instead selects
+that publication's normalized `PRESENT` A/B membership image, including a
+`BUILDING` or `PREPARED` candidate. The immutable result contains only complete
+provider, market, instrument-type, date, calculation-version, feature-null,
+and benchmark counts. It never returns or serializes OHLCV or feature values,
+and the caller retains transaction ownership.
+
+Feature coverage includes all 76 V1 analytical fields in profile order and
+enforces both report count equations. Unsupported SPX subjects take precedence
+over warm-up; expected denominator, variance, missing-volume, and exact-date
+alignment gaps are dependencies; guaranteed post-warm-up fields record a null
+as unexpected. Benchmark completeness uses populated intersections for the
+20-, 60-, and 252-observation multi-field families and the corresponding
+single persisted field for 50, 63, and 126 observations. The repeatable R8.2
+plan probe and evidence are
+[`tools/tech-indicators/report-summary-benchmark.py`](../../tools/tech-indicators/report-summary-benchmark.py)
+and
+[`docs/stonks/tech-indicators-report-summary-evidence-r8.2.md`](../../docs/stonks/tech-indicators-report-summary-evidence-r8.2.md).
