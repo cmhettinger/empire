@@ -66,7 +66,13 @@ class PdfRenderer:
         out_path: Path | None = None,
         templates: TemplateRegistry | None = None,
         header_footer: HeaderFooterSpec | None = None,
+        maximum_pages: int | None = None,
+        maximum_bytes: int | None = None,
     ) -> RenderResult:
+        if maximum_pages is not None and maximum_pages <= 0:
+            raise ValueError("maximum_pages must be positive.")
+        if maximum_bytes is not None and maximum_bytes <= 0:
+            raise ValueError("maximum_bytes must be positive.")
         resolved_path = out_path or default_output_path(
             context=self.context,
             metadata=self.metadata,
@@ -84,6 +90,18 @@ class PdfRenderer:
             ),
         )
         build_pdf(doc=doc, story=story, out_path=resolved_path, branding=self.branding)
+        page_count = int(doc.page)
+        byte_count = resolved_path.stat().st_size
+        if maximum_pages is not None and page_count > maximum_pages:
+            resolved_path.unlink(missing_ok=True)
+            raise ValueError(
+                f"Rendered PDF has {page_count} pages; limit is {maximum_pages}."
+            )
+        if maximum_bytes is not None and byte_count > maximum_bytes:
+            resolved_path.unlink(missing_ok=True)
+            raise ValueError(
+                f"Rendered PDF has {byte_count} bytes; limit is {maximum_bytes}."
+            )
         artifact = ReportArtifact(
             path=resolved_path,
             output_format=OutputFormat.PDF,

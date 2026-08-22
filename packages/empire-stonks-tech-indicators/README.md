@@ -82,8 +82,12 @@ and methodology language, is frozen in the
 [PDF design contract](../../docs/stonks/tech-indicators-pdf-design-v1.md).
 R8.2 supplies count-only database facts, R8.3 provides immutable typed report
 models plus deterministic JSON rendering, and R8.4 stores durable JSON through
-an injected Empire Core object store. PDF rendering, runners, CLIs, and Airflow
-remain owned by their later tasks.
+an injected Empire Core object store. R8.6 renders those same facts through
+`render_tech_indicators_report_pdf(...)` with shared `empire-reports` branding,
+cover/disclaimer and page templates. The package-owned PDF uses deterministic
+tables, a directly labeled feature-family chart, bounded exception/diagnostic
+rows, explicit empty states, and hard 25-page/5-MiB output checks. PDF storage,
+runners, CLIs, and Airflow remain owned by their later tasks.
 
 ## Public API
 
@@ -210,6 +214,10 @@ The immutable domain-model API consists of:
   `tech_indicators_report_metadata()`, and
   `store_tech_indicators_json_report()` for the validated durable Core JSON
   boundary
+- `TECH_INDICATORS_PDF_FEATURE_FAMILIES`,
+  `roll_up_pdf_feature_coverage()`, and
+  `render_tech_indicators_report_pdf()` for the bounded professional PDF
+  companion rendered from the same immutable report facts
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;

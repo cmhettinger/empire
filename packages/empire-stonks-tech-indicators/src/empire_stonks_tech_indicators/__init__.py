@@ -138,6 +138,17 @@ from empire_stonks_tech_indicators.report_storage import (
     store_tech_indicators_json_report,
     tech_indicators_report_metadata,
 )
+from empire_stonks_tech_indicators.report_pdf import (
+    PDF_DIAGNOSTIC_SAMPLE_LIMIT,
+    PDF_FEATURE_EXCEPTION_LIMIT,
+    PDF_LISTING_SAMPLE_LIMIT,
+    PDF_MAXIMUM_BYTES,
+    PDF_MAXIMUM_PAGES,
+    PdfFeatureFamilyCoverage,
+    TECH_INDICATORS_PDF_FEATURE_FAMILIES,
+    render_tech_indicators_report_pdf,
+    roll_up_pdf_feature_coverage,
+)
 from empire_stonks_tech_indicators.readiness import (
     EODDATA_DAILY_JOB_NAME,
     SourceReadinessDecision,
@@ -593,6 +604,15 @@ __all__ = [
     "build_tech_indicators_report_object_key",
     "store_tech_indicators_json_report",
     "tech_indicators_report_metadata",
+    "PDF_DIAGNOSTIC_SAMPLE_LIMIT",
+    "PDF_FEATURE_EXCEPTION_LIMIT",
+    "PDF_LISTING_SAMPLE_LIMIT",
+    "PDF_MAXIMUM_BYTES",
+    "PDF_MAXIMUM_PAGES",
+    "PdfFeatureFamilyCoverage",
+    "TECH_INDICATORS_PDF_FEATURE_FAMILIES",
+    "render_tech_indicators_report_pdf",
+    "roll_up_pdf_feature_coverage",
     "BACKFILL_CORE_JOB_NAME",
     "BACKFILL_REPORT_ID",
     "BENCHMARK_CONTRACT_VERSION",

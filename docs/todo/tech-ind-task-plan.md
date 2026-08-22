@@ -158,7 +158,7 @@ Goal: make every run operationally inspectable before production runners.
 | R8.3 | [x] | Build JSON report | Produce deterministic versioned JSON for success, warning, no-op, resumed/partial backfill, and failure. | R8.1-R8.2 |
 | R8.4 | [x] | Store JSON report | Store durable `report.json` through Core with approved kind, logical name, metadata, retention, and run relationship. | R8.3 |
 | R8.5 | [x] | Design professional PDF | Define Empire cover/disclaimer, status, scope, coverage, formula/library versions, benchmark health, quality, performance, warnings, and methodology without recommendations. | R8.1-R8.3 |
-| R8.6 | [ ] | Implement PDF renderer | Use reusable `empire-reports` components, bounded tables/charts, deterministic pagination, and accessible labels. | R8.5 |
+| R8.6 | [x] | Implement PDF renderer | Use reusable `empire-reports` components, bounded tables/charts, deterministic pagination, and accessible labels. | R8.5 |
 | R8.7 | [ ] | Visually verify PDF | Render success, warning, no-op, and large-scope reports; inspect every page for clipping, overflow, sparse layouts, charts, and branding. | R8.6 |
 | R8.8 | [ ] | Store PDF report | Store durable `report.pdf` with matching Core lineage/metadata and prove JSON/PDF facts agree. | R8.4, R8.7 |
 
@@ -199,6 +199,15 @@ language, bounded diagnostics, compaction, and methodology in
 contracts and package README. Verified contract mapping (76 unique fields, 10
 families, 5 outcomes), links (4 files), tech report/storage tests (`22 passed`),
 shared PDF/branding/contracts tests (`10 passed`), and `git diff --check`.
+
+Done: 2026-08-22 — added the typed professional renderer in `report_pdf.py`,
+ten-family chart/table rollups, bounded exceptions/diagnostics, fixed outcome
+and methodology language, public API/dependency wiring, and reusable page/byte
+bounds plus long-title fitting in `empire-reports`. Verified tech package `550
+passed, 16 skipped`; reports package `21 passed`; wheel/sdist build, dependency
+metadata/content, public import, compileall, Poetry lock/check, `pip check`, and
+`git diff --check`; rendered and inspected an 11-page, 174,224-byte PASS PDF
+with nine numbered/headered body pages.
 
 ---
 

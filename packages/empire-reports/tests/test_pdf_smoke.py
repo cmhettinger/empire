@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+import pytest
 from reportlab.platypus import PageBreak
 
 from empire_reports.contracts import RenderContext, ReportMetadata
@@ -76,6 +77,34 @@ def test_professional_title_page_without_date(tmp_path: Path) -> None:
     artifact = result.primary_artifact
     assert artifact.exists
     assert artifact.resolved_path().stat().st_size > 500
+
+
+def test_pdf_renderer_enforces_page_and_byte_bounds(tmp_path: Path) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(report_id="bounded", title="Bounded Report"),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    page_path = tmp_path / "too-many-pages.pdf"
+    with pytest.raises(ValueError, match="2 pages; limit is 1"):
+        renderer.render(
+            [
+                paragraph("One", styles=renderer.styles),
+                PageBreak(),
+                paragraph("Two", styles=renderer.styles),
+            ],
+            out_path=page_path,
+            maximum_pages=1,
+        )
+    assert not page_path.exists()
+
+    byte_path = tmp_path / "too-many-bytes.pdf"
+    with pytest.raises(ValueError, match="bytes; limit is 1"):
+        renderer.render(
+            [paragraph("One", styles=renderer.styles)],
+            out_path=byte_path,
+            maximum_bytes=1,
+        )
+    assert not byte_path.exists()
 
 
 def test_professional_disclaimer_page_uses_brand_assets(tmp_path: Path) -> None:

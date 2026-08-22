@@ -578,7 +578,7 @@ class ProfessionalLetterTitlePage(Flowable):
             theme.display_font,
             title_size,
             title_max_width,
-            minimum=28.0,
+            minimum=16.0,
         )
         canvas.setFillColor(theme.primary)
         canvas.setFont(theme.display_font, fitted_title_size)

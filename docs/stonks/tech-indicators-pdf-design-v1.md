@@ -85,7 +85,7 @@ The first body page repeats a smaller use-limitation callout:
 > no investment advice, target, ranking, strategy, or trading recommendation.
 > Values remain provider-native and may not be comparable across providers.
 
-Body headers add the exact effective date for daily and `start_date – end_date`
+Body headers add the exact effective date for daily and `start_date - end_date`
 for backfill. Body footers number content pages starting at 1 after the two
 front-matter pages. Every page repeats the classification.
 
@@ -97,8 +97,8 @@ label or value directly and use this palette:
 | `PASS` | green plus visible `PASS` |
 | `WARN` | amber plus visible `WARN` |
 | `NO_OP` | slate blue plus visible `NO OP` |
-| `PARTIAL` | amber plus visible `PARTIAL — UNPUBLISHED` |
-| `FAIL` | Empire red plus visible `FAIL — UNPUBLISHED` |
+| `PARTIAL` | amber plus visible `PARTIAL - UNPUBLISHED` |
+| `FAIL` | Empire red plus visible `FAIL - UNPUBLISHED` |
 
 Tables repeat header rows after a page break. They use a minimum 8-point font,
 wrapped cells, alternating neutral row fills, and left-aligned text except
@@ -292,7 +292,7 @@ reason, publication-readiness reason, then coverage anomaly; this prevents
 duplicate rows from consuming the bounds.
 
 Sample columns are ID, code, provider/market/ticker, listing UUID, date, field,
-and fixed message. Null cells display an em dash. No feature value, OHLCV,
+and fixed message. Null cells display `-`. No feature value, OHLCV,
 formula input, raw exception, SQL, or arbitrary source text is added.
 
 ## Methodology And Provider-Native Disclosures
