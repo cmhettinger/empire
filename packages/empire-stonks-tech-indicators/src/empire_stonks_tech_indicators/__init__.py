@@ -25,6 +25,13 @@ from empire_stonks_tech_indicators.models import (
     TechIndicatorsScope,
     TechIndicatorsSummary,
 )
+from empire_stonks_tech_indicators.persistence import (
+    FeatureRowKey,
+    SlotWriteCounts,
+    TechIndicatorsPayloadSlot,
+    copy_feature_rows_between_slots,
+    upsert_feature_rows,
+)
 from empire_stonks_tech_indicators.queries import (
     BenchmarkHistory,
     EligibleListing,
@@ -461,6 +468,11 @@ __all__ = [
     "resolve_spx_benchmark",
     "select_eligible_listings",
     "validate_feature_rows",
+    "FeatureRowKey",
+    "SlotWriteCounts",
+    "TechIndicatorsPayloadSlot",
+    "copy_feature_rows_between_slots",
+    "upsert_feature_rows",
     "FeatureCounts",
     "FeatureRow",
     "ReasonCount",

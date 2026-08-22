@@ -156,8 +156,8 @@ preserving caller transaction ownership.
 |----|--------|------|---------------|------------|
 | W7.1 | [x] | Add strict row validation | Validate finite values, copied source, bounds, warm-up nulls, dependencies, benchmark, observation counts, and generated inputs before SQL. | C4.8, T5.8, X6.8 |
 | W7.2 | [x] | Assemble complete rows | Merge core, TA-Lib, and SPX outputs without positional drift; every V1 field is intentionally populated or null. | W7.1 |
-| W7.3 | [ ] | Implement slot bulk upsert | Write bounded active/inactive-slot batches, omit generated columns, preserve copied-equivalent rows, count inserted/updated/unchanged, and avoid no-change updates. | S2.5, W7.2 |
-| W7.4 | [ ] | Persist optional recurrence state | If S2.2 approved state, write it atomically and prevent advancement without its feature row; otherwise record no writer is needed. | S2.2, W7.3 |
+| W7.3 | [x] | Implement slot bulk upsert | Write bounded active/inactive-slot batches, omit generated columns, preserve copied-equivalent rows, count inserted/updated/unchanged, and avoid no-change updates. | S2.5, W7.2 |
+| W7.4 | [x] | Persist optional recurrence state | If S2.2 approved state, write it atomically and prevent advancement without its feature row; otherwise record no writer is needed. | S2.2, W7.3 |
 | W7.5 | [ ] | Implement affected-range planner | Convert missing rows, source/SPX corrections, and version drift into deterministic work ranges with required prefix and suffix propagation. | I3.5, X6.7, W7.3-W7.4 |
 | W7.6 | [ ] | Prove rebuild equivalence | Compare full rebuild, append, resume, source correction, SPX correction, and version rebuild within approved tolerance. | B1.2, W7.3-W7.5 |
 | W7.7 | [ ] | Add published feature queries | Add view-backed date/listing coverage, freshness, version, benchmark, ranking, readiness-token, and one-snapshot model-input reads without strategy thresholds. | S2.4, W7.3 |
@@ -182,6 +182,25 @@ expected Core-runtime skip. Poetry lock, `pip check`, compileall, pinned
 runtime smoke, wheel/sdist build and isolated lazy wheel import,
 88-column/whitespace/`git diff --check`, Flyway validation of 39 migrations,
 and the technical schema contract with 64 expected failures passed.
+
+Done: 2026-08-22 — added bounded A/B-slot `MERGE` upserts and exact
+copied-equivalent slot transfers in
+`empire_stonks_tech_indicators/persistence.py`, public API/README integration,
+and focused unit/PostgreSQL coverage. Focused pytest passed 16; package pytest
+passed 472 with 2 expected Core-runtime skips; the rollback-only PostgreSQL
+integration passed 1. Poetry lock, `pip check`, compileall, pinned runtime
+smoke, wheel/sdist build and isolated wheel import,
+88-column/whitespace/`git diff --check`, Flyway validation of 39 migrations,
+and the technical schema contract with 64 expected failures passed.
+
+Done: 2026-08-22 — recorded the ratified B1.2/S2.2 V1 no-recurrence-state
+decision in the package README; no state model, table, configuration, or writer
+is required or added. The 20,000-row typical/high-offset equivalence prototype
+passed with full-prefix output equivalent and bounded replay rejected across
+EMA/RSI/ATR/ADX/MACD. Package pytest passed 472 with 2 expected Core-runtime
+skips; Flyway validated 39 migrations, the schema contract passed with 64
+expected failures and an absent state relation, repository scans found no
+state writer/schema, and `git diff --check` passed.
 
 ---
 

@@ -29,6 +29,11 @@ earliest eligible observation through the safe run horizon, then compare or
 write only the affected suffix. Fixed bounded replay and persisted recurrence
 state are not part of V1. See the
 [recursive-equivalence decision](../../docs/stonks/tech-indicators-recursive-equivalence-v1.md).
+Consequently, V1 intentionally has no recurrence-state model, table,
+configuration, or writer. Feature-row persistence is the only calculation
+state mutation, so no independent mathematical checkpoint can advance without
+its corresponding feature row. Publication resume cursors track workflow
+progress only and must never be treated as TA-Lib recurrence state.
 
 Live input paging, query-plan, transaction, cancellation, and RSS verification
 is provided by `tools/tech-indicators/large-read-smoke.py`; its representative
@@ -153,10 +158,27 @@ The immutable domain-model API consists of:
   bounds, benchmark lineage, and all generated-column inputs
 - `assemble_feature_rows()` for deterministic source/core/TA-Lib/SPX
   composition into the exact validated 65-column package-write payload
+- `TechIndicatorsPayloadSlot`, `SlotWriteCounts`, and
+  `upsert_feature_rows()` for bounded caller-transaction-owned bulk writes to
+  an explicit physical slot with tolerance-aware no-change handling
+- `FeatureRowKey` and `copy_feature_rows_between_slots()` for fail-closed,
+  exact slot-to-slot copies that retain source calculation and lifecycle fields
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
 reports and run results never embed source or feature-row collections.
+
+Each slot-write call accepts at most 25,000 unique natural keys and uses
+1,000-10,000-row batches; callers must keep the complete transaction within the
+same 25,000-row hard ceiling. Recalculation upserts omit generated and lifecycle
+columns on insert, set `updated_at` to the candidate calculation time only for
+a materially changed row, and preserve the stored run and timestamps for a
+numerically equivalent candidate. Slot copies require every requested source
+row and copy the exact 65-column payload plus `created_at` and `updated_at`.
+Copied rows report as unchanged/equivalent even when populating or repairing an
+inactive physical slot; they are never counted as recalculation writes.
+Both APIs leave commit, rollback, cursor lifetime, and transaction isolation to
+the caller.
 
 Callers may catch the package base or the narrow category they can handle. The
 public exceptions contain no TA-Lib values, SQL, database-driver exceptions,
