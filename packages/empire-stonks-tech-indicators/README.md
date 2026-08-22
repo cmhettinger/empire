@@ -148,6 +148,9 @@ The immutable domain-model API consists of:
   set-based current-source versus published-state drift facts
 - `SourceReadinessDecision` and `decide_source_readiness()` for same-date
   OHLCV, SPX, and successful-source evidence decisions
+- `validate_feature_rows()` for strict full-prefix, pre-SQL validation of
+  copied source values, observation counts, warm-up/null masks, formulas,
+  bounds, benchmark lineage, and all generated-column inputs
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -386,6 +389,18 @@ EODData evidence requires zero hard failures and missing exchange sessions;
 Yahoo evidence must represent the full seeded universe or explicitly include
 `SPX`, while exact SPX OHLCV coverage remains independently required whenever
 the selected effective date contains supported subject bars.
+
+Feature-row validation accepts one complete chronological row image plus its
+independent normalized source prefix and eligible-listing facts. It freshly
+calculates every V1 family, requires exact copied `Decimal` source values and
+chronological observation counts, compares every populated float under the
+frozen absolute/relative tolerance, and requires every warm-up or dependency
+null to match. Supported subjects require the resolved SPX UUID on every row;
+unsupported subjects require null benchmark lineage and all 11 SPX values.
+Before persistence, the validator also evaluates all 23 PostgreSQL-generated
+expressions from the proposed 65-column row inputs with the frozen exact-zero
+and SQL evaluation-order rules. Validation never writes SQL or weakens the
+database constraints.
 
 ## Development
 

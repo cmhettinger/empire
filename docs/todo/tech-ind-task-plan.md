@@ -154,7 +154,7 @@ preserving caller transaction ownership.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| W7.1 | [ ] | Add strict row validation | Validate finite values, copied source, bounds, warm-up nulls, dependencies, benchmark, observation counts, and generated inputs before SQL. | C4.8, T5.8, X6.8 |
+| W7.1 | [x] | Add strict row validation | Validate finite values, copied source, bounds, warm-up nulls, dependencies, benchmark, observation counts, and generated inputs before SQL. | C4.8, T5.8, X6.8 |
 | W7.2 | [ ] | Assemble complete rows | Merge core, TA-Lib, and SPX outputs without positional drift; every V1 field is intentionally populated or null. | W7.1 |
 | W7.3 | [ ] | Implement slot bulk upsert | Write bounded active/inactive-slot batches, omit generated columns, preserve copied-equivalent rows, count inserted/updated/unchanged, and avoid no-change updates. | S2.5, W7.2 |
 | W7.4 | [ ] | Persist optional recurrence state | If S2.2 approved state, write it atomically and prevent advancement without its feature row; otherwise record no writer is needed. | S2.2, W7.3 |
@@ -164,6 +164,15 @@ preserving caller transaction ownership.
 | W7.8 | [ ] | Add PostgreSQL integration | Cover slot/view visibility, rollback, generated values, idempotency, correction propagation, provider/benchmark isolation, and repeated runs. | W7.3-W7.7 |
 | W7.9 | [ ] | Benchmark persistence | Measure batches, upserts, index cost, memory, and latest-date latency; adjust only with evidence against P0.8. | P0.8, W7.8 |
 | W7.10 | [ ] | Implement atomic publication | Implement P0.9's bounded in-place finalizer, inactive-slot build/membership flip, recovery, and fail-closed readiness/model-input queries; prove readers never observe partial dates, mixed versions, incomplete benchmark output, or failed/cancelled work. | P0.9, S2.5, W7.3-W7.6 |
+
+Done: 2026-08-22 — added public full-prefix pre-SQL row validation in
+`empire_stonks_tech_indicators/validation.py`, lazy export/README guidance,
+and focused coverage in `tests/test_validation.py`. Focused pytest passed 14;
+package pytest passed 447 with 1 expected Core-runtime skip. Poetry lock,
+`pip check`, compileall, pinned runtime smoke, wheel/sdist build and isolated
+lazy wheel import, 88-column/whitespace/`git diff --check`, Flyway validation
+of 39 migrations, and the technical schema contract with 64 expected failures
+passed.
 
 ---
 

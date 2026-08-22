@@ -127,6 +127,7 @@ if TYPE_CHECKING:
         TALibAdapter,
         TALibRuntimeInfo,
     )
+    from empire_stonks_tech_indicators.validation import validate_feature_rows
 
 
 def __getattr__(name: str) -> object:
@@ -382,6 +383,11 @@ def __getattr__(name: str) -> object:
         }
         globals().update(exports)
         return exports[name]
+    if name == "validate_feature_rows":
+        from empire_stonks_tech_indicators.validation import validate_feature_rows
+
+        globals()[name] = validate_feature_rows
+        return validate_feature_rows
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
@@ -447,6 +453,7 @@ __all__ = [
     "normalize_source_bars",
     "resolve_spx_benchmark",
     "select_eligible_listings",
+    "validate_feature_rows",
     "FeatureCounts",
     "FeatureRow",
     "ReasonCount",

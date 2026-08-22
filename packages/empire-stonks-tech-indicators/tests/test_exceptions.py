@@ -87,6 +87,7 @@ def test_public_api_is_explicit() -> None:
         "normalize_source_bars",
         "resolve_spx_benchmark",
         "select_eligible_listings",
+        "validate_feature_rows",
         "FeatureCounts",
         "FeatureRow",
         "ReasonCount",
