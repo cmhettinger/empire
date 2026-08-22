@@ -210,7 +210,7 @@ def _generated_values(
     return values
 
 
-def _series_values(
+def _calculate_expected_feature_state(
     calculation_arrays: CalculationArrays,
     *,
     subject: EligibleListing,
@@ -328,32 +328,13 @@ def _validate_bounds(row: FeatureRow) -> None:
         _fail(row, "up and down streaks cannot both be positive")
 
 
-def validate_feature_rows(
+def _validate_feature_rows_against_state(
     rows: Sequence[FeatureRow],
     *,
     calculation_arrays: CalculationArrays,
     subject: EligibleListing,
-    benchmark_history: BenchmarkHistory | None = None,
+    expected_state: _ExpectedFeatureState,
 ) -> None:
-    """Validate one complete chronological feature image before persistence.
-
-    The row sequence must cover the same full source prefix as
-    ``calculation_arrays``. Every package-written field is checked against a
-    fresh V1 calculation, and every PostgreSQL-generated expression is
-    evaluated from the proposed row inputs before any SQL is allowed.
-    """
-
-    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
-        raise TypeError("rows must be a sequence of FeatureRow records.")
-    if not isinstance(calculation_arrays, CalculationArrays):
-        raise TypeError("calculation_arrays must be CalculationArrays.")
-    if not isinstance(subject, EligibleListing):
-        raise TypeError("subject must be an EligibleListing.")
-    if benchmark_history is not None and not isinstance(
-        benchmark_history,
-        BenchmarkHistory,
-    ):
-        raise TypeError("benchmark_history must be a BenchmarkHistory or None.")
     if any(not isinstance(row, FeatureRow) for row in rows):
         raise TypeError("rows must contain only FeatureRow records.")
     if len(rows) != calculation_arrays.observation_count:
@@ -362,11 +343,6 @@ def validate_feature_rows(
         )
 
     _validate_subject(calculation_arrays, subject)
-    expected_state = _series_values(
-        calculation_arrays,
-        subject=subject,
-        benchmark_history=benchmark_history,
-    )
 
     for index, row in enumerate(rows):
         source = calculation_arrays.source_bars[index]
@@ -471,6 +447,45 @@ def validate_feature_rows(
                     "generated value must be non-negative",
                     field_name=field_name,
                 )
+
+
+def validate_feature_rows(
+    rows: Sequence[FeatureRow],
+    *,
+    calculation_arrays: CalculationArrays,
+    subject: EligibleListing,
+    benchmark_history: BenchmarkHistory | None = None,
+) -> None:
+    """Validate one complete chronological feature image before persistence.
+
+    The row sequence must cover the same full source prefix as
+    ``calculation_arrays``. Every package-written field is checked against a
+    fresh V1 calculation, and every PostgreSQL-generated expression is
+    evaluated from the proposed row inputs before any SQL is allowed.
+    """
+
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
+        raise TypeError("rows must be a sequence of FeatureRow records.")
+    if not isinstance(calculation_arrays, CalculationArrays):
+        raise TypeError("calculation_arrays must be CalculationArrays.")
+    if not isinstance(subject, EligibleListing):
+        raise TypeError("subject must be an EligibleListing.")
+    if benchmark_history is not None and not isinstance(
+        benchmark_history,
+        BenchmarkHistory,
+    ):
+        raise TypeError("benchmark_history must be a BenchmarkHistory or None.")
+    expected_state = _calculate_expected_feature_state(
+        calculation_arrays,
+        subject=subject,
+        benchmark_history=benchmark_history,
+    )
+    _validate_feature_rows_against_state(
+        rows,
+        calculation_arrays=calculation_arrays,
+        subject=subject,
+        expected_state=expected_state,
+    )
 
 
 __all__ = [

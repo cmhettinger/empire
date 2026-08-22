@@ -61,6 +61,7 @@ def test_public_api_is_explicit() -> None:
         "TALibRuntimeInfo",
         "VolumeLiquidityArrays",
         "YAHOO_DAILY_JOB_NAME",
+        "assemble_feature_rows",
         "calculate_aligned_returns",
         "calculate_spx_beta",
         "calculate_spx_correlation",

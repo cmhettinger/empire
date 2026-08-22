@@ -45,6 +45,7 @@ from empire_stonks_tech_indicators.state import (
 )
 
 if TYPE_CHECKING:
+    from empire_stonks_tech_indicators.assembly import assemble_feature_rows
     from empire_stonks_tech_indicators.arrays import (
         CalculationArrays,
         MaskedFloatArray,
@@ -131,6 +132,11 @@ if TYPE_CHECKING:
 
 
 def __getattr__(name: str) -> object:
+    if name == "assemble_feature_rows":
+        from empire_stonks_tech_indicators.assembly import assemble_feature_rows
+
+        globals()[name] = assemble_feature_rows
+        return assemble_feature_rows
     if name in {
         "CalculationArrays",
         "MaskedFloatArray",
@@ -427,6 +433,7 @@ __all__ = [
     "TALibRuntimeInfo",
     "VolumeLiquidityArrays",
     "YAHOO_DAILY_JOB_NAME",
+    "assemble_feature_rows",
     "calculate_aligned_returns",
     "calculate_spx_beta",
     "calculate_spx_correlation",

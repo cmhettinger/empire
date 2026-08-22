@@ -155,7 +155,7 @@ preserving caller transaction ownership.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | W7.1 | [x] | Add strict row validation | Validate finite values, copied source, bounds, warm-up nulls, dependencies, benchmark, observation counts, and generated inputs before SQL. | C4.8, T5.8, X6.8 |
-| W7.2 | [ ] | Assemble complete rows | Merge core, TA-Lib, and SPX outputs without positional drift; every V1 field is intentionally populated or null. | W7.1 |
+| W7.2 | [x] | Assemble complete rows | Merge core, TA-Lib, and SPX outputs without positional drift; every V1 field is intentionally populated or null. | W7.1 |
 | W7.3 | [ ] | Implement slot bulk upsert | Write bounded active/inactive-slot batches, omit generated columns, preserve copied-equivalent rows, count inserted/updated/unchanged, and avoid no-change updates. | S2.5, W7.2 |
 | W7.4 | [ ] | Persist optional recurrence state | If S2.2 approved state, write it atomically and prevent advancement without its feature row; otherwise record no writer is needed. | S2.2, W7.3 |
 | W7.5 | [ ] | Implement affected-range planner | Convert missing rows, source/SPX corrections, and version drift into deterministic work ranges with required prefix and suffix propagation. | I3.5, X6.7, W7.3-W7.4 |
@@ -173,6 +173,15 @@ package pytest passed 447 with 1 expected Core-runtime skip. Poetry lock,
 lazy wheel import, 88-column/whitespace/`git diff --check`, Flyway validation
 of 39 migrations, and the technical schema contract with 64 expected failures
 passed.
+
+Done: 2026-08-22 — added public single-pass complete-row assembly in
+`empire_stonks_tech_indicators/assembly.py`, shared immutable calculation-state
+validation, lazy export/README guidance, and `tests/test_assembly.py`. Focused
+assembly/validation/API pytest passed 30; package pytest passed 456 with 1
+expected Core-runtime skip. Poetry lock, `pip check`, compileall, pinned
+runtime smoke, wheel/sdist build and isolated lazy wheel import,
+88-column/whitespace/`git diff --check`, Flyway validation of 39 migrations,
+and the technical schema contract with 64 expected failures passed.
 
 ---
 

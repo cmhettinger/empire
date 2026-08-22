@@ -151,6 +151,8 @@ The immutable domain-model API consists of:
 - `validate_feature_rows()` for strict full-prefix, pre-SQL validation of
   copied source values, observation counts, warm-up/null masks, formulas,
   bounds, benchmark lineage, and all generated-column inputs
+- `assemble_feature_rows()` for deterministic source/core/TA-Lib/SPX
+  composition into the exact validated 65-column package-write payload
 
 `FeatureRow` excludes the 23 PostgreSQL-generated fields and the database-owned
 `created_at` and `updated_at` timestamps. Its JSON-ready form is fixed-size;
@@ -401,6 +403,15 @@ Before persistence, the validator also evaluates all 23 PostgreSQL-generated
 expressions from the proposed 65-column row inputs with the frozen exact-zero
 and SQL evaluation-order rules. Validation never writes SQL or weakens the
 database constraints.
+
+Feature-row assembly calculates every V1 family once for one normalized source
+prefix, maps all 53 Python-owned feature columns by name, attaches exact source
+copies, chronological counts, calculation/Core lineage, and the one resolved
+benchmark identity, then runs W7.1 validation against the same immutable
+calculation state before returning rows. The result is a tuple in source order;
+warm-up, missing-input, zero-denominator, zero-variance, and unsupported-SPX
+nulls remain explicit. Generated columns and database-owned timestamps never
+enter the returned write payload.
 
 ## Development
 
