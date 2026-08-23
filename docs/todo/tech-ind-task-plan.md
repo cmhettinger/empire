@@ -154,7 +154,7 @@ runtime services and explicit scope.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| J9.1 | [ ] | Add Core lifecycle | Start, heartbeat, succeed, fail, and summarize jobs with stable identity and no source/feature payloads in Core metadata. | P0.2, B1.6 |
+| J9.1 | [x] | Add Core lifecycle | Start, heartbeat, succeed, fail, and summarize jobs with stable identity and no source/feature payloads in Core metadata. | P0.2, B1.6 |
 | J9.2 | [ ] | Define daily scope | Add effective date, provider/market/listing filters, readiness, version, dry-run, and force semantics; reject ambiguity. | P0.7, I3.6, W7.5 |
 | J9.9 | [ ] | Add package-owned writer lock | Implement P0.10's single PostgreSQL transaction advisory lock on a dedicated connection; all mutating scopes share it, contention returns immediately without workflow state, heartbeats detect loss, terminal publication uses the lock connection, and every terminal path releases it. | P0.10, J9.1-J9.2 |
 | J9.3 | [ ] | Implement daily runner | Sequence lock acquisition, readiness, planning, calculation, validation, atomic publication, summaries, JSON/PDF storage, and Core completion. | W7.8, W7.10, R8.8, J9.1-J9.2, J9.9 |
@@ -163,6 +163,13 @@ runtime services and explicit scope.
 | J9.6 | [ ] | Implement resumable backfill | Process deterministic inactive-slot batches with independent commits, unpublished partial progress, heartbeats, reports, exact resume, and no duplicate work; flip membership only for a complete P0.9 unit. | W7.9-W7.10, R8.8, J9.1, J9.5, J9.9 |
 | J9.7 | [ ] | Add failure safety | Validation, DB, cancellation, report, and benchmark failures mark Core correctly, preserve only safely resumable unpublished chunks, roll back active work, never advance publication readiness, release locks, and expose safe errors. | J9.3-J9.6, J9.9 |
 | J9.8 | [ ] | Add vertical runner integration | Run append, no-op, correction, version rebuild, and resumed backfill through PostgreSQL, Core, JSON, and PDF with zero fixture residue. | J9.3-J9.7 |
+
+Done: 2026-08-23 — added immutable aggregate-only Core start/heartbeat/succeed/
+fail handling in `core_lifecycle.py`, public API/README guidance, and unit plus
+cleanup-safe PostgreSQL coverage. Focused lifecycle/API pytest passed 21; full
+package pytest passed 584. Poetry lock/dependency/compile checks, 88-column
+scan, wheel/sdist build and source/wheel imports, Flyway validation of 39
+migrations, zero Core fixture residue, and `git diff --check` passed.
 
 ---
 

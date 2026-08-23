@@ -68,9 +68,23 @@ constant, not an environment override. Non-secret examples live in
 Airflow service. Reusable package code never opens either environment file.
 
 The package does not own an internal migration runner. Empire Flyway
-migrations under `db/` own the eventual technical-indicator schema. Core run
-lifecycle, JSON/PDF reports, package commands, and Airflow orchestration are
-introduced only by their assigned implementation tasks.
+migrations under `db/` own the technical-indicator schema. Package commands
+and Airflow orchestration are introduced only by their assigned implementation
+tasks.
+
+`TechIndicatorsCoreRun` owns the reusable J9.1 Core lifecycle for the frozen
+daily and backfill jobs. `start()` validates the `stonks` domain, job,
+`all_series` subject, effective date, calculation version, Core run type, and a
+safe runtime identifier before creating workflow state. Each run uses a
+90-second Core heartbeat timeout; callers record a heartbeat at every batch
+boundary and at least every 30 seconds during calculation. `succeed()` accepts
+only `PASS`, `WARN`, or `NO_OP`; `fail()` accepts only `FAIL` or backfill-only
+`PARTIAL` and stores one fixed safe failure message. Both terminal paths use
+`build_tech_indicators_core_summary()` to retain aggregate work counts,
+bounded reason counts, heartbeat count, and optional report/publication UUIDs.
+Issue samples, source bars, feature rows/values, selectors, exception text,
+runner metadata, and listing-ID collections never enter Core parameters or
+summaries. J9.2 owns any future scoped subject identity beyond `all_series`.
 
 The V1 domain report facts are frozen in the
 [report schema contract](../../docs/stonks/tech-indicators-report-schema-v1.md).
@@ -165,6 +179,9 @@ The immutable domain-model API consists of:
 - `ReasonCount` and `FeatureCounts` for deterministic aggregate ledgers
 - `TechIndicatorsSummary` for counts and at most 100 issue samples
 - `TechIndicatorsRunResult` for compact runner output
+- `TechIndicatorsCoreRun` and `build_tech_indicators_core_summary()` for the
+  frozen daily/backfill Core start, heartbeat, success, failure, and
+  aggregate-only metadata boundary
 - `EligibleListing`, `select_eligible_listings()`, and
   `iter_source_bar_pages()` for caller-transaction-owned P0.6 selection and
   bounded chronological OHLCV reads
