@@ -156,6 +156,41 @@ def test_source_readiness_accepts_exact_coverage_and_same_date_evidence() -> Non
     )
 
 
+def test_source_readiness_reuses_pre_resolved_listing_scope() -> None:
+    listing = readiness_module.EligibleListing(
+        provider_listing_id=EODDATA_ID,
+        provider_code="EODDATA",
+        market="NASDAQ",
+        ticker="TEST",
+        instrument_type_code="COMMON_STOCK",
+        status="ACTIVE",
+        first_trading_date=None,
+        last_trading_date=None,
+        source_observation_count=0,
+    )
+    cursor = SequencedCursor(
+        [
+            [_benchmark_row()],
+            [],
+            [(EODDATA_DAILY_JOB_NAME, EODDATA_RUN_ID)],
+        ]
+    )
+
+    decision = decide_source_readiness(
+        cursor=cursor,
+        scope=TechIndicatorsScope(),
+        effective_date=EFFECTIVE_DATE,
+        benchmark_config=BenchmarkConfig(),
+        resolved_listings=(listing,),
+    )
+
+    assert decision.ready is True
+    assert len(cursor.executions) == 3
+    assert "FROM stonks.provider_listing AS listing" not in "".join(
+        sql for sql, _ in cursor.executions
+    )
+
+
 def test_source_readiness_reports_evidence_and_spx_coverage_failures() -> None:
     cursor = SequencedCursor(
         [

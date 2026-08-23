@@ -128,6 +128,7 @@ def _start(
     repository: FakeRunRepository,
     *,
     workflow_kind: WorkflowKind = WorkflowKind.DAILY,
+    subject_key: str = TECH_INDICATORS_DEFAULT_SUBJECT_KEY,
 ) -> TechIndicatorsCoreRun:
     return TechIndicatorsCoreRun.start(
         run_service=RunService(repository),
@@ -135,6 +136,7 @@ def _start(
         effective_date=EFFECTIVE_DATE,
         run_type="cli",
         runner="pytest",
+        subject_key=subject_key,
     )
 
 
@@ -252,6 +254,15 @@ def test_lifecycle_identity_is_immutable() -> None:
         lifecycle.workflow_kind = WorkflowKind.BACKFILL
 
 
+def test_lifecycle_accepts_canonical_scoped_subject() -> None:
+    repository = FakeRunRepository()
+    subject_key = f"scope:{'a' * 64}"
+
+    lifecycle = _start(repository, subject_key=subject_key)
+
+    assert lifecycle.run_context.subject_key == subject_key
+
+
 @pytest.mark.parametrize(
     ("kwargs", "error", "message"),
     [
@@ -260,6 +271,7 @@ def test_lifecycle_identity_is_immutable() -> None:
         ({"run_type": "cron"}, ValueError, "run_type"),
         ({"runner": "  "}, ValueError, "runner"),
         ({"subject_key": " all_series"}, ValueError, "subject_key"),
+        ({"subject_key": "scope:not-a-hash"}, ValueError, "subject_key"),
         ({"calculation_version": "TECH_INDICATORS_V2"}, ValueError, "V1"),
     ],
 )

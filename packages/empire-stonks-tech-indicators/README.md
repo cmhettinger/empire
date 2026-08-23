@@ -74,8 +74,9 @@ tasks.
 
 `TechIndicatorsCoreRun` owns the reusable J9.1 Core lifecycle for the frozen
 daily and backfill jobs. `start()` validates the `stonks` domain, job,
-`all_series` subject, effective date, calculation version, Core run type, and a
-safe runtime identifier before creating workflow state. Each run uses a
+unfiltered `all_series` or J9.2 `scope:<lowercase SHA-256>` subject, effective
+date, calculation version, Core run type, and a safe runtime identifier before
+creating workflow state. Each run uses a
 90-second Core heartbeat timeout; callers record a heartbeat at every batch
 boundary and at least every 30 seconds during calculation. `succeed()` accepts
 only `PASS`, `WARN`, or `NO_OP`; `fail()` accepts only `FAIL` or backfill-only
@@ -84,7 +85,20 @@ only `PASS`, `WARN`, or `NO_OP`; `fail()` accepts only `FAIL` or backfill-only
 bounded reason counts, heartbeat count, and optional report/publication UUIDs.
 Issue samples, source bars, feature rows/values, selectors, exception text,
 runner metadata, and listing-ID collections never enter Core parameters or
-summaries. J9.2 owns any future scoped subject identity beyond `all_series`.
+summaries.
+
+`TechIndicatorsDailyScope` owns J9.2's exact-date daily inputs. Provider and
+market filters may be combined as dimension predicates; an exact listing-ID
+scope is a separate mode and cannot be mixed with them. Inputs are normalized,
+V1 calculation identity is mandatory, and `dry_run + force` is valid for a
+non-mutating explicit-rebuild preview. `resolve_tech_indicators_daily_scope()`
+resolves the concrete active P0.6 listing set and I3.6 readiness from the same
+caller-owned transaction snapshot, produces P0.10's exact compact canonical
+JSON and SHA-256 scope hash, and maps filtered work to a secret-safe
+`scope:<hash>` Core subject. `force` supplies every resolved ID to W7.5's
+explicit rebuild input but never bypasses source readiness, calculation/row
+validation, publication, or the J9.9 writer lock. The resolved model exposes a
+bounded R8.1 `ReportScope`; its JSON form never emits the resolved ID set.
 
 The V1 domain report facts are frozen in the
 [report schema contract](../../docs/stonks/tech-indicators-report-schema-v1.md).
@@ -174,6 +188,9 @@ The immutable domain-model API consists of:
   histogram, and generated normalized reference values
 - `FeatureRow` for the fixed 65 package-written columns
 - `TechIndicatorsScope` for normalized provider/listing/date selection
+- `TechIndicatorsDailyScope`, `ResolvedTechIndicatorsDailyScope`, and
+  `resolve_tech_indicators_daily_scope()` for exact daily selection, canonical
+  scope/Core identity, same-snapshot readiness, force planning, and report facts
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
 - `TechIndicatorsIssue` for bounded secret-safe diagnostics
 - `ReasonCount` and `FeatureCounts` for deterministic aggregate ledgers

@@ -13,6 +13,7 @@ from empire_stonks_tech_indicators.exceptions import (
 )
 from empire_stonks_tech_indicators.models import TechIndicatorsScope
 from empire_stonks_tech_indicators.queries import (
+    EligibleListing,
     resolve_spx_benchmark,
     select_eligible_listings,
 )
@@ -191,8 +192,13 @@ def decide_source_readiness(
     scope: TechIndicatorsScope,
     effective_date: date,
     benchmark_config: BenchmarkConfig,
+    resolved_listings: tuple[EligibleListing, ...] | None = None,
 ) -> SourceReadinessDecision:
-    """Decide same-date source readiness from current state and Core evidence."""
+    """Decide same-date source readiness from current state and Core evidence.
+
+    A workflow that already resolved its concrete scope may provide that exact
+    tuple so readiness and canonical identity use one selection snapshot.
+    """
 
     _validate_cursor(cursor)
     if not isinstance(scope, TechIndicatorsScope):
@@ -208,7 +214,26 @@ def decide_source_readiness(
             "readiness scope dates must both equal the effective date."
         )
 
-    listings = select_eligible_listings(cursor=cursor, scope=scope)
+    if resolved_listings is None:
+        listings = select_eligible_listings(cursor=cursor, scope=scope)
+    else:
+        if not isinstance(resolved_listings, tuple) or any(
+            not isinstance(item, EligibleListing) for item in resolved_listings
+        ):
+            raise TypeError(
+                "resolved_listings must contain only EligibleListing records."
+            )
+        listing_ids = tuple(
+            item.provider_listing_id for item in resolved_listings
+        )
+        if len(set(listing_ids)) != len(listing_ids):
+            raise ValueError("resolved_listings must contain unique IDs.")
+        if any(
+            item.provider_code not in {"EODDATA", "STOOQ", "YAHOO"}
+            for item in resolved_listings
+        ):
+            raise ValueError("resolved_listings contains an unsupported provider.")
+        listings = resolved_listings
     provider_ids = {
         provider_code: {
             item.provider_listing_id

@@ -10,6 +10,7 @@ import pytest
 
 from empire_stonks_tech_indicators import (
     BenchmarkConfig,
+    TechIndicatorsDailyScope,
     TechIndicatorsScope,
     TechIndicatorsValidationError,
     decide_source_readiness,
@@ -17,6 +18,7 @@ from empire_stonks_tech_indicators import (
     iter_state_comparison_pages,
     load_spx_benchmark_history,
     read_published_model_inputs,
+    resolve_tech_indicators_daily_scope,
     resolve_spx_benchmark,
     select_eligible_listings,
     select_published_feature_coverage,
@@ -1041,6 +1043,24 @@ def test_source_readiness_uses_same_date_live_coverage_and_core_evidence(
         assert ready.eoddata_source_run_id is not None
         assert ready.yahoo_source_run_id is not None
         assert ready.reasons == ()
+
+        resolved_daily = resolve_tech_indicators_daily_scope(
+            cursor=cursor,
+            scope=TechIndicatorsDailyScope(
+                effective_date=effective_date,
+                provider_listing_ids=(listing_id,),
+                dry_run=True,
+                force=True,
+            ),
+            benchmark_config=BenchmarkConfig(),
+        )
+
+        assert resolved_daily.ready is True
+        assert resolved_daily.subject_key == f"scope:{resolved_daily.scope_hash}"
+        assert resolved_daily.explicit_rebuild_listing_ids == (listing_id,)
+        assert resolved_daily.to_report_scope().resolved_listing_count == 1
+        assert resolved_daily.to_report_scope().dry_run is True
+        assert resolved_daily.to_report_scope().rebuild is True
 
         unsupported_date = date(2099, 1, 5)
         not_ready = decide_source_readiness(

@@ -155,7 +155,7 @@ runtime services and explicit scope.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | J9.1 | [x] | Add Core lifecycle | Start, heartbeat, succeed, fail, and summarize jobs with stable identity and no source/feature payloads in Core metadata. | P0.2, B1.6 |
-| J9.2 | [ ] | Define daily scope | Add effective date, provider/market/listing filters, readiness, version, dry-run, and force semantics; reject ambiguity. | P0.7, I3.6, W7.5 |
+| J9.2 | [x] | Define daily scope | Add effective date, provider/market/listing filters, readiness, version, dry-run, and force semantics; reject ambiguity. | P0.7, I3.6, W7.5 |
 | J9.9 | [ ] | Add package-owned writer lock | Implement P0.10's single PostgreSQL transaction advisory lock on a dedicated connection; all mutating scopes share it, contention returns immediately without workflow state, heartbeats detect loss, terminal publication uses the lock connection, and every terminal path releases it. | P0.10, J9.1-J9.2 |
 | J9.3 | [ ] | Implement daily runner | Sequence lock acquisition, readiness, planning, calculation, validation, atomic publication, summaries, JSON/PDF storage, and Core completion. | W7.8, W7.10, R8.8, J9.1-J9.2, J9.9 |
 | J9.4 | [ ] | Implement healthy no-op | No eligible new/corrected/version work succeeds with explicit readiness and durable reports but no writes. | J9.3 |
@@ -170,6 +170,15 @@ cleanup-safe PostgreSQL coverage. Focused lifecycle/API pytest passed 21; full
 package pytest passed 584. Poetry lock/dependency/compile checks, 88-column
 scan, wheel/sdist build and source/wheel imports, Flyway validation of 39
 migrations, zero Core fixture residue, and `git diff --check` passed.
+
+Done: 2026-08-23 — added canonical exact-date daily request/resolution in
+`daily_scope.py`, same-resolution I3.6 readiness, P0.10 hash/scoped Core
+identity, W7.5 force IDs, R8.1 report projection, public API/README guidance,
+and focused/unit/PostgreSQL coverage. Focused pytest passed 80; full package
+pytest passed 584 with 17 skips; rollback-only PostgreSQL pytest passed 9.
+Poetry check, `pip check`, compileall, 88-column scan, wheel/sdist build and
+isolated wheel import, Flyway validation of 39 migrations, and
+`git diff --check` passed.
 
 ---
 

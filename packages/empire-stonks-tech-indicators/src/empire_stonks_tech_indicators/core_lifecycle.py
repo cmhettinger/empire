@@ -30,6 +30,7 @@ TECH_INDICATORS_SAFE_FAILURE_MESSAGE: Final = (
 _CORE_RUN_TYPES = frozenset({"airflow", "cli", "api", "manual", "agent"})
 _CORE_REASON_COUNT_LIMIT = 100
 _RUNNER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$")
+_SUBJECT_KEY_PATTERN = re.compile(r"^(?:all_series|scope:[0-9a-f]{64})$")
 _SUCCESS_OUTCOMES = frozenset(
     {ReportOutcome.PASS, ReportOutcome.WARN, ReportOutcome.NO_OP}
 )
@@ -330,8 +331,10 @@ def _validate_safe_text(field_name: str, value: object) -> None:
             f"{field_name} must be non-empty, trimmed, and at most 200 characters."
         )
 
-    if field_name == "subject_key" and value != TECH_INDICATORS_DEFAULT_SUBJECT_KEY:
-        raise ValueError("subject_key must be all_series until J9.2 defines scope.")
+    if field_name == "subject_key" and not _SUBJECT_KEY_PATTERN.fullmatch(value):
+        raise ValueError(
+            "subject_key must be all_series or scope:<lowercase SHA-256>."
+        )
     if field_name == "runner" and not _RUNNER_PATTERN.fullmatch(value):
         raise ValueError("runner must be a safe runtime identifier.")
 

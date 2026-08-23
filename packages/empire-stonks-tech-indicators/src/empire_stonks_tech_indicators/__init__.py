@@ -14,6 +14,13 @@ from empire_stonks_tech_indicators.core_lifecycle import (
     TechIndicatorsCoreRun,
     build_tech_indicators_core_summary,
 )
+from empire_stonks_tech_indicators.daily_scope import (
+    TECH_INDICATORS_SCOPED_SUBJECT_PREFIX,
+    TECH_INDICATORS_SCOPE_SCHEMA_VERSION,
+    ResolvedTechIndicatorsDailyScope,
+    TechIndicatorsDailyScope,
+    resolve_tech_indicators_daily_scope,
+)
 from empire_stonks_tech_indicators.exceptions import (
     EmpireStonksTechIndicatorsError,
     TechIndicatorsCalculationError,
@@ -569,6 +576,11 @@ __all__ = [
     "TECH_INDICATORS_SAFE_FAILURE_MESSAGE",
     "TechIndicatorsCoreRun",
     "build_tech_indicators_core_summary",
+    "TECH_INDICATORS_SCOPED_SUBJECT_PREFIX",
+    "TECH_INDICATORS_SCOPE_SCHEMA_VERSION",
+    "ResolvedTechIndicatorsDailyScope",
+    "TechIndicatorsDailyScope",
+    "resolve_tech_indicators_daily_scope",
     "AlignedReturnArrays",
     "BarStructureArrays",
     "BollingerStateArrays",
