@@ -54,6 +54,11 @@ from empire_stonks_tech_indicators.publication import (
     fail_unpublished_publication,
     finalize_publication,
 )
+from empire_stonks_tech_indicators.published_queries import (
+    PublishedModelInputSnapshot,
+    PublishedReadinessToken,
+    read_published_model_inputs,
+)
 from empire_stonks_tech_indicators.queries import (
     BenchmarkHistory,
     EligibleListing,
@@ -150,10 +155,13 @@ class TechIndicatorsDailyRunResult:
             not isinstance(self.run_id, UUID)
             or not isinstance(self.json_report_object_id, UUID)
             or not isinstance(self.pdf_report_object_id, UUID)
-            or self.outcome not in {ReportOutcome.PASS, ReportOutcome.WARN}
+            or self.outcome
+            not in {ReportOutcome.PASS, ReportOutcome.WARN, ReportOutcome.NO_OP}
             or self.message is not None
         ):
             raise ValueError("succeeded result is incomplete.")
+        if self.outcome is ReportOutcome.NO_OP and self.publication_id is not None:
+            raise ValueError("NO_OP cannot create a publication.")
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -190,12 +198,7 @@ def run_tech_indicators_daily(
     runner: str,
     clock: Clock = _utc_now,
 ) -> TechIndicatorsDailyRunResult:
-    """Run one non-empty daily candidate through atomic publication.
-
-    J9.4 owns the healthy zero-work branch. J9.6 owns work that requires a
-    staged/version-rebuild publication. Those cases fail closed here rather
-    than weakening either later contract.
-    """
+    """Run one daily scope through no-op, dry-run, or atomic publication."""
 
     _validate_inputs(
         run_service=run_service,
@@ -244,8 +247,15 @@ def run_tech_indicators_daily(
                 config=config,
             )
             if plan.is_noop:
-                raise TechIndicatorsWorkflowError(
-                    "No affected technical-indicator work; use the J9.4 no-op path."
+                return _complete_zero_work(
+                    connection=connection,
+                    object_store=object_store,
+                    config=config,
+                    resolved=resolved,
+                    core_run=core_run,
+                    lock=lock,
+                    started_at=started_at,
+                    clock=clock,
                 )
             if any(
                 AffectedRangeReason.VERSION_DRIFT in item.reasons
@@ -320,6 +330,7 @@ def run_tech_indicators_daily(
                 largest_read_page_rows=largest_read_page_rows,
                 write_batch_count=write_batch_count,
                 config=config,
+                readiness_token=None,
             )
             json_object = store_tech_indicators_json_report(
                 object_store=object_store,
@@ -406,6 +417,102 @@ def run_tech_indicators_daily(
         raise
 
 
+def _complete_zero_work(
+    *,
+    connection: Any,
+    object_store: ObjectStore,
+    config: TechIndicatorsConfig,
+    resolved: ResolvedTechIndicatorsDailyScope,
+    core_run: TechIndicatorsCoreRun,
+    lock: Any,
+    started_at: datetime,
+    clock: Clock,
+) -> TechIndicatorsDailyRunResult:
+    """Prove existing readiness and complete a write-free daily workflow."""
+
+    lock.heartbeat()
+    core_run.heartbeat()
+    snapshot = _read_noop_snapshot(
+        connection,
+        resolved=resolved,
+        config=config,
+    )
+    if not snapshot.ready or snapshot.token is None:
+        raise TechIndicatorsWorkflowError(
+            "Zero-work scope does not have a compatible ready publication."
+        )
+    database_summary = _published_summary(
+        connection,
+        resolved=resolved,
+    )
+    finished_at = _aware_utc(clock())
+    report = _build_report(
+        resolved=resolved,
+        core_run=core_run,
+        publication_id=None,
+        benchmark=None,
+        database_summary=database_summary,
+        preview_counts=SlotWriteCounts(),
+        rows=(),
+        lock_facts=lock.report_facts(),
+        started_at=started_at,
+        finished_at=finished_at,
+        generated_at=_aware_utc(clock()),
+        read_page_count=0,
+        largest_read_page_rows=0,
+        write_batch_count=0,
+        config=config,
+        readiness_token=snapshot.token,
+    )
+    json_object = store_tech_indicators_json_report(
+        object_store=object_store,
+        run_context=core_run.run_context,
+        config=config,
+        report=report,
+    )
+    pdf_object = store_tech_indicators_pdf_report(
+        object_store=object_store,
+        run_context=core_run.run_context,
+        config=config,
+        report=report,
+    )
+    revalidated = _read_noop_snapshot(
+        connection,
+        resolved=resolved,
+        config=config,
+    )
+    if (
+        not revalidated.ready
+        or revalidated.token is None
+        or revalidated.token.value != snapshot.token.value
+    ):
+        raise TechIndicatorsWorkflowError(
+            "Existing publication readiness changed while storing reports."
+        )
+    summary = TechIndicatorsSummary(
+        counts=FeatureCounts(selected_listings=len(resolved.listings))
+    )
+    core_run.succeed(
+        outcome=report.outcome,
+        summary=summary,
+        json_report_object_id=json_object.object_id,
+        pdf_report_object_id=pdf_object.object_id,
+    )
+    if resolved.request.dry_run:
+        lock.rollback()
+    else:
+        lock.commit()
+    return TechIndicatorsDailyRunResult(
+        status="succeeded",
+        effective_date=resolved.request.effective_date,
+        run_id=core_run.run_context.run_id,
+        publication_id=None,
+        json_report_object_id=json_object.object_id,
+        pdf_report_object_id=pdf_object.object_id,
+        outcome=report.outcome,
+    )
+
+
 def _resolve(
     connection: Any,
     *,
@@ -429,6 +536,41 @@ def _resolved_scope(resolved: ResolvedTechIndicatorsDailyScope) -> TechIndicator
             item.provider_listing_id for item in resolved.listings
         )
     )
+
+
+def _read_noop_snapshot(
+    connection: Any,
+    *,
+    resolved: ResolvedTechIndicatorsDailyScope,
+    config: TechIndicatorsConfig,
+) -> PublishedModelInputSnapshot:
+    """Read the bounded ready token and one allowlisted field per model row."""
+
+    return read_published_model_inputs(
+        connection=connection,
+        scope=resolved.request.selection_scope,
+        effective_date=resolved.request.effective_date,
+        calculation_version=config.calculation_version,
+        benchmark_config=config.benchmark,
+        feature_names=("close",),
+        max_rows=HARD_MAX_TRANSACTION_ROWS,
+    )
+
+
+def _published_summary(
+    connection: Any,
+    *,
+    resolved: ResolvedTechIndicatorsDailyScope,
+) -> ReportDatabaseSummary:
+    try:
+        with connection.cursor() as cursor:
+            return select_report_database_summary(
+                cursor=cursor,
+                scope=_resolved_scope(resolved),
+                effective_date=resolved.request.effective_date,
+            )
+    finally:
+        connection.rollback()
 
 
 def _plan(
@@ -739,6 +881,7 @@ def _build_report(
     largest_read_page_rows: int,
     write_batch_count: int,
     config: TechIndicatorsConfig,
+    readiness_token: PublishedReadinessToken | None,
 ) -> TechIndicatorsReport:
     evaluated = _evaluated_dimensions(rows, resolved.listings, database_summary)
     counts = ReportCounts.from_database_summary(
@@ -750,6 +893,7 @@ def _build_report(
         evaluated_instrument_type_rows=evaluated[2],
     )
     dry_run = resolved.request.dry_run
+    healthy_noop = readiness_token is not None and not dry_run
     report_writes = ReportWrites(
         inserted=preview_counts.inserted_rows,
         updated=preview_counts.updated_rows,
@@ -762,16 +906,24 @@ def _build_report(
     throughput_elapsed = elapsed
     persisted = report_writes.persisted_rows
     readiness = resolved.readiness
+    benchmark_provider_listing_id = (
+        readiness_token.benchmark_provider_listing_id
+        if readiness_token is not None
+        else None if benchmark is None else benchmark.benchmark.provider_listing_id
+    )
     return TechIndicatorsReport(
         report_id=DAILY_REPORT_ID,
         workflow_kind=WorkflowKind.DAILY,
-        outcome=ReportOutcome.PASS,
+        outcome=ReportOutcome.NO_OP if healthy_noop else ReportOutcome.PASS,
         generated_at=max(generated_at, finished_at),
         identity=ReportIdentity(
             run_id=core_run.run_context.run_id,
             core_subject_key=resolved.subject_key,
             effective_date=resolved.request.effective_date,
             publication_id=publication_id,
+            existing_readiness_token=(
+                readiness_token.value if healthy_noop else None
+            ),
             core_job_name=DAILY_CORE_JOB_NAME,
         ),
         scope=resolved.to_report_scope(),
@@ -783,25 +935,37 @@ def _build_report(
         lock=lock_facts,
         source_readiness=_report_source_readiness(resolved, database_summary),
         publication=ReportPublication(
-            method=PublicationMethod.NONE if dry_run else PublicationMethod.IN_PLACE,
+            method=(
+                PublicationMethod.NONE
+                if dry_run or healthy_noop
+                else PublicationMethod.IN_PLACE
+            ),
             report_phase=(
                 PublicationReportPhase.DRY_RUN
                 if dry_run
+                else PublicationReportPhase.EXISTING_PUBLICATION
+                if healthy_noop
                 else PublicationReportPhase.PREPARED_CANDIDATE
             ),
-            candidate_status=None if dry_run else "PREPARED",
-            readiness_at_report=PublicationReadiness.NOT_READY,
+            candidate_status=None if dry_run or healthy_noop else "PREPARED",
+            readiness_at_report=(
+                PublicationReadiness.READY
+                if healthy_noop
+                else PublicationReadiness.NOT_READY
+            ),
             readiness_reason_counts=(
-                ReportReasonCount("PUBLICATION_NOT_READY", 1),
+                ()
+                if healthy_noop
+                else (ReportReasonCount("PUBLICATION_NOT_READY", 1),)
             ),
             publication_listing_count=counts.selected_listing_count,
             publication_source_row_count=counts.source_row_count,
             publication_payload_row_count=counts.payload_row_count,
-            benchmark_provider_listing_id=(
-                None if benchmark is None else benchmark.benchmark.provider_listing_id
-            ),
+            benchmark_provider_listing_id=benchmark_provider_listing_id,
             benchmark_contract_version=(
-                None if benchmark is None else "TECH_INDICATORS_SPX_V1"
+                None
+                if benchmark_provider_listing_id is None
+                else "TECH_INDICATORS_SPX_V1"
             ),
             resume_cursor=None,
         ),

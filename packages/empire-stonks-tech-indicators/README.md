@@ -209,7 +209,7 @@ The immutable domain-model API consists of:
   `resolve_tech_indicators_daily_scope()` for exact daily selection, canonical
   scope/Core identity, same-snapshot readiness, force planning, and report facts
 - `TechIndicatorsDailyRunResult` and `run_tech_indicators_daily()` for the
-  package-owned non-empty daily vertical: global lock, readiness, affected
+  package-owned daily vertical: global lock, healthy no-op proof, affected
   ranges, complete-row calculation/validation, rollback-only candidate summary,
   durable JSON/PDF evidence, Core success, and lock-transaction publication
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
@@ -329,8 +329,16 @@ durable reports. Lock contention returns without creating workflow state.
 The Core run service and durable object store must use repository connections
 separate from the work and lock connections because their lifecycle methods
 commit independently.
-Zero-work success is owned by J9.4; version rebuilds and work above the 25,000
-row in-place ceiling fail closed for the staged J9.6 workflow.
+A zero-range plan succeeds only when `read_published_model_inputs()` proves the
+existing exact scope ready under its read-only repeatable-read contract. The
+runner stores JSON/PDF facts with `NO_OP`, `EXISTING_PUBLICATION`, `READY`, and
+the descriptive transaction-local readiness token, then repeats the readiness
+read after report storage before completing Core and committing the write-free
+lock transaction. It creates no publication or payload/membership mutation and
+does not change payload timestamps. Zero-work dry runs store `DRY_RUN/PASS`
+facts and roll back the lock because dry runs cannot claim readiness. Version
+rebuilds and work above the 25,000-row in-place ceiling fail closed for the
+staged J9.6 workflow.
 
 Affected-range planning consumes the exact listing facts and state comparisons
 from the package read APIs. Each listing produces at most one range in stable

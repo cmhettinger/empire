@@ -158,7 +158,7 @@ runtime services and explicit scope.
 | J9.2 | [x] | Define daily scope | Add effective date, provider/market/listing filters, readiness, version, dry-run, and force semantics; reject ambiguity. | P0.7, I3.6, W7.5 |
 | J9.9 | [x] | Add package-owned writer lock | Implement P0.10's single PostgreSQL transaction advisory lock on a dedicated connection; all mutating scopes share it, contention returns immediately without workflow state, heartbeats detect loss, terminal publication uses the lock connection, and every terminal path releases it. | P0.10, J9.1-J9.2 |
 | J9.3 | [x] | Implement daily runner | Sequence lock acquisition, readiness, planning, calculation, validation, atomic publication, summaries, JSON/PDF storage, and Core completion. | W7.8, W7.10, R8.8, J9.1-J9.2, J9.9 |
-| J9.4 | [ ] | Implement healthy no-op | No eligible new/corrected/version work succeeds with explicit readiness and durable reports but no writes. | J9.3 |
+| J9.4 | [x] | Implement healthy no-op | No eligible new/corrected/version work succeeds with explicit readiness and durable reports but no writes. | J9.3 |
 | J9.5 | [ ] | Define backfill scope | Add provider/market/listing/date ranges, batches, resume cursor, version, rebuild, and confirmation for broad scopes. | P0.7-P0.8, W7.5 |
 | J9.6 | [ ] | Implement resumable backfill | Process deterministic inactive-slot batches with independent commits, unpublished partial progress, heartbeats, reports, exact resume, and no duplicate work; flip membership only for a complete P0.9 unit. | W7.9-W7.10, R8.8, J9.1, J9.5, J9.9 |
 | J9.7 | [ ] | Add failure safety | Validation, DB, cancellation, report, and benchmark failures mark Core correctly, preserve only safely resumable unpublished chunks, roll back active work, never advance publication readiness, release locks, and expose safe errors. | J9.3-J9.6, J9.9 |
@@ -198,6 +198,14 @@ pytest passed 615 with 23 skips; focused PostgreSQL passed 12, including dry
 and atomic published JSON/PDF verticals with zero residue. Poetry check/
 compile, 88-column scan, sdist/wheel build and isolated imports, Flyway
 validation of 39 migrations, and `git diff --check` passed.
+
+Done: 2026-08-23 — added the published-readiness-backed healthy no-op branch
+in `daily_runner.py`, durable `NO_OP` JSON/PDF and Core evidence, second-token
+drift protection, dry-zero semantics, README guidance, and live zero-write
+coverage in `test_daily_noop_integration.py`. Full package pytest passed 616
+with 24 skips; focused PostgreSQL passed 13 with zero fixture residue. Poetry
+check, compileall, 88-column scan, sdist/wheel build and isolated imports,
+Flyway validation of 39 migrations, and `git diff --check` passed.
 
 ---
 

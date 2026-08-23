@@ -51,6 +51,32 @@ def test_daily_result_exposes_only_compact_success_identity() -> None:
     }
 
 
+def test_daily_result_accepts_noop_without_a_publication() -> None:
+    result = TechIndicatorsDailyRunResult(
+        status="succeeded",
+        effective_date=EFFECTIVE_DATE,
+        run_id=RUN_ID,
+        publication_id=None,
+        json_report_object_id=JSON_ID,
+        pdf_report_object_id=PDF_ID,
+        outcome=ReportOutcome.NO_OP,
+    )
+
+    assert result.to_dict()["outcome"] == "NO_OP"
+    assert result.to_dict()["publication_id"] is None
+
+    with pytest.raises(ValueError, match="NO_OP cannot create a publication"):
+        TechIndicatorsDailyRunResult(
+            status="succeeded",
+            effective_date=EFFECTIVE_DATE,
+            run_id=RUN_ID,
+            publication_id=PUBLICATION_ID,
+            json_report_object_id=JSON_ID,
+            pdf_report_object_id=PDF_ID,
+            outcome=ReportOutcome.NO_OP,
+        )
+
+
 def test_contended_result_cannot_claim_workflow_state() -> None:
     result = TechIndicatorsDailyRunResult(
         status="contended",
