@@ -194,6 +194,10 @@ from empire_stonks_tech_indicators.writer_lock import (
 )
 
 if TYPE_CHECKING:
+    from empire_stonks_tech_indicators.daily_runner import (
+        TechIndicatorsDailyRunResult,
+        run_tech_indicators_daily,
+    )
     from empire_stonks_tech_indicators.affected_ranges import (
         AffectedRange,
         AffectedRangePlan,
@@ -287,6 +291,18 @@ if TYPE_CHECKING:
 
 
 def __getattr__(name: str) -> object:
+    if name in {"TechIndicatorsDailyRunResult", "run_tech_indicators_daily"}:
+        from empire_stonks_tech_indicators.daily_runner import (
+            TechIndicatorsDailyRunResult,
+            run_tech_indicators_daily,
+        )
+
+        exports = {
+            "TechIndicatorsDailyRunResult": TechIndicatorsDailyRunResult,
+            "run_tech_indicators_daily": run_tech_indicators_daily,
+        }
+        globals().update(exports)
+        return exports[name]
     if name in {
         "AffectedRange",
         "AffectedRangePlan",
@@ -601,6 +617,8 @@ __all__ = [
     "ResolvedTechIndicatorsDailyScope",
     "TechIndicatorsDailyScope",
     "resolve_tech_indicators_daily_scope",
+    "TechIndicatorsDailyRunResult",
+    "run_tech_indicators_daily",
     "AlignedReturnArrays",
     "BarStructureArrays",
     "BollingerStateArrays",

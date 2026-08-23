@@ -208,6 +208,10 @@ The immutable domain-model API consists of:
 - `TechIndicatorsDailyScope`, `ResolvedTechIndicatorsDailyScope`, and
   `resolve_tech_indicators_daily_scope()` for exact daily selection, canonical
   scope/Core identity, same-snapshot readiness, force planning, and report facts
+- `TechIndicatorsDailyRunResult` and `run_tech_indicators_daily()` for the
+  package-owned non-empty daily vertical: global lock, readiness, affected
+  ranges, complete-row calculation/validation, rollback-only candidate summary,
+  durable JSON/PDF evidence, Core success, and lock-transaction publication
 - `ResolvedBenchmark` for the exact resolved `YAHOO/XIDX/SPX` facts
 - `TechIndicatorsIssue` for bounded secret-safe diagnostics
 - `ReasonCount` and `FeatureCounts` for deterministic aggregate ledgers
@@ -311,6 +315,22 @@ cancelled, source-drifted, version-mixed, report-incomplete, and benchmark-
 incomplete candidates cannot activate. Model consumers still use
 `read_published_model_inputs()` so source changes after publication fail closed
 in one read-only repeatable-read snapshot.
+
+The daily runner accepts a caller-owned work connection and a separate
+connection factory for the dedicated writer lock. It commits a `BUILDING`
+candidate before previewing its in-place mutations in a transaction that is
+always rolled back; the existing set-based report query therefore observes the
+exact proposed generated-column image without exposing it. JSON and PDF are
+stored from those immutable facts, the candidate becomes `PREPARED`, Core is
+completed, and `finalize_publication()` replays and reconciles the retained
+changes on the lock connection before the single visibility commit. Dry runs
+roll back both candidate and payload preview and still complete Core with both
+durable reports. Lock contention returns without creating workflow state.
+The Core run service and durable object store must use repository connections
+separate from the work and lock connections because their lifecycle methods
+commit independently.
+Zero-work success is owned by J9.4; version rebuilds and work above the 25,000
+row in-place ceiling fail closed for the staged J9.6 workflow.
 
 Affected-range planning consumes the exact listing facts and state comparisons
 from the package read APIs. Each listing produces at most one range in stable

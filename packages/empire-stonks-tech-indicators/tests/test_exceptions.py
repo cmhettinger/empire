@@ -54,6 +54,8 @@ def test_public_api_is_explicit() -> None:
         "ResolvedTechIndicatorsDailyScope",
         "TechIndicatorsDailyScope",
         "resolve_tech_indicators_daily_scope",
+        "TechIndicatorsDailyRunResult",
+        "run_tech_indicators_daily",
         "AlignedReturnArrays",
         "BarStructureArrays",
         "BollingerStateArrays",
