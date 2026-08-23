@@ -27,6 +27,7 @@ from empire_stonks_tech_indicators.exceptions import (
     TechIndicatorsConfigError,
     TechIndicatorsPersistenceError,
     TechIndicatorsValidationError,
+    TechIndicatorsWriterLockLostError,
     TechIndicatorsWorkflowError,
 )
 from empire_stonks_tech_indicators.models import (
@@ -180,6 +181,16 @@ from empire_stonks_tech_indicators.readiness import (
 from empire_stonks_tech_indicators.state import (
     ListingStateComparison,
     iter_state_comparison_pages,
+)
+from empire_stonks_tech_indicators.writer_lock import (
+    TECH_INDICATORS_LOCK_CONTENDED_MESSAGE,
+    TECH_INDICATORS_LOCK_FAILURE_MESSAGE,
+    TECH_INDICATORS_LOCK_LOST_MESSAGE,
+    TECH_INDICATORS_TEMPORARY_FAILURE_EXIT_CODE,
+    TechIndicatorsWriterLock,
+    WriterLockAcquisition,
+    WriterLockOutcome,
+    acquire_tech_indicators_writer_lock,
 )
 
 if TYPE_CHECKING:
@@ -568,6 +579,7 @@ __all__ = [
     "TechIndicatorsPersistenceError",
     "TechIndicatorsValidationError",
     "TechIndicatorsWorkflowError",
+    "TechIndicatorsWriterLockLostError",
     "BenchmarkConfig",
     "TechIndicatorsConfig",
     "TECH_INDICATORS_CORE_DOMAIN",
@@ -576,6 +588,14 @@ __all__ = [
     "TECH_INDICATORS_SAFE_FAILURE_MESSAGE",
     "TechIndicatorsCoreRun",
     "build_tech_indicators_core_summary",
+    "TECH_INDICATORS_LOCK_CONTENDED_MESSAGE",
+    "TECH_INDICATORS_LOCK_FAILURE_MESSAGE",
+    "TECH_INDICATORS_LOCK_LOST_MESSAGE",
+    "TECH_INDICATORS_TEMPORARY_FAILURE_EXIT_CODE",
+    "TechIndicatorsWriterLock",
+    "WriterLockAcquisition",
+    "WriterLockOutcome",
+    "acquire_tech_indicators_writer_lock",
     "TECH_INDICATORS_SCOPED_SUBJECT_PREFIX",
     "TECH_INDICATORS_SCOPE_SCHEMA_VERSION",
     "ResolvedTechIndicatorsDailyScope",

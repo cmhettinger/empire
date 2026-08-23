@@ -12,6 +12,7 @@ from empire_stonks_tech_indicators.exceptions import (
     TechIndicatorsConfigError,
     TechIndicatorsPersistenceError,
     TechIndicatorsValidationError,
+    TechIndicatorsWriterLockLostError,
     TechIndicatorsWorkflowError,
 )
 
@@ -23,6 +24,7 @@ PUBLIC_EXCEPTIONS = (
     TechIndicatorsPersistenceError,
     TechIndicatorsValidationError,
     TechIndicatorsWorkflowError,
+    TechIndicatorsWriterLockLostError,
 )
 
 
@@ -39,6 +41,14 @@ def test_public_api_is_explicit() -> None:
         "TECH_INDICATORS_SAFE_FAILURE_MESSAGE",
         "TechIndicatorsCoreRun",
         "build_tech_indicators_core_summary",
+        "TECH_INDICATORS_LOCK_CONTENDED_MESSAGE",
+        "TECH_INDICATORS_LOCK_FAILURE_MESSAGE",
+        "TECH_INDICATORS_LOCK_LOST_MESSAGE",
+        "TECH_INDICATORS_TEMPORARY_FAILURE_EXIT_CODE",
+        "TechIndicatorsWriterLock",
+        "WriterLockAcquisition",
+        "WriterLockOutcome",
+        "acquire_tech_indicators_writer_lock",
         "TECH_INDICATORS_SCOPED_SUBJECT_PREFIX",
         "TECH_INDICATORS_SCOPE_SCHEMA_VERSION",
         "ResolvedTechIndicatorsDailyScope",

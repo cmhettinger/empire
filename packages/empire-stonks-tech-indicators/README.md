@@ -100,6 +100,23 @@ explicit rebuild input but never bypasses source readiness, calculation/row
 validation, publication, or the J9.9 writer lock. The resolved model exposes a
 bounded R8.1 `ReportScope`; its JSON form never emits the resolved ID set.
 
+`acquire_tech_indicators_writer_lock()` owns J9.9's P0.10 concurrency boundary.
+It accepts an injected zero-argument connection factory, explicitly begins one
+dedicated `READ COMMITTED` transaction, and makes exactly one nonblocking
+attempt with the frozen numeric advisory-lock key. An acquired result contains
+a single-use `TechIndicatorsWriterLock`; contention contains no handle and only
+the frozen seed/key plus a fixed safe message for the later CLI exit-code `75`
+mapping. The handle emits trivial lock-connection heartbeats, produces R8.1
+lock facts, and never exposes its connection as a calculation or staging
+connection. `commit_terminal()` gives only its cursor to the terminal P0.9
+operation and commits publication plus lock release together. Healthy no-ops
+may `commit()`; dry runs, failures, and cancellations `rollback()`. Uncommitted
+context-manager exits always roll back and close, while heartbeat, connection,
+or commit failure becomes one safe `TechIndicatorsWriterLockLostError` without
+reacquisition. Package code neither loads environment files nor creates the
+connection itself; later CLI and Airflow runtimes supply Empire's configured
+database factory.
+
 The V1 domain report facts are frozen in the
 [report schema contract](../../docs/stonks/tech-indicators-report-schema-v1.md).
 It defines one bounded, secret-safe immutable fact shape shared by daily and
@@ -199,6 +216,10 @@ The immutable domain-model API consists of:
 - `TechIndicatorsCoreRun` and `build_tech_indicators_core_summary()` for the
   frozen daily/backfill Core start, heartbeat, success, failure, and
   aggregate-only metadata boundary
+- `WriterLockOutcome`, `WriterLockAcquisition`,
+  `TechIndicatorsWriterLock`, and
+  `acquire_tech_indicators_writer_lock()` for the frozen global nonblocking
+  P0.10 lock, heartbeat/loss, terminal commit, and rollback lifecycle
 - `EligibleListing`, `select_eligible_listings()`, and
   `iter_source_bar_pages()` for caller-transaction-owned P0.6 selection and
   bounded chronological OHLCV reads

@@ -156,7 +156,7 @@ runtime services and explicit scope.
 |----|--------|------|---------------|------------|
 | J9.1 | [x] | Add Core lifecycle | Start, heartbeat, succeed, fail, and summarize jobs with stable identity and no source/feature payloads in Core metadata. | P0.2, B1.6 |
 | J9.2 | [x] | Define daily scope | Add effective date, provider/market/listing filters, readiness, version, dry-run, and force semantics; reject ambiguity. | P0.7, I3.6, W7.5 |
-| J9.9 | [ ] | Add package-owned writer lock | Implement P0.10's single PostgreSQL transaction advisory lock on a dedicated connection; all mutating scopes share it, contention returns immediately without workflow state, heartbeats detect loss, terminal publication uses the lock connection, and every terminal path releases it. | P0.10, J9.1-J9.2 |
+| J9.9 | [x] | Add package-owned writer lock | Implement P0.10's single PostgreSQL transaction advisory lock on a dedicated connection; all mutating scopes share it, contention returns immediately without workflow state, heartbeats detect loss, terminal publication uses the lock connection, and every terminal path releases it. | P0.10, J9.1-J9.2 |
 | J9.3 | [ ] | Implement daily runner | Sequence lock acquisition, readiness, planning, calculation, validation, atomic publication, summaries, JSON/PDF storage, and Core completion. | W7.8, W7.10, R8.8, J9.1-J9.2, J9.9 |
 | J9.4 | [ ] | Implement healthy no-op | No eligible new/corrected/version work succeeds with explicit readiness and durable reports but no writes. | J9.3 |
 | J9.5 | [ ] | Define backfill scope | Add provider/market/listing/date ranges, batches, resume cursor, version, rebuild, and confirmation for broad scopes. | P0.7-P0.8, W7.5 |
@@ -179,6 +179,16 @@ pytest passed 584 with 17 skips; rollback-only PostgreSQL pytest passed 9.
 Poetry check, `pip check`, compileall, 88-column scan, wheel/sdist build and
 isolated wheel import, Flyway validation of 39 migrations, and
 `git diff --check` passed.
+
+Done: 2026-08-23 — added the single-use package-owned P0.10 transaction lock
+in `writer_lock.py`, including fixed-key nonblocking acquisition, bounded
+contention/exit-75 facts, dedicated-connection heartbeat/loss, terminal-cursor
+commit, rollback/context cleanup, safe errors, public API/README guidance, and
+unit plus live concurrency coverage. Focused pytest passed 69; full package
+pytest passed 606 with 20 skips; PostgreSQL lock/publication/query integration
+passed 17 with zero workflow-state drift. Poetry check, `pip check`,
+compileall, 88-column scan, wheel/sdist build and isolated wheel import,
+Flyway validation of 39 migrations, and `git diff --check` passed.
 
 ---
 

@@ -25,6 +25,10 @@ class TechIndicatorsWorkflowError(EmpireStonksTechIndicatorsError):
     """Raised when a technical-indicator workflow cannot complete safely."""
 
 
+class TechIndicatorsWriterLockLostError(TechIndicatorsWorkflowError):
+    """Raised when an acquired writer-lock transaction becomes unusable."""
+
+
 __all__ = [
     "EmpireStonksTechIndicatorsError",
     "TechIndicatorsCalculationError",
@@ -32,4 +36,5 @@ __all__ = [
     "TechIndicatorsPersistenceError",
     "TechIndicatorsValidationError",
     "TechIndicatorsWorkflowError",
+    "TechIndicatorsWriterLockLostError",
 ]
