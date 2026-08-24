@@ -260,6 +260,43 @@ class TechIndicatorsCoreRun:
         object.__setattr__(self, "run_context", context)
         return context
 
+    def correct_succeeded_failure(
+        self,
+        *,
+        summary: TechIndicatorsSummary,
+        json_report_object_id: UUID | None = None,
+        pdf_report_object_id: UUID | None = None,
+        publication_id: UUID | None = None,
+    ) -> RunContext:
+        """Correct Core when publication fails after success was recorded.
+
+        Publication is the final authority for a mutating workflow.  The
+        runner records Core success immediately before the atomic publication
+        transaction, so a failure in that transaction must replace the
+        premature success with the fixed secret-safe failure terminal state.
+        """
+
+        if self.run_context.status != "succeeded":
+            raise RuntimeError("Core failure correction requires succeeded status.")
+        core_summary = build_tech_indicators_core_summary(
+            workflow_kind=self.workflow_kind,
+            outcome=ReportOutcome.FAIL,
+            calculation_version=self.calculation_version,
+            summary=summary,
+            heartbeat_count=self.heartbeat_count,
+            json_report_object_id=json_report_object_id,
+            pdf_report_object_id=pdf_report_object_id,
+            publication_id=publication_id,
+        )
+        context = self.run_service.fail_run(
+            self.run_context.run_id,
+            TECH_INDICATORS_SAFE_FAILURE_MESSAGE,
+            summary=core_summary,
+        )
+        self._validate_context(context, expected_status="failed")
+        object.__setattr__(self, "run_context", context)
+        return context
+
     def _require_active(self) -> None:
         if self.run_context.status != "started":
             raise RuntimeError("Core run is already terminal.")

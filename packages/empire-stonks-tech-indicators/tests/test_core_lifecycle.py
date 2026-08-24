@@ -233,6 +233,32 @@ def test_failure_uses_fixed_message_and_discards_issue_details() -> None:
     assert SENSITIVE_TEXT not in repository.failure_messages[failed.run_id]
 
 
+def test_publication_failure_corrects_premature_core_success_safely() -> None:
+    repository = FakeRunRepository()
+    lifecycle = _start(repository)
+    lifecycle.succeed(
+        outcome=ReportOutcome.PASS,
+        summary=_summary(),
+        json_report_object_id=JSON_REPORT_ID,
+        pdf_report_object_id=PDF_REPORT_ID,
+        publication_id=PUBLICATION_ID,
+    )
+
+    corrected = lifecycle.correct_succeeded_failure(
+        summary=TechIndicatorsSummary(),
+        publication_id=PUBLICATION_ID,
+    )
+
+    assert corrected.status == "failed"
+    assert corrected.summary["outcome"] == "FAIL"
+    assert corrected.summary["json_report_object_id"] is None
+    assert corrected.summary["pdf_report_object_id"] is None
+    assert corrected.summary["publication_id"] == str(PUBLICATION_ID)
+    assert repository.failure_messages[corrected.run_id] == (
+        TECH_INDICATORS_SAFE_FAILURE_MESSAGE
+    )
+
+
 def test_terminal_run_rejects_heartbeat_or_second_transition() -> None:
     repository = FakeRunRepository()
     lifecycle = _start(repository)

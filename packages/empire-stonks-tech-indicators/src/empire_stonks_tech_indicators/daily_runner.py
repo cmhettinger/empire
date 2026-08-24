@@ -37,6 +37,12 @@ from empire_stonks_tech_indicators.daily_scope import (
     resolve_tech_indicators_daily_scope,
 )
 from empire_stonks_tech_indicators.exceptions import TechIndicatorsWorkflowError
+from empire_stonks_tech_indicators.failure_safety import (
+    close_core_after_failure,
+    is_workflow_cancellation,
+    safe_workflow_error,
+    terminalize_unpublished_candidate,
+)
 from empire_stonks_tech_indicators.models import (
     FeatureCounts,
     FeatureRow,
@@ -51,7 +57,6 @@ from empire_stonks_tech_indicators.persistence import (
 )
 from empire_stonks_tech_indicators.publication import (
     InPlaceSlotChanges,
-    fail_unpublished_publication,
     finalize_publication,
 )
 from empire_stonks_tech_indicators.published_queries import (
@@ -223,6 +228,9 @@ def run_tech_indicators_daily(
 
     core_run: TechIndicatorsCoreRun | None = None
     publication_id: UUID | None = None
+    publication_was_published = False
+    json_report_object_id: UUID | None = None
+    pdf_report_object_id: UUID | None = None
     summary = TechIndicatorsSummary()
     try:
         with lock:
@@ -338,12 +346,14 @@ def run_tech_indicators_daily(
                 config=config,
                 report=report,
             )
+            json_report_object_id = json_object.object_id
             pdf_object = store_tech_indicators_pdf_report(
                 object_store=object_store,
                 run_context=core_run.run_context,
                 config=config,
                 report=report,
             )
+            pdf_report_object_id = pdf_object.object_id
             summary = _core_summary(
                 resolved=resolved,
                 preview_counts=preview_counts,
@@ -387,6 +397,7 @@ def run_tech_indicators_daily(
                         in_place_changes=changes,
                     )
                 )
+                publication_was_published = True
                 durable_publication_id = publication_id
             return TechIndicatorsDailyRunResult(
                 status="succeeded",
@@ -397,24 +408,27 @@ def run_tech_indicators_daily(
                 pdf_report_object_id=pdf_object.object_id,
                 outcome=report.outcome,
             )
-    except BaseException:
+    except BaseException as error:
         _rollback_quietly(connection)
-        if core_run is not None and core_run.run_context.status == "started":
-            try:
-                core_run.fail(outcome=ReportOutcome.FAIL, summary=summary)
-            except Exception:
-                pass
-        if publication_id is not None and lock.is_held and not scope.dry_run:
-            try:
-                lock.commit_terminal(
-                    lambda cursor: fail_unpublished_publication(
-                        cursor=cursor,
-                        publication_id=publication_id,
-                    )
-                )
-            except Exception:
-                pass
-        raise
+        cancelled = is_workflow_cancellation(error)
+        if not scope.dry_run and not publication_was_published:
+            publication_was_published = terminalize_unpublished_candidate(
+                publication_id=publication_id,
+                lock=lock,
+                lock_connection_factory=lock_connection_factory,
+                abandoned=cancelled,
+            )
+        close_core_after_failure(
+            core_run=core_run,
+            summary=summary,
+            publication_id=publication_id,
+            json_report_object_id=json_report_object_id,
+            pdf_report_object_id=pdf_report_object_id,
+            publication_was_published=publication_was_published,
+        )
+        if cancelled:
+            raise
+        raise safe_workflow_error(error) from error
 
 
 def _complete_zero_work(

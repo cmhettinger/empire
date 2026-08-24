@@ -284,10 +284,14 @@ def inspect_publication_recovery(
         action = PublicationRecoveryAction.ALREADY_PUBLISHED
     elif publication.status in {"FAILED", "ABANDONED", "RETIRED"}:
         action = PublicationRecoveryAction.TERMINAL_FAILURE
+    elif (
+        publication.status == "BUILDING"
+        and publication.completed_batch_count is not None
+        and publication.completed_batch_count > 0
+    ):
+        action = PublicationRecoveryAction.RESUME_BUILDING
     elif core_status in {"failed", "cancelled", "abandoned"}:
         action = PublicationRecoveryAction.TERMINAL_FAILURE
-    elif publication.status == "BUILDING":
-        action = PublicationRecoveryAction.RESUME_BUILDING
     elif publication.status == "PREPARED" and core_status == "succeeded":
         action = PublicationRecoveryAction.FINALIZE_PREPARED
     else:

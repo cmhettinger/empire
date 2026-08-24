@@ -161,7 +161,7 @@ runtime services and explicit scope.
 | J9.4 | [x] | Implement healthy no-op | No eligible new/corrected/version work succeeds with explicit readiness and durable reports but no writes. | J9.3 |
 | J9.5 | [x] | Define backfill scope | Add provider/market/listing/date ranges, batches, resume cursor, version, rebuild, and confirmation for broad scopes. | P0.7-P0.8, W7.5 |
 | J9.6 | [x] | Implement resumable backfill | Process deterministic inactive-slot batches with independent commits, unpublished partial progress, heartbeats, reports, exact resume, and no duplicate work; flip membership only for a complete P0.9 unit. | W7.9-W7.10, R8.8, J9.1, J9.5, J9.9 |
-| J9.7 | [ ] | Add failure safety | Validation, DB, cancellation, report, and benchmark failures mark Core correctly, preserve only safely resumable unpublished chunks, roll back active work, never advance publication readiness, release locks, and expose safe errors. | J9.3-J9.6, J9.9 |
+| J9.7 | [x] | Add failure safety | Validation, DB, cancellation, report, and benchmark failures mark Core correctly, preserve only safely resumable unpublished chunks, roll back active work, never advance publication readiness, release locks, and expose safe errors. | J9.3-J9.6, J9.9 |
 | J9.8 | [ ] | Add vertical runner integration | Run append, no-op, correction, version rebuild, and resumed backfill through PostgreSQL, Core, JSON, and PDF with zero fixture residue. | J9.3-J9.7 |
 
 Done: 2026-08-23 — added immutable aggregate-only Core start/heartbeat/succeed/
@@ -226,6 +226,15 @@ package pytest passed 659 with 25 skips; focused backfill/daily/publication
 PostgreSQL pytest passed 9 with zero J9.6 fixture residue. Poetry check,
 `pip check`, compileall, 88-column scan, sdist/wheel build and source/wheel
 imports, Flyway validation of 39 migrations, and `git diff --check` passed.
+
+Done: 2026-08-24 — added shared fail-closed runner cleanup in
+`failure_safety.py`, Core post-success correction, terminal candidate recovery,
+cursor-proven failed-Core resume classification, safe outward errors, and
+failure-injection coverage. Full package pytest passed 666 with 25 skips;
+focused PostgreSQL publication/daily/backfill pytest passed 8 with zero fixture
+residue. Poetry check, `pip check`, compileall, changed-file 88-column scan,
+package build, source/wheel imports, Flyway validation of 39 migrations, and
+`git diff --check` passed.
 
 ---
 

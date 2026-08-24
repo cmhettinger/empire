@@ -36,6 +36,12 @@ from empire_stonks_tech_indicators.config import (
 )
 from empire_stonks_tech_indicators.core_lifecycle import TechIndicatorsCoreRun
 from empire_stonks_tech_indicators.exceptions import TechIndicatorsWorkflowError
+from empire_stonks_tech_indicators.failure_safety import (
+    close_core_after_failure,
+    is_workflow_cancellation,
+    safe_workflow_error,
+    terminalize_unpublished_candidate,
+)
 from empire_stonks_tech_indicators.models import (
     FeatureCounts,
     TechIndicatorsScope,
@@ -108,6 +114,15 @@ Clock = Callable[[], datetime]
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+@dataclass
+class _BackfillFailureState:
+    candidate_prepared: bool = False
+    publication_was_published: bool = False
+    core_summary: TechIndicatorsSummary | None = None
+    json_report_object_id: UUID | None = None
+    pdf_report_object_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -218,6 +233,8 @@ def run_tech_indicators_backfill(
     assert lock is not None
     core_run: TechIndicatorsCoreRun | None = None
     progress: BackfillPublicationProgress | None = None
+    failure_state = _BackfillFailureState()
+    resume_prefix_validated = False
     summary = TechIndicatorsSummary()
     try:
         with lock:
@@ -264,6 +281,7 @@ def run_tech_indicators_backfill(
                 progress=progress,
                 calculation_version=config.calculation_version,
             )
+            resume_prefix_validated = True
             evaluated = {
                 item.provider_listing_id: 0 for item in listings
             }
@@ -422,6 +440,7 @@ def run_tech_indicators_backfill(
                             largest_read=largest_read,
                             complete=False,
                             planned_batch_count=planned_batch_count,
+                            failure_state=failure_state,
                         )
             return _finish(
                 connection=connection,
@@ -440,15 +459,43 @@ def run_tech_indicators_backfill(
                 largest_read=largest_read,
                 complete=True,
                 planned_batch_count=planned_batch_count,
+                failure_state=failure_state,
             )
-    except BaseException:
+    except BaseException as error:
         _rollback(connection)
-        if core_run is not None and core_run.run_context.status == "started":
-            try:
-                core_run.fail(outcome=ReportOutcome.FAIL, summary=summary)
-            except Exception:
-                pass
-        raise
+        cancelled = is_workflow_cancellation(error)
+        safely_resumable = (
+            progress is not None
+            and progress.completed_batch_count > 0
+            and resume_prefix_validated
+            and not failure_state.candidate_prepared
+            and not scope.dry_run
+        )
+        publication_id = None if progress is None else progress.publication_id
+        if (
+            not safely_resumable
+            and not scope.dry_run
+            and not failure_state.publication_was_published
+        ):
+            failure_state.publication_was_published = (
+                terminalize_unpublished_candidate(
+                    publication_id=publication_id,
+                    lock=lock,
+                    lock_connection_factory=lock_connection_factory,
+                    abandoned=cancelled,
+                )
+            )
+        close_core_after_failure(
+            core_run=core_run,
+            summary=failure_state.core_summary or summary,
+            publication_id=publication_id,
+            json_report_object_id=failure_state.json_report_object_id,
+            pdf_report_object_id=failure_state.pdf_report_object_id,
+            publication_was_published=failure_state.publication_was_published,
+        )
+        if cancelled:
+            raise
+        raise safe_workflow_error(error) from error
 
 
 def _finish(
@@ -459,6 +506,7 @@ def _finish(
     evaluated: dict[UUID, int], started_at: datetime, clock: Clock,
     read_pages: int, largest_read: int, complete: bool,
     planned_batch_count: int,
+    failure_state: _BackfillFailureState,
 ) -> TechIndicatorsBackfillRunResult:
     report_scope = TechIndicatorsScope(
         provider_listing_ids=tuple(item.provider_listing_id for item in listings),
@@ -494,10 +542,12 @@ def _finish(
         object_store=object_store, run_context=core_run.run_context,
         config=config, report=report,
     )
+    failure_state.json_report_object_id = json_object.object_id
     pdf_object = store_tech_indicators_pdf_report(
         object_store=object_store, run_context=core_run.run_context,
         config=config, report=report,
     )
+    failure_state.pdf_report_object_id = pdf_object.object_id
     core_summary = TechIndicatorsSummary(
         counts=FeatureCounts(
             selected_listings=len(listings),
@@ -511,6 +561,7 @@ def _finish(
             deleted_rows=progress.deleted_row_count,
         )
     )
+    failure_state.core_summary = core_summary
     if not complete:
         core_run.fail(
             outcome=ReportOutcome.PARTIAL, summary=core_summary,
@@ -546,6 +597,7 @@ def _finish(
                 pdf_report_object_id=pdf_object.object_id,
             )
         connection.commit()
+        failure_state.candidate_prepared = True
         core_run.succeed(
             outcome=ReportOutcome.PASS, summary=core_summary,
             json_report_object_id=json_object.object_id,
@@ -560,6 +612,7 @@ def _finish(
                 item.provider_listing_id for item in listings
             ),
         ))
+        failure_state.publication_was_published = True
         publication_id = progress.publication_id
     return TechIndicatorsBackfillRunResult(
         "succeeded", resolved.request.effective_date,

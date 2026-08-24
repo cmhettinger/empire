@@ -128,6 +128,19 @@ only with its final batch; only the complete source image for every listing can
 become `PREPARED` and pass the lock-transaction terminal membership flip. Dry
 runs roll back all staged state after storing complete preview reports.
 
+Daily and backfill runners share J9.7 fail-closed cleanup. Validation,
+calculation, benchmark, persistence, report, Core, cancellation, and lock-path
+exceptions roll back the current work transaction and never change active
+membership. A daily or zero-progress candidate becomes `FAILED`, cancellation
+uses `ABANDONED`, and a `PREPARED` candidate is terminalized even when terminal
+publication already released the original lock. Backfill preserves a
+`BUILDING` candidate only after its exact durable resume prefix was validated
+and at least one cursor batch is committed. Core is failed with aggregate-only
+facts; a success recorded immediately before failed publication is corrected
+to the same fixed safe failure state. Runtime cancellations retain their
+native exception type, while ordinary failures expose only the fixed workflow
+message and retain the underlying exception as the Python cause.
+
 `acquire_tech_indicators_writer_lock()` owns J9.9's P0.10 concurrency boundary.
 It accepts an injected zero-argument connection factory, explicitly begins one
 dedicated `READ COMMITTED` transaction, and makes exactly one nonblocking

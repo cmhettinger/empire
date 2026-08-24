@@ -7,12 +7,19 @@ from uuid import UUID, uuid4
 
 import pytest
 
+import empire_stonks_tech_indicators.backfill_runner as backfill_runner_module
 from empire_core import ObjectStore, RunService
 from empire_stonks_tech_indicators import (
+    PublicationRecoveryAction,
     ReportOutcome,
     TechIndicatorsBackfillScope,
     TechIndicatorsConfig,
+    TechIndicatorsWorkflowError,
+    inspect_publication_recovery,
     run_tech_indicators_backfill,
+)
+from empire_stonks_tech_indicators.publication import (
+    TECH_INDICATORS_WRITER_LOCK_KEY,
 )
 
 
@@ -31,6 +38,7 @@ DATABASE_ENVIRONMENT = (
 
 def test_backfill_commits_partial_progress_and_resumes_without_duplicate_work(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     if any(not os.environ.get(name) for name in DATABASE_ENVIRONMENT):
         pytest.skip("Empire database environment is not configured.")
@@ -123,6 +131,89 @@ def test_backfill_commits_partial_progress_and_resumes_without_duplicate_work(
             (listing_id,),
         )
         assert cursor.fetchone() == (0,)
+
+        original_upsert = backfill_runner_module.upsert_feature_rows
+
+        def fail_next_batch(**_values: object) -> object:
+            raise RuntimeError("database password=should-not-escape")
+
+        monkeypatch.setattr(
+            backfill_runner_module,
+            "upsert_feature_rows",
+            fail_next_batch,
+        )
+        with pytest.raises(
+            TechIndicatorsWorkflowError,
+            match="^Technical-indicator workflow failed safely\\.$",
+        ) as failure:
+            run_tech_indicators_backfill(
+                **services,
+                scope=TechIndicatorsBackfillScope(
+                    effective_date=effective_date,
+                    start_date=start_date,
+                    end_date=effective_date,
+                    provider_listing_ids=(listing_id,),
+                    batch_size=1000,
+                    resume_cursor=first.resume_cursor,
+                ),
+            )
+        assert isinstance(failure.value.__cause__, RuntimeError)
+        assert "password=should-not-escape" not in str(failure.value)
+        monkeypatch.setattr(
+            backfill_runner_module,
+            "upsert_feature_rows",
+            original_upsert,
+        )
+        cursor.execute(
+            """
+            SELECT status, completed_batch_count, staged_payload_row_count
+            FROM stonks.tech_indicators_publication WHERE publication_id = %s
+            """,
+            (publication_id,),
+        )
+        assert cursor.fetchone() == ("BUILDING", 1, 1000)
+        cursor.execute(
+            """
+            SELECT status, error_message
+            FROM core.core_run
+            WHERE job_name = 'stonks_tech_indicators_backfill'
+              AND runner = %s
+            ORDER BY started_at DESC
+            LIMIT 1
+            """,
+            (runner_identity,),
+        )
+        assert cursor.fetchone() == (
+            "failed",
+            "Technical-indicator workflow failed safely.",
+        )
+        cursor.execute(
+            """
+            SELECT count(*) FROM stonks.ohlcv_daily_tech_indicators
+            WHERE provider_listing_id = %s
+            """,
+            (listing_id,),
+        )
+        assert cursor.fetchone() == (0,)
+        cursor.execute(
+            "SELECT scope_hash FROM stonks.tech_indicators_publication "
+            "WHERE publication_id = %s",
+            (publication_id,),
+        )
+        scope_hash = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT pg_try_advisory_xact_lock(%s::bigint)",
+            (TECH_INDICATORS_WRITER_LOCK_KEY,),
+        )
+        assert cursor.fetchone() == (True,)
+        recovery = inspect_publication_recovery(
+            cursor=cursor,
+            publication_id=publication_id,
+            scope_hash=scope_hash,
+            calculation_version="TECH_INDICATORS_V1",
+        )
+        assert recovery.action is PublicationRecoveryAction.RESUME_BUILDING
+        work.rollback()
 
         second = run_tech_indicators_backfill(
             **services,
