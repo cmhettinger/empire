@@ -62,6 +62,8 @@ def test_public_api_is_explicit() -> None:
         "resolve_tech_indicators_daily_scope",
         "TechIndicatorsDailyRunResult",
         "run_tech_indicators_daily",
+        "TechIndicatorsBackfillRunResult",
+        "run_tech_indicators_backfill",
         "AlignedReturnArrays",
         "BarStructureArrays",
         "BollingerStateArrays",

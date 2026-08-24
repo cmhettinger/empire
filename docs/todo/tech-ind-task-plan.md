@@ -160,7 +160,7 @@ runtime services and explicit scope.
 | J9.3 | [x] | Implement daily runner | Sequence lock acquisition, readiness, planning, calculation, validation, atomic publication, summaries, JSON/PDF storage, and Core completion. | W7.8, W7.10, R8.8, J9.1-J9.2, J9.9 |
 | J9.4 | [x] | Implement healthy no-op | No eligible new/corrected/version work succeeds with explicit readiness and durable reports but no writes. | J9.3 |
 | J9.5 | [x] | Define backfill scope | Add provider/market/listing/date ranges, batches, resume cursor, version, rebuild, and confirmation for broad scopes. | P0.7-P0.8, W7.5 |
-| J9.6 | [ ] | Implement resumable backfill | Process deterministic inactive-slot batches with independent commits, unpublished partial progress, heartbeats, reports, exact resume, and no duplicate work; flip membership only for a complete P0.9 unit. | W7.9-W7.10, R8.8, J9.1, J9.5, J9.9 |
+| J9.6 | [x] | Implement resumable backfill | Process deterministic inactive-slot batches with independent commits, unpublished partial progress, heartbeats, reports, exact resume, and no duplicate work; flip membership only for a complete P0.9 unit. | W7.9-W7.10, R8.8, J9.1, J9.5, J9.9 |
 | J9.7 | [ ] | Add failure safety | Validation, DB, cancellation, report, and benchmark failures mark Core correctly, preserve only safely resumable unpublished chunks, roll back active work, never advance publication readiness, release locks, and expose safe errors. | J9.3-J9.6, J9.9 |
 | J9.8 | [ ] | Add vertical runner integration | Run append, no-op, correction, version rebuild, and resumed backfill through PostgreSQL, Core, JSON, and PDF with zero fixture residue. | J9.3-J9.7 |
 
@@ -215,6 +215,17 @@ public API/README guidance and unit/live query coverage. Focused pytest passed
 integration passed 9. Poetry check/lock, `pip check`, compileall, 88-column
 scan, sdist/wheel build and isolated imports, Flyway validation of 39
 migrations, and `git diff --check` passed.
+
+Done: 2026-08-24 — added `backfill_runner.py` and
+`backfill_publication.py` for independently committed inactive-slot batches,
+exact out-of-range active-row copies, durable cursor/prefix validation,
+unpublished `PARTIAL` JSON/PDF and Core evidence, complete-listing membership,
+and one terminal P0.9 flip; added
+public API/README guidance and cleanup-safe PostgreSQL resume coverage. Full
+package pytest passed 659 with 25 skips; focused backfill/daily/publication
+PostgreSQL pytest passed 9 with zero J9.6 fixture residue. Poetry check,
+`pip check`, compileall, 88-column scan, sdist/wheel build and source/wheel
+imports, Flyway validation of 39 migrations, and `git diff --check` passed.
 
 ---
 

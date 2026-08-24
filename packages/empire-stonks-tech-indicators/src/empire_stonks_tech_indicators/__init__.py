@@ -202,6 +202,10 @@ from empire_stonks_tech_indicators.writer_lock import (
 )
 
 if TYPE_CHECKING:
+    from empire_stonks_tech_indicators.backfill_runner import (
+        TechIndicatorsBackfillRunResult,
+        run_tech_indicators_backfill,
+    )
     from empire_stonks_tech_indicators.daily_runner import (
         TechIndicatorsDailyRunResult,
         run_tech_indicators_daily,
@@ -299,6 +303,21 @@ if TYPE_CHECKING:
 
 
 def __getattr__(name: str) -> object:
+    if name in {
+        "TechIndicatorsBackfillRunResult",
+        "run_tech_indicators_backfill",
+    }:
+        from empire_stonks_tech_indicators.backfill_runner import (
+            TechIndicatorsBackfillRunResult,
+            run_tech_indicators_backfill,
+        )
+
+        exports = {
+            "TechIndicatorsBackfillRunResult": TechIndicatorsBackfillRunResult,
+            "run_tech_indicators_backfill": run_tech_indicators_backfill,
+        }
+        globals().update(exports)
+        return exports[name]
     if name in {"TechIndicatorsDailyRunResult", "run_tech_indicators_daily"}:
         from empire_stonks_tech_indicators.daily_runner import (
             TechIndicatorsDailyRunResult,
@@ -633,6 +652,8 @@ __all__ = [
     "resolve_tech_indicators_daily_scope",
     "TechIndicatorsDailyRunResult",
     "run_tech_indicators_daily",
+    "TechIndicatorsBackfillRunResult",
+    "run_tech_indicators_backfill",
     "AlignedReturnArrays",
     "BarStructureArrays",
     "BollingerStateArrays",

@@ -111,8 +111,22 @@ inexact explicit scopes, validates that a cursor belongs to the resolved range,
 and produces the P0.10 canonical hash plus bounded R8.1 scope/cursor facts.
 Execution date, batch size, confirmation, and resume position are deliberately
 absent from the hash: they are operational controls for the same immutable
-listing/range/version publication unit. J9.6 owns inactive-slot commits,
-durable cursor matching, and final publication.
+listing/range/version publication unit.
+
+`run_tech_indicators_backfill()` owns J9.6's staged execution. It calculates
+one complete current listing history at a time, writes deterministic
+1,000-10,000-row inactive-slot batches, and commits the payload plus cumulative
+cursor/count advance in each transaction. Existing active rows outside a
+non-rebuild date range are copied exactly between slots and reported separately
+from evaluated calculation outcomes; initial images and rebuilds calculate the
+complete source image. A positive `batch_limit` produces a
+durable `PARTIAL` JSON/PDF report and failed-partial Core run while leaving the
+candidate `BUILDING` and invisible. Resume requires the same immutable scope
+and exact durable cursor, rechecks the committed prefix against current source,
+and starts strictly after that cursor. Complete-listing membership is inserted
+only with its final batch; only the complete source image for every listing can
+become `PREPARED` and pass the lock-transaction terminal membership flip. Dry
+runs roll back all staged state after storing complete preview reports.
 
 `acquire_tech_indicators_writer_lock()` owns J9.9's P0.10 concurrency boundary.
 It accepts an injected zero-argument connection factory, explicitly begins one
