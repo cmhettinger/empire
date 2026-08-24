@@ -100,6 +100,20 @@ explicit rebuild input but never bypasses source readiness, calculation/row
 validation, publication, or the J9.9 writer lock. The resolved model exposes a
 bounded R8.1 `ReportScope`; its JSON form never emits the resolved ID set.
 
+`TechIndicatorsBackfillScope` owns J9.5's inclusive historical range,
+provider/market or exact-listing selection, inactive opt-in, 1,000-10,000-row
+batch size, V1 version/rebuild/dry-run facts, and optional exclusive
+`TechIndicatorsBackfillCursor`. Provider/market/unfiltered cohorts, more than
+100 requested or resolved listings, and more than 1,000,000 resolved source
+rows require `confirm_broad_scope=True`; confirmation remains mandatory for a
+dry run and does not bypass later validation. Resolution fails on empty or
+inexact explicit scopes, validates that a cursor belongs to the resolved range,
+and produces the P0.10 canonical hash plus bounded R8.1 scope/cursor facts.
+Execution date, batch size, confirmation, and resume position are deliberately
+absent from the hash: they are operational controls for the same immutable
+listing/range/version publication unit. J9.6 owns inactive-slot commits,
+durable cursor matching, and final publication.
+
 `acquire_tech_indicators_writer_lock()` owns J9.9's P0.10 concurrency boundary.
 It accepts an injected zero-argument connection factory, explicitly begins one
 dedicated `READ COMMITTED` transaction, and makes exactly one nonblocking
@@ -208,6 +222,11 @@ The immutable domain-model API consists of:
 - `TechIndicatorsDailyScope`, `ResolvedTechIndicatorsDailyScope`, and
   `resolve_tech_indicators_daily_scope()` for exact daily selection, canonical
   scope/Core identity, same-snapshot readiness, force planning, and report facts
+- `TechIndicatorsBackfillCursor`, `TechIndicatorsBackfillScope`,
+  `ResolvedTechIndicatorsBackfillScope`, and
+  `resolve_tech_indicators_backfill_scope()` for bounded historical selection,
+  broad-scope confirmation, canonical publication identity, batch/resume
+  controls, rebuild planning, and report projections
 - `TechIndicatorsDailyRunResult` and `run_tech_indicators_daily()` for the
   package-owned daily vertical: global lock, healthy no-op proof, affected
   ranges, complete-row calculation/validation, rollback-only candidate summary,

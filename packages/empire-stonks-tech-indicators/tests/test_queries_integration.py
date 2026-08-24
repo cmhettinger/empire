@@ -10,6 +10,8 @@ import pytest
 
 from empire_stonks_tech_indicators import (
     BenchmarkConfig,
+    TechIndicatorsBackfillCursor,
+    TechIndicatorsBackfillScope,
     TechIndicatorsDailyScope,
     TechIndicatorsScope,
     TechIndicatorsValidationError,
@@ -18,6 +20,7 @@ from empire_stonks_tech_indicators import (
     iter_state_comparison_pages,
     load_spx_benchmark_history,
     read_published_model_inputs,
+    resolve_tech_indicators_backfill_scope,
     resolve_tech_indicators_daily_scope,
     resolve_spx_benchmark,
     select_eligible_listings,
@@ -1061,6 +1064,33 @@ def test_source_readiness_uses_same_date_live_coverage_and_core_evidence(
         assert resolved_daily.to_report_scope().resolved_listing_count == 1
         assert resolved_daily.to_report_scope().dry_run is True
         assert resolved_daily.to_report_scope().rebuild is True
+
+        resolved_backfill = resolve_tech_indicators_backfill_scope(
+            cursor=cursor,
+            scope=TechIndicatorsBackfillScope(
+                effective_date=date(2026, 8, 24),
+                start_date=effective_date,
+                end_date=effective_date,
+                provider_listing_ids=(listing_id,),
+                batch_size=1_000,
+                resume_cursor=TechIndicatorsBackfillCursor(
+                    provider_listing_id=listing_id,
+                    trading_date=effective_date,
+                    batch_number=1,
+                ),
+                rebuild=True,
+            ),
+        )
+
+        assert resolved_backfill.source_observation_count == 1
+        assert resolved_backfill.subject_key == (
+            f"scope:{resolved_backfill.scope_hash}"
+        )
+        assert resolved_backfill.explicit_rebuild_listing_ids == (listing_id,)
+        assert resolved_backfill.resumed_from_cursor is not None
+        assert resolved_backfill.to_report_scope().effective_date is None
+        assert resolved_backfill.to_report_scope().start_date == effective_date
+        assert resolved_backfill.to_report_scope().rebuild is True
 
         unsupported_date = date(2099, 1, 5)
         not_ready = decide_source_readiness(

@@ -6,6 +6,14 @@ from empire_stonks_tech_indicators.config import (
     BenchmarkConfig,
     TechIndicatorsConfig,
 )
+from empire_stonks_tech_indicators.backfill_scope import (
+    BACKFILL_CONFIRMATION_MAX_LISTINGS,
+    BACKFILL_CONFIRMATION_MAX_SOURCE_ROWS,
+    ResolvedTechIndicatorsBackfillScope,
+    TechIndicatorsBackfillCursor,
+    TechIndicatorsBackfillScope,
+    resolve_tech_indicators_backfill_scope,
+)
 from empire_stonks_tech_indicators.core_lifecycle import (
     TECH_INDICATORS_CORE_DOMAIN,
     TECH_INDICATORS_DEFAULT_SUBJECT_KEY,
@@ -614,6 +622,12 @@ __all__ = [
     "acquire_tech_indicators_writer_lock",
     "TECH_INDICATORS_SCOPED_SUBJECT_PREFIX",
     "TECH_INDICATORS_SCOPE_SCHEMA_VERSION",
+    "BACKFILL_CONFIRMATION_MAX_LISTINGS",
+    "BACKFILL_CONFIRMATION_MAX_SOURCE_ROWS",
+    "ResolvedTechIndicatorsBackfillScope",
+    "TechIndicatorsBackfillCursor",
+    "TechIndicatorsBackfillScope",
+    "resolve_tech_indicators_backfill_scope",
     "ResolvedTechIndicatorsDailyScope",
     "TechIndicatorsDailyScope",
     "resolve_tech_indicators_daily_scope",
