@@ -141,6 +141,13 @@ to the same fixed safe failure state. Runtime cancellations retain their
 native exception type, while ordinary failures expose only the fixed workflow
 message and retain the underlying exception as the Python cause.
 
+J9.8's cleanup-safe PostgreSQL vertical proves the complete runner transition
+chain: a true daily tail append, healthy no-op, source correction, staged
+version rebuild, partial backfill, and exact resume. Every transition closes
+Core with aggregate-only facts and stores a matching durable JSON/PDF pair.
+SPX may remain a source/readiness dependency for a benchmark-only scope without
+being reported as selected supported-subject benchmark coverage.
+
 `acquire_tech_indicators_writer_lock()` owns J9.9's P0.10 concurrency boundary.
 It accepts an injected zero-argument connection factory, explicitly begins one
 dedicated `READ COMMITTED` transaction, and makes exactly one nonblocking

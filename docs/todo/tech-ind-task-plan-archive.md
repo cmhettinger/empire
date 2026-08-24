@@ -942,3 +942,104 @@ passed`; an 11-page stored PDF with Poppler/pypdf; Poetry lock/check, build,
 `git diff --check`.
 
 ---
+
+## Phase 9: Implement Daily And Backfill Runners
+
+Goal: own complete Core-tracked workflows in the package while callers provide
+runtime services and explicit scope.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| J9.1 | [x] | Add Core lifecycle | Start, heartbeat, succeed, fail, and summarize jobs with stable identity and no source/feature payloads in Core metadata. | P0.2, B1.6 |
+| J9.2 | [x] | Define daily scope | Add effective date, provider/market/listing filters, readiness, version, dry-run, and force semantics; reject ambiguity. | P0.7, I3.6, W7.5 |
+| J9.9 | [x] | Add package-owned writer lock | Implement P0.10's single PostgreSQL transaction advisory lock on a dedicated connection; all mutating scopes share it, contention returns immediately without workflow state, heartbeats detect loss, terminal publication uses the lock connection, and every terminal path releases it. | P0.10, J9.1-J9.2 |
+| J9.3 | [x] | Implement daily runner | Sequence lock acquisition, readiness, planning, calculation, validation, atomic publication, summaries, JSON/PDF storage, and Core completion. | W7.8, W7.10, R8.8, J9.1-J9.2, J9.9 |
+| J9.4 | [x] | Implement healthy no-op | No eligible new/corrected/version work succeeds with explicit readiness and durable reports but no writes. | J9.3 |
+| J9.5 | [x] | Define backfill scope | Add provider/market/listing/date ranges, batches, resume cursor, version, rebuild, and confirmation for broad scopes. | P0.7-P0.8, W7.5 |
+| J9.6 | [x] | Implement resumable backfill | Process deterministic inactive-slot batches with independent commits, unpublished partial progress, heartbeats, reports, exact resume, and no duplicate work; flip membership only for a complete P0.9 unit. | W7.9-W7.10, R8.8, J9.1, J9.5, J9.9 |
+| J9.7 | [x] | Add failure safety | Validation, DB, cancellation, report, and benchmark failures mark Core correctly, preserve only safely resumable unpublished chunks, roll back active work, never advance publication readiness, release locks, and expose safe errors. | J9.3-J9.6, J9.9 |
+| J9.8 | [x] | Add vertical runner integration | Run append, no-op, correction, version rebuild, and resumed backfill through PostgreSQL, Core, JSON, and PDF with zero fixture residue. | J9.3-J9.7 |
+
+Done: 2026-08-23 — added immutable aggregate-only Core start/heartbeat/succeed/
+fail handling in `core_lifecycle.py`, public API/README guidance, and unit plus
+cleanup-safe PostgreSQL coverage. Focused lifecycle/API pytest passed 21; full
+package pytest passed 584. Poetry lock/dependency/compile checks, 88-column
+scan, wheel/sdist build and source/wheel imports, Flyway validation of 39
+migrations, zero Core fixture residue, and `git diff --check` passed.
+
+Done: 2026-08-23 — added canonical exact-date daily request/resolution in
+`daily_scope.py`, same-resolution I3.6 readiness, P0.10 hash/scoped Core
+identity, W7.5 force IDs, R8.1 report projection, public API/README guidance,
+and focused/unit/PostgreSQL coverage. Focused pytest passed 80; full package
+pytest passed 584 with 17 skips; rollback-only PostgreSQL pytest passed 9.
+Poetry check, `pip check`, compileall, 88-column scan, wheel/sdist build and
+isolated wheel import, Flyway validation of 39 migrations, and
+`git diff --check` passed.
+
+Done: 2026-08-23 — added the single-use package-owned P0.10 transaction lock
+in `writer_lock.py`, including fixed-key nonblocking acquisition, bounded
+contention/exit-75 facts, dedicated-connection heartbeat/loss, terminal-cursor
+commit, rollback/context cleanup, safe errors, public API/README guidance, and
+unit plus live concurrency coverage. Focused pytest passed 69; full package
+pytest passed 606 with 20 skips; PostgreSQL lock/publication/query integration
+passed 17 with zero workflow-state drift. Poetry check, `pip check`,
+compileall, 88-column scan, wheel/sdist build and isolated wheel import,
+Flyway validation of 39 migrations, and `git diff --check` passed.
+
+Done: 2026-08-23 — added `daily_runner.py` and `daily_publication.py` for the
+non-empty daily/dry-run vertical, rollback-only exact candidate summaries,
+durable JSON/PDF evidence, Core completion, and lock-transaction publication;
+added API/README guidance and unit/PostgreSQL vertical coverage. Full package
+pytest passed 615 with 23 skips; focused PostgreSQL passed 12, including dry
+and atomic published JSON/PDF verticals with zero residue. Poetry check/
+compile, 88-column scan, sdist/wheel build and isolated imports, Flyway
+validation of 39 migrations, and `git diff --check` passed.
+
+Done: 2026-08-23 — added the published-readiness-backed healthy no-op branch
+in `daily_runner.py`, durable `NO_OP` JSON/PDF and Core evidence, second-token
+drift protection, dry-zero semantics, README guidance, and live zero-write
+coverage in `test_daily_noop_integration.py`. Full package pytest passed 616
+with 24 skips; focused PostgreSQL passed 13 with zero fixture residue. Poetry
+check, compileall, 88-column scan, sdist/wheel build and isolated imports,
+Flyway validation of 39 migrations, and `git diff --check` passed.
+
+Done: 2026-08-24 — added `backfill_scope.py` with bounded inclusive selection,
+P0.10 identity, batch/resume controls, rebuild/inactive semantics, exact source-
+cursor validation, and 100-listing/1,000,000-row broad confirmation; added
+public API/README guidance and unit/live query coverage. Focused pytest passed
+63; full package pytest passed 657 with 24 skips; read-only PostgreSQL query
+integration passed 9. Poetry check/lock, `pip check`, compileall, 88-column
+scan, sdist/wheel build and isolated imports, Flyway validation of 39
+migrations, and `git diff --check` passed.
+
+Done: 2026-08-24 — added `backfill_runner.py` and
+`backfill_publication.py` for independently committed inactive-slot batches,
+exact out-of-range active-row copies, durable cursor/prefix validation,
+unpublished `PARTIAL` JSON/PDF and Core evidence, complete-listing membership,
+and one terminal P0.9 flip; added
+public API/README guidance and cleanup-safe PostgreSQL resume coverage. Full
+package pytest passed 659 with 25 skips; focused backfill/daily/publication
+PostgreSQL pytest passed 9 with zero J9.6 fixture residue. Poetry check,
+`pip check`, compileall, 88-column scan, sdist/wheel build and source/wheel
+imports, Flyway validation of 39 migrations, and `git diff --check` passed.
+
+Done: 2026-08-24 — added shared fail-closed runner cleanup in
+`failure_safety.py`, Core post-success correction, terminal candidate recovery,
+cursor-proven failed-Core resume classification, safe outward errors, and
+failure-injection coverage. Full package pytest passed 666 with 25 skips;
+focused PostgreSQL publication/daily/backfill pytest passed 8 with zero fixture
+residue. Poetry check, `pip check`, compileall, changed-file 88-column scan,
+package build, source/wheel imports, Flyway validation of 39 migrations, and
+`git diff --check` passed.
+
+Done: 2026-08-24 — added the cleanup-safe append/no-op/correction/version-
+rebuild/partial-resume PostgreSQL vertical in
+`test_runner_vertical_integration.py` and corrected benchmark-only no-op report
+facts in `daily_runner.py`. The vertical passed with seven matching Core and
+JSON/PDF outcomes; all PostgreSQL integrations passed 26 with zero J9.8/SPX
+fixture residue; full package pytest passed 666 with 26 skips. Poetry check,
+`pip check`, compileall, changed-file 88-column scan, package build,
+source/wheel imports, Flyway validation of 39 migrations, and
+`git diff --check` passed.
+
+---

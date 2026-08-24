@@ -925,6 +925,8 @@ def _build_report(
         if readiness_token is not None
         else None if benchmark is None else benchmark.benchmark.provider_listing_id
     )
+    if database_summary.benchmark.supported_listing_count == 0:
+        benchmark_provider_listing_id = None
     return TechIndicatorsReport(
         report_id=DAILY_REPORT_ID,
         workflow_kind=WorkflowKind.DAILY,
