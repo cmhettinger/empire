@@ -90,6 +90,26 @@ command directly. The check proves configuration and infrastructure readiness;
 it does not claim effective-date source or published model-input readiness and
 does not acquire the writer lock.
 
+The installed `stonks-tech-indicators-daily` command and local wrapper expose
+the package-owned J9 daily runner with exact effective-date, repeatable provider,
+market or listing scope, calculation-version, dry-run, and explicit-force
+options:
+
+```bash
+bin/stonks-tech-indicators-daily --effective-date 2026-08-24 --dry-run
+bin/stonks-tech-indicators-daily \
+  --effective-date 2026-08-24 \
+  --provider-code EODDATA \
+  --market NASDAQ
+```
+
+Exact listing IDs cannot be combined with provider or market filters. The
+wrapper loads `deploy/env/local.env`; the installed command expects its runtime
+environment to be loaded already. Success reserves stdout for one compact JSON
+result. Writer-lock contention produces compact JSON on stderr and exit code
+75 without creating workflow state; other runtime failures expose only a fixed
+safe message.
+
 `TechIndicatorsCoreRun` owns the reusable J9.1 Core lifecycle for the frozen
 daily and backfill jobs. `start()` validates the `stonks` domain, job,
 unfiltered `all_series` or J9.2 `scope:<lowercase SHA-256>` subject, effective

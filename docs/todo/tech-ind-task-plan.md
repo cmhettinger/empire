@@ -154,7 +154,7 @@ Goal: expose safe operator workflows before Airflow coordination.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | O10.1 | [x] | Add config command | Add a secret-safe package command and `bin/stonks-tech-indicators-config` using `bin/env-load`; validate runtime, dependency, benchmark, and DB readiness. | B1.5-B1.8, I3.6 |
-| O10.2 | [ ] | Add daily command | Add package command and `bin/stonks-tech-indicators-daily` with effective date/scope/version/dry-run options and compact JSON stdout. | J9.3-J9.4 |
+| O10.2 | [x] | Add daily command | Add package command and `bin/stonks-tech-indicators-daily` with effective date/scope/version/dry-run options and compact JSON stdout. | J9.3-J9.4 |
 | O10.3 | [ ] | Add backfill command | Add package command and `bin/stonks-tech-indicators-backfill` with bounded scope, resume, rebuild protection, progress, and compact JSON stdout. | J9.5-J9.7 |
 | O10.4 | [ ] | Add inspect command | Add read-only `bin/stonks-tech-indicators-inspect` for coverage, freshness, drift, SPX readiness, and bounded samples without target recommendations. | W7.7, R8.2 |
 | O10.5 | [ ] | Add CLI validation | Cover help, invalid scopes, missing config, benchmark failure, lock contention, dry run, no-op, success, resume, exit codes, and safe stdout/stderr. | O10.1-O10.4 |
@@ -169,6 +169,15 @@ package pytest passed 674 with 26 environment-gated skips; Poetry check/install,
 `make db-validate` validated 39 migrations, and the live wrapper returned ready
 for Python 3.14.6, NumPy 2.4.6, TA-Lib/C 0.7.1, PostgreSQL 18.4, ten required
 relations/privileges, active `global` storage, and reviewed `YAHOO/XIDX/SPX`.
+
+Done: 2026-08-25 — added the installed `scripts.daily` command,
+`bin/stonks-tech-indicators-daily`, focused CLI tests, and README guidance for
+effective-date, provider/market/listing, version, dry-run, force, compact-success,
+and exit-75 contention behavior. Full package pytest passed 684 with 26
+environment-gated skips; focused cleanup-safe PostgreSQL/Core runner pytest
+passed 3; Poetry check/install, `pip check`, compileall, build and wheel
+entry-point inspection, Bash/package/wrapper help smokes, `make db-validate`
+(39 migrations), and `git diff --check` passed.
 
 ---
 
