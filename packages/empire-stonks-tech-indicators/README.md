@@ -110,6 +110,30 @@ result. Writer-lock contention produces compact JSON on stderr and exit code
 75 without creating workflow state; other runtime failures expose only a fixed
 safe message.
 
+The installed `stonks-tech-indicators-backfill` command and local wrapper expose
+the J9 staged backfill with required inclusive dates, exact provider/market or
+listing scope, bounded batches, partial-run limits, exact resume cursors,
+inactive-listing opt-in, dry runs, and explicit broad-scope and rebuild
+confirmations:
+
+```bash
+bin/stonks-tech-indicators-backfill \
+  --effective-date 2026-08-24 \
+  --start-date 2025-01-01 \
+  --end-date 2026-08-23 \
+  --provider-listing-id 00000000-0000-4000-8000-000000000001 \
+  --batch-limit 2
+```
+
+Each completed batch emits one compact, aggregate progress object on stderr
+after its transaction boundary. A requested batch limit returns `partial` on
+stdout with the exact cursor fields needed by the three `--resume-*` options;
+the staged candidate remains unpublished. Rebuild requires both `--rebuild`
+and `--confirm-rebuild`. Provider, market, unfiltered, and larger resolved
+scopes require `--confirm-broad-scope`, including dry runs. Contention retains
+the daily command's stderr/exit-75 contract, and all other runtime failures use
+a fixed safe message.
+
 `TechIndicatorsCoreRun` owns the reusable J9.1 Core lifecycle for the frozen
 daily and backfill jobs. `start()` validates the `stonks` domain, job,
 unfiltered `all_series` or J9.2 `scope:<lowercase SHA-256>` subject, effective

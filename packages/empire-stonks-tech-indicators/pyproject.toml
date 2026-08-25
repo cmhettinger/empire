@@ -20,6 +20,7 @@ pypdf = ">=6,<7"
 [tool.poetry.scripts]
 stonks-tech-indicators-config = "empire_stonks_tech_indicators.scripts.config:main"
 stonks-tech-indicators-daily = "empire_stonks_tech_indicators.scripts.daily:main"
+stonks-tech-indicators-backfill = "empire_stonks_tech_indicators.scripts.backfill:main"
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]

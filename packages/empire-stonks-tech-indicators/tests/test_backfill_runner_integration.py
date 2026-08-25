@@ -98,6 +98,7 @@ def test_backfill_commits_partial_progress_and_resumes_without_duplicate_work(
             run_type="manual",
             runner=runner_identity,
         )
+        progress_events: list[dict[str, object]] = []
         first = run_tech_indicators_backfill(
             **services,
             scope=TechIndicatorsBackfillScope(
@@ -108,10 +109,23 @@ def test_backfill_commits_partial_progress_and_resumes_without_duplicate_work(
                 batch_size=1000,
             ),
             batch_limit=1,
+            progress_sink=progress_events.append,
         )
         assert first.status == "partial"
         assert first.outcome is ReportOutcome.PARTIAL
         assert first.resume_cursor.batch_number == 1
+        assert progress_events == [
+            {
+                "run_id": str(first.run_id),
+                "stage": "batch",
+                "completed_batch_count": 1,
+                "committed_batch_count_this_run": 1,
+                "planned_batch_count": 2,
+                "staged_payload_row_count": 1000,
+                "resume_cursor": first.resume_cursor.to_dict(),
+                "durable": True,
+            }
+        ]
         publication_id = first.publication_id
         publication_ids.append(publication_id)
         run_ids.append(first.run_id)

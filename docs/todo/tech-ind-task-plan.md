@@ -155,7 +155,7 @@ Goal: expose safe operator workflows before Airflow coordination.
 |----|--------|------|---------------|------------|
 | O10.1 | [x] | Add config command | Add a secret-safe package command and `bin/stonks-tech-indicators-config` using `bin/env-load`; validate runtime, dependency, benchmark, and DB readiness. | B1.5-B1.8, I3.6 |
 | O10.2 | [x] | Add daily command | Add package command and `bin/stonks-tech-indicators-daily` with effective date/scope/version/dry-run options and compact JSON stdout. | J9.3-J9.4 |
-| O10.3 | [ ] | Add backfill command | Add package command and `bin/stonks-tech-indicators-backfill` with bounded scope, resume, rebuild protection, progress, and compact JSON stdout. | J9.5-J9.7 |
+| O10.3 | [x] | Add backfill command | Add package command and `bin/stonks-tech-indicators-backfill` with bounded scope, resume, rebuild protection, progress, and compact JSON stdout. | J9.5-J9.7 |
 | O10.4 | [ ] | Add inspect command | Add read-only `bin/stonks-tech-indicators-inspect` for coverage, freshness, drift, SPX readiness, and bounded samples without target recommendations. | W7.7, R8.2 |
 | O10.5 | [ ] | Add CLI validation | Cover help, invalid scopes, missing config, benchmark failure, lock contention, dry run, no-op, success, resume, exit codes, and safe stdout/stderr. | O10.1-O10.4 |
 | O10.6 | [ ] | Add operator documentation | Document setup, reports, scopes, publication readiness, lock contention/recovery, backfill/resume, rebuild, corrections, benchmark failure, and safe SQL inspection. | O10.1-O10.5 |
@@ -178,6 +178,15 @@ environment-gated skips; focused cleanup-safe PostgreSQL/Core runner pytest
 passed 3; Poetry check/install, `pip check`, compileall, build and wheel
 entry-point inspection, Bash/package/wrapper help smokes, `make db-validate`
 (39 migrations), and `git diff --check` passed.
+
+Done: 2026-08-25 — added the installed `scripts.backfill` command,
+`bin/stonks-tech-indicators-backfill`, post-batch aggregate JSON progress,
+bounded scope/batch controls, exact resume cursors, broad-scope/rebuild
+confirmation, focused tests, and README guidance. Full package pytest passed
+706 with 26 environment-gated skips; focused cleanup-safe PostgreSQL/Core
+partial/resume pytest passed 2; Poetry check/install, `pip check`, compileall,
+build and wheel entry-point inspection, Bash/package/wrapper help smokes,
+`make db-validate` (39 migrations), and `git diff --check` passed.
 
 ---
 

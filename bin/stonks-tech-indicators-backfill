@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  bin/stonks-tech-indicators-backfill \
+    --effective-date YYYY-MM-DD \
+    --start-date YYYY-MM-DD \
+    --end-date YYYY-MM-DD \
+    [--provider-code CODE ...] \
+    [--market MARKET ...] \
+    [--provider-listing-id UUID ...] \
+    [--include-inactive] [--batch-size ROWS] [--batch-limit BATCHES] \
+    [--resume-provider-listing-id UUID] \
+    [--resume-trading-date YYYY-MM-DD] [--resume-batch-number NUMBER] \
+    [--calculation-version VERSION] \
+    [--rebuild --confirm-rebuild] [--confirm-broad-scope] [--dry-run] \
+    [--env-file PATH]
+
+Description:
+  Loads the Empire environment and runs the package-owned resumable staged
+  technical-indicator backfill. Progress is compact JSON on stderr; a terminal
+  result, including any exact resume cursor, is compact JSON on stdout.
+
+Options:
+  --effective-date DATE       Required Core execution/benchmark evidence date.
+  --start-date DATE           Required inclusive first requested trading date.
+  --end-date DATE             Required inclusive last requested trading date.
+  --provider-code CODE        Include an exact provider; repeat as needed.
+  --market MARKET             Include an exact provider-native market; repeat.
+  --provider-listing-id UUID  Include an exact listing; repeat, and do not mix
+                              with provider or market filters.
+  --include-inactive          Exact-listing scopes only.
+  --batch-size ROWS           Rows per transaction; defaults to 5000 and must
+                              be between 1000 and 10000.
+  --batch-limit BATCHES       Stop after newly committing this many batches.
+  --resume-provider-listing-id UUID
+                              Listing UUID from the exact durable cursor.
+  --resume-trading-date DATE  Trading date from the exact durable cursor.
+  --resume-batch-number NUM   Batch number from the exact durable cursor.
+  --calculation-version VER   Calculation profile. Defaults to
+                              TECH_INDICATORS_V1.
+  --rebuild                   Recalculate complete selected listing images.
+  --confirm-rebuild           Required acknowledgement for --rebuild.
+  --confirm-broad-scope       Required for provider, market, unfiltered, or
+                              broad listing/row scopes, including dry runs.
+  --dry-run                   Calculate/report and roll back staged state;
+                              cannot resume or use --batch-limit.
+  --env-file PATH             Load an environment file before running. Defaults
+                              to deploy/env/local.env.
+  -h, --help                  Show this help message.
+EOF
+}
+
+ENV_FILE="deploy/env/local.env"
+ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env-file)
+      ENV_FILE="${2:-}"
+      if [[ -z "${ENV_FILE}" ]]; then
+        echo "ERROR: --env-file requires a path." >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      ARGS+=("$@")
+      break
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# shellcheck source=bin/env-load
+source "${REPO_ROOT}/bin/env-load" "${ENV_FILE}" >/dev/null
+
+PYTHON_BIN="${REPO_ROOT}/packages/empire-stonks-tech-indicators/.venv/bin/python"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "ERROR: python3 was not found." >&2
+  exit 1
+fi
+
+export PYTHONPATH="${REPO_ROOT}/packages/empire-stonks-tech-indicators/src:${REPO_ROOT}/packages/empire-core/src:${REPO_ROOT}/packages/empire-reports/src${PYTHONPATH:+:${PYTHONPATH}}"
+
+if ! "${PYTHON_BIN}" -c 'import empire_core, empire_reports, empire_stonks_tech_indicators' >/dev/null 2>&1; then
+  echo "ERROR: empire-stonks-tech-indicators dependencies are not installed for ${PYTHON_BIN}." >&2
+  echo "       Run: cd packages/empire-stonks-tech-indicators && poetry install" >&2
+  exit 1
+fi
+
+exec "${PYTHON_BIN}" -m empire_stonks_tech_indicators.scripts.backfill "${ARGS[@]}"

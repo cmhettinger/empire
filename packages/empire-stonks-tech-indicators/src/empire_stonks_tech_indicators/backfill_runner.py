@@ -110,6 +110,7 @@ from empire_stonks_tech_indicators.writer_lock import (
 
 
 Clock = Callable[[], datetime]
+ProgressSink = Callable[[dict[str, object]], None]
 
 
 def _utc_now() -> datetime:
@@ -214,6 +215,7 @@ def run_tech_indicators_backfill(
     run_type: str,
     runner: str,
     batch_limit: int | None = None,
+    progress_sink: ProgressSink | None = None,
     clock: Clock = _utc_now,
 ) -> TechIndicatorsBackfillRunResult:
     """Stage complete listing images in committed batches and publish once."""
@@ -222,6 +224,8 @@ def run_tech_indicators_backfill(
         raise ValueError("batch_limit must be a positive integer or None.")
     if scope.dry_run and (scope.resume_cursor is not None or batch_limit is not None):
         raise ValueError("dry-run cannot resume or stop with partial progress.")
+    if progress_sink is not None and not callable(progress_sink):
+        raise TypeError("progress_sink must be callable or None.")
     acquired = acquire_tech_indicators_writer_lock(
         connection_factory=lock_connection_factory
     )
@@ -422,6 +426,14 @@ def run_tech_indicators_backfill(
                         connection.commit()
                     lock.heartbeat()
                     core_run.heartbeat()
+                    _emit_progress(
+                        progress_sink,
+                        run_id=core_run.run_context.run_id,
+                        progress=progress,
+                        planned_batch_count=planned_batch_count,
+                        committed_this_run=committed_this_run,
+                        durable=not scope.dry_run,
+                    )
                     if batch_limit == committed_this_run:
                         return _finish(
                             connection=connection,
@@ -496,6 +508,32 @@ def run_tech_indicators_backfill(
         if cancelled:
             raise
         raise safe_workflow_error(error) from error
+
+
+def _emit_progress(
+    sink: ProgressSink | None,
+    *,
+    run_id: UUID,
+    progress: BackfillPublicationProgress,
+    planned_batch_count: int,
+    committed_this_run: int,
+    durable: bool,
+) -> None:
+    if sink is None:
+        return
+    assert progress.cursor is not None
+    sink(
+        {
+            "run_id": str(run_id),
+            "stage": "batch",
+            "completed_batch_count": progress.completed_batch_count,
+            "committed_batch_count_this_run": committed_this_run,
+            "planned_batch_count": planned_batch_count,
+            "staged_payload_row_count": progress.staged_payload_row_count,
+            "resume_cursor": progress.cursor.to_dict(),
+            "durable": durable,
+        }
+    )
 
 
 def _finish(
