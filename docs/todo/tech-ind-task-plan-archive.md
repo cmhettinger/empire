@@ -1043,3 +1043,82 @@ source/wheel imports, Flyway validation of 39 migrations, and
 `git diff --check` passed.
 
 ---
+
+## Phase 10: Add Package Commands And `bin/` Wrappers
+
+Goal: expose safe operator workflows before Airflow coordination.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| O10.1 | [x] | Add config command | Add a secret-safe package command and `bin/stonks-tech-indicators-config` using `bin/env-load`; validate runtime, dependency, benchmark, and DB readiness. | B1.5-B1.8, I3.6 |
+| O10.2 | [x] | Add daily command | Add package command and `bin/stonks-tech-indicators-daily` with effective date/scope/version/dry-run options and compact JSON stdout. | J9.3-J9.4 |
+| O10.3 | [x] | Add backfill command | Add package command and `bin/stonks-tech-indicators-backfill` with bounded scope, resume, rebuild protection, progress, and compact JSON stdout. | J9.5-J9.7 |
+| O10.4 | [x] | Add inspect command | Add read-only `bin/stonks-tech-indicators-inspect` for coverage, freshness, drift, SPX readiness, and bounded samples without target recommendations. | W7.7, R8.2 |
+| O10.5 | [x] | Add CLI validation | Cover help, invalid scopes, missing config, benchmark failure, lock contention, dry run, no-op, success, resume, exit codes, and safe stdout/stderr. | O10.1-O10.4 |
+| O10.6 | [x] | Add operator documentation | Document setup, reports, scopes, publication readiness, lock contention/recovery, backfill/resume, rebuild, corrections, benchmark failure, and safe SQL inspection. | O10.1-O10.5 |
+| O10.7 | [x] | Verify installed commands | Build/install and prove package scripts/wrappers work in Poetry and Airflow with environment loading owned by runtime. | O10.1-O10.6 |
+
+Done: 2026-08-25 — added package-owned runtime/dependency/database/SPX checks
+in `config_readiness.py`, the installed `scripts.config` command,
+`bin/stonks-tech-indicators-config`, focused tests, and README guidance. Full
+package pytest passed 674 with 26 environment-gated skips; Poetry check/install,
+`pip check`, compileall, build, Bash/help smokes, and `git diff --check` passed;
+`make db-validate` validated 39 migrations, and the live wrapper returned ready
+for Python 3.14.6, NumPy 2.4.6, TA-Lib/C 0.7.1, PostgreSQL 18.4, ten required
+relations/privileges, active `global` storage, and reviewed `YAHOO/XIDX/SPX`.
+
+Done: 2026-08-25 — added the installed `scripts.daily` command,
+`bin/stonks-tech-indicators-daily`, focused CLI tests, and README guidance for
+effective-date, provider/market/listing, version, dry-run, force, compact-success,
+and exit-75 contention behavior. Full package pytest passed 684 with 26
+environment-gated skips; focused cleanup-safe PostgreSQL/Core runner pytest
+passed 3; Poetry check/install, `pip check`, compileall, build and wheel
+entry-point inspection, Bash/package/wrapper help smokes, `make db-validate`
+(39 migrations), and `git diff --check` passed.
+
+Done: 2026-08-25 — added the installed `scripts.backfill` command,
+`bin/stonks-tech-indicators-backfill`, post-batch aggregate JSON progress,
+bounded scope/batch controls, exact resume cursors, broad-scope/rebuild
+confirmation, focused tests, and README guidance. Full package pytest passed
+706 with 26 environment-gated skips; focused cleanup-safe PostgreSQL/Core
+partial/resume pytest passed 2; Poetry check/install, `pip check`, compileall,
+build and wheel entry-point inspection, Bash/package/wrapper help smokes,
+`make db-validate` (39 migrations), and `git diff --check` passed.
+
+Done: 2026-08-25 — added `inspection.py`, the installed `scripts.inspect`
+command, `bin/stonks-tech-indicators-inspect`, bounded CLI/service/PostgreSQL
+tests, and README guidance for read-only coverage, freshness, drift, and
+SPX/source-readiness facts without feature values or recommendations. Full
+package pytest passed 724 with 27 environment-gated skips; focused unit/query
+pytest passed 93 and read-only PostgreSQL pytest passed 10; Poetry check/install,
+`pip check`, compileall, build/wheel inspection, Bash/package/wrapper and bounded
+live-wrapper smokes, `make db-validate` (39 migrations), and `git diff --check`
+passed.
+
+Done: 2026-08-25 — completed config/daily/backfill/inspect CLI validation in
+the four `tests/test_*_cli.py` suites, adding explicit secret-safe pre-connect
+missing-config coverage and daily `NO_OP` success output. Focused CLI pytest
+passed 55; cleanup-safe PostgreSQL dry-run/success/no-op/resume/lock/inspection
+pytest passed 8; full package pytest passed 728 with 27 environment-gated skips;
+four wrapper Bash/help smokes, Poetry check, `make db-validate` (39 migrations),
+and `git diff --check` passed.
+
+Done: 2026-08-25 — added
+`docs/stonks/tech-indicators-operator-runbook.md` and linked it from the package
+README, covering setup, bounded scopes, publication/readiness, reports,
+contention/recovery, backfill/resume, rebuild/corrections, benchmark failure,
+and safe SQL. Focused CLI pytest passed 55; four wrapper Bash/help smokes, live
+config and bounded inspect, six live read-only SQL checks, and 35 report/render
+pytest passed; 21/21 documentation links, balanced fences, Poetry check,
+`make db-validate` (39 migrations), and `git diff --check` passed.
+
+Done: 2026-08-25 — verified package 0.1.0 build/install and all four console
+scripts plus wrappers in Poetry and the fresh Airflow 3.2.1 image. Poetry and
+wrapper live readiness passed on Python 3.14.6; the Compose-owned Airflow
+runtime supplied 10/10 settings, passed `pip check`, all four help smokes, and
+live readiness on Python 3.13.13 without package-owned environment loading.
+Wheel/sdist build and four-entry-point inspection, full package pytest (728
+passed, 27 environment-gated skips), compileall, `make db-validate` (39
+migrations), archive checks, and `git diff --check` passed.
+
+---
