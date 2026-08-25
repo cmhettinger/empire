@@ -157,7 +157,7 @@ Goal: expose safe operator workflows before Airflow coordination.
 | O10.2 | [x] | Add daily command | Add package command and `bin/stonks-tech-indicators-daily` with effective date/scope/version/dry-run options and compact JSON stdout. | J9.3-J9.4 |
 | O10.3 | [x] | Add backfill command | Add package command and `bin/stonks-tech-indicators-backfill` with bounded scope, resume, rebuild protection, progress, and compact JSON stdout. | J9.5-J9.7 |
 | O10.4 | [x] | Add inspect command | Add read-only `bin/stonks-tech-indicators-inspect` for coverage, freshness, drift, SPX readiness, and bounded samples without target recommendations. | W7.7, R8.2 |
-| O10.5 | [ ] | Add CLI validation | Cover help, invalid scopes, missing config, benchmark failure, lock contention, dry run, no-op, success, resume, exit codes, and safe stdout/stderr. | O10.1-O10.4 |
+| O10.5 | [x] | Add CLI validation | Cover help, invalid scopes, missing config, benchmark failure, lock contention, dry run, no-op, success, resume, exit codes, and safe stdout/stderr. | O10.1-O10.4 |
 | O10.6 | [ ] | Add operator documentation | Document setup, reports, scopes, publication readiness, lock contention/recovery, backfill/resume, rebuild, corrections, benchmark failure, and safe SQL inspection. | O10.1-O10.5 |
 | O10.7 | [ ] | Verify installed commands | Build/install and prove package scripts/wrappers work in Poetry and Airflow with environment loading owned by runtime. | O10.1-O10.6 |
 
@@ -197,6 +197,14 @@ pytest passed 93 and read-only PostgreSQL pytest passed 10; Poetry check/install
 `pip check`, compileall, build/wheel inspection, Bash/package/wrapper and bounded
 live-wrapper smokes, `make db-validate` (39 migrations), and `git diff --check`
 passed.
+
+Done: 2026-08-25 — completed config/daily/backfill/inspect CLI validation in
+the four `tests/test_*_cli.py` suites, adding explicit secret-safe pre-connect
+missing-config coverage and daily `NO_OP` success output. Focused CLI pytest
+passed 55; cleanup-safe PostgreSQL dry-run/success/no-op/resume/lock/inspection
+pytest passed 8; full package pytest passed 728 with 27 environment-gated skips;
+four wrapper Bash/help smokes, Poetry check, `make db-validate` (39 migrations),
+and `git diff --check` passed.
 
 ---
 

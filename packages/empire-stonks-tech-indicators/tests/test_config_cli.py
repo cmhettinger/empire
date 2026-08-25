@@ -92,7 +92,10 @@ def test_config_cli_hides_config_and_database_exception_text(
         ),
     )
 
-    exit_code = cli.main([], connect_from_env=FakeConnection)
+    exit_code = cli.main(
+        [],
+        connect_from_env=lambda: pytest.fail("database must not open"),
+    )
 
     captured = capsys.readouterr()
     assert exit_code == 1

@@ -191,6 +191,30 @@ def test_inspect_cli_hides_runtime_exception_text(
     assert connection.exited is True
 
 
+def test_inspect_cli_hides_missing_config_and_does_not_connect(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        cli.TechIndicatorsConfig,
+        "from_env",
+        lambda: (_ for _ in ()).throw(
+            RuntimeError("password=must-not-leak")
+        ),
+    )
+
+    exit_code = cli.main(
+        ["--effective-date", "2026-08-24"],
+        connect_from_env=lambda: pytest.fail("database must not open"),
+    )
+
+    output = capsys.readouterr()
+    assert exit_code == 1
+    assert output.out == ""
+    assert output.err == cli.SAFE_INSPECTION_FAILURE + "\n"
+    assert "must-not-leak" not in output.err
+
+
 def test_inspect_cli_help_does_not_connect(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

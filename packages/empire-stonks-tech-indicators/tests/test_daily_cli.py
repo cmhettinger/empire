@@ -62,6 +62,18 @@ def _success_result() -> TechIndicatorsDailyRunResult:
     )
 
 
+def _noop_result() -> TechIndicatorsDailyRunResult:
+    return TechIndicatorsDailyRunResult(
+        status="succeeded",
+        effective_date=EFFECTIVE_DATE,
+        run_id=RUN_ID,
+        publication_id=None,
+        json_report_object_id=JSON_ID,
+        pdf_report_object_id=PDF_ID,
+        outcome=ReportOutcome.NO_OP,
+    )
+
+
 def test_daily_cli_wires_exact_scope_and_prints_compact_json(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -113,6 +125,24 @@ def test_daily_cli_wires_exact_scope_and_prints_compact_json(
     assert scope.provider_listing_ids == ()
     assert scope.dry_run is True
     assert scope.force is True
+
+
+def test_daily_cli_prints_noop_as_success(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    result = _noop_result()
+
+    exit_code = cli.main(
+        ["--effective-date", "2026-08-24"],
+        connect_from_env=ConnectionFactory(),
+        runner=lambda **_: result,
+    )
+
+    output = capsys.readouterr()
+    assert exit_code == 0
+    assert json.loads(output.out) == result.to_dict()
+    assert output.out.count("\n") == 1
+    assert output.err == ""
 
 
 def test_daily_cli_wires_exact_listing_scope(
@@ -223,6 +253,30 @@ def test_daily_cli_hides_runtime_exception_text(
     assert output.err == cli.SAFE_DAILY_FAILURE + "\n"
     assert "must-not-leak" not in output.err
     assert all(item.exited for item in factory.connections)
+
+
+def test_daily_cli_hides_missing_config_and_does_not_connect(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        cli.TechIndicatorsConfig,
+        "from_env",
+        lambda: (_ for _ in ()).throw(
+            RuntimeError("password=must-not-leak")
+        ),
+    )
+
+    exit_code = cli.main(
+        ["--effective-date", "2026-08-24"],
+        connect_from_env=lambda: pytest.fail("database must not open"),
+    )
+
+    output = capsys.readouterr()
+    assert exit_code == 1
+    assert output.out == ""
+    assert output.err == cli.SAFE_DAILY_FAILURE + "\n"
+    assert "must-not-leak" not in output.err
 
 
 def test_daily_cli_help_does_not_connect(
