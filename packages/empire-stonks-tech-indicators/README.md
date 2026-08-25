@@ -134,6 +134,27 @@ scopes require `--confirm-broad-scope`, including dry runs. Contention retains
 the daily command's stderr/exit-75 contract, and all other runtime failures use
 a fixed safe message.
 
+The installed `stonks-tech-indicators-inspect` command and local wrapper run a
+strictly read-only operational inspection in one `REPEATABLE READ READ ONLY`
+snapshot. It combines R8.2 count-only coverage and feature quality, W7.7 raw
+freshness, source-versus-published drift, and exact-date SPX/source readiness:
+
+```bash
+bin/stonks-tech-indicators-inspect \
+  --effective-date 2026-08-24 \
+  --provider-code EODDATA \
+  --market NASDAQ \
+  --sample-limit 10
+```
+
+Optional inclusive dates bound coverage and drift and must contain the
+effective date. Listing, freshness, and drift samples are capped at 1-100 rows;
+the command emits no feature payload values, screening thresholds, ranks,
+target selection, or recommendations. It does not acquire the writer lock or
+create Core, publication, report, or payload state. The wrapper owns environment
+loading, while successful stdout is one compact JSON object and failures use a
+fixed safe stderr message.
+
 `TechIndicatorsCoreRun` owns the reusable J9.1 Core lifecycle for the frozen
 daily and backfill jobs. `start()` validates the `stonks` domain, job,
 unfiltered `all_series` or J9.2 `scope:<lowercase SHA-256>` subject, effective

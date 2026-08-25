@@ -156,7 +156,7 @@ Goal: expose safe operator workflows before Airflow coordination.
 | O10.1 | [x] | Add config command | Add a secret-safe package command and `bin/stonks-tech-indicators-config` using `bin/env-load`; validate runtime, dependency, benchmark, and DB readiness. | B1.5-B1.8, I3.6 |
 | O10.2 | [x] | Add daily command | Add package command and `bin/stonks-tech-indicators-daily` with effective date/scope/version/dry-run options and compact JSON stdout. | J9.3-J9.4 |
 | O10.3 | [x] | Add backfill command | Add package command and `bin/stonks-tech-indicators-backfill` with bounded scope, resume, rebuild protection, progress, and compact JSON stdout. | J9.5-J9.7 |
-| O10.4 | [ ] | Add inspect command | Add read-only `bin/stonks-tech-indicators-inspect` for coverage, freshness, drift, SPX readiness, and bounded samples without target recommendations. | W7.7, R8.2 |
+| O10.4 | [x] | Add inspect command | Add read-only `bin/stonks-tech-indicators-inspect` for coverage, freshness, drift, SPX readiness, and bounded samples without target recommendations. | W7.7, R8.2 |
 | O10.5 | [ ] | Add CLI validation | Cover help, invalid scopes, missing config, benchmark failure, lock contention, dry run, no-op, success, resume, exit codes, and safe stdout/stderr. | O10.1-O10.4 |
 | O10.6 | [ ] | Add operator documentation | Document setup, reports, scopes, publication readiness, lock contention/recovery, backfill/resume, rebuild, corrections, benchmark failure, and safe SQL inspection. | O10.1-O10.5 |
 | O10.7 | [ ] | Verify installed commands | Build/install and prove package scripts/wrappers work in Poetry and Airflow with environment loading owned by runtime. | O10.1-O10.6 |
@@ -187,6 +187,16 @@ confirmation, focused tests, and README guidance. Full package pytest passed
 partial/resume pytest passed 2; Poetry check/install, `pip check`, compileall,
 build and wheel entry-point inspection, Bash/package/wrapper help smokes,
 `make db-validate` (39 migrations), and `git diff --check` passed.
+
+Done: 2026-08-25 — added `inspection.py`, the installed `scripts.inspect`
+command, `bin/stonks-tech-indicators-inspect`, bounded CLI/service/PostgreSQL
+tests, and README guidance for read-only coverage, freshness, drift, and
+SPX/source-readiness facts without feature values or recommendations. Full
+package pytest passed 724 with 27 environment-gated skips; focused unit/query
+pytest passed 93 and read-only PostgreSQL pytest passed 10; Poetry check/install,
+`pip check`, compileall, build/wheel inspection, Bash/package/wrapper and bounded
+live-wrapper smokes, `make db-validate` (39 migrations), and `git diff --check`
+passed.
 
 ---
 
