@@ -158,7 +158,7 @@ Goal: expose safe operator workflows before Airflow coordination.
 | O10.3 | [x] | Add backfill command | Add package command and `bin/stonks-tech-indicators-backfill` with bounded scope, resume, rebuild protection, progress, and compact JSON stdout. | J9.5-J9.7 |
 | O10.4 | [x] | Add inspect command | Add read-only `bin/stonks-tech-indicators-inspect` for coverage, freshness, drift, SPX readiness, and bounded samples without target recommendations. | W7.7, R8.2 |
 | O10.5 | [x] | Add CLI validation | Cover help, invalid scopes, missing config, benchmark failure, lock contention, dry run, no-op, success, resume, exit codes, and safe stdout/stderr. | O10.1-O10.4 |
-| O10.6 | [ ] | Add operator documentation | Document setup, reports, scopes, publication readiness, lock contention/recovery, backfill/resume, rebuild, corrections, benchmark failure, and safe SQL inspection. | O10.1-O10.5 |
+| O10.6 | [x] | Add operator documentation | Document setup, reports, scopes, publication readiness, lock contention/recovery, backfill/resume, rebuild, corrections, benchmark failure, and safe SQL inspection. | O10.1-O10.5 |
 | O10.7 | [ ] | Verify installed commands | Build/install and prove package scripts/wrappers work in Poetry and Airflow with environment loading owned by runtime. | O10.1-O10.6 |
 
 Done: 2026-08-25 — added package-owned runtime/dependency/database/SPX checks
@@ -205,6 +205,15 @@ passed 55; cleanup-safe PostgreSQL dry-run/success/no-op/resume/lock/inspection
 pytest passed 8; full package pytest passed 728 with 27 environment-gated skips;
 four wrapper Bash/help smokes, Poetry check, `make db-validate` (39 migrations),
 and `git diff --check` passed.
+
+Done: 2026-08-25 — added
+`docs/stonks/tech-indicators-operator-runbook.md` and linked it from the package
+README, covering setup, bounded scopes, publication/readiness, reports,
+contention/recovery, backfill/resume, rebuild/corrections, benchmark failure,
+and safe SQL. Focused CLI pytest passed 55; four wrapper Bash/help smokes, live
+config and bounded inspect, six live read-only SQL checks, and 35 report/render
+pytest passed; 21/21 documentation links, balanced fences, Poetry check,
+`make db-validate` (39 migrations), and `git diff --check` passed.
 
 ---
 

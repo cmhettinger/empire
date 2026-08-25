@@ -9,6 +9,12 @@ CLIs, and other runtimes will call package-owned capabilities rather than own
 business logic. The B1.3 scaffold intentionally contains only the importable
 package boundary; later tasks add those capabilities incrementally.
 
+Operators should use the
+[technical-indicators operator runbook](../../docs/stonks/tech-indicators-operator-runbook.md)
+for secret-safe setup, bounded scopes, daily and backfill execution, exact
+resume/rebuild procedures, readiness and report interpretation, contention and
+recovery, benchmark failures, and safe SQL inspection.
+
 ## Runtime contract
 
 The initial package version is `0.1.0` and supports Python `>=3.11,<4.0`. It
