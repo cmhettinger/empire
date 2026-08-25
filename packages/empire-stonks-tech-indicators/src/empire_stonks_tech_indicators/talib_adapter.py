@@ -90,6 +90,60 @@ def _assert_global_settings() -> None:
             )
 
 
+def validate_talib_runtime() -> TALibRuntimeInfo:
+    """Validate the pinned native runtime with representative V1 calls."""
+
+    runtime = _runtime_info()
+    close = np.ascontiguousarray(
+        np.linspace(100.0, 179.0, 80, dtype=np.float64)
+    )
+    high = np.ascontiguousarray(close + 1.25)
+    low = np.ascontiguousarray(close - 1.25)
+    calls = (
+        ("SMA", _talib.SMA(close, timeperiod=20), 19),
+        ("EMA", _talib.EMA(close, timeperiod=20), 19),
+        ("RSI", _talib.RSI(close, timeperiod=14), 14),
+        ("ATR", _talib.ATR(high, low, close, timeperiod=14), 14),
+        ("PLUS_DI", _talib.PLUS_DI(high, low, close, timeperiod=14), 14),
+        ("MINUS_DI", _talib.MINUS_DI(high, low, close, timeperiod=14), 14),
+        ("ADX", _talib.ADX(high, low, close, timeperiod=14), 27),
+    )
+    for output_name, output, first_valid_index in calls:
+        _normalize_output(
+            output,
+            output_name=output_name,
+            observation_count=close.size,
+            first_valid_index=first_valid_index,
+        )
+    try:
+        macd_outputs = _talib.MACD(
+            close,
+            fastperiod=12,
+            slowperiod=26,
+            signalperiod=9,
+        )
+    except Exception:
+        raise TechIndicatorsCalculationError(
+            "TA-Lib MACD runtime validation failed."
+        ) from None
+    if not isinstance(macd_outputs, tuple) or len(macd_outputs) != 3:
+        raise TechIndicatorsCalculationError(
+            "TA-Lib MACD runtime validation returned invalid output."
+        )
+    for output_name, output in zip(
+        ("MACD", "MACD_SIGNAL", "MACD_HISTOGRAM"),
+        macd_outputs,
+        strict=True,
+    ):
+        _normalize_output(
+            output,
+            output_name=output_name,
+            observation_count=close.size,
+            first_valid_index=33,
+        )
+    return runtime
+
+
 def _validate_timeperiod(timeperiod: int) -> None:
     if type(timeperiod) is not int or timeperiod < 2:
         raise ValueError("timeperiod must be an integer of at least 2.")
@@ -306,4 +360,4 @@ class TALibAdapter:
         )
 
 
-__all__ = ["TALibAdapter", "TALibRuntimeInfo"]
+__all__ = ["TALibAdapter", "TALibRuntimeInfo", "validate_talib_runtime"]

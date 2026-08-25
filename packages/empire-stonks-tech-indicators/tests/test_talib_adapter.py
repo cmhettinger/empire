@@ -46,7 +46,11 @@ def _arrays(observation_count: int = 80) -> CalculationArrays:
 def test_adapter_api_is_explicit_and_records_exact_runtime() -> None:
     adapter = TALibAdapter(_arrays())
 
-    assert adapter_module.__all__ == ["TALibAdapter", "TALibRuntimeInfo"]
+    assert adapter_module.__all__ == [
+        "TALibAdapter",
+        "TALibRuntimeInfo",
+        "validate_talib_runtime",
+    ]
     assert public_api.TALibAdapter is TALibAdapter
     assert public_api.TALibRuntimeInfo is TALibRuntimeInfo
     assert adapter.runtime == TALibRuntimeInfo(

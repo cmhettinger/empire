@@ -68,9 +68,27 @@ constant, not an environment override. Non-secret examples live in
 Airflow service. Reusable package code never opens either environment file.
 
 The package does not own an internal migration runner. Empire Flyway
-migrations under `db/` own the technical-indicator schema. Package commands
-and Airflow orchestration are introduced only by their assigned implementation
-tasks.
+migrations under `db/` own the technical-indicator schema.
+
+The installed `stonks-tech-indicators-config` command validates the resolved
+non-secret configuration, supported Python and pinned NumPy/TA-Lib calculation
+runtime, required Core/report/database dependencies, all ten required source,
+Core, payload, publication, and published-view relations plus their runtime
+privileges, the active `global` report-storage root, and the exact active
+`YAHOO/XIDX/SPX` benchmark identity. It is
+strictly read-only, emits one compact JSON object, and returns nonzero with only
+a fixed safe failure or readiness-stage classification. The local wrapper owns
+environment loading:
+
+```bash
+bin/stonks-tech-indicators-config
+bin/stonks-tech-indicators-config --env-file deploy/env/local.example.env
+```
+
+Installed runtimes must load their environment before invoking the package
+command directly. The check proves configuration and infrastructure readiness;
+it does not claim effective-date source or published model-input readiness and
+does not acquire the writer lock.
 
 `TechIndicatorsCoreRun` owns the reusable J9.1 Core lifecycle for the frozen
 daily and backfill jobs. `start()` validates the `stonks` domain, job,
