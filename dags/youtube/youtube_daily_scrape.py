@@ -228,7 +228,7 @@ def youtube_daily_scrape():
         )
         return report
 
-    @task(task_id="finalize_downloads", trigger_rule="all_done")
+    @task(task_id="finalize_downloads")
     def finalize_downloads(summary_report: dict[str, object]) -> dict[str, object]:
         report = summary_report["report"]
         summary = report["summary"]

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
+import empire_youtube.runner as runner_module
 from empire_core import ObjectStore, RunService
 
 from empire_youtube.processor import ThumbnailAsset, YouTubeScrapeProcessor
@@ -254,6 +258,116 @@ def test_run_youtube_processor_skips_existing_sidecar_metadata_without_file(
 
     assert result.sidecar_object_count == 1
     assert result.skipped_sidecar_count == 1
+
+
+@pytest.mark.parametrize("remove_file", [False, True])
+def test_run_youtube_processor_restores_soft_deleted_sidecar(
+    tmp_path,
+    monkeypatch,
+    remove_file,
+):
+    monkeypatch.setenv("EMPIRE_STORAGE_KEY_YOUTUBE", "/youtube/")
+    monkeypatch.delenv("EMPIRE_STORAGE_KEY_YOUTUBE_LIBRARY", raising=False)
+    run_repo = InMemoryRunRepository()
+    object_repo = InMemoryObjectRepository(str(tmp_path))
+    object_repo.roots["jellyfin"] = object_repo.roots["global"]
+    run_service = RunService(run_repo)
+    object_store = ObjectStore(object_repo)
+    generated_at = datetime(2026, 5, 23, 22, 0, tzinfo=UTC)
+    payload = {
+        "source": "youtube",
+        "schema_version": 1,
+        "run_id": "scrape-run",
+        "videos": [
+            {
+                "video_id": "abc123",
+                "url": "https://www.youtube.com/watch?v=abc123",
+                "title": "Example Video",
+                "channel": {"channel_name": "Example Channel"},
+                "published_at": "2026-05-23T12:00:00Z",
+            }
+        ],
+    }
+
+    first = run_youtube_processor_to_object_store(
+        scrape_payload=payload,
+        processor=YouTubeScrapeProcessor(thumbnail_fetcher=FakeThumbnailFetcher()),
+        run_service=run_service,
+        object_store=object_store,
+        run_type="manual",
+        runner="pytest",
+        generated_at=generated_at,
+    )
+    deleted = next(
+        stored
+        for stored in object_repo.objects.values()
+        if stored.filename == "empire.json"
+    )
+    deleted_path = object_store.get_path(deleted.object_id)
+    object_repo.objects[deleted.object_id] = replace(
+        deleted,
+        deleted_at=generated_at,
+        purge_after=generated_at + timedelta(days=7),
+    )
+    if remove_file:
+        deleted_path.unlink()
+
+    second = run_youtube_processor_to_object_store(
+        scrape_payload=payload,
+        processor=YouTubeScrapeProcessor(thumbnail_fetcher=FakeThumbnailFetcher()),
+        run_service=run_service,
+        object_store=object_store,
+        run_type="manual",
+        runner="pytest",
+        generated_at=generated_at,
+    )
+
+    restored = object_repo.objects[deleted.object_id]
+    assert restored.deleted_at is None
+    assert restored.purge_after is None
+    assert restored.run_id == second.run_context.run_id
+    assert object_store.get_path(restored.object_id).is_file()
+    assert second.sidecar_object_count == 1
+    assert second.skipped_sidecar_count == 1
+    assert first.run_context.run_id != second.run_context.run_id
+
+
+def test_run_youtube_processor_rolls_back_before_marking_failure(
+    tmp_path,
+    monkeypatch,
+):
+    events = []
+    run_repo = InMemoryRunRepository()
+    original_fail_run = run_repo.fail_run
+
+    def record_fail_run(run_id, error_message, summary):
+        events.append("fail")
+        return original_fail_run(run_id, error_message, summary)
+
+    run_repo.fail_run = record_fail_run
+    object_repo = InMemoryObjectRepository(str(tmp_path))
+    object_repo.roots["jellyfin"] = object_repo.roots["global"]
+    monkeypatch.setattr(
+        runner_module,
+        "_rollback_if_possible",
+        lambda _object_store: events.append("rollback"),
+    )
+
+    class FailingProcessor:
+        def process(self, _payload):
+            raise RuntimeError("processor failed")
+
+    with pytest.raises(RuntimeError, match="processor failed"):
+        run_youtube_processor_to_object_store(
+            scrape_payload={"videos": []},
+            processor=FailingProcessor(),
+            run_service=RunService(run_repo),
+            object_store=ObjectStore(object_repo),
+            run_type="manual",
+            runner="pytest",
+        )
+
+    assert events == ["rollback", "fail"]
 
 
 class FakeThumbnailFetcher:

@@ -369,6 +369,12 @@ This installs Python dependencies from:
 deploy/docker/airflow/airflow-requirements.txt
 ```
 
+The build intentionally refreshes its base image layers and bypasses the Docker
+build cache. This ensures every build installs the latest available `yt-dlp`,
+`bgutil-ytdlp-pot-provider`, and Deno releases. It also pulls the latest
+`brainicism/bgutil-ytdlp-pot-provider` service image. Airflow builds therefore
+require network access and take longer than a cached rebuild.
+
 Build:
 
 ```bash

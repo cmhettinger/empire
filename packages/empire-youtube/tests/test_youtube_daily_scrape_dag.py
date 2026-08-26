@@ -56,9 +56,7 @@ def test_youtube_daily_scrape_dag_wires_stages_in_order(monkeypatch):
         "download_one_video",
     ]
     assert dag.task_by_id["generate_daily_summary"].decorator_kwargs == {}
-    assert dag.task_by_id["finalize_downloads"].decorator_kwargs == {
-        "trigger_rule": "all_done"
-    }
+    assert dag.task_by_id["finalize_downloads"].decorator_kwargs == {}
     assert dag.task_by_id["finalize_downloads"].call_args[0].task_id == (
         "generate_daily_summary"
     )

@@ -264,6 +264,7 @@ def run_youtube_processor_to_object_store(
                         object_kind=planned_file.object_kind,
                         expires_at=expires_at,
                         metadata=planned_file.metadata,
+                        overwrite=True,
                     )
                 )
         data = library_plan.to_json().encode("utf-8")
@@ -312,6 +313,7 @@ def run_youtube_processor_to_object_store(
             skipped_sidecar_count=skipped_sidecar_count,
         )
     except Exception as exc:
+        _rollback_if_possible(object_store)
         run_service.fail_run(
             ctx.run_id,
             error_message=str(exc),
@@ -330,51 +332,56 @@ def _object_file_exists(
     root = object_store.repository.get_storage_root(storage_root)
     if root is None or root.backend_type != "filesystem":
         return False
-    if _stored_object_metadata_exists(
+    metadata_is_active = _stored_object_metadata_is_active(
         object_store=object_store,
         storage_root_id=root.storage_root_id,
         object_key=object_key,
         filename=filename,
-    ):
-        return True
+    )
+    if metadata_is_active is not None:
+        return metadata_is_active
     return FilesystemStorageBackend(root.base_uri).exists(object_key, filename)
 
 
-def _stored_object_metadata_exists(
+def _stored_object_metadata_is_active(
     *,
     object_store: ObjectStore,
     storage_root_id: int,
     object_key: str,
     filename: str,
-) -> bool:
+) -> bool | None:
     repository = object_store.repository
     objects = getattr(repository, "objects", None)
     if isinstance(objects, dict):
-        return any(
-            obj.storage_root_id == storage_root_id
-            and obj.object_key == object_key
-            and obj.filename == filename
-            and obj.deleted_at is None
-            for obj in objects.values()
+        stored = next(
+            (
+                obj
+                for obj in objects.values()
+                if obj.storage_root_id == storage_root_id
+                and obj.object_key == object_key
+                and obj.filename == filename
+            ),
+            None,
         )
+        return None if stored is None else stored.deleted_at is None
 
     connection = getattr(repository, "connection", None)
     if connection is None:
-        return False
+        return None
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT 1
+            SELECT deleted_at
             FROM core.stored_object
             WHERE storage_root_id = %s
               AND object_key = %s
               AND filename = %s
-              AND deleted_at IS NULL
             LIMIT 1
             """,
             (storage_root_id, object_key, filename),
         )
-        return cursor.fetchone() is not None
+        row = cursor.fetchone()
+        return None if row is None else row[0] is None
 
 
 def _rollback_if_possible(object_store: ObjectStore) -> None:

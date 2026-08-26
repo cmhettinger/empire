@@ -2,7 +2,6 @@ FROM apache/airflow:3.2.1
 
 USER root
 
-ARG DENO_VERSION=2.5.6
 ARG TARGETARCH
 
 RUN apt-get update \
@@ -12,7 +11,7 @@ RUN apt-get update \
         arm64) DENO_ARCH="aarch64-unknown-linux-gnu" ;; \
         *) echo "Unsupported TARGETARCH: $TARGETARCH" && exit 1 ;; \
     esac \
-    && curl -fsSL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-${DENO_ARCH}.zip" -o /tmp/deno.zip \
+    && curl -fsSL "https://github.com/denoland/deno/releases/latest/download/deno-${DENO_ARCH}.zip" -o /tmp/deno.zip \
     && unzip /tmp/deno.zip -d /usr/local/bin \
     && chmod +x /usr/local/bin/deno \
     && rm /tmp/deno.zip \
