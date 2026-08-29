@@ -1226,3 +1226,96 @@ EODData unpaused, Yahoo/coordinator paused, and zero queued/running runs for all
 three DAGs; changed-prose scan and `git diff --check` passed.
 
 ---
+
+## Phase 12: Complete Verification And Close Development
+
+Goal: finish the code and documentation, prove correctness and representative
+performance, and produce a release candidate that is ready to deploy to the
+new production host.
+
+Phase 12 is a development-closeout phase. It may use fixtures, generated
+datasets, PostgreSQL integration environments, and deliberately bounded
+existing development data. It must not run a broad Stooq or Yahoo source
+backfill, a broad technical-indicator backfill, or a normal live-production
+cadence on the development laptop. Those operations belong to Phase 13.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| V12.1 | [x] | Complete package README | Document ownership, profile, formulas, source caveats, config, tables, validation, versions, reports, CLIs, DAGs, and deferred work. | O10.6, A11.8 |
+| V12.2 | [x] | Complete operator runbook | Document daily operation, atomic publication, lock diagnosis/recovery, backfill, resume/rebuild, reports, SPX readiness, corrections, version rollout, Airflow recovery, and rollback. | V12.1 |
+| V12.3 | [x] | Run formatting and full tests | Formatting/linting, package, schema, PostgreSQL/Core, report, CLI, and DAG suites pass from repository root. | V12.2 |
+| V12.4 | [x] | Validate DB and regenerate docs | Flyway, Stonks contracts, OHLCV regressions, and all DB documentation generation pass without drift. | V12.2 |
+| V12.5 | [x] | Run correctness and isolation audit | Using deterministic fixtures, generated datasets, PostgreSQL integration tests, and only deliberately bounded existing development data, compare stored features with fresh calculations, pinned TA-Lib, independent formulas, and incremental outputs across providers, gaps, short history, corrections, and SPX alignment; concurrently exercise publication visibility, version isolation, benchmark completeness, the global writer lock, and failure recovery. | W7.6, W7.10, J9.8-J9.9, V12.3-V12.4 |
+| V12.6 | [x] | Run representative performance gate | Measure rebuild, append, source/SPX correction, upsert, atomic publication/staging, lock acquisition/contention, latest-date scan/rank, report, and memory against P0.8 using generated or already-available bounded data; tune only from evidence and defer production-scale confirmation to Phase 13. | W7.9-W7.10, V12.3-V12.5 |
+| V12.7 | [x] | Audit the release candidate | Verify package versions and locks, migrations, environment templates, wrappers, Compose/Airflow definitions, report assets, supported provider universes, rollback paths, and production-host prerequisites. Resolve every code or documentation blocker; record any operational risk that can only be evaluated on production hardware. | V12.1-V12.6, A11.8 |
+| V12.8 | [x] | Close the development gate | Record the reviewed commit, calculation version, test and performance evidence, supported universes, known risks, recovery procedures, production capacity assumptions, and an explicit ready/not-ready decision for Phase 13. Do not enable production cadence or perform broad source or indicator backfills. | V12.7 |
+
+Done: 2026-08-29 — completed
+`packages/empire-stonks-tech-indicators/README.md` against the live V1 package,
+schema, reports, four CLIs, and event-driven paused Airflow coordinator. Focused
+pytest passed 148 tests; Poetry lock and `pip check`, wheel/sdist build,
+distribution import/version, four wrapper help smokes, 20 local links, required
+section/fence validation, and `git diff --check` passed.
+
+Done: 2026-08-29 — completed
+`docs/stonks/tech-indicators-operator-runbook.md` with daily operation, atomic
+publication, Airflow/lock recovery, staged backfill/resume, correction and
+version rollout/rollback procedures. Focused pytest passed 186 tests including
+CLI, report/PDF, writer-lock, runner, scope, and DAG coverage; Poetry lock and
+`pip check`, four wrapper help smokes, 13 required sections, 48 balanced fences,
+13 local links, and `git diff --check` passed.
+
+Done: 2026-08-29 — full technical-indicators pytest passed 788 tests against
+live PostgreSQL; standalone Core and reports pytest passed 32 and 21 tests.
+The rollback-only schema contract passed 64 expected failures. Poetry lock,
+`pip check`, compileall, wheel/sdist build, distribution import/version, four
+CLI help smokes, deployed Airflow DAG listing with zero import errors, and
+`git diff --check` passed; the repository configures no formatter or linter.
+
+Done: 2026-08-29 — Flyway validated 39 migrations; all four rollback-only
+Stonks SQL contracts passed, including 64 technical-indicator expected
+failures. Full database-enabled OHLCV pytest passed 641 tests, including both
+technical-child regressions. `make docs-db` generated both schemas, 12 Stonks
+groups, and both SchemaSpy sites; 88 tracked artifacts, 24 grouped Mermaid
+files, 48 grouped images, and all 28 PNG/28 SVG signatures passed. Schema,
+ERD, and image outputs had zero drift; only both tool-owned generation
+timestamps advanced. `git diff --check` passed.
+
+Done: 2026-08-29 — added the rollback-only 850-row/76-feature PostgreSQL audit
+in `test_correctness_audit_integration.py` and recorded the V12.5 matrix in
+`docs/stonks/tech-indicators-correctness-isolation-audit-v12.5.md`. Focused
+formula/equivalence pytest passed 107 tests, focused PostgreSQL isolation and
+recovery pytest passed 27, and full package pytest passed 789. Bounded
+repeatable-read development aggregates, Poetry check, compileall, line-length
+scan, and `git diff --check` passed; no backfill, cadence, or durable data write
+ran.
+
+Done: 2026-08-29 — added the deterministic 20,000-observation calculation
+probe and recorded the V12.6 gate in
+`docs/stonks/tech-indicators-performance-evidence-v12.6.md`. Rebuild, append,
+source/SPX correction, the 1,000,000-row pilot, 25,000-row upserts/scan/rank,
+summary projection, publication, lock, vertical/no-op, report, RSS, storage,
+WAL, and disk gates passed; pilot throughput was 1,035.40 rows/s at 412.47 MiB
+RSS and 35.87 GiB projected slots. Full pytest passed 789; Poetry check,
+compileall, zero scratch residue, line scan, and `git diff --check` passed. No
+tuning, broad backfill, publication, or cadence ran; production confirmation
+remains Phase 13.
+
+Done: 2026-08-29 — recorded the passing V12.7 release-candidate audit in
+`docs/stonks/tech-indicators-release-candidate-audit-v12.7.md`. Flyway validated
+39 migrations; the schema contract passed 64 expected failures; all 789 package
+tests passed across database-partitioned runs; 35 report and 53 OHLCV/Airflow
+integration tests passed. Lock/build, `pip check`, config preflight, 8 CLI help
+smokes, Compose/Airflow import/runtime, 10-setting parity, assets, seven exact
+provider cohorts, rollback, production risks, and `git diff --check` passed; no
+backfill, publication, migration, remediation, or cadence change ran.
+
+Done: 2026-08-29 — recorded the V12.8 READY decision for staged Phase 13 entry
+in `docs/stonks/tech-indicators-development-gate-v12.8.md` against reviewed
+commit `eedc9d264241e4e6e8b326e21142d31b85c17cf7` and `TECH_INDICATORS_V1`.
+Lock and local/Airflow dependency checks, 39-migration Flyway validation,
+`ready=true` config preflight, paused technical DAG, zero Airflow import errors,
+links/fences, completion assertions, and `git diff --check` passed; no backfill,
+publication, migration, remediation, activation, or cadence change ran.
+
+---
