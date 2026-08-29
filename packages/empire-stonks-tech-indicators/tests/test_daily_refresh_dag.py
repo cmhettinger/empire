@@ -18,7 +18,7 @@ LISTING_ID_B = UUID("20000000-0000-4000-8000-000000000002")
 LETTERED_LISTING_ID = UUID("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
 
 
-def test_daily_refresh_dag_is_manual_one_task_and_thin(monkeypatch) -> None:
+def test_daily_refresh_dag_is_event_driven_two_task_and_thin(monkeypatch) -> None:
     module, _fake_sdk = _load_dag_module(monkeypatch)
 
     dag = module.stonks_tech_indicators_daily_refresh_dag
@@ -34,7 +34,7 @@ def test_daily_refresh_dag_is_manual_one_task_and_thin(monkeypatch) -> None:
     assert dag.start_date.tzinfo.key == "America/New_York"
     assert dag.catchup is False
     assert dag.max_active_runs == 1
-    assert dag.tags == ["stonks", "tech-indicators", "manual"]
+    assert dag.tags == ["stonks", "tech-indicators", "event-driven"]
     assert [item.task_id for item in dag.tasks] == [
         "check_source_readiness",
         "run_tech_indicators_daily"

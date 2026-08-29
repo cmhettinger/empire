@@ -117,8 +117,10 @@ result. Writer-lock contention produces compact JSON on stderr and exit code
 safe message.
 
 The Airflow DAG `stonks_tech_indicators_daily_refresh` exposes the same daily
-runner as one thin task. It is manual-only (`schedule=None`), does not catch up,
-and permits one active DAG run. Every invocation requires an exact
+runner through a thin two-task graph. A11.8 selects event-driven source
+completion as its production cadence: it retains `schedule=None`, does not
+catch up, and permits one active DAG run. It remains paused until the V12.10
+live-data rollout gate records a go decision. Every invocation requires an exact
 `effective_date` in `dag_run.conf`; an empty configuration never falls back to
 the wall-clock or Airflow logical date. Optional JSON fields are
 `provider_codes`, `markets`, `provider_listing_ids`, `calculation_version`,
@@ -157,6 +159,14 @@ may wake the coordinator again. The DAG's one-active-run limit is secondary:
 the package's global transaction advisory lock rejects overlap before workflow
 state, and a later unchanged same-date run completes as a durable `NO_OP`
 without another publication or payload update.
+
+The selected cadence, activation gate, queued-wake handling, pause commands,
+and data-preserving rollback are frozen in the
+[Airflow rollout contract](../../docs/stonks/tech-indicators-airflow-rollout-v1.md).
+Pausing the coordinator does not stop source DAGs from creating queued wakes;
+operators must inspect that backlog before resume. Cadence rollback pauses the
+coordinator and preserves source schedules, Core history, reports, and the last
+complete publication.
 
 The installed `stonks-tech-indicators-backfill` command and local wrapper expose
 the J9 staged backfill with required inclusive dates, exact provider/market or

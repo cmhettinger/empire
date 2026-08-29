@@ -170,7 +170,10 @@ Two thin DAGs are implemented and discovered by the Airflow runtime. Both use
 
 Both DAGs dispatch a qualifying completion signal to the unscheduled
 technical-indicator coordinator. This downstream wiring does not change either
-source cadence.
+source cadence. A11.8 selects event-driven operation for that coordinator but
+keeps it paused until the technical-indicator V12.10 rollout gate; EODData
+remains scheduled, while Yahoo remains manual-only and paused between operator
+runs.
 
 The Stooq historical workflow has no DAG. It remains a manual CLI-only import
 because Empire neither downloads the archive nor automates provider CAPTCHA,

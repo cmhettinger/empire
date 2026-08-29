@@ -226,6 +226,47 @@ durable technical `NO_OP`, while an overlapping writer returns the fixed
 contention result before Core or report state. Do not diagnose duplicate source
 wakes by deleting publication rows or advisory locks.
 
+### Airflow Cadence, Pause, And Rollback
+
+A11.8 selects event-driven source completion as the production cadence; the
+coordinator still has `schedule=None`. It remains paused until V12.10 records a
+go decision after the staged backfill and bounded live-daily gates. EODData
+keeps its reviewed schedule, and Yahoo remains manual-only and paused between
+operator runs.
+
+Inspect Airflow before activation, resume, or incident recovery:
+
+```bash
+make airflow-dags
+make airflow-dag-runs DAG=stonks_tech_indicators_daily_refresh
+```
+
+Pausing the coordinator does not stop source DAGs from creating queued wakes,
+and `max_active_runs=1` does not bound that queue. Account for every queued or
+running coordinator run before resume. A short backlog may drain one at a time
+through the exact-date readiness, lock, and idempotency path. Keep a prolonged
+or unexplained backlog paused until each exact run is reviewed; do not clear it
+by deleting Airflow metadata, Core runs, publications, payloads, feature rows,
+source rows, or advisory locks.
+
+Pause or roll back the cadence with:
+
+```bash
+docker compose --env-file deploy/env/local.env \
+  -f deploy/compose/empire.yml exec airflow-api \
+  airflow dags pause stonks_tech_indicators_daily_refresh
+make airflow-dags
+make airflow-dag-runs DAG=stonks_tech_indicators_daily_refresh
+```
+
+A pause does not terminate an already running task. Let healthy work finish and
+inspect its Core/report state; exceptional cancellation requires an exact
+target and explicit authorization. Cadence rollback changes no source schedule
+and no data. Preserve the last complete publication and use the normal bounded
+correction or rebuild path for a separate data issue. The full activation,
+backlog, stop-condition, and resume checklist is in the
+[Airflow rollout contract](tech-indicators-airflow-rollout-v1.md).
+
 ## Publication Readiness
 
 Calculation completion and publication readiness are different facts. A row in

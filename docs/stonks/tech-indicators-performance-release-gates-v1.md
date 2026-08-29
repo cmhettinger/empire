@@ -252,9 +252,10 @@ RSS, database counts, query plans where applicable, and JSON/PDF report IDs.
 8. **Full-backfill gate:** run/resume the complete eligible universe only after
    the projected disk and 24-hour/2-GiB gates pass. Audit every row count,
    version, benchmark shape, source copy, and bounded report outcome.
-9. **Live-daily gate:** keep the tech-indicators DAG manual initially. At least
+9. **Live-daily gate:** keep the tech-indicators DAG paused initially. At least
    three consecutive ready effective dates plus an unchanged rerun must pass
-   within daily targets before A11.8/V12.10 may approve a cadence.
+   within daily targets before V12.10 may approve activation of the
+   event-driven cadence selected, but not enabled, by A11.8.
 
 Rollout stops and remains unpublished on any formula/equivalence mismatch,
 source mutation, provider leakage, unexpected non-finite output, partial or
@@ -267,8 +268,9 @@ their exact counts and reasons match the frozen contracts.
 Promotion requires zero unexplained warnings, exact count reconciliation,
 durable matching JSON/PDF reports, cleanup-safe Core lineage, and a documented
 rollback to the previous complete publication. Enabling or scheduling normal
-operation remains an explicit A11.8/V12.10 decision; completing a benchmark or
-backfill does not enable it automatically.
+operation remains an explicit V12.10 go decision after A11.8 selects and
+documents the target cadence; completing a benchmark or backfill does not
+enable it automatically.
 
 ## Required Verification Evidence
 

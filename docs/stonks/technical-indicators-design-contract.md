@@ -709,6 +709,11 @@ identity, effective date, Core run identity, report outcome, and a deterministic
 trigger ID; it contains no credentials or raw data. Repeated source runs must
 lead to idempotent, nonconcurrent refresh behavior. Airflow must call the same
 package-owned publication and locking paths as CLI and manual execution.
+A11.8 selects that event-driven source-completion path as the production
+cadence while retaining `schedule=None`. The coordinator remains paused until
+V12.10 records a go decision after bounded live evidence. Pause, queued-wake
+review, and data-preserving rollback are frozen in the
+[Airflow rollout contract](tech-indicators-airflow-rollout-v1.md).
 
 ## Deliberately Deferred Features
 
@@ -751,7 +756,7 @@ chats should resolve them rather than reopen the entire design:
 | Performance measurements and evidence-based tuning within frozen gates | W7.9, V12.6 |
 | Atomic publication unit and readiness predicate | P0.9 (frozen in `tech-indicators-publication-contract-v1.md`) |
 | Package-owned lock identity and contention policy | P0.10 (frozen in `tech-indicators-concurrency-contract-v1.md`) |
-| Airflow source-completion coordination | A11.1-A11.6 (mechanism, signals, coordinator, source/preflight wiring, and repeated-run/lock proof frozen in `tech-indicators-airflow-coordination-v1.md`); A11.7 deployed vertical proven in `tech-indicators-airflow-vertical-evidence-a11.7.md`; A11.8 decides cadence |
+| Airflow source-completion coordination | A11.1-A11.6 mechanism and safety frozen in `tech-indicators-airflow-coordination-v1.md`; A11.7 vertical proven in `tech-indicators-airflow-vertical-evidence-a11.7.md`; A11.8 event-driven cadence and paused-until-V12.10 rollout frozen in `tech-indicators-airflow-rollout-v1.md` |
 
 Any new indicator or material formula change requires a concrete consumer,
 versioned semantics, incremental behavior, storage/query justification, and an

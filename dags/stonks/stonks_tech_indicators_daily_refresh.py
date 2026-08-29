@@ -184,7 +184,7 @@ def _optional_bool(conf: Mapping[str, object], key: str) -> bool:
     schedule=None,
     catchup=False,
     max_active_runs=1,
-    tags=["stonks", "tech-indicators", "manual"],
+    tags=["stonks", "tech-indicators", "event-driven"],
 )
 def stonks_tech_indicators_daily_refresh():
     @task(task_id="check_source_readiness")
