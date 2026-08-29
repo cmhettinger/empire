@@ -119,7 +119,7 @@ safe message.
 The Airflow DAG `stonks_tech_indicators_daily_refresh` exposes the same daily
 runner through a thin two-task graph. A11.8 selects event-driven source
 completion as its production cadence: it retains `schedule=None`, does not
-catch up, and permits one active DAG run. It remains paused until the V12.10
+catch up, and permits one active DAG run. It remains paused until the P13.14
 live-data rollout gate records a go decision. Every invocation requires an exact
 `effective_date` in `dag_run.conf`; an empty configuration never falls back to
 the wall-clock or Airflow logical date. Optional JSON fields are

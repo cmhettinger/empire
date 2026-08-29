@@ -1216,7 +1216,7 @@ focused coordinator/source pytest (28 and 53 passed), changed-prose line scan,
 and `git diff --check` passed.
 
 Done: 2026-08-29 — selected event-driven source-completion operation with
-`schedule=None`, kept normal technical refresh paused until the V12.10 go
+`schedule=None`, kept normal technical refresh paused until the P13.14 go
 decision, and froze activation, queued-wake, pause, and data-preserving rollback
 in `tech-indicators-airflow-rollout-v1.md`; retagged the coordinator
 `event-driven` and restored Yahoo's required manual-only paused state. Focused

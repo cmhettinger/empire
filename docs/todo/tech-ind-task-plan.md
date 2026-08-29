@@ -10,9 +10,10 @@ features, and stores current state in
 `stonks.ohlcv_daily_tech_indicators`. It does not put calculation logic in the
 OHLCV package, DAGs, reports, or strategies.
 
-The rollout proves one manageable, testable layer at a time: contracts,
+The delivery proves one manageable, testable layer at a time: contracts,
 runtime dependencies, schema, inputs, calculation families, persistence,
-reports, runners, CLIs, Airflow coordination, and bounded release.
+reports, runners, CLIs, Airflow coordination, development closeout, and a
+separate production buildout.
 
 ## Starting A Task In A New Codex Chat
 
@@ -148,10 +149,17 @@ R8.1-R8.8, J9.1-J9.9, O10.1-O10.7, and A11.1-A11.8, together with their
 
 ---
 
-## Phase 12: Verify, Backfill, And Roll Out Incrementally
+## Phase 12: Complete Verification And Close Development
 
-Goal: prove correctness and performance from fixtures through bounded live
-operation before normal refresh begins.
+Goal: finish the code and documentation, prove correctness and representative
+performance, and produce a release candidate that is ready to deploy to the
+new production host.
+
+Phase 12 is a development-closeout phase. It may use fixtures, generated
+datasets, PostgreSQL integration environments, and deliberately bounded
+existing development data. It must not run a broad Stooq or Yahoo source
+backfill, a broad technical-indicator backfill, or a normal live-production
+cadence on the development laptop. Those operations belong to Phase 13.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
@@ -159,12 +167,41 @@ operation before normal refresh begins.
 | V12.2 | [ ] | Complete operator runbook | Document daily operation, atomic publication, lock diagnosis/recovery, backfill, resume/rebuild, reports, SPX readiness, corrections, version rollout, Airflow recovery, and rollback. | V12.1 |
 | V12.3 | [ ] | Run formatting and full tests | Formatting/linting, package, schema, PostgreSQL/Core, report, CLI, and DAG suites pass from repository root. | V12.2 |
 | V12.4 | [ ] | Validate DB and regenerate docs | Flyway, Stonks contracts, OHLCV regressions, and all DB documentation generation pass without drift. | V12.2 |
-| V12.5 | [ ] | Run correctness and isolation audit | Compare stored features with fresh rebuilds, pinned TA-Lib, independent formulas, and incremental outputs across providers, gaps, short history, corrections, and SPX alignment; concurrently exercise publication visibility, version isolation, benchmark completeness, the global writer lock, and failure recovery. | W7.6, W7.10, J9.8-J9.9, V12.3-V12.4 |
-| V12.6 | [ ] | Run performance gate | Measure rebuild, append, source/SPX correction, upsert, atomic publication/staging, lock acquisition/contention, latest-date scan/rank, report, and memory against P0.8; tune only from evidence. | W7.9-W7.10, V12.3-V12.5 |
-| V12.7 | [ ] | Run bounded backfill | Backfill a representative cohort and verify counts, warm-up/null coverage, generated/SPX values, resume, reports, and no source mutation. | V12.5-V12.6 |
-| V12.8 | [ ] | Expand backfill in stages | Expand by provider/market cohorts with checkpoints and stop criteria; audit adjustment warnings, inactive listings, performance, and reports. | V12.7 |
-| V12.9 | [ ] | Run bounded live daily | Execute live source prerequisites then technical refresh; inspect atomic readiness/publication, idempotency, corrections, lock behavior, Core, JSON/PDF, and Airflow. | A11.8, V12.7 |
-| V12.10 | [ ] | Close rollout gate | Record cadence, calculation version, supported universes, coverage, performance, risks, recovery, and go/no-go; enable only after healthy evidence. | V12.8-V12.9 |
+| V12.5 | [ ] | Run correctness and isolation audit | Using deterministic fixtures, generated datasets, PostgreSQL integration tests, and only deliberately bounded existing development data, compare stored features with fresh calculations, pinned TA-Lib, independent formulas, and incremental outputs across providers, gaps, short history, corrections, and SPX alignment; concurrently exercise publication visibility, version isolation, benchmark completeness, the global writer lock, and failure recovery. | W7.6, W7.10, J9.8-J9.9, V12.3-V12.4 |
+| V12.6 | [ ] | Run representative performance gate | Measure rebuild, append, source/SPX correction, upsert, atomic publication/staging, lock acquisition/contention, latest-date scan/rank, report, and memory against P0.8 using generated or already-available bounded data; tune only from evidence and defer production-scale confirmation to Phase 13. | W7.9-W7.10, V12.3-V12.5 |
+| V12.7 | [ ] | Audit the release candidate | Verify package versions and locks, migrations, environment templates, wrappers, Compose/Airflow definitions, report assets, supported provider universes, rollback paths, and production-host prerequisites. Resolve every code or documentation blocker; record any operational risk that can only be evaluated on production hardware. | V12.1-V12.6, A11.8 |
+| V12.8 | [ ] | Close the development gate | Record the reviewed commit, calculation version, test and performance evidence, supported universes, known risks, recovery procedures, production capacity assumptions, and an explicit ready/not-ready decision for Phase 13. Do not enable production cadence or perform broad source or indicator backfills. | V12.7 |
+
+---
+
+## Phase 13: Build Out Production And Start Daily Operation
+
+Goal: provision the new home-lab production host, establish durable network and
+NAS-backed operation, add deployment-aware Airflow cadence, seed production
+history, build initial technical coverage, and start automated daily EODData,
+Yahoo, and technical-indicator workflows while local development stays manual.
+
+Phase 13 starts only after V12.8 records a ready decision. Broad imports and
+backfills run on the new production host, not on the development laptop. Each
+long-running step must have a reviewed scope, capacity check, durable report,
+checkpoint or resume path, stop criteria, and post-run coverage audit.
+
+| ID | Status | Goal | Complete When | Depends On |
+|----|--------|------|---------------|------------|
+| P13.1 | [ ] | Size and procure the HPE host | Convert the V12.8 CPU, memory, storage-growth, database, container, and network assumptions into a reviewed HPE server configuration; record the selected hardware, expansion headroom, warranty/support, expected delivery, and purchase decision. | V12.8 |
+| P13.2 | [ ] | Establish the host baseline | Install and patch the reviewed server OS, firmware, Docker/Compose runtime, time synchronization, administrative access, firewall, power/restart behavior, and monitoring prerequisites; record versions and the recovery path. | P13.1 |
+| P13.3 | [ ] | Connect production networking and NAS storage | Assign the stable host identity and network configuration, create the production NAS shares and Empire storage layout, mount them with least-privilege ownership, and prove boot-time mount, reconnect, throughput, free-space, and failure behavior. Do not initialize Empire storage roots until the expected mounts are present. | P13.2 |
+| P13.4 | [ ] | Design deployment-aware Airflow cadence | Evaluate one shared DAG definition with a small validated deployment profile and environment-supplied schedules against separate local/prod DAG files. Prefer shared task logic and one DAG ID per workflow: local resolves EODData and Yahoo to `schedule=None`, production resolves explicit reviewed schedules, and the technical coordinator stays event-driven with `schedule=None`. Define parse-time validation, timezone/DST behavior, tags and observability, pause/rollback, configuration ownership, and safe behavior for missing or invalid settings. Duplicate DAG files are allowed only if Airflow import/serialization evidence shows the shared design is unsafe or materially harder to operate. | V12.8, A11.8 |
+| P13.5 | [ ] | Implement and verify scheduling profiles | Implement the selected cadence configuration without duplicating package business logic. Add committed non-secret defaults/templates and deployment wiring; update the Yahoo provider-access decision and rollout contracts for a conservative production cadence. Tests must parse the same DAG code under local and production profiles, prove local source DAGs are manual, prove production EODData and Yahoo schedules are exact, prove catchup/overlap protections and source-triggered technical dispatch remain intact, and prove rollback to manual operation requires configuration plus the documented Airflow refresh/restart rather than a code fork. | P13.4 |
+| P13.6 | [ ] | Deploy the reviewed Empire release | Clone the repository on the server, check out the exact commit reviewed after P13.5, create the uncommitted production environment and secrets from the committed template, configure the production Airflow profile, database, and NAS-backed storage roots, build the required images, run Flyway, initialize Core storage roots, and initialize Airflow using repository workflows. | V12.8, P13.3, P13.5 |
+| P13.7 | [ ] | Prove production infrastructure readiness | Run database, PgBouncer, storage, package, CLI, report, and Airflow preflights; verify expected DAGs and import health, exact production schedules, local-versus-production profile isolation, backups and restore procedure, service restart/reboot recovery, observability, and initial paused states before source loading. | P13.6 |
+| P13.8 | [ ] | Run the weekend Stooq starter import | Manually acquire and record the approved Stooq archive and provenance, run the production Stooq historical import for the reviewed U.S. stock partitions with checkpoints and stop criteria, resume safely as needed, and audit counts, coverage, warnings, performance, Core lineage, JSON/PDF reports, and absence of canonical/source crossover. | P13.7 |
+| P13.9 | [ ] | Backfill the Yahoo benchmark universe | Run the bounded seeded Yahoo index, yield, volatility, currency, commodity, and continuous-futures backfill with provider-safe pacing and resume; verify SPX identity/history, calendar coverage, native semantics, request volume, lineage, and JSON/PDF reports. | P13.7 |
+| P13.10 | [ ] | Build initial production technical coverage | After the Stooq and Yahoo source audits pass, backfill technical indicators in staged provider/market cohorts. Verify counts, warm-up/null and generated/SPX coverage, publication isolation, resume, adjustment warnings, inactive-listing handling, production performance, reports, and no OHLCV mutation. | P13.8-P13.9 |
+| P13.11 | [ ] | Rehearse the automated production daily path | With normal automation still paused, temporarily exercise the production schedules or their exact scheduled-run semantics for bounded same-date EODData and Yahoo prerequisites followed by source-triggered technical refresh. Inspect effective-date derivation, readiness, atomic publication, idempotency, correction behavior, locking, Core lineage, reports, Airflow dispatch, and rollback; confirm the local profile remains manual. | P13.10, A11.8 |
+| P13.12 | [ ] | Start the first Monday automated daily cycle | Enable the reviewed production EODData and Yahoo schedules while leaving local development manual. Release the technical coordinator only under the reviewed readiness and backlog procedure, then record same-date source completion, automatic dispatch, technical freshness, resource use, and recovery evidence. | P13.11 |
+| P13.13 | [ ] | Observe bounded production operation | Verify at least three consecutive ready effective dates and one unchanged rerun within release targets; audit scheduled-run timing, queued wakes, warnings, source and benchmark coverage, provider request pressure, resource use, reports, backups, and stop conditions before normal activation. | P13.12 |
+| P13.14 | [ ] | Close the production rollout gate | Record the deployed commit, local and production cadence profiles, calculation version, supported universes, coverage, production performance, provider-access evidence, risks, recovery, and explicit go/no-go. On a go decision, leave the reviewed production source schedules and technical coordinator enabled while retaining `schedule=None` for the corresponding local-development source DAGs. | P13.13 |
 
 ---
 

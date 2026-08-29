@@ -7,7 +7,7 @@ indicators. A11.2 freezes its source completion signals, A11.3 implements the
 initially manual coordinator DAG, A11.4 freezes its DAG contract tests, A11.5
 wires both sources to the package-owned same-date preflight join, and A11.6
 proves repeated-run and overlap behavior. A11.7 proves the deployed vertical,
-and A11.8 selects event-driven operation while holding activation for V12.10.
+and A11.8 selects event-driven operation while holding activation for P13.14.
 This
 contract decides how successful EODData and Yahoo/SPX completions wake the
 technical-indicator workflow and how it joins those prerequisites for one
@@ -282,7 +282,7 @@ and [`TriggerDagRunOperator` contract](https://airflow.apache.org/docs/apache-ai
   remains manual.
 - A11.8 selects event-driven source completion as the technical production
   cadence, retains `schedule=None`, and holds the coordinator paused until the
-  V12.10 go decision. Its rollout contract owns pause, queued-wake handling,
+  P13.14 go decision. Its rollout contract owns pause, queued-wake handling,
   and rollback.
 
 ## Implementation Handoff
@@ -308,4 +308,4 @@ and [`TriggerDagRunOperator` contract](https://airflow.apache.org/docs/apache-ai
 - A11.8 selected event-driven source-completion operation, restored Yahoo's
   required paused state, and documented activation, pause, backlog, and
   data-preserving rollback in `tech-indicators-airflow-rollout-v1.md`. Normal
-  technical operation remains paused until the V12.10 go decision.
+  technical operation remains paused until the P13.14 go decision.

@@ -171,7 +171,7 @@ Two thin DAGs are implemented and discovered by the Airflow runtime. Both use
 Both DAGs dispatch a qualifying completion signal to the unscheduled
 technical-indicator coordinator. This downstream wiring does not change either
 source cadence. A11.8 selects event-driven operation for that coordinator but
-keeps it paused until the technical-indicator V12.10 rollout gate; EODData
+keeps it paused until the technical-indicator P13.14 rollout gate; EODData
 remains scheduled, while Yahoo remains manual-only and paused between operator
 runs.
 

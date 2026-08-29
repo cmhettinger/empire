@@ -9,7 +9,7 @@ and Yahoo/SPX completions wake it asynchronously, and its package-owned
 same-effective-date readiness check remains authoritative.
 
 This decision does not enable normal refresh yet. The coordinator remains
-paused until V12.10 records a go decision after the staged backfill and bounded
+paused until P13.14 records a go decision after the staged backfill and bounded
 live-daily gates. This preserves the release contract that a successful
 fixture vertical is necessary evidence, not production authorization.
 
@@ -19,7 +19,7 @@ The source cadences do not change:
   reviewed weekday cadence.
 - `stonks_ohlcv_yahoo_daily_scrape` remains `schedule=None`, manual-only, and
   paused between operator runs under the V10.10 source decision.
-- The technical coordinator remains `schedule=None` and paused until V12.10.
+- The technical coordinator remains `schedule=None` and paused until P13.14.
 
 ## Evidence And Alternatives
 
@@ -41,7 +41,7 @@ failure-prone step without improving readiness authority.
 
 ## Activation Gate
 
-V12.10 may unpause the coordinator only after V12.8-V12.9 evidence satisfies
+P13.14 may approve normal operation only after P13.8-P13.13 evidence satisfies
 the frozen release gates, including at least three consecutive ready effective
 dates and one unchanged rerun within the daily targets. Before activation:
 
@@ -50,7 +50,7 @@ dates and one unchanged rerun within the daily targets. Before activation:
 3. Inspect coordinator DAG runs and account for every queued or running wake.
 4. Confirm the reviewed calculation version, source universes, database
    readiness, report storage, performance, risks, and recovery decision.
-5. Record the V12.10 go decision before unpausing the coordinator.
+5. Record the P13.14 go decision before leaving the coordinator enabled for normal operation.
 
 Use the repository Airflow views for the first checks:
 
@@ -140,4 +140,4 @@ stonks_tech_indicators_daily_refresh  paused=true   active=0
 ```
 
 The selected event-driven cadence is therefore documented and ready for the
-later V12.10 decision, while normal technical refresh remains disabled.
+later P13.14 decision, while normal technical refresh remains disabled.

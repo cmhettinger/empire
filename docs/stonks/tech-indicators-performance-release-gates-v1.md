@@ -254,7 +254,7 @@ RSS, database counts, query plans where applicable, and JSON/PDF report IDs.
    version, benchmark shape, source copy, and bounded report outcome.
 9. **Live-daily gate:** keep the tech-indicators DAG paused initially. At least
    three consecutive ready effective dates plus an unchanged rerun must pass
-   within daily targets before V12.10 may approve activation of the
+   within daily targets before P13.14 may approve activation of the
    event-driven cadence selected, but not enabled, by A11.8.
 
 Rollout stops and remains unpublished on any formula/equivalence mismatch,
@@ -268,7 +268,7 @@ their exact counts and reasons match the frozen contracts.
 Promotion requires zero unexplained warnings, exact count reconciliation,
 durable matching JSON/PDF reports, cleanup-safe Core lineage, and a documented
 rollback to the previous complete publication. Enabling or scheduling normal
-operation remains an explicit V12.10 go decision after A11.8 selects and
+operation remains an explicit P13.14 go decision after A11.8 selects and
 documents the target cadence; completing a benchmark or backfill does not
 enable it automatically.
 

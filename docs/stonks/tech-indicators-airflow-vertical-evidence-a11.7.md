@@ -94,5 +94,5 @@ After cleanup, the live import-error result remained `[]`, and
 `stonks_tech_indicators_daily_refresh` was confirmed paused. A11.8 therefore
 retained the full cadence, pause, backlog, and rollback decision. It
 subsequently selected event-driven source-completion operation while keeping
-the coordinator paused until the V12.10 go decision; see
+the coordinator paused until the P13.14 go decision; see
 `tech-indicators-airflow-rollout-v1.md`.
