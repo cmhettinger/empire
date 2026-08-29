@@ -166,7 +166,7 @@ cadence on the development laptop. Those operations belong to Phase 13.
 | V12.1 | [x] | Complete package README | Document ownership, profile, formulas, source caveats, config, tables, validation, versions, reports, CLIs, DAGs, and deferred work. | O10.6, A11.8 |
 | V12.2 | [x] | Complete operator runbook | Document daily operation, atomic publication, lock diagnosis/recovery, backfill, resume/rebuild, reports, SPX readiness, corrections, version rollout, Airflow recovery, and rollback. | V12.1 |
 | V12.3 | [x] | Run formatting and full tests | Formatting/linting, package, schema, PostgreSQL/Core, report, CLI, and DAG suites pass from repository root. | V12.2 |
-| V12.4 | [ ] | Validate DB and regenerate docs | Flyway, Stonks contracts, OHLCV regressions, and all DB documentation generation pass without drift. | V12.2 |
+| V12.4 | [x] | Validate DB and regenerate docs | Flyway, Stonks contracts, OHLCV regressions, and all DB documentation generation pass without drift. | V12.2 |
 | V12.5 | [ ] | Run correctness and isolation audit | Using deterministic fixtures, generated datasets, PostgreSQL integration tests, and only deliberately bounded existing development data, compare stored features with fresh calculations, pinned TA-Lib, independent formulas, and incremental outputs across providers, gaps, short history, corrections, and SPX alignment; concurrently exercise publication visibility, version isolation, benchmark completeness, the global writer lock, and failure recovery. | W7.6, W7.10, J9.8-J9.9, V12.3-V12.4 |
 | V12.6 | [ ] | Run representative performance gate | Measure rebuild, append, source/SPX correction, upsert, atomic publication/staging, lock acquisition/contention, latest-date scan/rank, report, and memory against P0.8 using generated or already-available bounded data; tune only from evidence and defer production-scale confirmation to Phase 13. | W7.9-W7.10, V12.3-V12.5 |
 | V12.7 | [ ] | Audit the release candidate | Verify package versions and locks, migrations, environment templates, wrappers, Compose/Airflow definitions, report assets, supported provider universes, rollback paths, and production-host prerequisites. Resolve every code or documentation blocker; record any operational risk that can only be evaluated on production hardware. | V12.1-V12.6, A11.8 |
@@ -193,6 +193,15 @@ The rollback-only schema contract passed 64 expected failures. Poetry lock,
 `pip check`, compileall, wheel/sdist build, distribution import/version, four
 CLI help smokes, deployed Airflow DAG listing with zero import errors, and
 `git diff --check` passed; the repository configures no formatter or linter.
+
+Done: 2026-08-29 — Flyway validated 39 migrations; all four rollback-only
+Stonks SQL contracts passed, including 64 technical-indicator expected
+failures. Full database-enabled OHLCV pytest passed 641 tests, including both
+technical-child regressions. `make docs-db` generated both schemas, 12 Stonks
+groups, and both SchemaSpy sites; 88 tracked artifacts, 24 grouped Mermaid
+files, 48 grouped images, and all 28 PNG/28 SVG signatures passed. Schema,
+ERD, and image outputs had zero drift; only both tool-owned generation
+timestamps advanced. `git diff --check` passed.
 
 ---
 
