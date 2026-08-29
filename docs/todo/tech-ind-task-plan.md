@@ -163,7 +163,7 @@ cadence on the development laptop. Those operations belong to Phase 13.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| V12.1 | [ ] | Complete package README | Document ownership, profile, formulas, source caveats, config, tables, validation, versions, reports, CLIs, DAGs, and deferred work. | O10.6, A11.8 |
+| V12.1 | [x] | Complete package README | Document ownership, profile, formulas, source caveats, config, tables, validation, versions, reports, CLIs, DAGs, and deferred work. | O10.6, A11.8 |
 | V12.2 | [ ] | Complete operator runbook | Document daily operation, atomic publication, lock diagnosis/recovery, backfill, resume/rebuild, reports, SPX readiness, corrections, version rollout, Airflow recovery, and rollback. | V12.1 |
 | V12.3 | [ ] | Run formatting and full tests | Formatting/linting, package, schema, PostgreSQL/Core, report, CLI, and DAG suites pass from repository root. | V12.2 |
 | V12.4 | [ ] | Validate DB and regenerate docs | Flyway, Stonks contracts, OHLCV regressions, and all DB documentation generation pass without drift. | V12.2 |
@@ -171,6 +171,13 @@ cadence on the development laptop. Those operations belong to Phase 13.
 | V12.6 | [ ] | Run representative performance gate | Measure rebuild, append, source/SPX correction, upsert, atomic publication/staging, lock acquisition/contention, latest-date scan/rank, report, and memory against P0.8 using generated or already-available bounded data; tune only from evidence and defer production-scale confirmation to Phase 13. | W7.9-W7.10, V12.3-V12.5 |
 | V12.7 | [ ] | Audit the release candidate | Verify package versions and locks, migrations, environment templates, wrappers, Compose/Airflow definitions, report assets, supported provider universes, rollback paths, and production-host prerequisites. Resolve every code or documentation blocker; record any operational risk that can only be evaluated on production hardware. | V12.1-V12.6, A11.8 |
 | V12.8 | [ ] | Close the development gate | Record the reviewed commit, calculation version, test and performance evidence, supported universes, known risks, recovery procedures, production capacity assumptions, and an explicit ready/not-ready decision for Phase 13. Do not enable production cadence or perform broad source or indicator backfills. | V12.7 |
+
+Done: 2026-08-29 — completed
+`packages/empire-stonks-tech-indicators/README.md` against the live V1 package,
+schema, reports, four CLIs, and event-driven paused Airflow coordinator. Focused
+pytest passed 148 tests; Poetry lock and `pip check`, wheel/sdist build,
+distribution import/version, four wrapper help smokes, 20 local links, required
+section/fence validation, and `git diff --check` passed.
 
 ---
 

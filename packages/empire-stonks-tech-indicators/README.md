@@ -1,25 +1,184 @@
 # empire-stonks-tech-indicators
 
-Reusable provider-native daily technical-indicator calculation utilities for
-Empire Stonks.
+Reusable provider-native daily technical indicators for Empire Stonks.
 
-This package is the platform-owned boundary for technical calculation,
-validation, persistence, operational reporting, and workflow runners. Airflow,
-CLIs, and other runtimes will call package-owned capabilities rather than own
-business logic. The B1.3 scaffold intentionally contains only the importable
-package boundary; later tasks add those capabilities incrementally.
+`empire-stonks-tech-indicators` reads the current provider-native daily bars in
+`stonks.ohlcv_daily`, calculates the immutable `TECH_INDICATORS_V1` profile,
+validates complete listing histories, and atomically publishes current feature
+state through `stonks.ohlcv_daily_tech_indicators`. It also owns affected-range
+planning, daily and resumable-backfill runners, model-input readiness queries,
+Core lifecycle and durable JSON/PDF reports, four operator commands, and the
+business logic used by the thin Airflow coordinator.
+
+The upstream `empire-stonks-ohlcv` package remains the sole owner of provider
+acquisition, parsing, listing identity, source semantics, and OHLCV mutation;
+it does not import this package. Airflow, `bin/` wrappers, and installed
+commands construct runtime services and delegate to package APIs. Strategy and
+backtest consumers own thresholds, targets, point-in-time universes, execution
+timing, portfolio construction, costs, and performance analysis.
 
 Operators should use the
-[technical-indicators operator runbook](../../docs/stonks/tech-indicators-operator-runbook.md)
+[operator runbook](../../docs/stonks/tech-indicators-operator-runbook.md)
 for secret-safe setup, bounded scopes, daily and backfill execution, exact
 resume/rebuild procedures, readiness and report interpretation, contention and
 recovery, benchmark failures, and safe SQL inspection.
 
-## Runtime contract
+The authoritative design baseline is the
+[design contract](../../docs/stonks/technical-indicators-design-contract.md).
+Its linked V1 contracts define exact fields, formulas, source eligibility,
+benchmark behavior, recalculation, publication, concurrency, reports, and
+Airflow coordination.
 
-The initial package version is `0.1.0` and supports Python `>=3.11,<4.0`. It
-depends on `empire-core` for the injected R8.4 object-storage boundary and on
-the exact calculation pair frozen by B1.1:
+## Supported source profile and caveats
+
+The calculation grain is one current provider-native series and date:
+
+```text
+(provider_listing_id, trading_date)
+```
+
+Selection is exact and case-sensitive except for the explicitly trimmed and
+case-folded EODData metadata type:
+
+| Provider | Eligible subject identity | Additional requirement |
+|---|---|---|
+| `EODDATA` | market `NYSE`, `NASDAQ`, or `AMEX` | `metadata.type` resolves to `EQUITY` |
+| `STOOQ` | market `nasdaq`, `nyse`, or `nysemkt` | selected U.S. stock partition |
+| `YAHOO` | `XIDX/SPX` | `EQUITY_INDEX` and `metadata.YahooTicker = ^GSPC` |
+
+Unsupported listings are omitted; the package does not publish placeholder
+all-null rows for them. Active listings are selected by default. Inactive
+maintenance requires an exact listing-ID scope and explicit opt-in.
+
+All values inherit the owning OHLCV source contract:
+
+- EODData Quote List adjustment, volume, and bar-currency bases are
+  unspecified. Listing currency is best-effort metadata, not proof of bar
+  currency.
+- Stooq history adjustment, volume, currency, and corporate-action semantics
+  are unspecified; volume may be fractional or zero.
+- Yahoo SPX uses native unadjusted Chart OHLC. Optional adjusted close is only
+  diagnostic, volume may be null, and neither price repair nor corporate-action
+  reconstruction is applied.
+
+The package never normalizes splits or distributions, converts currencies,
+merges providers, infers canonical identity, or mutates `ohlcv_daily`.
+`dollar_volume = abs(close) * volume` is a nominal within-listing feature, not
+necessarily USD and not an approved cross-listing liquidity measure. Provider
+corrections replace current source state and can change an affected technical
+suffix; there is no source-bar or technical revision history. See the frozen
+[source-value policy](../../docs/stonks/tech-indicators-source-value-policy-v1.md)
+and the upstream
+[EODData](../../docs/stonks/ohlcv-eoddata-source-contract.md),
+[Stooq](../../docs/stonks/ohlcv-stooq-history-source-contract.md), and
+[Yahoo](../../docs/stonks/ohlcv-yahoo-source-contract.md) contracts.
+
+## V1 feature and formula profile
+
+The published relation has 90 columns: nine identity/lifecycle fields, five
+copied exact `NUMERIC` OHLCV fields, 53 Python-calculated fields, and 23
+PostgreSQL `STORED` generated fields. The 76 analytical fields cover:
+
+| Family | V1 profile |
+|---|---|
+| Returns and state | 1/2/3/5/10/20/63/126/252-observation returns, history count, up/down streaks |
+| Bar and range | gap, intraday return, daily range, close location, 20/50/252 highs, 20/50 lows and close distances |
+| Trend | SMA 20/50/200, EMA 12/20/26/50, price/average and SMA-spread distances, 20-observation SMA 50/200 changes |
+| Momentum and volatility | RSI 14, ATR 14 and ratio, 20/60 return volatility, prior-20 1d/3d return z-scores |
+| Bollinger and direction | price deviation 20, fixed 20/2 `%b` and BandWidth, +DI 14, -DI 14, ADX 14 |
+| MACD | 12/26/9 line, signal, histogram, and normalized line/histogram |
+| Volume | dollar volume, 20/60 average volume, 20 average dollar volume, relative volume 20 |
+| SPX | price ratio and 20/50 trends, 20/63/126/252 relative returns, 60/252 beta and correlation |
+
+Lookbacks count stored chronological observations, never calendar days, and
+never read a future row. Calendar gaps create no synthetic observations.
+Incomplete windows, null dependencies, exact-zero denominators, and defined
+zero-variance cases yield SQL null; valid zero values remain zero. Returns and
+distances are ratios, so `0.05` means five percent. Return volatility is a
+nonannualized sample standard deviation. Z-scores compare the current return
+with the previous 20 corresponding returns and exclude the current value from
+the reference distribution.
+
+SMA 20/50/200, EMA 12/20/26/50, RSI 14, ATR 14, population price deviation 20,
++DI/-DI/ADX 14, and MACD 12/26/9 use the pinned TA-Lib contract. Default
+compatibility and zero unstable periods are mandatory. Expected TA-Lib warm-up
+`NaN` becomes null; any post-lookback non-finite output fails the batch. EMA,
+RSI, ATR, ADX, and MACD always calculate from the listing's complete source
+prefix, while persistence writes only the affected suffix. V1 has no
+recurrence-state table or bounded-replay shortcut.
+
+SPX is resolved from the stable facts `YAHOO/XIDX/SPX`, `EQUITY_INDEX`, and
+`YahooTicker=^GSPC`; its UUID is never hardcoded. Relative features are
+supported only for the eligible EODData and Stooq U.S. cash-equity cohorts.
+Subject and SPX closes align on exact common dates with no forward fill,
+nearest-date match, or holiday synthesis. Unsupported subjects, including SPX
+itself, retain null benchmark lineage and null SPX-relative fields.
+
+The exact field ownership and formulas are frozen in the
+[feature profile](../../docs/stonks/tech-indicators-feature-profile-v1.md),
+[formula specification](../../docs/stonks/tech-indicators-formula-spec-v1.md),
+and [SPX contract](../../docs/stonks/tech-indicators-spx-contract-v1.md).
+
+## Database and publication model
+
+Flyway owns these relations; the package has no migration runner:
+
+| Relation | Purpose |
+|---|---|
+| `stonks.ohlcv_daily` | upstream provider-native source current state; never mutated here |
+| `stonks.ohlcv_daily_tech_indicators_a` | physical 90-column payload slot A |
+| `stonks.ohlcv_daily_tech_indicators_b` | physical 90-column payload slot B |
+| `stonks.tech_indicators_publication` | calculation/publication lifecycle, scope, counts, reports, and resume facts |
+| `stonks.tech_indicators_publication_listing` | per-listing active/candidate slot membership |
+| `stonks.ohlcv_daily_tech_indicators` | read-only published 90-column consumer view over active A/B membership |
+
+Each slot owns one row per `(provider_listing_id, trading_date)`, copies exact
+source OHLCV, stores Python historical/cross-series outputs as `DOUBLE
+PRECISION`, and lets PostgreSQL own 23 cheap same-row generated expressions.
+The source composite FK cascades source deletion; optional last-write Core
+`run_id` uses `ON DELETE SET NULL`. The table is current calculated state, not
+revision history.
+
+Bounded daily/correction work updates active slots only inside one terminal
+transaction. Backfills, version rebuilds, and large corrections build complete
+inactive listing images and publish them with one membership flip. Incomplete,
+failed, abandoned, report-incomplete, benchmark-incomplete, source-drifted, or
+mixed-version candidates remain invisible. Model readers use a package-owned
+`REPEATABLE READ READ ONLY` snapshot that revalidates source, benchmark,
+publication, membership, version, and requested coverage before returning any
+rows.
+
+Every writer and dry-run path makes one nonblocking attempt at the same
+capability-wide PostgreSQL transaction advisory lock. Contention creates no
+Core run or publication state and maps to CLI exit code 75. The lock is held on
+a dedicated connection through terminal publication and releases by commit,
+rollback, or connection loss. Airflow overlap settings are secondary to this
+database boundary.
+
+## Validation and versioning
+
+Python is the only supported normal writer. Before SQL, it recalculates and
+validates complete chronological rows: exact source copies, observation counts,
+warm-up/null masks, finite values, formula results, bounds, benchmark lineage,
+and all 23 generated-expression inputs. Identifiers, dates, source `NUMERIC`
+values, counts, versions, and null masks compare exactly. Derived floats use
+absolute tolerance `1e-12` and relative tolerance `1e-10`; tolerance never
+turns a nonzero denominator into zero or equates null, zero, `NaN`, and
+infinity. PostgreSQL retains keys, FKs, lifecycle checks, basic bounds, and row
+shape rather than duplicating exhaustive float validation.
+
+`TECH_INDICATORS_V1` is an immutable formula-profile identity and is distinct
+from package version `0.1.0`, report schema version `1`, and source parser
+versions. A formula, estimator, lookback, TA-Lib parameter, warm-up, benchmark,
+source-eligibility, or other accepted-output semantic change requires a new
+uppercase calculation version and explicit contract/test updates. A code fix
+that preserves accepted outputs does not.
+
+## Package and calculation runtime
+
+Package version `0.1.0` supports Python `>=3.11,<4.0`. It depends on
+`empire-core` for injected run/object services, `empire-reports` for shared PDF
+primitives, and the exact calculation pair frozen by B1.1:
 
 ```text
 numpy==2.4.6
@@ -47,7 +206,7 @@ is provided by `tools/tech-indicators/large-read-smoke.py`; its representative
 I3.7 result is recorded in the
 [large-read evidence](../../docs/stonks/tech-indicators-large-read-evidence-i3.7.md).
 
-## Ownership and configuration
+## Configuration and operational surfaces
 
 Reusable package code reads configuration only from `os.environ`. It does not
 load `.env` files, assume repository paths, or depend on Airflow. Environment
@@ -76,6 +235,8 @@ Airflow service. Reusable package code never opens either environment file.
 The package does not own an internal migration runner. Empire Flyway
 migrations under `db/` own the technical-indicator schema.
 
+### Configuration readiness
+
 The installed `stonks-tech-indicators-config` command validates the resolved
 non-secret configuration, supported Python and pinned NumPy/TA-Lib calculation
 runtime, required Core/report/database dependencies, all ten required source,
@@ -96,6 +257,8 @@ command directly. The check proves configuration and infrastructure readiness;
 it does not claim effective-date source or published model-input readiness and
 does not acquire the writer lock.
 
+### Daily command
+
 The installed `stonks-tech-indicators-daily` command and local wrapper expose
 the package-owned J9 daily runner with exact effective-date, repeatable provider,
 market or listing scope, calculation-version, dry-run, and explicit-force
@@ -115,6 +278,8 @@ environment to be loaded already. Success reserves stdout for one compact JSON
 result. Writer-lock contention produces compact JSON on stderr and exit code
 75 without creating workflow state; other runtime failures expose only a fixed
 safe message.
+
+### Airflow coordinator
 
 The Airflow DAG `stonks_tech_indicators_daily_refresh` exposes the same daily
 runner through a thin two-task graph. A11.8 selects event-driven source
@@ -168,6 +333,8 @@ operators must inspect that backlog before resume. Cadence rollback pauses the
 coordinator and preserves source schedules, Core history, reports, and the last
 complete publication.
 
+### Backfill command
+
 The installed `stonks-tech-indicators-backfill` command and local wrapper expose
 the J9 staged backfill with required inclusive dates, exact provider/market or
 listing scope, bounded batches, partial-run limits, exact resume cursors,
@@ -192,6 +359,8 @@ scopes require `--confirm-broad-scope`, including dry runs. Contention retains
 the daily command's stderr/exit-75 contract, and all other runtime failures use
 a fixed safe message.
 
+### Inspection command
+
 The installed `stonks-tech-indicators-inspect` command and local wrapper run a
 strictly read-only operational inspection in one `REPEATABLE READ READ ONLY`
 snapshot. It combines R8.2 count-only coverage and feature quality, W7.7 raw
@@ -212,6 +381,8 @@ target selection, or recommendations. It does not acquire the writer lock or
 create Core, publication, report, or payload state. The wrapper owns environment
 loading, while successful stdout is one compact JSON object and failures use a
 fixed safe stderr message.
+
+### Core lifecycle, scopes, and runners
 
 `TechIndicatorsCoreRun` owns the reusable J9.1 Core lifecycle for the frozen
 daily and backfill jobs. `start()` validates the `stonks` domain, job,
@@ -306,6 +477,8 @@ reacquisition. Package code neither loads environment files nor creates the
 connection itself; later CLI and Airflow runtimes supply Empire's configured
 database factory.
 
+### Durable JSON and PDF reports
+
 The V1 domain report facts are frozen in the
 [report schema contract](../../docs/stonks/tech-indicators-report-schema-v1.md).
 It defines one bounded, secret-safe immutable fact shape shared by daily and
@@ -323,7 +496,20 @@ tables, a directly labeled feature-family chart, bounded exception/diagnostic
 rows, explicit empty states, and hard 25-page/5-MiB output checks. R8.8 stores
 the PDF through the same Core run key and nine-field metadata allowlist as JSON,
 with its frozen PDF object kind and logical name. Runners, CLIs, and Airflow
-remain owned by their later tasks. R8.7's six-
+consume these same immutable report facts. Every substantive daily/backfill
+run, including healthy no-op, dry-run, and resumable partial outcomes, stores
+non-expiring `report.json` and `report.pdf` beneath:
+
+```text
+stonks/tech-indicators/runs/YYYY/MM/DD/<run_id>/reports
+```
+
+Reports cover identity and scope, package/calculation/TA-Lib/NumPy versions,
+source and publication readiness, lock/publication outcome, provider and
+market coverage, writes and null/warm-up coverage, benchmark health, bounded
+warnings/diagnostics, timing, throughput, and methodology. They never contain
+credentials, complete listing-ID collections, source rows, feature payloads,
+screening thresholds, recommendations, or investment advice. R8.7's six-
 variant, 68-page visual acceptance result is recorded in the
 [PDF visual evidence](../../docs/stonks/tech-indicators-pdf-visual-evidence-r8.7.md).
 
@@ -822,6 +1008,27 @@ calculation state before returning rows. The result is a tuple in source order;
 warm-up, missing-input, zero-denominator, zero-variance, and unsupported-SPX
 nulls remain explicit. Generated columns and database-owned timestamps never
 enter the returned write payload.
+
+## Deferred work
+
+The following are intentionally outside V1 and must not be inferred from the
+wide table or operational queries:
+
+- strategy flags, model thresholds, target selection, and threshold-specific
+  indexes;
+- sector-relative features until point-in-time mappings exist;
+- cross-sectional historical ranks until universe membership is explicit;
+- portfolio/backtest execution, scoring, slippage, costs, and performance;
+- stochastic, Williams `%R`, CCI, MFI, OBV, Chaikin A/D, Aroon, Parabolic SAR,
+  Ichimoku, Keltner, candlestick-pattern, and cycle/Hilbert families;
+- intraday indicators and true session VWAP;
+- canonical, cross-provider, consensus, adjusted, or authoritative technical
+  histories; and
+- append-only source or technical revision history.
+
+New indicators require a concrete consumer, exact versioned formula,
+incremental/recalculation behavior, storage and query justification, and an
+independent regression reference.
 
 ## Development
 
