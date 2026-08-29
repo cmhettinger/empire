@@ -1079,6 +1079,13 @@ provider-universe, rollback, and production-prerequisite audit is recorded in
 It records the remaining production-only operational risks without enabling
 cadence or running a broad backfill.
 
+The explicit V12.8 development-gate decision, reviewed commit, evidence,
+supported scope, known risks, recovery handoff, and production capacity
+assumptions are recorded in
+[`docs/stonks/tech-indicators-development-gate-v12.8.md`](../../docs/stonks/tech-indicators-development-gate-v12.8.md).
+The decision is ready to begin staged Phase 13 work, not authorization for
+production cadence or a broad backfill.
+
 Report construction uses `select_report_database_summary(...)` with an injected
 cursor and the same `TechIndicatorsScope` as calculation. With no publication
 ID it summarizes the active published view; a publication ID instead selects

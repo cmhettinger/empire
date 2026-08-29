@@ -170,7 +170,7 @@ cadence on the development laptop. Those operations belong to Phase 13.
 | V12.5 | [x] | Run correctness and isolation audit | Using deterministic fixtures, generated datasets, PostgreSQL integration tests, and only deliberately bounded existing development data, compare stored features with fresh calculations, pinned TA-Lib, independent formulas, and incremental outputs across providers, gaps, short history, corrections, and SPX alignment; concurrently exercise publication visibility, version isolation, benchmark completeness, the global writer lock, and failure recovery. | W7.6, W7.10, J9.8-J9.9, V12.3-V12.4 |
 | V12.6 | [x] | Run representative performance gate | Measure rebuild, append, source/SPX correction, upsert, atomic publication/staging, lock acquisition/contention, latest-date scan/rank, report, and memory against P0.8 using generated or already-available bounded data; tune only from evidence and defer production-scale confirmation to Phase 13. | W7.9-W7.10, V12.3-V12.5 |
 | V12.7 | [x] | Audit the release candidate | Verify package versions and locks, migrations, environment templates, wrappers, Compose/Airflow definitions, report assets, supported provider universes, rollback paths, and production-host prerequisites. Resolve every code or documentation blocker; record any operational risk that can only be evaluated on production hardware. | V12.1-V12.6, A11.8 |
-| V12.8 | [ ] | Close the development gate | Record the reviewed commit, calculation version, test and performance evidence, supported universes, known risks, recovery procedures, production capacity assumptions, and an explicit ready/not-ready decision for Phase 13. Do not enable production cadence or perform broad source or indicator backfills. | V12.7 |
+| V12.8 | [x] | Close the development gate | Record the reviewed commit, calculation version, test and performance evidence, supported universes, known risks, recovery procedures, production capacity assumptions, and an explicit ready/not-ready decision for Phase 13. Do not enable production cadence or perform broad source or indicator backfills. | V12.7 |
 
 Done: 2026-08-29 — completed
 `packages/empire-stonks-tech-indicators/README.md` against the live V1 package,
@@ -231,6 +231,14 @@ integration tests passed. Lock/build, `pip check`, config preflight, 8 CLI help
 smokes, Compose/Airflow import/runtime, 10-setting parity, assets, seven exact
 provider cohorts, rollback, production risks, and `git diff --check` passed; no
 backfill, publication, migration, remediation, or cadence change ran.
+
+Done: 2026-08-29 — recorded the V12.8 READY decision for staged Phase 13 entry
+in `docs/stonks/tech-indicators-development-gate-v12.8.md` against reviewed
+commit `eedc9d264241e4e6e8b326e21142d31b85c17cf7` and `TECH_INDICATORS_V1`.
+Lock and local/Airflow dependency checks, 39-migration Flyway validation,
+`ready=true` config preflight, paused technical DAG, zero Airflow import errors,
+links/fences, completion assertions, and `git diff --check` passed; no backfill,
+publication, migration, remediation, activation, or cadence change ran.
 
 ---
 
