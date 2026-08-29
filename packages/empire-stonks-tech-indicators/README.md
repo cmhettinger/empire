@@ -1059,6 +1059,13 @@ write default and both existing indexes. Future wide payload-history readers
 should keyset-page at 1,000 rows; the independently measured narrow source
 reader remains at 10,000.
 
+The V12.5 calculation, stored-feature, publication, version-isolation, writer-
+lock, and recovery audit is recorded in
+[`docs/stonks/tech-indicators-correctness-isolation-audit-v12.5.md`](../../docs/stonks/tech-indicators-correctness-isolation-audit-v12.5.md).
+It uses deterministic fixtures, rollback-only generated PostgreSQL data, and
+bounded read-only development-data aggregates; it does not run a broad source
+or technical-indicator backfill.
+
 Report construction uses `select_report_database_summary(...)` with an injected
 cursor and the same `TechIndicatorsScope` as calculation. With no publication
 ID it summarizes the active published view; a publication ID instead selects
