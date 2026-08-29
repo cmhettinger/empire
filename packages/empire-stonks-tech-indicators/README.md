@@ -1073,6 +1073,12 @@ Its deterministic 20,000-observation calculation probe is
 [`tools/tech-indicators/calculation-performance-benchmark.py`](../../tools/tech-indicators/calculation-performance-benchmark.py).
 Production-scale confirmation remains a Phase 13 rollout gate.
 
+The V12.7 package, migration, configuration, deployment, report-asset,
+provider-universe, rollback, and production-prerequisite audit is recorded in
+[`docs/stonks/tech-indicators-release-candidate-audit-v12.7.md`](../../docs/stonks/tech-indicators-release-candidate-audit-v12.7.md).
+It records the remaining production-only operational risks without enabling
+cadence or running a broad backfill.
+
 Report construction uses `select_report_database_summary(...)` with an injected
 cursor and the same `TechIndicatorsScope` as calculation. With no publication
 ID it summarizes the active published view; a publication ID instead selects
