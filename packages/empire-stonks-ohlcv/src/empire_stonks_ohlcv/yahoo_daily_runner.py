@@ -23,6 +23,10 @@ from empire_stonks_ohlcv.object_store import Clock
 from empire_stonks_ohlcv.results import PersistenceCounts
 from empire_stonks_ohlcv.runner import DEFAULT_DOMAIN, SAFE_FAILURE_MESSAGE
 from empire_stonks_ohlcv.source_conventions import YAHOO_DAILY_SOURCE
+from empire_stonks_ohlcv.tech_indicators_completion import (
+    TECH_INDICATORS_BENCHMARK_TICKER,
+    TechIndicatorsSourceCompletionSignal,
+)
 from empire_stonks_ohlcv.yahoo import (
     YAHOO_PROVIDER_CODE,
     RandomUniform,
@@ -173,7 +177,27 @@ class YahooDailyRunResult:
     def corrected_reconciliation_bars(self) -> int:
         return self.reconciliation.import_result.corrected_reconciliation_bars
 
+    @property
+    def tech_indicators_completion_signal(
+        self,
+    ) -> TechIndicatorsSourceCompletionSignal | None:
+        """Return a wake signal only when this run covered SPX readiness."""
+
+        if self.scope.tickers and (
+            TECH_INDICATORS_BENCHMARK_TICKER not in self.scope.tickers
+        ):
+            return None
+        return TechIndicatorsSourceCompletionSignal(
+            provider_code=YAHOO_PROVIDER_CODE,
+            source_code=YAHOO_DAILY_SOURCE.source_code,
+            job_name=YAHOO_DAILY_JOB_NAME,
+            effective_date=self.scope.effective_date,
+            source_run_id=self.run_id,
+            report_outcome=self.report_outcome,
+        )
+
     def to_dict(self) -> dict[str, Any]:
+        completion_signal = self.tech_indicators_completion_signal
         return {
             "run_id": str(self.run_id),
             "status": self.status,
@@ -195,6 +219,11 @@ class YahooDailyRunResult:
                 self.benchmark_pdf_report_object_id
             ),
             "report_outcome": self.report_outcome,
+            "tech_indicators_completion_signal": (
+                None
+                if completion_signal is None
+                else completion_signal.to_dict()
+            ),
         }
 
 

@@ -3,10 +3,11 @@
 ## Status And Scope
 
 A11.1 selects the V1 Airflow coordination mechanism for daily technical
-indicators. This contract decides how completed EODData and Yahoo/SPX work wakes
-the technical-indicator workflow and how the workflow joins those prerequisites
-for one effective date. It does not implement the source signals, DAG, trigger
-wiring, or production enablement owned by A11.2-A11.8.
+indicators. A11.2 freezes its source completion signals. This contract decides
+how successful EODData and Yahoo/SPX completions wake the technical-indicator
+workflow and how it joins those prerequisites for one effective date. It does
+not implement the coordinator DAG, trigger wiring, or production enablement
+owned by A11.3-A11.8.
 
 The deployed runtime is Apache Airflow 3.2.1 with
 `apache-airflow-providers-standard` 1.12.3. The live source DAGs are intentionally
@@ -44,8 +45,8 @@ The dispatch contract is:
 - Dispatch only downstream of successful package-runner completion. A failed
   or cancelled source task emits no successful wake.
 - Pass the explicit source `effective_date`, source provider, source Core run
-  ID, source DAG ID, and source DAG-run ID as small secret-safe provenance.
-  A11.2 freezes the exact payload shape.
+  ID, source DAG ID, and source DAG-run ID as small secret-safe provenance,
+  using the exact A11.2 payload below.
 - Give each source completion a deterministic coordinator run ID derived from
   its source identity and Core run ID. Set `skip_when_already_exists=True` so a
   retry of the same dispatch does not create another wake.
@@ -66,6 +67,60 @@ authority for publication.
 Manual invocations use the same coordinator task graph and package runner. They
 may provide the bounded A11.3 scope overrides, but no override bypasses source
 readiness, the writer lock, validation, or atomic publication.
+
+## Frozen Source Completion Signal
+
+The OHLCV package owns the immutable
+`TechIndicatorsSourceCompletionSignal`; source DAGs do not construct ad hoc
+dictionaries. A qualifying source runner result exposes it under
+`tech_indicators_completion_signal`. Its exact JSON-safe output is:
+
+```json
+{
+  "schema_version": 1,
+  "signal_type": "stonks_ohlcv_daily_completion",
+  "provider_code": "EODDATA",
+  "source_code": "eoddata_daily",
+  "job_name": "stonks_ohlcv_eoddata_daily",
+  "effective_date": "2026-08-28",
+  "source_run_id": "10000000-0000-4000-8000-000000000001",
+  "report_outcome": "WARN",
+  "trigger_run_id": "source__eoddata__10000000-0000-4000-8000-000000000001"
+}
+```
+
+The Yahoo identity is `YAHOO`, `yahoo_daily`, and
+`stonks_ohlcv_yahoo_daily`; its trigger prefix is `source__yahoo__`. The source
+Core run UUID makes the trigger ID deterministic for one completed run and
+distinct for a later reconciliation run.
+
+Eligibility deliberately mirrors the source half of I3.6:
+
+- EODData emits only for a succeeded result with `PASS` or `WARN`, zero
+  failures, and zero missing sessions.
+- Yahoo emits only for a succeeded `PASS` or `WARN` result whose ticker scope
+  is empty (the full eligible universe) or explicitly contains `SPX`.
+- A result that does not meet those rules serializes the nested signal as
+  `null`; failed source tasks return no successful result at all.
+
+The trigger configuration derived from the signal has exactly these fields:
+
+```text
+coordination_schema_version
+effective_date
+source_provider_code
+source_code
+source_job_name
+source_core_run_id
+source_dag_id
+source_dag_run_id
+```
+
+It accepts only the two frozen source identities and a bounded Airflow-safe
+source DAG-run ID. Neither output carries credentials, configuration, report or
+raw-object IDs, raw data, row counts, issue text, or diagnostics. The signal is
+still only a wake hint; the coordinator must execute the database readiness
+join below.
 
 ## Authoritative Date-Scoped Join
 
@@ -181,8 +236,8 @@ and [`TriggerDagRunOperator` contract](https://airflow.apache.org/docs/apache-ai
 
 ## Implementation Handoff
 
-- A11.2 adds the minimal secret-safe source completion values required for
-  deterministic dispatch and same-date evidence.
+- A11.2 added the package-owned minimal, secret-safe source completion signal
+  and deterministic trigger configuration described above.
 - A11.3 adds the manual/event-woken coordinator DAG and validated scope inputs.
 - A11.4 freezes its import, schedule, task-shape, date, logging, and delegation
   tests.

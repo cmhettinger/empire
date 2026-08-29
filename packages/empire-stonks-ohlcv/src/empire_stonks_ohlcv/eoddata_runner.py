@@ -56,6 +56,9 @@ from empire_stonks_ohlcv.source_conventions import (
     EODDATA_DAILY_SOURCE,
     EODDATA_SYMBOL_LIST_SOURCE,
 )
+from empire_stonks_ohlcv.tech_indicators_completion import (
+    TechIndicatorsSourceCompletionSignal,
+)
 from empire_stonks_ohlcv.validation import ProviderValidationResult
 
 
@@ -141,7 +144,29 @@ class EODDataDailyRunResult:
         if self.corrected_current_rows > self.bar_counts.updated:
             raise ValueError("corrected rows cannot exceed updated bars.")
 
+    @property
+    def tech_indicators_completion_signal(
+        self,
+    ) -> TechIndicatorsSourceCompletionSignal | None:
+        """Return a wake signal only for complete successful source evidence."""
+
+        if (
+            self.failure_count != 0
+            or self.missing_session_count != 0
+            or self.report_outcome not in {"PASS", "WARN"}
+        ):
+            return None
+        return TechIndicatorsSourceCompletionSignal(
+            provider_code=EODDATA_PROVIDER_CODE,
+            source_code=EODDATA_DAILY_SOURCE.source_code,
+            job_name=EODDATA_DAILY_JOB_NAME,
+            effective_date=self.effective_date,
+            source_run_id=self.run_id,
+            report_outcome=self.report_outcome,
+        )
+
     def to_dict(self) -> dict[str, Any]:
+        completion_signal = self.tech_indicators_completion_signal
         return {
             "run_id": str(self.run_id),
             "status": self.status,
@@ -167,6 +192,11 @@ class EODDataDailyRunResult:
             "planned_exchange_count": self.planned_exchange_count,
             "retry_count": self.retry_count,
             "corrected_current_rows": self.corrected_current_rows,
+            "tech_indicators_completion_signal": (
+                None
+                if completion_signal is None
+                else completion_signal.to_dict()
+            ),
         }
 
 

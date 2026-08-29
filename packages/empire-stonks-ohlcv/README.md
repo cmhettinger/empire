@@ -881,9 +881,9 @@ runtime identity; the package neither loads environment files nor depends on
 Airflow.
 
 The returned `EODDataDailyRunResult` contains only the run and three report
-object IDs, status,
-effective date, aggregate write/issue and rejected-row counts, inactive skip
-count, and report outcome. Core params and summaries use
+object IDs, status, effective date, aggregate write/issue and rejected-row
+counts, inactive skip count, report outcome, and the optional downstream
+completion signal described below. Core params and summaries use
 `OHLCVConfig.to_safe_dict()` and never
 contain credentials, source payloads, issue text, or full report contents.
 Acquisition and parsing failures also record the safe market and source code
@@ -891,6 +891,29 @@ when the failed partition is known; all runtime failures record a safe stage
 while the original exception is re-raised. Previously stored raw
 objects and successfully committed import data are not deleted on later-stage
 failure, making a new Core run for the same effective date safe to retry.
+
+### Technical-indicator source completion signal
+
+Successful EODData and Yahoo daily results expose an optional
+`tech_indicators_completion_signal`. EODData emits it only for `PASS` or `WARN`
+runs with zero failures and zero missing sessions. Yahoo emits it only for
+`PASS` or `WARN` runs whose explicit ticker scope is empty (the full eligible
+universe) or contains `SPX`.
+
+The schema-version-1 signal contains only its type, provider/source/job
+identity, effective date, source Core run ID, report outcome, and a
+deterministic coordinator trigger-run ID. It contains no configuration,
+credentials, object IDs, raw payloads, diagnostics, or row data. The public
+`TechIndicatorsSourceCompletionSignal.to_trigger_conf()` method adds the exact
+source DAG and DAG-run provenance needed by the A11 coordination contract.
+Repeating dispatch for one source Core run therefore yields the same trigger
+ID, while a genuine new source run remains independently observable.
+
+This output is only a secret-safe Airflow wake hint. It never proves the
+two-source join: the technical-indicator package still rechecks the exact-date
+Core, OHLCV, and SPX state through its authoritative readiness predicate before
+calculation or publication. Source-DAG trigger wiring is intentionally owned by
+the later Airflow integration task.
 
 ## EODData scheduled DAG
 

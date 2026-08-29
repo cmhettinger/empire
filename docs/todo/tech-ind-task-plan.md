@@ -155,7 +155,7 @@ are ready for the same effective date, without moving package logic into DAGs.
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
 | A11.1 | [x] | Select coordination mechanism | Evaluate Airflow 3 assets/events, coordinator DAG, and trigger/wait patterns against scheduled EODData and manual Yahoo. Select a date-scoped prerequisite join that does not rely on timing alone. | I3.6, J9.3, OHLCV V10.8-V10.10 |
-| A11.2 | [ ] | Define source completion signals | Add/reuse minimal date-scoped source outputs/assets so EODData and Yahoo success is unambiguous, rerun-safe, and contains no credentials/raw data. | A11.1 |
+| A11.2 | [x] | Define source completion signals | Add/reuse minimal date-scoped source outputs/assets so EODData and Yahoo success is unambiguous, rerun-safe, and contains no credentials/raw data. | A11.1 |
 | A11.3 | [ ] | Add manual tech-indicators DAG | Add thin `stonks_tech_indicators_daily_refresh` wiring runtime services and validated effective-date/scope overrides to the package runner; begin `schedule=None`, no catchup, one active run. | O10.7, A11.1 |
 | A11.4 | [ ] | Add DAG contract tests | Cover import, tags, schedule, task shape, date handling, overrides, runner identity, logging, and absence of calculation SQL/business logic. | A11.3 |
 | A11.5 | [ ] | Wire prerequisites | Implement the selected EODData plus Yahoo/SPX join so automatic refresh occurs only after both inputs succeed or readiness is explicitly proven for the same date. | A11.2-A11.4 |
@@ -172,6 +172,16 @@ scheduled polling, and logical-date sensors. Documentation marker/link checks,
 the Airflow 3.2.1/provider 1.12.3 API probe, focused source-DAG pytest (20
 passed), focused readiness pytest (9 passed), non-table/non-URL prose
 88-column scan, and `git diff --check` passed.
+
+Done: 2026-08-29 — added the immutable, JSON-safe EODData/Yahoo completion
+signal and deterministic Airflow trigger configuration in
+`empire_stonks_ohlcv.tech_indicators_completion`; qualifying daily results now
+expose it without credentials, raw data, or report/object payloads, with exact
+eligibility and rerun contracts documented in the OHLCV README and A11
+coordination/design contracts. Focused pytest passed (76), full OHLCV pytest
+passed (597 passed, 33 skipped), `poetry check --lock`, `pip check`, package
+build, compile/import smoke, both daily CLI `--help` smokes, prose line scan,
+and `git diff --check` passed.
 
 ---
 

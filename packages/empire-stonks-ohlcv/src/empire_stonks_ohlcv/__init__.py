@@ -217,6 +217,12 @@ from empire_stonks_ohlcv.stooq_history_writer import (
     StooqHistoryChunkWriter,
     StooqHistoryWriteSummary,
 )
+from empire_stonks_ohlcv.tech_indicators_completion import (
+    TECH_INDICATORS_BENCHMARK_TICKER,
+    TECH_INDICATORS_COMPLETION_SCHEMA_VERSION,
+    TECH_INDICATORS_COMPLETION_SIGNAL_TYPE,
+    TechIndicatorsSourceCompletionSignal,
+)
 from empire_stonks_ohlcv.validation import (
     MAX_ISSUE_SAMPLES,
     BoundedIssueSummary,
@@ -432,6 +438,10 @@ __all__ = [
     "STOOQ_HISTORY_REPORT_LOGICAL_NAME",
     "STOOQ_HISTORY_REPORT_TYPE",
     "STOOQ_HISTORY_SUBJECT_KEY",
+    "TECH_INDICATORS_BENCHMARK_TICKER",
+    "TECH_INDICATORS_COMPLETION_SCHEMA_VERSION",
+    "TECH_INDICATORS_COMPLETION_SIGNAL_TYPE",
+    "TechIndicatorsSourceCompletionSignal",
     "StooqHistoryChunk",
     "StooqHistoryChunkWriteResult",
     "StooqHistoryChunkWriter",
