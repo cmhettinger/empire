@@ -116,6 +116,37 @@ result. Writer-lock contention produces compact JSON on stderr and exit code
 75 without creating workflow state; other runtime failures expose only a fixed
 safe message.
 
+The Airflow DAG `stonks_tech_indicators_daily_refresh` exposes the same daily
+runner as one thin task. It is manual-only (`schedule=None`), does not catch up,
+and permits one active DAG run. Every invocation requires an exact
+`effective_date` in `dag_run.conf`; an empty configuration never falls back to
+the wall-clock or Airflow logical date. Optional JSON fields are
+`provider_codes`, `markets`, `provider_listing_ids`, `calculation_version`,
+`dry_run`, and `force`:
+
+```json
+{
+  "effective_date": "2026-08-28",
+  "provider_codes": ["EODDATA"],
+  "markets": ["NASDAQ"],
+  "dry_run": true
+}
+```
+
+Provider codes must be exact uppercase strings, markets exact trimmed strings,
+and listing IDs canonical lowercase UUID strings. All three selectors are JSON
+arrays; listing IDs cannot be combined with provider or market filters. The
+version must be the configured V1 value, and `dry_run` and `force` must be JSON
+booleans. The DAG rejects unsupported configuration keys, loads configuration
+from the Compose-owned environment, opens the package-required independent
+work/Core/object-store connections, and delegates locking and all readiness,
+calculation, reporting, and publication behavior to the package runner.
+
+The DAG is not automatically triggered in A11.3. Source completion dispatch
+and the read-only preflight join remain disabled until A11.5; manual execution
+therefore relies on the runner's authoritative readiness check and fails closed
+when same-date prerequisites are absent.
+
 The installed `stonks-tech-indicators-backfill` command and local wrapper expose
 the J9 staged backfill with required inclusive dates, exact provider/market or
 listing scope, bounded batches, partial-run limits, exact resume cursors,

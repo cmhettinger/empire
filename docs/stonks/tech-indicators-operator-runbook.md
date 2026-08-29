@@ -184,6 +184,38 @@ daily scope. It never bypasses source readiness, scope validation, benchmark
 identity, report validation, transaction bounds, or the writer lock. Rehearse
 with `--dry-run --force` first.
 
+### Manual Airflow Daily Run
+
+The `stonks_tech_indicators_daily_refresh` DAG is initially manual-only, with
+no catchup and one active run. Trigger it with a JSON configuration containing
+the required exact effective date:
+
+```json
+{
+  "effective_date": "2026-08-24"
+}
+```
+
+The optional fields mirror the daily command: `provider_codes`, `markets`, and
+`provider_listing_ids` are JSON arrays; `calculation_version` is exact text;
+and `dry_run` and `force` are JSON booleans. Exact listing IDs cannot be mixed
+with provider or market filters. Use a bounded dry-run scope first when
+rehearsing a correction:
+
+```json
+{
+  "effective_date": "2026-08-24",
+  "provider_codes": ["EODDATA"],
+  "markets": ["NASDAQ"],
+  "dry_run": true
+}
+```
+
+The DAG never derives the business date from its logical date. Automatic
+source-completion dispatch and the coordinator preflight are not enabled in
+A11.3; until they are verified, manual runs still fail closed through the
+package's same-date readiness decision.
+
 ## Publication Readiness
 
 Calculation completion and publication readiness are different facts. A row in

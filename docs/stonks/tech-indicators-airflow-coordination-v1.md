@@ -3,11 +3,12 @@
 ## Status And Scope
 
 A11.1 selects the V1 Airflow coordination mechanism for daily technical
-indicators. A11.2 freezes its source completion signals. This contract decides
-how successful EODData and Yahoo/SPX completions wake the technical-indicator
-workflow and how it joins those prerequisites for one effective date. It does
-not implement the coordinator DAG, trigger wiring, or production enablement
-owned by A11.3-A11.8.
+indicators. A11.2 freezes its source completion signals, and A11.3 implements
+the initially manual coordinator DAG. This contract decides how successful
+EODData and Yahoo/SPX completions wake the technical-indicator workflow and how
+it joins those prerequisites for one effective date. It does not implement the
+formal DAG contract suite, trigger wiring, or production enablement owned by
+A11.4-A11.8.
 
 The deployed runtime is Apache Airflow 3.2.1 with
 `apache-airflow-providers-standard` 1.12.3. The live source DAGs are intentionally
@@ -67,6 +68,31 @@ authority for publication.
 Manual invocations use the same coordinator task graph and package runner. They
 may provide the bounded A11.3 scope overrides, but no override bypasses source
 readiness, the writer lock, validation, or atomic publication.
+
+## Manual Coordinator Contract
+
+`dags/stonks/stonks_tech_indicators_daily_refresh.py` contains one task named
+`run_tech_indicators_daily`. The DAG has `schedule=None`, `catchup=False`, and
+`max_active_runs=1`, and uses `America/New_York` only for its fixed start-date
+identity. It never derives the business effective date from wall time, logical
+date, or data interval.
+
+Every run requires `dag_run.conf.effective_date` as canonical `YYYY-MM-DD`.
+Optional scope keys are `provider_codes`, `markets`, `provider_listing_ids`,
+`calculation_version`, `dry_run`, and `force`. Selectors must be JSON arrays;
+provider codes are uppercase, markets are trimmed provider-native text, and
+listing IDs are canonical lowercase UUID strings. Listing-ID scope cannot be
+combined with provider or market filters. Booleans must be JSON booleans, and
+the package scope enforces the frozen calculation version and all remaining
+normalization and compatibility rules.
+
+The DAG also reserves the exact A11.2 coordination keys so later source wakes
+do not require a second configuration shape. A11.3 does not interpret those
+keys or perform the preflight join. It loads the Compose-owned environment,
+uses independent work, Core, and object-store connections plus the normal lock
+connection factory, and delegates directly to `run_tech_indicators_daily()`
+with `run_type="airflow"` and `runner="airflow"`. The task returns and logs only
+the runner's compact secret-safe result.
 
 ## Frozen Source Completion Signal
 
@@ -238,7 +264,8 @@ and [`TriggerDagRunOperator` contract](https://airflow.apache.org/docs/apache-ai
 
 - A11.2 added the package-owned minimal, secret-safe source completion signal
   and deterministic trigger configuration described above.
-- A11.3 adds the manual/event-woken coordinator DAG and validated scope inputs.
+- A11.3 added the manual coordinator DAG, exact-date/scope validation, runtime
+  service wiring, and package-runner delegation described above.
 - A11.4 freezes its import, schedule, task-shape, date, logging, and delegation
   tests.
 - A11.5 adds asynchronous trigger tasks to both source DAGs and the coordinator
