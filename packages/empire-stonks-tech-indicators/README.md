@@ -1066,6 +1066,13 @@ It uses deterministic fixtures, rollback-only generated PostgreSQL data, and
 bounded read-only development-data aggregates; it does not run a broad source
 or technical-indicator backfill.
 
+The representative V12.6 calculation, persistence, query, publication, lock,
+report, storage, and memory gate is recorded in
+[`docs/stonks/tech-indicators-performance-evidence-v12.6.md`](../../docs/stonks/tech-indicators-performance-evidence-v12.6.md).
+Its deterministic 20,000-observation calculation probe is
+[`tools/tech-indicators/calculation-performance-benchmark.py`](../../tools/tech-indicators/calculation-performance-benchmark.py).
+Production-scale confirmation remains a Phase 13 rollout gate.
+
 Report construction uses `select_report_database_summary(...)` with an injected
 cursor and the same `TechIndicatorsScope` as calculation. With no publication
 ID it summarizes the active published view; a publication ID instead selects
