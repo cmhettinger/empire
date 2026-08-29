@@ -8,8 +8,10 @@ This runbook covers the package-owned technical-indicator operator commands:
 - Bounded daily calculation, dry runs, corrections, and healthy no-ops.
 - Staged historical backfill, partial progress, and exact resume.
 - Explicit rebuilds.
+- Calculation-version rollout and rollback.
 - Read-only coverage, freshness, drift, and source-readiness inspection.
-- Report interpretation, publication recovery, and safe SQL inspection.
+- Atomic publication, report interpretation, Airflow recovery, and safe SQL
+  inspection.
 
 Run commands from the Empire repository root. These workflows read
 provider-native `stonks.ohlcv_daily` rows and mutate only technical-indicator,
@@ -52,9 +54,11 @@ Confirm that the active file is ignored without displaying it:
 git check-ignore deploy/env/local.env
 ```
 
-The Core `global` storage root must exist and be writable. Every substantive
-daily or backfill attempt stores durable JSON and PDF reports, including dry
-runs, healthy no-ops, and partial backfills.
+The Core `global` storage root must exist and be writable. Every completed
+lock-acquired daily or backfill result stores durable JSON and PDF reports,
+including dry runs, healthy no-ops, and partial backfills. Argument,
+configuration, preflight, lock-contention, or process failures that stop before
+report storage do not create both reports.
 
 Run the read-only preflight before operator work:
 
@@ -139,6 +143,26 @@ Review these sections:
 The disclosure is intentional: inspection returns no feature values, ranks,
 screening thresholds, targets, or recommendations. Prefer it to ad hoc payload
 queries.
+
+## Normal Daily Operating Sequence
+
+The coordinator remains paused until the P13.14 production-go decision. During
+V12, do not unpause it or introduce an independent schedule. Use this bounded
+manual sequence for an approved daily date and scope:
+
+1. Run `bin/stonks-tech-indicators-config` and require `ready=true`.
+2. Inspect the exact effective date and intended scope. Require complete
+   EODData plus Yahoo/SPX source evidence and review coverage and drift.
+3. Run the same scope with `--dry-run` and review both report object IDs.
+4. Run the same scope without `--dry-run`. Preserve its run, publication, and
+   report IDs and its terminal outcome.
+5. Inspect the same date and scope again. Require current source-key,
+   calculation-version, copied-source, benchmark, and publication coverage.
+
+After P13.14 activation, qualifying source completions wake the same package
+path through Airflow. Review skipped not-ready wakes, healthy `NO_OP` results,
+warnings, and failures against the exact source date. Do not add a technical
+indicator cron or infer a date from Airflow's logical date.
 
 ## Daily Runs, Dry Runs, And No-Ops
 
@@ -267,6 +291,41 @@ correction or rebuild path for a separate data issue. The full activation,
 backlog, stop-condition, and resume checklist is in the
 [Airflow rollout contract](tech-indicators-airflow-rollout-v1.md).
 
+Use this recovery guide for a failed or surprising coordinator run:
+
+| Observation | Recovery |
+|---|---|
+| `check_source_readiness` is skipped | Treat an early source wake as expected. Inspect the exact date and wait for matching EODData and Yahoo/SPX evidence; trigger manually only after it is ready. |
+| Runner exits with contention | Inspect the current advisory-lock owner. The contended invocation created no Core, report, publication, or payload state; retry once after the owner is terminal. |
+| Runner returns `FAIL` | Keep the coordinator paused if failures repeat. Inspect the exact Core run, reports, and publication, correct the owning source or configuration issue, and rerun the identical bounded scope. |
+| Task response fails after possible commit | Inspect the Core run and publication before retrying. A terminal commit may have completed even when Airflow did not receive the result. |
+| Queued wakes accumulated while paused | Reconcile every exact date and source run. Drain a reviewed short queue serially or keep the DAG paused; never delete lifecycle data to clear it. |
+
+## Atomic Publication And Failure Visibility
+
+Readers see either the prior complete publication or the new complete
+publication. They never see a partially written candidate:
+
+| Work | Publication method | Visibility boundary |
+|---|---|---|
+| Bounded daily refresh or correction within 25,000 writes and 60 seconds | `IN_PLACE` | After report storage, feature and publication changes finish in one terminal transaction. |
+| Backfill, calculation-version rebuild, or larger correction | `STAGED` | Batches fill inactive A/B slots; one terminal membership flip exposes the complete selected listing image. |
+| Healthy no-op | None | The existing compatible publication is re-proven; no candidate or payload mutation occurs. |
+| Dry run | Selected method, rolled back | Reports persist, but feature and publication state does not. |
+
+The writer lock is acquired before scope and readiness resolution and remains
+held through the terminal commit. A publishing workflow calculates and
+validates, stores both reports, reaches `PREPARED`, records Core success, then
+revalidates and atomically publishes. Because reports must exist before the
+terminal transaction, their publication snapshot records
+`phase=PREPARED_CANDIDATE` and `readiness_at_report=NOT_READY`; successful CLI
+or Airflow output is returned only after the final publication commit.
+
+On failure before that commit, the prior complete publication remains visible.
+Inactive staged batches and a bare `BUILDING`, `PREPARED`, or `PUBLISHED` status
+are not readiness evidence. Always use the package-owned readiness query or
+the bounded inspect command.
+
 ## Publication Readiness
 
 Calculation completion and publication readiness are different facts. A row in
@@ -389,6 +448,57 @@ technical row is itself a suffix-rebuild signal. SPX corrections propagate to
 all supported subjects with affected published coverage; the package does not
 guess a proxy benchmark or null old SPX fields to publish partial work.
 
+## Calculation-Version Rollout
+
+The installed implementation accepts only `TECH_INDICATORS_V1`. The CLI option
+and environment setting identify that supported profile; changing either to a
+new string does not activate a new calculation version. A future version must
+first ship as reviewed package code with its formulas, warm-up and null rules,
+tests, report contract, database compatibility, and runtime configuration.
+
+After a release explicitly supports a new version, roll it out as a staged
+rebuild rather than an in-place daily change:
+
+1. Pause the coordinator and account for every queued or running wake.
+2. Run configuration preflight from the reviewed release and record the
+   supported calculation version and runtime evidence.
+3. Inspect one exact listing and date range, then run its staged rebuild with
+   `--calculation-version`, `--rebuild`, `--confirm-rebuild`, and `--dry-run`.
+4. Review source and payload counts, null and benchmark coverage, warnings,
+   estimated batches, and both reports.
+5. Publish the same immutable cohort without `--dry-run`; use exact cursors to
+   resume any deliberate partial run.
+6. Inspect scoped readiness for the new version before proceeding to the next
+   cohort. Mixed versions may exist outside that exact scope, but global
+   readiness cannot pass until every intended active listing is migrated.
+7. Resume event-driven cadence only after its rollout gates and stop conditions
+   pass for the complete intended universe.
+
+A calculation-version change rebuilds each selected listing from its first
+eligible source observation through the safe horizon. Do not treat it as a tail
+append or silently include inactive listings. Add an inactive listing only by
+exact ID with the documented explicit opt-in.
+
+Version rollback is also a new validated publication, not a database rewind.
+Before terminal publication, leave the candidate invisible and use a fresh
+package invocation to validate, resume, or fail it; the prior publication
+remains visible. After publication, pause the coordinator and either forward-fix
+with a new version or use reviewed code that still supports the target version
+to perform a fresh staged rebuild from current source. Never manually flip
+membership to an old slot or reactivate stale rows; an inactive slot is reusable
+only after full source, version, benchmark, and publication validation.
+
+## Rollback Decision Guide
+
+| Situation | Safe rollback or recovery |
+|---|---|
+| Cadence caused unexpected runs | Pause only the technical coordinator, inventory queued/running wakes, and preserve source schedules and published data. |
+| Dry run was wrong | Correct the input or release and rerun; feature and publication state was rolled back already, while reports remain as evidence. |
+| Daily or staged work failed before terminal commit | Keep the prior publication. Rerun the exact bounded scope, using only a returned durable cursor for staged resume. |
+| A new publication committed but the task response failed | Inspect Core, publication, reports, and readiness first. Do not republish merely to manufacture a successful response. |
+| Published source data is corrected | Converge the correction through the owning OHLCV workflow, inspect drift, then run a bounded daily correction or staged rebuild. |
+| A published calculation version must be withdrawn | Pause cadence and create a fresh validated staged publication under reviewed supported code; never restore rows or flip slots manually. |
+
 ## Benchmark Failure
 
 The benchmark contract requires exactly one reviewed, active
@@ -414,8 +524,8 @@ recalculation must complete before readiness can pass.
 
 ## Reports And Exit Behavior
 
-Every substantive daily or backfill attempt stores under the configured storage
-key (default `stonks/tech-indicators`):
+Every completed lock-acquired daily or backfill result stores under the
+configured storage key (default `stonks/tech-indicators`):
 
 ```text
 <storage_key>/runs/YYYY/MM/DD/<run_id>/reports/report.json
@@ -681,6 +791,8 @@ Exit `psql` with `\q`.
 - [Recalculation contract](tech-indicators-recalculation-contract-v1.md)
 - [Publication contract](tech-indicators-publication-contract-v1.md)
 - [Concurrency contract](tech-indicators-concurrency-contract-v1.md)
+- [Airflow coordination contract](tech-indicators-airflow-coordination-v1.md)
+- [Airflow rollout contract](tech-indicators-airflow-rollout-v1.md)
 - [Report schema](tech-indicators-report-schema-v1.md)
 - [PDF design](tech-indicators-pdf-design-v1.md)
 - [OHLCV operator runbook](ohlcv-operator-runbook.md)
