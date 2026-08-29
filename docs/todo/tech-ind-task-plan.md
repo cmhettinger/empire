@@ -157,7 +157,7 @@ are ready for the same effective date, without moving package logic into DAGs.
 | A11.1 | [x] | Select coordination mechanism | Evaluate Airflow 3 assets/events, coordinator DAG, and trigger/wait patterns against scheduled EODData and manual Yahoo. Select a date-scoped prerequisite join that does not rely on timing alone. | I3.6, J9.3, OHLCV V10.8-V10.10 |
 | A11.2 | [x] | Define source completion signals | Add/reuse minimal date-scoped source outputs/assets so EODData and Yahoo success is unambiguous, rerun-safe, and contains no credentials/raw data. | A11.1 |
 | A11.3 | [x] | Add manual tech-indicators DAG | Add thin `stonks_tech_indicators_daily_refresh` wiring runtime services and validated effective-date/scope overrides to the package runner; begin `schedule=None`, no catchup, one active run. | O10.7, A11.1 |
-| A11.4 | [ ] | Add DAG contract tests | Cover import, tags, schedule, task shape, date handling, overrides, runner identity, logging, and absence of calculation SQL/business logic. | A11.3 |
+| A11.4 | [x] | Add DAG contract tests | Cover import, tags, schedule, task shape, date handling, overrides, runner identity, logging, and absence of calculation SQL/business logic. | A11.3 |
 | A11.5 | [ ] | Wire prerequisites | Implement the selected EODData plus Yahoo/SPX join so automatic refresh occurs only after both inputs succeed or readiness is explicitly proven for the same date. | A11.2-A11.4 |
 | A11.6 | [ ] | Handle repeated source runs | Prove EODData's multiple daily runs and Yahoo/manual reconciliation coalesce or safely trigger idempotent refresh through the package-owned scope lock, without concurrent duplicate work or partial publication. | A11.5, J9.4, J9.9 |
 | A11.7 | [ ] | Verify Airflow vertical | Rebuild Airflow, verify zero import errors, run source fixture completions through tech indicators, and inspect Core plus JSON/PDF objects. | A11.4-A11.6 |
@@ -193,6 +193,17 @@ pytest passed (728 passed, 27 skipped); Poetry lock and dependency checks,
 compileall, live Airflow 3.2.1 import/task-shape and scope smokes, zero Airflow
 import errors, changed-file prose/code line scan, absence-of-SQL scan, and
 `git diff --check` passed.
+
+Done: 2026-08-29 — added
+`packages/empire-stonks-tech-indicators/tests/test_daily_refresh_dag.py` with
+25 contract cases covering import, tags/manual schedule, task shape, required
+exact date, normalized and invalid scope overrides, reserved A11.2 provenance,
+separate runtime services, lock-factory and Airflow runner identity, compact
+secret-safe logging, failure cleanup, and absence of SQL/calculation logic.
+Focused pytest passed (25); full package pytest passed (753 passed, 27 skipped);
+Poetry lock/dependency checks, compileall, live Airflow 3.2.1 contract import,
+zero Airflow import errors, changed-file line scan, and `git diff --check`
+passed.
 
 ---
 

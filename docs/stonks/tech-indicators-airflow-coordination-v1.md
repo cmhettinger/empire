@@ -3,12 +3,12 @@
 ## Status And Scope
 
 A11.1 selects the V1 Airflow coordination mechanism for daily technical
-indicators. A11.2 freezes its source completion signals, and A11.3 implements
-the initially manual coordinator DAG. This contract decides how successful
-EODData and Yahoo/SPX completions wake the technical-indicator workflow and how
-it joins those prerequisites for one effective date. It does not implement the
-formal DAG contract suite, trigger wiring, or production enablement owned by
-A11.4-A11.8.
+indicators. A11.2 freezes its source completion signals, A11.3 implements the
+initially manual coordinator DAG, and A11.4 freezes its DAG contract tests. This
+contract decides how successful EODData and Yahoo/SPX completions wake the
+technical-indicator workflow and how it joins those prerequisites for one
+effective date. It does not implement trigger wiring, repeated-run proof, or
+production enablement owned by A11.5-A11.8.
 
 The deployed runtime is Apache Airflow 3.2.1 with
 `apache-airflow-providers-standard` 1.12.3. The live source DAGs are intentionally
@@ -266,8 +266,9 @@ and [`TriggerDagRunOperator` contract](https://airflow.apache.org/docs/apache-ai
   and deterministic trigger configuration described above.
 - A11.3 added the manual coordinator DAG, exact-date/scope validation, runtime
   service wiring, and package-runner delegation described above.
-- A11.4 freezes its import, schedule, task-shape, date, logging, and delegation
-  tests.
+- A11.4 added contract tests for import, tags, manual scheduling, task shape,
+  exact-date/scope validation, runtime delegation and identity, compact
+  logging, failure cleanup, and the no-SQL/business-logic boundary.
 - A11.5 adds asynchronous trigger tasks to both source DAGs and the coordinator
   preflight join.
 - A11.6 proves repeated-run coalescence, idempotency, and lock behavior.
