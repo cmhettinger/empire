@@ -160,7 +160,7 @@ are ready for the same effective date, without moving package logic into DAGs.
 | A11.4 | [x] | Add DAG contract tests | Cover import, tags, schedule, task shape, date handling, overrides, runner identity, logging, and absence of calculation SQL/business logic. | A11.3 |
 | A11.5 | [x] | Wire prerequisites | Implement the selected EODData plus Yahoo/SPX join so automatic refresh occurs only after both inputs succeed or readiness is explicitly proven for the same date. | A11.2-A11.4 |
 | A11.6 | [x] | Handle repeated source runs | Prove EODData's multiple daily runs and Yahoo/manual reconciliation coalesce or safely trigger idempotent refresh through the package-owned scope lock, without concurrent duplicate work or partial publication. | A11.5, J9.4, J9.9 |
-| A11.7 | [ ] | Verify Airflow vertical | Rebuild Airflow, verify zero import errors, run source fixture completions through tech indicators, and inspect Core plus JSON/PDF objects. | A11.4-A11.6 |
+| A11.7 | [x] | Verify Airflow vertical | Rebuild Airflow, verify zero import errors, run source fixture completions through tech indicators, and inspect Core plus JSON/PDF objects. | A11.4-A11.6 |
 | A11.8 | [ ] | Decide production cadence | From bounded evidence, choose event-driven, scheduled, or manual-only operation and document pause/rollback before enabling it. | A11.7 |
 
 Done: 2026-08-29 — selected asynchronous EODData/Yahoo source-success
@@ -227,6 +227,17 @@ passed 9 with zero fixture residue; full tech-indicators pytest passed 761 with
 27 skipped and full OHLCV pytest passed 608 with 33 skipped. Both Poetry lock,
 dependency, and compileall checks, `make db-validate` (39 migrations), fresh
 Airflow 3.2.1 DAG assertions, and `git diff --check` passed.
+
+Done: 2026-08-29 — added the cleanup-safe
+`tools/tech-indicators/airflow-vertical.py` probe and recorded the deployed
+vertical in `tech-indicators-airflow-vertical-evidence-a11.7.md`: fresh Airflow
+3.2.1/provider 1.12.3 build and recreation, zero import errors, two successful
+source-provenance DAG runs, one 15,498-row `PASS` publication, one zero-write
+`NO_OP`, and four checksum-valid schema-V1 JSON/12-page PDF objects. Fresh-image
+`pip check`, exact DAG/task states, JSON/PDF inspection, paused-state restore,
+six zero database residue counts, zero report-file residue, probe compile/help,
+focused coordinator/source pytest (28 and 53 passed), changed-prose line scan,
+and `git diff --check` passed.
 
 ---
 

@@ -295,6 +295,10 @@ and [`TriggerDagRunOperator` contract](https://airflow.apache.org/docs/apache-ai
 - A11.6 added explicit source retry/new-run identity contracts and a live
   repeated-run proof covering zero-state contention, lock release, atomic first
   publication, latest same-date source evidence, and idempotent `NO_OP`.
-- A11.7 verifies the complete Airflow/Core/report vertical.
+- A11.7 verified the complete deployed Airflow/Core/report vertical with two
+  bounded source-completion fixtures, one atomic `PASS` publication, one
+  zero-write `NO_OP`, four checksum-valid JSON/PDF objects, and zero fixture
+  residue. Exact evidence is recorded in
+  `tech-indicators-airflow-vertical-evidence-a11.7.md`.
 - A11.8 alone decides whether and how automatic dispatch is enabled in normal
   operation.
