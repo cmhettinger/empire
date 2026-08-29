@@ -699,10 +699,14 @@ renders the same operational facts professionally. Neither report is an
 investment recommendation or a dump of feature rows.
 
 Airflow coordination must join successful EODData and Yahoo/SPX readiness for
-the same effective date. Task timing alone is insufficient. The package owns a
-readiness decision, and repeated source runs must lead to idempotent,
-nonconcurrent refresh behavior. Airflow must call the same package-owned
-publication and locking paths as CLI and manual execution.
+the same effective date. Task timing alone is insufficient. A11.1 selects
+asynchronous source-completion dispatch to the manual/event-woken coordinator
+DAG, with the package's database-backed readiness decision as the authoritative
+date join, in the
+[coordination contract](tech-indicators-airflow-coordination-v1.md)
+contract. Repeated source runs must lead to idempotent, nonconcurrent refresh
+behavior. Airflow must call the same package-owned publication and locking paths
+as CLI and manual execution.
 
 ## Deliberately Deferred Features
 
@@ -745,7 +749,7 @@ chats should resolve them rather than reopen the entire design:
 | Performance measurements and evidence-based tuning within frozen gates | W7.9, V12.6 |
 | Atomic publication unit and readiness predicate | P0.9 (frozen in `tech-indicators-publication-contract-v1.md`) |
 | Package-owned lock identity and contention policy | P0.10 (frozen in `tech-indicators-concurrency-contract-v1.md`) |
-| Airflow source-completion coordination | A11.1-A11.8 |
+| Airflow source-completion coordination | A11.1 (selected in `tech-indicators-airflow-coordination-v1.md`); A11.2-A11.8 implement and verify it |
 
 Any new indicator or material formula change requires a concrete consumer,
 versioned semantics, incremental behavior, storage/query justification, and an

@@ -154,7 +154,7 @@ are ready for the same effective date, without moving package logic into DAGs.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| A11.1 | [ ] | Select coordination mechanism | Evaluate Airflow 3 assets/events, coordinator DAG, and trigger/wait patterns against scheduled EODData and manual Yahoo. Select a date-scoped prerequisite join that does not rely on timing alone. | I3.6, J9.3, OHLCV V10.8-V10.10 |
+| A11.1 | [x] | Select coordination mechanism | Evaluate Airflow 3 assets/events, coordinator DAG, and trigger/wait patterns against scheduled EODData and manual Yahoo. Select a date-scoped prerequisite join that does not rely on timing alone. | I3.6, J9.3, OHLCV V10.8-V10.10 |
 | A11.2 | [ ] | Define source completion signals | Add/reuse minimal date-scoped source outputs/assets so EODData and Yahoo success is unambiguous, rerun-safe, and contains no credentials/raw data. | A11.1 |
 | A11.3 | [ ] | Add manual tech-indicators DAG | Add thin `stonks_tech_indicators_daily_refresh` wiring runtime services and validated effective-date/scope overrides to the package runner; begin `schedule=None`, no catchup, one active run. | O10.7, A11.1 |
 | A11.4 | [ ] | Add DAG contract tests | Cover import, tags, schedule, task shape, date handling, overrides, runner identity, logging, and absence of calculation SQL/business logic. | A11.3 |
@@ -162,6 +162,16 @@ are ready for the same effective date, without moving package logic into DAGs.
 | A11.6 | [ ] | Handle repeated source runs | Prove EODData's multiple daily runs and Yahoo/manual reconciliation coalesce or safely trigger idempotent refresh through the package-owned scope lock, without concurrent duplicate work or partial publication. | A11.5, J9.4, J9.9 |
 | A11.7 | [ ] | Verify Airflow vertical | Rebuild Airflow, verify zero import errors, run source fixture completions through tech indicators, and inspect Core plus JSON/PDF objects. | A11.4-A11.6 |
 | A11.8 | [ ] | Decide production cadence | From bounded evidence, choose event-driven, scheduled, or manual-only operation and document pause/rollback before enabling it. | A11.7 |
+
+Done: 2026-08-29 — selected asynchronous EODData/Yahoo source-success
+dispatch to the manual/event-woken coordinator, with I3.6's same-effective-date
+Core/OHLCV/SPX readiness predicate as the authoritative join, in
+`docs/stonks/tech-indicators-airflow-coordination-v1.md`; rejected
+unpartitioned assets, unavailable Airflow 3.2.1 runtime partition assignment,
+scheduled polling, and logical-date sensors. Documentation marker/link checks,
+the Airflow 3.2.1/provider 1.12.3 API probe, focused source-DAG pytest (20
+passed), focused readiness pytest (9 passed), non-table/non-URL prose
+88-column scan, and `git diff --check` passed.
 
 ---
 
