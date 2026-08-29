@@ -165,7 +165,7 @@ cadence on the development laptop. Those operations belong to Phase 13.
 |----|--------|------|---------------|------------|
 | V12.1 | [x] | Complete package README | Document ownership, profile, formulas, source caveats, config, tables, validation, versions, reports, CLIs, DAGs, and deferred work. | O10.6, A11.8 |
 | V12.2 | [x] | Complete operator runbook | Document daily operation, atomic publication, lock diagnosis/recovery, backfill, resume/rebuild, reports, SPX readiness, corrections, version rollout, Airflow recovery, and rollback. | V12.1 |
-| V12.3 | [ ] | Run formatting and full tests | Formatting/linting, package, schema, PostgreSQL/Core, report, CLI, and DAG suites pass from repository root. | V12.2 |
+| V12.3 | [x] | Run formatting and full tests | Formatting/linting, package, schema, PostgreSQL/Core, report, CLI, and DAG suites pass from repository root. | V12.2 |
 | V12.4 | [ ] | Validate DB and regenerate docs | Flyway, Stonks contracts, OHLCV regressions, and all DB documentation generation pass without drift. | V12.2 |
 | V12.5 | [ ] | Run correctness and isolation audit | Using deterministic fixtures, generated datasets, PostgreSQL integration tests, and only deliberately bounded existing development data, compare stored features with fresh calculations, pinned TA-Lib, independent formulas, and incremental outputs across providers, gaps, short history, corrections, and SPX alignment; concurrently exercise publication visibility, version isolation, benchmark completeness, the global writer lock, and failure recovery. | W7.6, W7.10, J9.8-J9.9, V12.3-V12.4 |
 | V12.6 | [ ] | Run representative performance gate | Measure rebuild, append, source/SPX correction, upsert, atomic publication/staging, lock acquisition/contention, latest-date scan/rank, report, and memory against P0.8 using generated or already-available bounded data; tune only from evidence and defer production-scale confirmation to Phase 13. | W7.9-W7.10, V12.3-V12.5 |
@@ -186,6 +186,13 @@ version rollout/rollback procedures. Focused pytest passed 186 tests including
 CLI, report/PDF, writer-lock, runner, scope, and DAG coverage; Poetry lock and
 `pip check`, four wrapper help smokes, 13 required sections, 48 balanced fences,
 13 local links, and `git diff --check` passed.
+
+Done: 2026-08-29 — full technical-indicators pytest passed 788 tests against
+live PostgreSQL; standalone Core and reports pytest passed 32 and 21 tests.
+The rollback-only schema contract passed 64 expected failures. Poetry lock,
+`pip check`, compileall, wheel/sdist build, distribution import/version, four
+CLI help smokes, deployed Airflow DAG listing with zero import errors, and
+`git diff --check` passed; the repository configures no formatter or linter.
 
 ---
 
