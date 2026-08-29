@@ -12,6 +12,7 @@ from empire_stonks_ohlcv import (
     TECH_INDICATORS_BENCHMARK_TICKER,
     TECH_INDICATORS_COMPLETION_SCHEMA_VERSION,
     TECH_INDICATORS_COMPLETION_SIGNAL_TYPE,
+    TECH_INDICATORS_COORDINATOR_DAG_ID,
     EODDataDailyRunResult,
     PersistenceCounts,
     TechIndicatorsSourceCompletionSignal,
@@ -19,6 +20,7 @@ from empire_stonks_ohlcv import (
     YahooDailyScope,
     YahooReportPhase,
     empty_yahoo_report_phase,
+    build_tech_indicators_dispatch,
 )
 
 
@@ -94,11 +96,16 @@ def test_completion_contract_is_explicit_and_json_safe() -> None:
         "stonks_ohlcv_daily_completion"
     )
     assert TECH_INDICATORS_BENCHMARK_TICKER == "SPX"
+    assert TECH_INDICATORS_COORDINATOR_DAG_ID == (
+        "stonks_tech_indicators_daily_refresh"
+    )
     assert completion_module.__all__ == [
         "TECH_INDICATORS_BENCHMARK_TICKER",
         "TECH_INDICATORS_COMPLETION_SCHEMA_VERSION",
         "TECH_INDICATORS_COMPLETION_SIGNAL_TYPE",
+        "TECH_INDICATORS_COORDINATOR_DAG_ID",
         "TechIndicatorsSourceCompletionSignal",
+        "build_tech_indicators_dispatch",
     ]
     assert signal.source_dag_id == "stonks_ohlcv_eoddata_daily_scrape"
     assert signal.trigger_run_id == (
@@ -116,6 +123,9 @@ def test_completion_contract_is_explicit_and_json_safe() -> None:
         "trigger_run_id": signal.trigger_run_id,
     }
     assert json.loads(json.dumps(signal.to_dict())) == signal.to_dict()
+    assert TechIndicatorsSourceCompletionSignal.from_dict(
+        signal.to_dict()
+    ) == signal
 
 
 def test_trigger_configuration_has_exact_secret_safe_provenance() -> None:
@@ -134,6 +144,72 @@ def test_trigger_configuration_has_exact_secret_safe_provenance() -> None:
         "source_dag_id": "stonks_ohlcv_yahoo_daily_scrape",
         "source_dag_run_id": "scheduled__2026-08-28T23:15:00+00:00",
     }
+
+
+def test_dispatch_builder_returns_exact_operator_arguments() -> None:
+    result = _eoddata_result().to_dict()
+
+    assert build_tech_indicators_dispatch(
+        result,
+        source_dag_id="stonks_ohlcv_eoddata_daily_scrape",
+        source_dag_run_id="scheduled__2026-08-28T23:15:00+00:00",
+    ) == {
+        "trigger_run_id": (
+            "source__eoddata__10000000-0000-4000-8000-000000000001"
+        ),
+        "conf": {
+            "coordination_schema_version": 1,
+            "effective_date": "2026-08-28",
+            "source_provider_code": "EODDATA",
+            "source_code": "eoddata_daily",
+            "source_job_name": "stonks_ohlcv_eoddata_daily",
+            "source_core_run_id": str(EODDATA_RUN_ID),
+            "source_dag_id": "stonks_ohlcv_eoddata_daily_scrape",
+            "source_dag_run_id": (
+                "scheduled__2026-08-28T23:15:00+00:00"
+            ),
+        },
+    }
+
+
+def test_dispatch_builder_returns_none_without_qualifying_signal() -> None:
+    result = _yahoo_result(tickers=("DOW",)).to_dict()
+
+    assert build_tech_indicators_dispatch(
+        result,
+        source_dag_id="stonks_ohlcv_yahoo_daily_scrape",
+        source_dag_run_id="manual__2026-08-29T12:00:00+00:00",
+    ) is None
+
+
+@pytest.mark.parametrize(
+    "changes, message",
+    [
+        ({"trigger_run_id": "source__wrong"}, "trigger_run_id"),
+        ({"effective_date": "2026-8-28"}, "effective_date"),
+        ({"extra": "value"}, "shape"),
+        ({"schema_version": True}, "schema_version"),
+    ],
+)
+def test_completion_signal_rejects_tampered_serialized_payload(
+    changes: dict[str, object],
+    message: str,
+) -> None:
+    signal = _eoddata_result().tech_indicators_completion_signal
+    assert signal is not None
+    payload = {**signal.to_dict(), **changes}
+
+    with pytest.raises(ValueError, match=message):
+        TechIndicatorsSourceCompletionSignal.from_dict(payload)
+
+
+def test_dispatch_builder_rejects_source_dag_identity_drift() -> None:
+    with pytest.raises(ValueError, match="DAG identity"):
+        build_tech_indicators_dispatch(
+            _eoddata_result().to_dict(),
+            source_dag_id="stonks_ohlcv_yahoo_daily_scrape",
+            source_dag_run_id="manual__2026-08-29T12:00:00+00:00",
+        )
 
 
 @pytest.mark.parametrize(

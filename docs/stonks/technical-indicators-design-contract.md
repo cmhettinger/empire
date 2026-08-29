@@ -751,7 +751,7 @@ chats should resolve them rather than reopen the entire design:
 | Performance measurements and evidence-based tuning within frozen gates | W7.9, V12.6 |
 | Atomic publication unit and readiness predicate | P0.9 (frozen in `tech-indicators-publication-contract-v1.md`) |
 | Package-owned lock identity and contention policy | P0.10 (frozen in `tech-indicators-concurrency-contract-v1.md`) |
-| Airflow source-completion coordination | A11.1-A11.4 (mechanism, signals, manual DAG, and contract tests frozen in `tech-indicators-airflow-coordination-v1.md`); A11.5-A11.8 wire and verify it |
+| Airflow source-completion coordination | A11.1-A11.5 (mechanism, signals, coordinator, contract tests, and source/preflight wiring frozen in `tech-indicators-airflow-coordination-v1.md`); A11.6-A11.8 prove repetition, the full vertical, and cadence |
 
 Any new indicator or material formula change requires a concrete consumer,
 versioned semantics, incremental behavior, storage/query justification, and an

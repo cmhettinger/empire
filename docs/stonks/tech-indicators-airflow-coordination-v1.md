@@ -4,11 +4,12 @@
 
 A11.1 selects the V1 Airflow coordination mechanism for daily technical
 indicators. A11.2 freezes its source completion signals, A11.3 implements the
-initially manual coordinator DAG, and A11.4 freezes its DAG contract tests. This
+initially manual coordinator DAG, A11.4 freezes its DAG contract tests, and
+A11.5 wires both sources to the package-owned same-date preflight join. This
 contract decides how successful EODData and Yahoo/SPX completions wake the
 technical-indicator workflow and how it joins those prerequisites for one
-effective date. It does not implement trigger wiring, repeated-run proof, or
-production enablement owned by A11.5-A11.8.
+effective date. Repeated-run proof, the full Airflow vertical, and the final
+production cadence decision remain owned by A11.6-A11.8.
 
 The deployed runtime is Apache Airflow 3.2.1 with
 `apache-airflow-providers-standard` 1.12.3. The live source DAGs are intentionally
@@ -71,11 +72,11 @@ readiness, the writer lock, validation, or atomic publication.
 
 ## Manual Coordinator Contract
 
-`dags/stonks/stonks_tech_indicators_daily_refresh.py` contains one task named
-`run_tech_indicators_daily`. The DAG has `schedule=None`, `catchup=False`, and
-`max_active_runs=1`, and uses `America/New_York` only for its fixed start-date
-identity. It never derives the business effective date from wall time, logical
-date, or data interval.
+`dags/stonks/stonks_tech_indicators_daily_refresh.py` contains the ordered tasks
+`check_source_readiness` and `run_tech_indicators_daily`. The DAG has
+`schedule=None`, `catchup=False`, and `max_active_runs=1`, and uses
+`America/New_York` only for its fixed start-date identity. It never derives the
+business effective date from wall time, logical date, or data interval.
 
 Every run requires `dag_run.conf.effective_date` as canonical `YYYY-MM-DD`.
 Optional scope keys are `provider_codes`, `markets`, `provider_listing_ids`,
@@ -86,13 +87,14 @@ combined with provider or market filters. Booleans must be JSON booleans, and
 the package scope enforces the frozen calculation version and all remaining
 normalization and compatibility rules.
 
-The DAG also reserves the exact A11.2 coordination keys so later source wakes
-do not require a second configuration shape. A11.3 does not interpret those
-keys or perform the preflight join. It loads the Compose-owned environment,
-uses independent work, Core, and object-store connections plus the normal lock
-connection factory, and delegates directly to `run_tech_indicators_daily()`
-with `run_type="airflow"` and `runner="airflow"`. The task returns and logs only
-the runner's compact secret-safe result.
+The DAG accepts and validates the exact A11.2 coordination provenance keys.
+Its package-owned preflight uses a repeatable-read, read-only transaction and
+returns only the bounded readiness decision. When ready, the runner task loads
+the Compose-owned environment, uses independent work, Core, and object-store
+connections plus the normal lock connection factory, and delegates to
+`run_tech_indicators_daily()` with `run_type="airflow"` and
+`runner="airflow"`. It returns and logs only the runner's compact secret-safe
+result.
 
 ## Frozen Source Completion Signal
 
@@ -256,9 +258,10 @@ and [`TriggerDagRunOperator` contract](https://airflow.apache.org/docs/apache-ai
   failed technical Core run.
 - Once invoked, technical runner failure propagates normally and must preserve
   J9.7 failure safety, report, lock-release, and publication rules.
-- No task in A11.1 enables scheduling or changes either source DAG. A11.8 owns
-  the production cadence, pause behavior, backlog handling, and rollback
-  decision after the Airflow vertical is proven.
+- A11.5 adds dispatch to the existing source DAGs but does not change their
+  schedules: EODData retains its reviewed two-run weekday cadence and Yahoo
+  remains manual. A11.8 owns the final production cadence, pause behavior,
+  backlog handling, and rollback decision after the Airflow vertical is proven.
 
 ## Implementation Handoff
 
@@ -269,8 +272,9 @@ and [`TriggerDagRunOperator` contract](https://airflow.apache.org/docs/apache-ai
 - A11.4 added contract tests for import, tags, manual scheduling, task shape,
   exact-date/scope validation, runtime delegation and identity, compact
   logging, failure cleanup, and the no-SQL/business-logic boundary.
-- A11.5 adds asynchronous trigger tasks to both source DAGs and the coordinator
-  preflight join.
+- A11.5 added strict signal deserialization and dispatch construction,
+  asynchronous trigger tasks to both source DAGs, and the coordinator's
+  package-owned read-only preflight join.
 - A11.6 proves repeated-run coalescence, idempotency, and lock behavior.
 - A11.7 verifies the complete Airflow/Core/report vertical.
 - A11.8 alone decides whether and how automatic dispatch is enabled in normal

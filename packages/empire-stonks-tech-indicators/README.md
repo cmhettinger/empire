@@ -142,10 +142,14 @@ from the Compose-owned environment, opens the package-required independent
 work/Core/object-store connections, and delegates locking and all readiness,
 calculation, reporting, and publication behavior to the package runner.
 
-The DAG is not automatically triggered in A11.3. Source completion dispatch
-and the read-only preflight join remain disabled until A11.5; manual execution
-therefore relies on the runner's authoritative readiness check and fails closed
-when same-date prerequisites are absent.
+Qualifying EODData and Yahoo/SPX source completions asynchronously wake this
+DAG with exact-date, secret-safe provenance. Its first task runs the
+package-owned read-only readiness preflight. A not-ready wake skips the runner
+without creating a technical Core run, report, or publication. A ready wake
+invokes the normal runner, which reacquires the package lock and repeats the
+authoritative readiness check before calculation or publication. Manual runs
+use the same two-task graph and therefore fail closed on missing same-date
+prerequisites.
 
 The installed `stonks-tech-indicators-backfill` command and local wrapper expose
 the J9 staged backfill with required inclusive dates, exact provider/market or

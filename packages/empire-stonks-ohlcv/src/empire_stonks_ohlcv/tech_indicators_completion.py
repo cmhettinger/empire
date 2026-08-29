@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Final
@@ -14,6 +15,9 @@ TECH_INDICATORS_COMPLETION_SIGNAL_TYPE: Final = (
     "stonks_ohlcv_daily_completion"
 )
 TECH_INDICATORS_BENCHMARK_TICKER: Final = "SPX"
+TECH_INDICATORS_COORDINATOR_DAG_ID: Final = (
+    "stonks_tech_indicators_daily_refresh"
+)
 
 _SOURCE_CONTRACTS: Final = {
     (
@@ -49,6 +53,15 @@ class TechIndicatorsSourceCompletionSignal:
     signal_type: str = TECH_INDICATORS_COMPLETION_SIGNAL_TYPE
 
     def __post_init__(self) -> None:
+        for field_name in (
+            "provider_code",
+            "source_code",
+            "job_name",
+            "report_outcome",
+            "signal_type",
+        ):
+            if not isinstance(getattr(self, field_name), str):
+                raise TypeError(f"{field_name} must be a string.")
         contract = (self.provider_code, self.source_code, self.job_name)
         if contract not in _SOURCE_CONTRACTS:
             raise ValueError("source completion identity is not supported.")
@@ -58,7 +71,11 @@ class TechIndicatorsSourceCompletionSignal:
             raise TypeError("source_run_id must be a UUID.")
         if self.report_outcome not in {"PASS", "WARN"}:
             raise ValueError("report_outcome must be PASS or WARN.")
-        if self.schema_version != TECH_INDICATORS_COMPLETION_SCHEMA_VERSION:
+        if (
+            type(self.schema_version) is not int
+            or self.schema_version
+            != TECH_INDICATORS_COMPLETION_SCHEMA_VERSION
+        ):
             raise ValueError("schema_version is not supported.")
         if self.signal_type != TECH_INDICATORS_COMPLETION_SIGNAL_TYPE:
             raise ValueError("signal_type is not supported.")
@@ -94,6 +111,42 @@ class TechIndicatorsSourceCompletionSignal:
             "trigger_run_id": self.trigger_run_id,
         }
 
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, object],
+    ) -> TechIndicatorsSourceCompletionSignal:
+        """Rebuild one signal only from its exact public JSON contract."""
+
+        expected_keys = {
+            "schema_version",
+            "signal_type",
+            "provider_code",
+            "source_code",
+            "job_name",
+            "effective_date",
+            "source_run_id",
+            "report_outcome",
+            "trigger_run_id",
+        }
+        if not isinstance(payload, Mapping) or set(payload) != expected_keys:
+            raise ValueError("source completion signal shape is invalid.")
+        effective_date = _parse_date(payload["effective_date"])
+        source_run_id = _parse_uuid(payload["source_run_id"])
+        signal = cls(
+            provider_code=payload["provider_code"],
+            source_code=payload["source_code"],
+            job_name=payload["job_name"],
+            effective_date=effective_date,
+            source_run_id=source_run_id,
+            report_outcome=payload["report_outcome"],
+            schema_version=payload["schema_version"],
+            signal_type=payload["signal_type"],
+        )
+        if payload["trigger_run_id"] != signal.trigger_run_id:
+            raise ValueError("source completion trigger_run_id is invalid.")
+        return signal
+
     def to_trigger_conf(self, *, source_dag_run_id: str) -> dict[str, Any]:
         """Build the exact A11.1 coordinator trigger configuration."""
 
@@ -121,9 +174,65 @@ def _validate_airflow_run_id(value: str) -> None:
         raise ValueError("source_dag_run_id is not a safe Airflow run ID.")
 
 
+def build_tech_indicators_dispatch(
+    source_result: Mapping[str, object],
+    *,
+    source_dag_id: str,
+    source_dag_run_id: str,
+) -> dict[str, object] | None:
+    """Build one strict coordinator dispatch from a compact source result."""
+
+    if not isinstance(source_result, Mapping):
+        raise TypeError("source_result must be a mapping.")
+    signal_payload = source_result.get("tech_indicators_completion_signal")
+    if signal_payload is None:
+        return None
+    if not isinstance(signal_payload, Mapping):
+        raise ValueError("source completion signal must be a JSON object.")
+    signal = TechIndicatorsSourceCompletionSignal.from_dict(signal_payload)
+    if signal.source_dag_id != source_dag_id:
+        raise ValueError("source completion DAG identity does not match.")
+    return {
+        "trigger_run_id": signal.trigger_run_id,
+        "conf": signal.to_trigger_conf(
+            source_dag_run_id=source_dag_run_id,
+        ),
+    }
+
+
+def _parse_date(value: object) -> date:
+    if not isinstance(value, str):
+        raise ValueError("source completion effective_date is invalid.")
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError:
+        raise ValueError(
+            "source completion effective_date is invalid."
+        ) from None
+    if parsed.isoformat() != value:
+        raise ValueError("source completion effective_date is invalid.")
+    return parsed
+
+
+def _parse_uuid(value: object) -> UUID:
+    if not isinstance(value, str):
+        raise ValueError("source completion source_run_id is invalid.")
+    try:
+        parsed = UUID(value)
+    except ValueError:
+        raise ValueError(
+            "source completion source_run_id is invalid."
+        ) from None
+    if str(parsed) != value:
+        raise ValueError("source completion source_run_id is invalid.")
+    return parsed
+
+
 __all__ = [
     "TECH_INDICATORS_BENCHMARK_TICKER",
     "TECH_INDICATORS_COMPLETION_SCHEMA_VERSION",
     "TECH_INDICATORS_COMPLETION_SIGNAL_TYPE",
+    "TECH_INDICATORS_COORDINATOR_DAG_ID",
     "TechIndicatorsSourceCompletionSignal",
+    "build_tech_indicators_dispatch",
 ]

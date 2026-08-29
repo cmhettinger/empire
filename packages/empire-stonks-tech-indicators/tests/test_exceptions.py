@@ -60,6 +60,7 @@ def test_public_api_is_explicit() -> None:
         "ResolvedTechIndicatorsDailyScope",
         "TechIndicatorsDailyScope",
         "resolve_tech_indicators_daily_scope",
+        "preflight_tech_indicators_daily",
         "TechIndicatorsDailyRunResult",
         "run_tech_indicators_daily",
         "TechIndicatorsBackfillRunResult",

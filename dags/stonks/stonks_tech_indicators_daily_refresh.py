@@ -8,10 +8,12 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from airflow.sdk import dag, get_current_context, task
+from airflow.sdk.exceptions import AirflowSkipException
 from empire_core import EmpireDatabase, ObjectStore, RunService
 from empire_stonks_tech_indicators import (
     TechIndicatorsConfig,
     TechIndicatorsDailyScope,
+    preflight_tech_indicators_daily,
     run_tech_indicators_daily,
 )
 
@@ -185,8 +187,43 @@ def _optional_bool(conf: Mapping[str, object], key: str) -> bool:
     tags=["stonks", "tech-indicators", "manual"],
 )
 def stonks_tech_indicators_daily_refresh():
+    @task(task_id="check_source_readiness")
+    def check_readiness() -> dict[str, object]:
+        context = get_current_context()
+        config = TechIndicatorsConfig.from_env()
+        scope = _scope_from_context(context, config)
+
+        with EmpireDatabase.connect_from_env() as connection:
+            decision = preflight_tech_indicators_daily(
+                connection=connection,
+                config=config,
+                scope=scope,
+            )
+
+        payload = decision.to_dict()
+        if not decision.ready:
+            log.info(
+                "Technical-indicator source readiness not satisfied for %s; "
+                "selected listings=%s, reasons=%s",
+                payload["effective_date"],
+                payload["selected_listing_count"],
+                ",".join(payload["reasons"]),
+            )
+            raise AirflowSkipException(
+                "Technical-indicator source readiness is not satisfied."
+            )
+        log.info(
+            "Technical-indicator source readiness satisfied for %s; "
+            "selected listings=%s, EODData run=%s, Yahoo run=%s",
+            payload["effective_date"],
+            payload["selected_listing_count"],
+            payload["eoddata_source_run_id"],
+            payload["yahoo_source_run_id"],
+        )
+        return payload
+
     @task(task_id="run_tech_indicators_daily")
-    def run_daily() -> dict[str, object]:
+    def run_daily(_readiness: dict[str, object]) -> dict[str, object]:
         context = get_current_context()
         config = TechIndicatorsConfig.from_env()
         scope = _scope_from_context(context, config)
@@ -227,7 +264,7 @@ def stonks_tech_indicators_daily_refresh():
         )
         return payload
 
-    run_daily()
+    run_daily(check_readiness())
 
 
 stonks_tech_indicators_daily_refresh_dag = (

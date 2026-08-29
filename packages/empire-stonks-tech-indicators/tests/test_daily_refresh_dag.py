@@ -36,10 +36,13 @@ def test_daily_refresh_dag_is_manual_one_task_and_thin(monkeypatch) -> None:
     assert dag.max_active_runs == 1
     assert dag.tags == ["stonks", "tech-indicators", "manual"]
     assert [item.task_id for item in dag.tasks] == [
+        "check_source_readiness",
         "run_tech_indicators_daily"
     ]
     assert dag.tasks[0].call_args == ()
     assert dag.tasks[0].call_kwargs == {}
+    assert dag.tasks[1].call_args == (dag.tasks[0],)
+    assert dag.tasks[1].call_kwargs == {}
 
     source = Path(module.__file__).read_text(encoding="utf-8")
     assert "run_tech_indicators_daily(" in source
@@ -223,6 +226,112 @@ def test_scope_rejects_invalid_or_ambiguous_overrides(
         )
 
 
+def test_preflight_task_returns_ready_decision_without_workflow_services(
+    monkeypatch,
+    caplog,
+) -> None:
+    module, fake_sdk = _load_dag_module(monkeypatch)
+    fake_sdk.context = _context({"effective_date": "2026-08-28"})
+    config = module.TechIndicatorsConfig()
+    connection = object()
+    calls: list[dict[str, object]] = []
+    payload = {
+        "effective_date": "2026-08-28",
+        "ready": True,
+        "selected_listing_count": 84,
+        "eoddata_source_run_id": str(LISTING_ID_A),
+        "yahoo_source_run_id": str(LISTING_ID_B),
+        "reasons": [],
+    }
+    decision = SimpleNamespace(ready=True, to_dict=lambda: payload)
+
+    monkeypatch.setattr(
+        module.EmpireDatabase,
+        "connect_from_env",
+        lambda: FakeConnectionContext(connection, [], []),
+    )
+    monkeypatch.setattr(module.TechIndicatorsConfig, "from_env", lambda: config)
+    monkeypatch.setattr(
+        module,
+        "preflight_tech_indicators_daily",
+        lambda **values: calls.append(values) or decision,
+    )
+    monkeypatch.setattr(
+        module.RunService,
+        "from_connection",
+        lambda _value: pytest.fail("preflight created a Core service"),
+    )
+    monkeypatch.setattr(
+        module.ObjectStore,
+        "from_connection",
+        lambda _value: pytest.fail("preflight created an object service"),
+    )
+
+    with caplog.at_level(logging.INFO, logger=module.__name__):
+        result = _preflight_task(module).python_callable()
+
+    assert result == payload
+    assert calls == [
+        {
+            "connection": connection,
+            "config": config,
+            "scope": module.TechIndicatorsDailyScope(
+                effective_date=date(2026, 8, 28)
+            ),
+        }
+    ]
+    assert "source readiness satisfied" in caplog.text
+    assert str(LISTING_ID_A) in caplog.text
+    assert str(LISTING_ID_B) in caplog.text
+
+
+def test_preflight_task_skips_not_ready_without_workflow_state(
+    monkeypatch,
+    caplog,
+) -> None:
+    module, fake_sdk = _load_dag_module(monkeypatch)
+    fake_sdk.context = _context({"effective_date": "2026-08-28"})
+    payload = {
+        "effective_date": "2026-08-28",
+        "ready": False,
+        "selected_listing_count": 84,
+        "eoddata_source_run_id": str(LISTING_ID_A),
+        "yahoo_source_run_id": None,
+        "reasons": ["YAHOO_SOURCE_EVIDENCE_MISSING"],
+    }
+    decision = SimpleNamespace(ready=False, to_dict=lambda: payload)
+
+    monkeypatch.setattr(
+        module.EmpireDatabase,
+        "connect_from_env",
+        lambda: FakeConnectionContext(object(), [], []),
+    )
+    monkeypatch.setattr(
+        module.TechIndicatorsConfig,
+        "from_env",
+        module.TechIndicatorsConfig,
+    )
+    monkeypatch.setattr(
+        module,
+        "preflight_tech_indicators_daily",
+        lambda **_values: decision,
+    )
+    monkeypatch.setattr(
+        module,
+        "run_tech_indicators_daily",
+        lambda **_values: pytest.fail("not-ready preflight invoked runner"),
+    )
+
+    with caplog.at_level(logging.INFO, logger=module.__name__):
+        with pytest.raises(
+            module.AirflowSkipException,
+            match="readiness is not satisfied",
+        ):
+            _preflight_task(module).python_callable()
+
+    assert "YAHOO_SOURCE_EVIDENCE_MISSING" in caplog.text
+
+
 def test_task_delegates_with_separate_services_and_logs_compact_result(
     monkeypatch,
     caplog,
@@ -286,7 +395,7 @@ def test_task_delegates_with_separate_services_and_logs_compact_result(
     monkeypatch.setattr(module, "run_tech_indicators_daily", run)
 
     with caplog.at_level(logging.INFO, logger=module.__name__):
-        payload = _run_task(module).python_callable()
+        payload = _run_task(module).python_callable({"ready": True})
 
     assert payload == expected_payload
     assert len(connect_calls) == 3
@@ -362,7 +471,7 @@ def test_task_propagates_runner_failure_and_closes_connections(
     )
 
     with pytest.raises(RuntimeError, match="runner failed"):
-        _run_task(module).python_callable()
+        _run_task(module).python_callable({"ready": True})
 
     assert len(exited) == 3
 
@@ -382,14 +491,27 @@ def _run_task(module):
     ]
 
 
+def _preflight_task(module):
+    return module.stonks_tech_indicators_daily_refresh_dag.task_by_id[
+        "check_source_readiness"
+    ]
+
+
 def _load_dag_module(monkeypatch):
     fake_sdk = FakeAirflowSdk()
     airflow_module = ModuleType("airflow")
     airflow_sdk_module = ModuleType("airflow.sdk")
+    airflow_sdk_exceptions_module = ModuleType("airflow.sdk.exceptions")
+    airflow_sdk_exceptions_module.AirflowSkipException = AirflowSkipException
     airflow_sdk_module.dag = fake_sdk.dag
     airflow_sdk_module.task = fake_sdk.task
     airflow_sdk_module.get_current_context = fake_sdk.get_current_context
     monkeypatch.setitem(sys.modules, "airflow", airflow_module)
+    monkeypatch.setitem(
+        sys.modules,
+        "airflow.sdk.exceptions",
+        airflow_sdk_exceptions_module,
+    )
     monkeypatch.setitem(sys.modules, "airflow.sdk", airflow_sdk_module)
 
     repo_root = Path(__file__).resolve().parents[3]
@@ -473,6 +595,10 @@ class FakeTaskCall:
     python_callable: object
     call_args: tuple[object, ...]
     call_kwargs: dict[str, object]
+
+
+class AirflowSkipException(Exception):
+    pass
 
 
 class FakeConnectionContext:

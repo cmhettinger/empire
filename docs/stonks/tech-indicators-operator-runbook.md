@@ -186,9 +186,10 @@ with `--dry-run --force` first.
 
 ### Manual Airflow Daily Run
 
-The `stonks_tech_indicators_daily_refresh` DAG is initially manual-only, with
-no catchup and one active run. Trigger it with a JSON configuration containing
-the required exact effective date:
+The `stonks_tech_indicators_daily_refresh` DAG has no independent schedule,
+no catchup, and one active run. Qualifying EODData and Yahoo/SPX source runs
+wake it asynchronously. Operators may also trigger it with a JSON
+configuration containing the required exact effective date:
 
 ```json
 {
@@ -211,10 +212,12 @@ rehearsing a correction:
 }
 ```
 
-The DAG never derives the business date from its logical date. Automatic
-source-completion dispatch and the coordinator preflight are not enabled in
-A11.3; until they are verified, manual runs still fail closed through the
-package's same-date readiness decision.
+The DAG never derives the business date from its logical date. Its read-only
+preflight checks the package-owned same-date EODData plus Yahoo/SPX readiness
+before opening any technical Core run or producing reports/publications. A
+not-ready wake is skipped as a bounded orchestration no-op. A ready wake calls
+the normal runner, which rechecks readiness after acquiring the package-owned
+scope lock. Source and manual wakes therefore use the same fail-closed path.
 
 ## Publication Readiness
 

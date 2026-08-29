@@ -168,6 +168,10 @@ Two thin DAGs are implemented and discovered by the Airflow runtime. Both use
 | `stonks_ohlcv_eoddata_daily_scrape` | `run_eoddata_daily()` | Enabled at 20:15 and 23:15 ET each weekday after the bounded V10.8 rollout. |
 | `stonks_ohlcv_yahoo_daily_scrape` | `run_yahoo_daily()` | Manual-only and paused by the explicit V10.10 rollout decision. |
 
+Both DAGs dispatch a qualifying completion signal to the unscheduled
+technical-indicator coordinator. This downstream wiring does not change either
+source cadence.
+
 The Stooq historical workflow has no DAG. It remains a manual CLI-only import
 because Empire neither downloads the archive nor automates provider CAPTCHA,
 JavaScript, browser-verification, or challenge flows. See the
@@ -912,8 +916,11 @@ ID, while a genuine new source run remains independently observable.
 This output is only a secret-safe Airflow wake hint. It never proves the
 two-source join: the technical-indicator package still rechecks the exact-date
 Core, OHLCV, and SPX state through its authoritative readiness predicate before
-calculation or publication. Source-DAG trigger wiring is intentionally owned by
-the later Airflow integration task.
+calculation or publication. Each source DAG converts a qualifying signal with
+`build_tech_indicators_dispatch()` and asynchronously triggers
+`stonks_tech_indicators_daily_refresh`. Non-qualifying results skip dispatch;
+same-source retries use the deterministic trigger-run ID and do not reset an
+existing coordinator run.
 
 ## EODData scheduled DAG
 
@@ -924,7 +931,9 @@ runtime settings from the
 Compose-provided process environment and delegates the complete workflow to
 `run_eoddata_daily()`. The package planner selects due exchanges; an
 ineligible or already-complete date completes as a normal no-op run with
-durable reports.
+durable reports. A qualifying result then asynchronously wakes the
+technical-indicator coordinator; its same-date package preflight is the join
+authority.
 
 For a manual run or rerun, pass an explicit provider date with DAG run
 configuration such as `{"effective_date": "2026-07-15"}`. If omitted, the DAG

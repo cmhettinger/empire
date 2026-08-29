@@ -5,11 +5,17 @@ from collections.abc import Mapping
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from airflow.providers.standard.operators.trigger_dagrun import (
+    TriggerDagRunOperator,
+)
 from airflow.sdk import dag, get_current_context, task
+from airflow.sdk.exceptions import AirflowSkipException
 from empire_core import EmpireDatabase, ObjectStore, RunService
 from empire_stonks_ohlcv import (
+    TECH_INDICATORS_COORDINATOR_DAG_ID,
     OHLCVConfig,
     YahooDailyScope,
+    build_tech_indicators_dispatch,
     run_yahoo_daily,
 )
 
@@ -154,7 +160,43 @@ def stonks_ohlcv_yahoo_daily_scrape():
         )
         return payload
 
-    run_daily()
+    @task(task_id="prepare_tech_indicators_dispatch")
+    def prepare_dispatch(
+        source_result: dict[str, object],
+    ) -> dict[str, object]:
+        context = get_current_context()
+        dag_run = context["dag_run"]
+        dispatch = build_tech_indicators_dispatch(
+            source_result,
+            source_dag_id=DAG_ID,
+            source_dag_run_id=str(dag_run.run_id),
+        )
+        if dispatch is None:
+            log.info(
+                "Yahoo daily result has no qualifying technical-indicator "
+                "completion signal; dispatch skipped"
+            )
+            raise AirflowSkipException(
+                "No qualifying technical-indicator completion signal."
+            )
+        log.info(
+            "Prepared technical-indicator dispatch for Yahoo run %s and %s",
+            dispatch["conf"]["source_core_run_id"],
+            dispatch["conf"]["effective_date"],
+        )
+        return dispatch
+
+    source_result = run_daily()
+    dispatch = prepare_dispatch(source_result)
+    TriggerDagRunOperator(
+        task_id="trigger_tech_indicators_refresh",
+        trigger_dag_id=TECH_INDICATORS_COORDINATOR_DAG_ID,
+        trigger_run_id=dispatch["trigger_run_id"],
+        conf=dispatch["conf"],
+        reset_dag_run=False,
+        wait_for_completion=False,
+        skip_when_already_exists=True,
+    )
 
 
 stonks_ohlcv_yahoo_daily_scrape_dag = stonks_ohlcv_yahoo_daily_scrape()

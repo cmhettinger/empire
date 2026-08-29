@@ -158,7 +158,7 @@ are ready for the same effective date, without moving package logic into DAGs.
 | A11.2 | [x] | Define source completion signals | Add/reuse minimal date-scoped source outputs/assets so EODData and Yahoo success is unambiguous, rerun-safe, and contains no credentials/raw data. | A11.1 |
 | A11.3 | [x] | Add manual tech-indicators DAG | Add thin `stonks_tech_indicators_daily_refresh` wiring runtime services and validated effective-date/scope overrides to the package runner; begin `schedule=None`, no catchup, one active run. | O10.7, A11.1 |
 | A11.4 | [x] | Add DAG contract tests | Cover import, tags, schedule, task shape, date handling, overrides, runner identity, logging, and absence of calculation SQL/business logic. | A11.3 |
-| A11.5 | [ ] | Wire prerequisites | Implement the selected EODData plus Yahoo/SPX join so automatic refresh occurs only after both inputs succeed or readiness is explicitly proven for the same date. | A11.2-A11.4 |
+| A11.5 | [x] | Wire prerequisites | Implement the selected EODData plus Yahoo/SPX join so automatic refresh occurs only after both inputs succeed or readiness is explicitly proven for the same date. | A11.2-A11.4 |
 | A11.6 | [ ] | Handle repeated source runs | Prove EODData's multiple daily runs and Yahoo/manual reconciliation coalesce or safely trigger idempotent refresh through the package-owned scope lock, without concurrent duplicate work or partial publication. | A11.5, J9.4, J9.9 |
 | A11.7 | [ ] | Verify Airflow vertical | Rebuild Airflow, verify zero import errors, run source fixture completions through tech indicators, and inspect Core plus JSON/PDF objects. | A11.4-A11.6 |
 | A11.8 | [ ] | Decide production cadence | From bounded evidence, choose event-driven, scheduled, or manual-only operation and document pause/rollback before enabling it. | A11.7 |
@@ -204,6 +204,17 @@ Focused pytest passed (25); full package pytest passed (753 passed, 27 skipped);
 Poetry lock/dependency checks, compileall, live Airflow 3.2.1 contract import,
 zero Airflow import errors, changed-file line scan, and `git diff --check`
 passed.
+
+Done: 2026-08-29 — wired qualifying EODData and Yahoo/SPX results through
+strict package-owned dispatch construction to asynchronous, deterministic
+`TriggerDagRunOperator` wakes; added the coordinator's repeatable-read,
+read-only package preflight so not-ready dates skip before Core/report work and
+ready dates retain the locked authoritative runner recheck. Key files:
+`tech_indicators_completion.py`, `daily_preflight.py`, and the three Stonks
+DAGs. Full pytest passed for tech indicators (760 passed, 27 skipped) and OHLCV
+(606 passed, 33 skipped); both Poetry lock, `pip check`, and compileall checks,
+`make airflow-build`, fresh Airflow 3.2.1 image DAG graph/operator assertions,
+fresh-image `pip check`, and `git diff --check` passed.
 
 ---
 

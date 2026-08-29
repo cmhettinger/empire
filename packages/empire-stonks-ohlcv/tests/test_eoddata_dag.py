@@ -26,7 +26,24 @@ def test_eoddata_daily_dag_has_bounded_production_cadence(
     assert dag.catchup is False
     assert dag.max_active_runs == 1
     assert dag.tags == ["stonks", "ohlcv", "eoddata", "scheduled"]
-    assert [item.task_id for item in dag.tasks] == ["run_eoddata_daily"]
+    assert [item.task_id for item in dag.tasks] == [
+        "run_eoddata_daily",
+        "prepare_tech_indicators_dispatch",
+        "trigger_tech_indicators_refresh",
+    ]
+    assert dag.tasks[1].call_args == (dag.tasks[0],)
+    assert dag.tasks[2].operator_kwargs == {
+        "task_id": "trigger_tech_indicators_refresh",
+        "trigger_dag_id": "stonks_tech_indicators_daily_refresh",
+        "trigger_run_id": FakeXComArg(
+            "prepare_tech_indicators_dispatch",
+            "trigger_run_id",
+        ),
+        "conf": FakeXComArg("prepare_tech_indicators_dispatch", "conf"),
+        "reset_dag_run": False,
+        "wait_for_completion": False,
+        "skip_when_already_exists": True,
+    }
 
     source = Path(module.__file__).read_text(encoding="utf-8")
     production_note = source.index("V10.8 rollout decision")
@@ -218,20 +235,99 @@ def test_eoddata_daily_task_propagates_runner_failure(monkeypatch):
         dag_run_task(module).python_callable()
 
 
+def test_eoddata_dispatch_uses_exact_source_dag_run_provenance(monkeypatch):
+    module, fake_sdk = _load_dag_module(monkeypatch)
+    fake_sdk.context = {
+        "dag_run": SimpleNamespace(run_id="scheduled__2026-08-28T23:15:00+00:00")
+    }
+    source_result = {"tech_indicators_completion_signal": {"safe": True}}
+    expected = {
+        "trigger_run_id": "source__eoddata__run-id",
+        "conf": {
+            "source_core_run_id": "run-id",
+            "effective_date": "2026-08-28",
+        },
+    }
+    calls = []
+
+    def build(*args, **kwargs):
+        calls.append((args, kwargs))
+        return expected
+
+    monkeypatch.setattr(module, "build_tech_indicators_dispatch", build)
+
+    assert prepare_dispatch_task(module).python_callable(source_result) == expected
+    assert calls == [
+        (
+            (source_result,),
+            {
+                "source_dag_id": DAG_ID,
+                "source_dag_run_id": (
+                    "scheduled__2026-08-28T23:15:00+00:00"
+                ),
+            },
+        )
+    ]
+
+
 def dag_run_task(module):
     return module.stonks_ohlcv_eoddata_daily_scrape_dag.task_by_id[
         "run_eoddata_daily"
     ]
 
 
+def prepare_dispatch_task(module):
+    return module.stonks_ohlcv_eoddata_daily_scrape_dag.task_by_id[
+        "prepare_tech_indicators_dispatch"
+    ]
+
+
 def _load_dag_module(monkeypatch):
     fake_sdk = FakeAirflowSdk()
     airflow_module = ModuleType("airflow")
+    airflow_sdk_exceptions_module = ModuleType("airflow.sdk.exceptions")
+    airflow_providers_module = ModuleType("airflow.providers")
+    airflow_standard_module = ModuleType("airflow.providers.standard")
+    airflow_operators_module = ModuleType(
+        "airflow.providers.standard.operators"
+    )
+    airflow_trigger_module = ModuleType(
+        "airflow.providers.standard.operators.trigger_dagrun"
+    )
     airflow_sdk_module = ModuleType("airflow.sdk")
+    airflow_sdk_exceptions_module.AirflowSkipException = AirflowSkipException
+    airflow_trigger_module.TriggerDagRunOperator = (
+        fake_sdk.trigger_dag_run_operator
+    )
     airflow_sdk_module.dag = fake_sdk.dag
     airflow_sdk_module.task = fake_sdk.task
     airflow_sdk_module.get_current_context = fake_sdk.get_current_context
     monkeypatch.setitem(sys.modules, "airflow", airflow_module)
+    monkeypatch.setitem(
+        sys.modules,
+        "airflow.sdk.exceptions",
+        airflow_sdk_exceptions_module,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "airflow.providers",
+        airflow_providers_module,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "airflow.providers.standard",
+        airflow_standard_module,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "airflow.providers.standard.operators",
+        airflow_operators_module,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "airflow.providers.standard.operators.trigger_dagrun",
+        airflow_trigger_module,
+    )
     monkeypatch.setitem(sys.modules, "airflow.sdk", airflow_sdk_module)
 
     repo_root = Path(__file__).resolve().parents[3]
@@ -290,6 +386,15 @@ class FakeAirflowSdk:
         assert self.context is not None
         return self.context
 
+    def trigger_dag_run_operator(self, **operator_kwargs):
+        assert self.active_dag is not None
+        operator = FakeOperatorCall(
+            task_id=operator_kwargs["task_id"],
+            operator_kwargs=operator_kwargs,
+        )
+        self.active_dag.tasks.append(operator)
+        return operator
+
 
 @dataclass
 class FakeDag:
@@ -299,7 +404,7 @@ class FakeDag:
     catchup: bool
     max_active_runs: int
     tags: list[str]
-    tasks: list["FakeTaskCall"] = field(default_factory=list)
+    tasks: list[object] = field(default_factory=list)
 
     @property
     def task_by_id(self):
@@ -312,3 +417,22 @@ class FakeTaskCall:
     python_callable: object
     call_args: tuple[object, ...]
     call_kwargs: dict[str, object]
+
+    def __getitem__(self, key: str):
+        return FakeXComArg(self.task_id, key)
+
+
+@dataclass(frozen=True)
+class FakeXComArg:
+    task_id: str
+    key: str
+
+
+@dataclass
+class FakeOperatorCall:
+    task_id: str
+    operator_kwargs: dict[str, object]
+
+
+class AirflowSkipException(Exception):
+    pass

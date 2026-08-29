@@ -29,6 +29,9 @@ from empire_stonks_tech_indicators.daily_scope import (
     TechIndicatorsDailyScope,
     resolve_tech_indicators_daily_scope,
 )
+from empire_stonks_tech_indicators.daily_preflight import (
+    preflight_tech_indicators_daily,
+)
 from empire_stonks_tech_indicators.exceptions import (
     EmpireStonksTechIndicatorsError,
     TechIndicatorsCalculationError,
@@ -650,6 +653,7 @@ __all__ = [
     "ResolvedTechIndicatorsDailyScope",
     "TechIndicatorsDailyScope",
     "resolve_tech_indicators_daily_scope",
+    "preflight_tech_indicators_daily",
     "TechIndicatorsDailyRunResult",
     "run_tech_indicators_daily",
     "TechIndicatorsBackfillRunResult",
