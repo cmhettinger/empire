@@ -318,3 +318,53 @@ def test_completion_signal_is_stable_for_one_source_run() -> None:
     assert second_signal is not None
     assert first_signal == result.tech_indicators_completion_signal
     assert first_signal.trigger_run_id == second_signal.trigger_run_id
+
+
+def test_retried_source_dispatch_coalesces_on_core_run_identity() -> None:
+    result = _eoddata_result().to_dict()
+
+    first = build_tech_indicators_dispatch(
+        result,
+        source_dag_id="stonks_ohlcv_eoddata_daily_scrape",
+        source_dag_run_id="scheduled__2026-08-28T20:15:00+00:00",
+    )
+    retried = build_tech_indicators_dispatch(
+        result,
+        source_dag_id="stonks_ohlcv_eoddata_daily_scrape",
+        source_dag_run_id="scheduled__2026-08-28T23:15:00+00:00",
+    )
+
+    assert first is not None
+    assert retried is not None
+    assert first["trigger_run_id"] == retried["trigger_run_id"]
+    assert first["conf"]["source_dag_run_id"] != (
+        retried["conf"]["source_dag_run_id"]
+    )
+    assert first["conf"]["effective_date"] == "2026-08-28"
+    assert retried["conf"]["effective_date"] == "2026-08-28"
+
+
+def test_new_same_date_source_runs_create_distinct_coordinator_wakes() -> None:
+    later_eoddata_run_id = UUID("30000000-0000-4000-8000-000000000003")
+    first = _eoddata_result().tech_indicators_completion_signal
+    later = replace(
+        _eoddata_result(),
+        run_id=later_eoddata_run_id,
+    ).tech_indicators_completion_signal
+    yahoo = _yahoo_result(tickers=("SPX",)).tech_indicators_completion_signal
+
+    assert first is not None
+    assert later is not None
+    assert yahoo is not None
+    assert {
+        first.trigger_run_id,
+        later.trigger_run_id,
+        yahoo.trigger_run_id,
+    } == {
+        "source__eoddata__10000000-0000-4000-8000-000000000001",
+        "source__eoddata__30000000-0000-4000-8000-000000000003",
+        "source__yahoo__20000000-0000-4000-8000-000000000002",
+    }
+    assert {first.effective_date, later.effective_date, yahoo.effective_date} == {
+        EFFECTIVE_DATE
+    }

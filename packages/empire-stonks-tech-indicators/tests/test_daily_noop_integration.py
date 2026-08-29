@@ -10,8 +10,10 @@ import pytest
 from empire_core import ObjectStore, RunService
 from empire_stonks_tech_indicators import (
     ReportOutcome,
+    TECH_INDICATORS_LOCK_CONTENDED_MESSAGE,
     TechIndicatorsConfig,
     TechIndicatorsDailyScope,
+    acquire_tech_indicators_writer_lock,
     run_tech_indicators_daily,
 )
 
@@ -41,6 +43,7 @@ def test_healthy_noop_reuses_ready_publication_without_payload_writes() -> None:
     source_run_ids: list[UUID] = []
     workflow_run_ids: list[UUID] = []
     publication_id: UUID | None = None
+    owner_lock = None
     stored_paths: list[tuple[Path, Path]] = []
     marker = uuid4().hex[:12].upper()
     try:
@@ -145,6 +148,72 @@ def test_healthy_noop_reuses_ready_publication_without_payload_writes() -> None:
             effective_date=effective_date,
             provider_listing_ids=(listing_id, benchmark_id),
         )
+        cursor.execute(
+            """
+            SELECT
+                (SELECT count(*) FROM core.core_run
+                 WHERE domain = 'stonks'
+                   AND job_name = 'stonks_tech_indicators_daily'
+                   AND effective_date = %s),
+                (SELECT count(*)
+                 FROM stonks.tech_indicators_publication),
+                (SELECT count(*)
+                 FROM stonks.ohlcv_daily_tech_indicators_a
+                 WHERE provider_listing_id = %s),
+                (SELECT count(*)
+                 FROM stonks.ohlcv_daily_tech_indicators_b
+                 WHERE provider_listing_id = %s)
+            """,
+            (effective_date, listing_id, listing_id),
+        )
+        state_before_contention = cursor.fetchone()
+        owner = acquire_tech_indicators_writer_lock(
+            connection_factory=EmpireDatabase.connect_from_env
+        )
+        assert owner.lock is not None
+        owner_lock = owner.lock
+        contended = run_tech_indicators_daily(
+            run_service=RunService.from_connection(core_connection),
+            connection=work,
+            lock_connection_factory=EmpireDatabase.connect_from_env,
+            object_store=object_store,
+            config=TechIndicatorsConfig(),
+            scope=scope,
+            run_type="airflow",
+            runner="airflow",
+        )
+        assert contended.to_dict() == {
+            "status": "contended",
+            "effective_date": effective_date.isoformat(),
+            "run_id": None,
+            "publication_id": None,
+            "json_report_object_id": None,
+            "pdf_report_object_id": None,
+            "outcome": None,
+            "message": TECH_INDICATORS_LOCK_CONTENDED_MESSAGE,
+        }
+        cursor.execute(
+            """
+            SELECT
+                (SELECT count(*) FROM core.core_run
+                 WHERE domain = 'stonks'
+                   AND job_name = 'stonks_tech_indicators_daily'
+                   AND effective_date = %s),
+                (SELECT count(*)
+                 FROM stonks.tech_indicators_publication),
+                (SELECT count(*)
+                 FROM stonks.ohlcv_daily_tech_indicators_a
+                 WHERE provider_listing_id = %s),
+                (SELECT count(*)
+                 FROM stonks.ohlcv_daily_tech_indicators_b
+                 WHERE provider_listing_id = %s)
+            """,
+            (effective_date, listing_id, listing_id),
+        )
+        assert cursor.fetchone() == state_before_contention
+        owner_lock.rollback()
+        owner_lock = None
+
         first = run_tech_indicators_daily(
             run_service=RunService.from_connection(core_connection),
             connection=work,
@@ -174,6 +243,26 @@ def test_healthy_noop_reuses_ready_publication_without_payload_writes() -> None:
         )
         publication_count_before = cursor.fetchone()[0]
 
+        replacement_source_run_ids: list[UUID] = []
+        for job_name, summary in evidence:
+            cursor.execute(
+                """
+                INSERT INTO core.core_run (
+                    domain, job_name, subject_key, effective_date, run_type,
+                    status, runner, summary, completed_at
+                )
+                VALUES (
+                    'stonks', %s, 'pytest-reconciliation', %s, 'airflow',
+                    'succeeded', 'airflow', %s::jsonb, clock_timestamp()
+                )
+                RETURNING run_id
+                """,
+                (job_name, effective_date, json.dumps(summary)),
+            )
+            replacement_source_run_ids.append(cursor.fetchone()[0])
+        source_run_ids.extend(replacement_source_run_ids)
+        work.commit()
+
         noop = run_tech_indicators_daily(
             run_service=RunService.from_connection(core_connection),
             connection=work,
@@ -198,6 +287,18 @@ def test_healthy_noop_reuses_ready_publication_without_payload_writes() -> None:
             "EXISTING_PUBLICATION"
         )
         assert report_payload["publication"]["readiness_at_report"] == "READY"
+        evidence_by_provider = {
+            item["provider_code"]: item
+            for item in report_payload["source_readiness"][
+                "provider_evidence"
+            ]
+        }
+        assert evidence_by_provider["EODDATA"][
+            "latest_successful_run_id"
+        ] == str(replacement_source_run_ids[0])
+        assert evidence_by_provider["YAHOO"][
+            "latest_successful_run_id"
+        ] == str(replacement_source_run_ids[1])
         assert report_payload["writes"] == {
             "batch_count": 0,
             "committed_batch_count": 0,
@@ -287,6 +388,8 @@ def test_healthy_noop_reuses_ready_publication_without_payload_writes() -> None:
         )
         assert cursor.fetchall() == timestamps_before
     finally:
+        if owner_lock is not None and owner_lock.is_held:
+            owner_lock.rollback()
         for connection in (work, core_connection, object_connection):
             try:
                 connection.rollback()

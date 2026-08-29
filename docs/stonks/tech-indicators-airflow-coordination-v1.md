@@ -4,12 +4,13 @@
 
 A11.1 selects the V1 Airflow coordination mechanism for daily technical
 indicators. A11.2 freezes its source completion signals, A11.3 implements the
-initially manual coordinator DAG, A11.4 freezes its DAG contract tests, and
-A11.5 wires both sources to the package-owned same-date preflight join. This
+initially manual coordinator DAG, A11.4 freezes its DAG contract tests, A11.5
+wires both sources to the package-owned same-date preflight join, and A11.6
+proves repeated-run and overlap behavior. This
 contract decides how successful EODData and Yahoo/SPX completions wake the
 technical-indicator workflow and how it joins those prerequisites for one
-effective date. Repeated-run proof, the full Airflow vertical, and the final
-production cadence decision remain owned by A11.6-A11.8.
+effective date. The full Airflow vertical and final production cadence decision
+remain owned by A11.7-A11.8.
 
 The deployed runtime is Apache Airflow 3.2.1 with
 `apache-airflow-providers-standard` 1.12.3. The live source DAGs are intentionally
@@ -197,7 +198,23 @@ may create later coordinator wakes for the same date. This is intentional:
   affected-range path rather than relying on Airflow deduplication for data
   correctness.
 
-A11.6 must prove these behaviors under repeated and overlapping source runs.
+A11.6 proves these behaviors at the package and database boundaries:
+
+- Replaying one serialized source completion under a different Airflow source
+  run retains the exact trigger-run ID because the source Core run is unchanged.
+- New EODData and Yahoo Core runs for the same date receive distinct wake IDs,
+  while both provenance shapes resolve the same package daily scope.
+- A real contending daily runner returns the fixed bounded `CONTENDED` result
+  before creating Core, report, publication, or payload state.
+- After the held lock is released, the first ready run publishes atomically.
+  Later healthy same-date source evidence is selected by readiness, but
+  unchanged OHLCV converges to a reported `NO_OP` with no second publication or
+  payload timestamp change.
+
+The cleanup-safe PostgreSQL proof also reruns the existing lock-release and
+reader-publication visibility cases. This deliberately proves data safety
+through the package boundary rather than treating Airflow run serialization as
+the correctness mechanism.
 
 ## Alternatives Evaluated
 
@@ -275,7 +292,9 @@ and [`TriggerDagRunOperator` contract](https://airflow.apache.org/docs/apache-ai
 - A11.5 added strict signal deserialization and dispatch construction,
   asynchronous trigger tasks to both source DAGs, and the coordinator's
   package-owned read-only preflight join.
-- A11.6 proves repeated-run coalescence, idempotency, and lock behavior.
+- A11.6 added explicit source retry/new-run identity contracts and a live
+  repeated-run proof covering zero-state contention, lock release, atomic first
+  publication, latest same-date source evidence, and idempotent `NO_OP`.
 - A11.7 verifies the complete Airflow/Core/report vertical.
 - A11.8 alone decides whether and how automatic dispatch is enabled in normal
   operation.

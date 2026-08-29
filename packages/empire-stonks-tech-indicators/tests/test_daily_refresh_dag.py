@@ -160,22 +160,40 @@ def test_scope_normalizes_exact_listing_overrides(monkeypatch) -> None:
     assert scope.markets == ()
 
 
-def test_scope_accepts_reserved_source_coordination_provenance(
+@pytest.mark.parametrize(
+    "provenance",
+    [
+        {
+            "coordination_schema_version": 1,
+            "source_provider_code": "EODDATA",
+            "source_code": "eoddata_daily",
+            "source_job_name": "stonks_ohlcv_eoddata_daily",
+            "source_core_run_id": str(LISTING_ID_A),
+            "source_dag_id": "stonks_ohlcv_eoddata_daily_scrape",
+            "source_dag_run_id": "scheduled__2026-08-29T20:15:00+00:00",
+        },
+        {
+            "coordination_schema_version": 1,
+            "source_provider_code": "YAHOO",
+            "source_code": "yahoo_daily",
+            "source_job_name": "stonks_ohlcv_yahoo_daily",
+            "source_core_run_id": str(LISTING_ID_B),
+            "source_dag_id": "stonks_ohlcv_yahoo_daily_scrape",
+            "source_dag_run_id": "manual__2026-08-29T22:00:00+00:00",
+        },
+    ],
+)
+def test_source_wakes_for_one_date_converge_to_the_same_scope(
     monkeypatch,
+    provenance,
 ) -> None:
     module, _fake_sdk = _load_dag_module(monkeypatch)
 
     scope = module._scope_from_context(
         _context(
             {
-                "coordination_schema_version": 1,
                 "effective_date": "2026-08-28",
-                "source_provider_code": "YAHOO",
-                "source_code": "yahoo_daily",
-                "source_job_name": "stonks_ohlcv_yahoo_daily",
-                "source_core_run_id": str(LISTING_ID_A),
-                "source_dag_id": "stonks_ohlcv_yahoo_daily_scrape",
-                "source_dag_run_id": "manual__2026-08-29T12:00:00+00:00",
+                **provenance,
             }
         ),
         module.TechIndicatorsConfig(),

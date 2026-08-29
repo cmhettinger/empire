@@ -920,7 +920,10 @@ calculation or publication. Each source DAG converts a qualifying signal with
 `build_tech_indicators_dispatch()` and asynchronously triggers
 `stonks_tech_indicators_daily_refresh`. Non-qualifying results skip dispatch;
 same-source retries use the deterministic trigger-run ID and do not reset an
-existing coordinator run.
+existing coordinator run. A genuine new source Core run for the same date uses
+a distinct trigger-run ID so a later EODData reconciliation or Yahoo/SPX rerun
+can recheck readiness; unchanged technical inputs converge through the
+downstream package's locked `NO_OP` path.
 
 ## EODData scheduled DAG
 

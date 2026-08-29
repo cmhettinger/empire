@@ -219,6 +219,13 @@ not-ready wake is skipped as a bounded orchestration no-op. A ready wake calls
 the normal runner, which rechecks readiness after acquiring the package-owned
 scope lock. Source and manual wakes therefore use the same fail-closed path.
 
+Repeated EODData/Yahoo wakes are expected. An exact source-dispatch retry is
+coalesced by its deterministic coordinator run ID. A new same-date source Core
+run may create another coordinator wake; if inputs are unchanged it produces a
+durable technical `NO_OP`, while an overlapping writer returns the fixed
+contention result before Core or report state. Do not diagnose duplicate source
+wakes by deleting publication rows or advisory locks.
+
 ## Publication Readiness
 
 Calculation completion and publication readiness are different facts. A row in

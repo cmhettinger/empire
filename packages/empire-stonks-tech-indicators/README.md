@@ -151,6 +151,13 @@ authoritative readiness check before calculation or publication. Manual runs
 use the same two-task graph and therefore fail closed on missing same-date
 prerequisites.
 
+Repeated source wakes are safe by construction. A retry of one source Core run
+uses the same deterministic coordinator run ID; a genuine later reconciliation
+may wake the coordinator again. The DAG's one-active-run limit is secondary:
+the package's global transaction advisory lock rejects overlap before workflow
+state, and a later unchanged same-date run completes as a durable `NO_OP`
+without another publication or payload update.
+
 The installed `stonks-tech-indicators-backfill` command and local wrapper expose
 the J9 staged backfill with required inclusive dates, exact provider/market or
 listing scope, bounded batches, partial-run limits, exact resume cursors,
