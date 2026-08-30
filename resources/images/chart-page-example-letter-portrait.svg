@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="854" height="1000" viewBox="0 0 854 1000">
+  <rect width="854" height="1000" fill="#FFFFFF"/>
+  <g stroke="#E1E1E1" stroke-width="2">
+    <line x1="150" y1="70" x2="150" y2="865"/>
+    <line x1="300" y1="70" x2="300" y2="865"/>
+    <line x1="450" y1="70" x2="450" y2="865"/>
+    <line x1="600" y1="70" x2="600" y2="865"/>
+    <line x1="750" y1="70" x2="750" y2="865"/>
+  </g>
+  <g fill="#666666" font-family="Arial, sans-serif" font-size="21" text-anchor="middle">
+    <text x="150" y="52">0</text>
+    <text x="300" y="52">25</text>
+    <text x="450" y="52">50</text>
+    <text x="600" y="52">75</text>
+    <text x="750" y="52">100</text>
+  </g>
+  <g fill="#4A4A4A" font-family="Arial, sans-serif" font-size="22" text-anchor="end">
+    <text x="132" y="133">North</text>
+    <text x="132" y="213">South</text>
+    <text x="132" y="293">East</text>
+    <text x="132" y="373">West</text>
+    <text x="132" y="453">Central</text>
+    <text x="132" y="533">Coastal</text>
+    <text x="132" y="613">Metro</text>
+    <text x="132" y="693">Rural</text>
+    <text x="132" y="773">Online</text>
+    <text x="132" y="853">Partner</text>
+  </g>
+  <g fill="#D8D8D8">
+    <rect x="150" y="105" width="510" height="34" rx="5"/>
+    <rect x="150" y="185" width="435" height="34" rx="5"/>
+    <rect x="150" y="265" width="525" height="34" rx="5"/>
+    <rect x="150" y="345" width="390" height="34" rx="5"/>
+    <rect x="150" y="425" width="465" height="34" rx="5"/>
+    <rect x="150" y="505" width="345" height="34" rx="5"/>
+    <rect x="150" y="585" width="570" height="34" rx="5"/>
+    <rect x="150" y="665" width="315" height="34" rx="5"/>
+    <rect x="150" y="745" width="600" height="34" rx="5"/>
+    <rect x="150" y="825" width="405" height="34" rx="5"/>
+  </g>
+  <g fill="#8B0000">
+    <rect x="150" y="105" width="558" height="34" rx="5"/>
+    <rect x="150" y="185" width="468" height="34" rx="5"/>
+    <rect x="150" y="265" width="588" height="34" rx="5"/>
+    <rect x="150" y="345" width="444" height="34" rx="5"/>
+    <rect x="150" y="425" width="510" height="34" rx="5"/>
+    <rect x="150" y="505" width="402" height="34" rx="5"/>
+    <rect x="150" y="585" width="606" height="34" rx="5"/>
+    <rect x="150" y="665" width="360" height="34" rx="5"/>
+    <rect x="150" y="745" width="576" height="34" rx="5"/>
+    <rect x="150" y="825" width="456" height="34" rx="5"/>
+  </g>
+  <g fill="#444444" font-family="Arial, sans-serif" font-size="21">
+    <rect x="195" y="915" width="44" height="16" rx="3" fill="#8B0000"/>
+    <text x="250" y="931">Current period</text>
+    <rect x="470" y="915" width="44" height="16" rx="3" fill="#D8D8D8"/>
+    <text x="525" y="931">Prior period</text>
+  </g>
+  <text x="150" y="978" fill="#777777" font-family="Arial, sans-serif" font-size="19">Source: Synthetic playground data</text>
+</svg>

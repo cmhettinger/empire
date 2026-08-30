@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="634" height="1000" viewBox="0 0 634 1000">
+  <rect width="634" height="1000" fill="#FFFFFF"/>
+  <g stroke="#E1E1E1" stroke-width="2">
+    <line x1="125" y1="70" x2="125" y2="865"/>
+    <line x1="235" y1="70" x2="235" y2="865"/>
+    <line x1="345" y1="70" x2="345" y2="865"/>
+    <line x1="455" y1="70" x2="455" y2="865"/>
+    <line x1="565" y1="70" x2="565" y2="865"/>
+  </g>
+  <g fill="#666666" font-family="Arial, sans-serif" font-size="19" text-anchor="middle">
+    <text x="125" y="52">0</text>
+    <text x="235" y="52">25</text>
+    <text x="345" y="52">50</text>
+    <text x="455" y="52">75</text>
+    <text x="565" y="52">100</text>
+  </g>
+  <g fill="#4A4A4A" font-family="Arial, sans-serif" font-size="20" text-anchor="end">
+    <text x="108" y="133">North</text>
+    <text x="108" y="213">South</text>
+    <text x="108" y="293">East</text>
+    <text x="108" y="373">West</text>
+    <text x="108" y="453">Central</text>
+    <text x="108" y="533">Coastal</text>
+    <text x="108" y="613">Metro</text>
+    <text x="108" y="693">Rural</text>
+    <text x="108" y="773">Online</text>
+    <text x="108" y="853">Partner</text>
+  </g>
+  <g fill="#D8D8D8">
+    <rect x="125" y="105" width="374" height="34" rx="5"/>
+    <rect x="125" y="185" width="319" height="34" rx="5"/>
+    <rect x="125" y="265" width="385" height="34" rx="5"/>
+    <rect x="125" y="345" width="286" height="34" rx="5"/>
+    <rect x="125" y="425" width="341" height="34" rx="5"/>
+    <rect x="125" y="505" width="253" height="34" rx="5"/>
+    <rect x="125" y="585" width="418" height="34" rx="5"/>
+    <rect x="125" y="665" width="231" height="34" rx="5"/>
+    <rect x="125" y="745" width="440" height="34" rx="5"/>
+    <rect x="125" y="825" width="297" height="34" rx="5"/>
+  </g>
+  <g fill="#2B2B2B">
+    <rect x="125" y="105" width="409" height="34" rx="5"/>
+    <rect x="125" y="185" width="343" height="34" rx="5"/>
+    <rect x="125" y="265" width="431" height="34" rx="5"/>
+    <rect x="125" y="345" width="326" height="34" rx="5"/>
+    <rect x="125" y="425" width="374" height="34" rx="5"/>
+    <rect x="125" y="505" width="295" height="34" rx="5"/>
+    <rect x="125" y="585" width="444" height="34" rx="5"/>
+    <rect x="125" y="665" width="264" height="34" rx="5"/>
+    <rect x="125" y="745" width="422" height="34" rx="5"/>
+    <rect x="125" y="825" width="334" height="34" rx="5"/>
+  </g>
+  <g fill="#444444" font-family="Arial, sans-serif" font-size="19">
+    <rect x="105" y="915" width="38" height="15" rx="3" fill="#2B2B2B"/>
+    <text x="153" y="930">Current</text>
+    <rect x="340" y="915" width="38" height="15" rx="3" fill="#D8D8D8"/>
+    <text x="388" y="930">Prior</text>
+  </g>
+  <text x="125" y="978" fill="#777777" font-family="Arial, sans-serif" font-size="17">Source: Synthetic playground data</text>
+</svg>

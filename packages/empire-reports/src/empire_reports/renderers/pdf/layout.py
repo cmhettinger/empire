@@ -13,6 +13,7 @@ from empire_reports.branding import ReportTheme
 
 Orientation = Literal["portrait", "landscape"]
 PageSizeName = Literal["LETTER", "LEGAL", "CUSTOM"]
+ChartPageSizeName = Literal["LETTER", "LEGAL"]
 TemplateRole = Literal["title", "body", "chart"]
 
 
@@ -128,6 +129,40 @@ class TemplateRegistry:
 
     def all(self) -> list[PageTemplate]:
         return list(self._templates.values())
+
+
+def chart_page_template_key(
+    size_name: ChartPageSizeName,
+    orientation: Orientation,
+) -> str:
+    if size_name not in {"LETTER", "LEGAL"}:
+        raise ValueError("Chart page size_name must be 'LETTER' or 'LEGAL'.")
+    if orientation not in {"portrait", "landscape"}:
+        raise ValueError("Chart page orientation must be 'portrait' or 'landscape'.")
+    return f"chart_{size_name.lower()}_{orientation}"
+
+
+def chart_page_template_specs(theme: ReportTheme) -> tuple[TemplateSpec, ...]:
+    header_footer = HeaderFooterSpec(
+        show_header=False,
+        show_footer=False,
+        show_page_number=False,
+    )
+    return tuple(
+        TemplateSpec(
+            page=PageSpec(
+                key=chart_page_template_key(size_name, orientation),
+                size_name=size_name,
+                orientation=orientation,
+                margins=Margins.inches(0.25, 0.25, 0.25, 0.25),
+                role="chart",
+            ),
+            header_footer=header_footer,
+            theme=theme,
+        )
+        for size_name in ("LETTER", "LEGAL")
+        for orientation in ("portrait", "landscape")
+    )
 
 
 def draw_header_footer(

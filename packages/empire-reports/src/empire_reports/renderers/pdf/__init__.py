@@ -1,5 +1,13 @@
 """ReportLab-based PDF rendering helpers."""
 
+from empire_reports.renderers.pdf.chart_pages import (
+    ChartAccentTone,
+    ChartBox,
+    ChartPage,
+    ChartPageLayout,
+    chart_page,
+    chart_page_layout,
+)
 from empire_reports.renderers.pdf.components import (
     AppendixDividerPage,
     IntentionallyBlankPage,
@@ -35,12 +43,14 @@ from empire_reports.renderers.pdf.document import (
     make_doc,
 )
 from empire_reports.renderers.pdf.layout import (
+    ChartPageSizeName,
     FrameSpec,
     HeaderFooterSpec,
     Margins,
     PageSpec,
     TemplateRegistry,
     TemplateSpec,
+    chart_page_template_key,
     inches,
     make_page_template,
 )
@@ -48,6 +58,11 @@ from empire_reports.renderers.pdf.renderer import PdfRenderer
 
 __all__ = [
     "AppendixDividerPage",
+    "ChartAccentTone",
+    "ChartBox",
+    "ChartPage",
+    "ChartPageLayout",
+    "ChartPageSizeName",
     "DocumentSpec",
     "FrameSpec",
     "HeaderFooterSpec",
@@ -72,6 +87,9 @@ __all__ = [
     "TemplateSpec",
     "appendix_divider_page",
     "build_pdf",
+    "chart_page",
+    "chart_page_layout",
+    "chart_page_template_key",
     "cover_page",
     "intentionally_blank_page",
     "metrics_page",

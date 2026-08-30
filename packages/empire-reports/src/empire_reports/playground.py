@@ -21,6 +21,8 @@ from reportlab.platypus import (
 
 from empire_reports.contracts import RenderContext, RenderResult, ReportMetadata
 from empire_reports.renderers.pdf import (
+    ChartAccentTone,
+    ChartPageSizeName,
     HeaderFooterSpec,
     MetricCardSpec,
     MetricDetailRow,
@@ -28,6 +30,8 @@ from empire_reports.renderers.pdf import (
     PdfRenderer,
     QuoteTileSpec,
     appendix_divider_page,
+    chart_page,
+    chart_page_template_key,
     intentionally_blank_page,
     metrics_page,
     notes_page,
@@ -41,6 +45,7 @@ from empire_reports.renderers.pdf import (
 )
 from empire_reports.renderers.pdf.charts import ChartBlock, ChartBlockSpec
 from empire_reports.renderers.pdf.images import scaled_image
+from empire_reports.renderers.pdf.layout import Orientation
 from empire_reports.renderers.pdf.tables import simple_table
 
 
@@ -324,6 +329,66 @@ def playground_pages() -> tuple[PlaygroundPage, ...]:
             ),
             builder=_metrics_red_page,
             template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="chart-page-letter-portrait",
+            title="Chart page - Letter portrait",
+            description=(
+                "A minimal full-page chart frame on portrait US Letter."
+            ),
+            options=(
+                "red accent",
+                "portrait-specific chart artwork fills the available chart box",
+                "logo and page number only in the footer",
+            ),
+            builder=_chart_page_letter_portrait,
+            template_key=chart_page_template_key("LETTER", "portrait"),
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="chart-page-letter-landscape",
+            title="Chart page - Letter landscape",
+            description=(
+                "The same chart frame on landscape US Letter."
+            ),
+            options=(
+                "grey accent",
+                "optional thin chart-area border",
+                "logo and page number only in the footer",
+            ),
+            builder=_chart_page_letter_landscape,
+            template_key=chart_page_template_key("LETTER", "landscape"),
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="chart-page-legal-portrait",
+            title="Chart page - Legal portrait",
+            description=(
+                "The chart frame using the additional height of portrait US Legal."
+            ),
+            options=(
+                "grey accent",
+                "portrait-specific chart artwork fills the available chart box",
+                "logo and page number only in the footer",
+            ),
+            builder=_chart_page_legal_portrait,
+            template_key=chart_page_template_key("LEGAL", "portrait"),
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="chart-page-legal-landscape",
+            title="Chart page - Legal landscape",
+            description=(
+                "The widest supported chart frame on landscape US Legal."
+            ),
+            options=(
+                "red accent",
+                "optional thin chart-area border",
+                "logo and page number only in the footer",
+            ),
+            builder=_chart_page_legal_landscape,
+            template_key=chart_page_template_key("LEGAL", "landscape"),
             annotate=False,
         ),
     )
@@ -819,6 +884,100 @@ def _metrics_page_content(
         ),
     )
     return metrics, sections
+
+
+def _chart_page_letter_portrait(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    return _chart_page_example(
+        renderer,
+        report_date,
+        page_size="LETTER",
+        orientation="portrait",
+        accent_tone="red",
+        show_chart_border=False,
+        title="REGIONAL PERFORMANCE BY MARKET",
+        chart_filename="chart-page-example-letter-portrait.svg",
+    )
+
+
+def _chart_page_letter_landscape(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    return _chart_page_example(
+        renderer,
+        report_date,
+        page_size="LETTER",
+        orientation="landscape",
+        accent_tone="grey",
+        show_chart_border=True,
+        title="REVENUE AND OPERATING MARGIN TREND",
+        chart_filename="chart-page-example.svg",
+    )
+
+
+def _chart_page_legal_portrait(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    return _chart_page_example(
+        renderer,
+        report_date,
+        page_size="LEGAL",
+        orientation="portrait",
+        accent_tone="grey",
+        show_chart_border=False,
+        title="REGIONAL PERFORMANCE BY MARKET",
+        chart_filename="chart-page-example-legal-portrait.svg",
+    )
+
+
+def _chart_page_legal_landscape(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    return _chart_page_example(
+        renderer,
+        report_date,
+        page_size="LEGAL",
+        orientation="landscape",
+        accent_tone="red",
+        show_chart_border=True,
+        title="REVENUE AND OPERATING MARGIN TREND",
+        chart_filename="chart-page-example.svg",
+    )
+
+
+def _chart_page_example(
+    renderer: PdfRenderer,
+    report_date: date,
+    *,
+    page_size: ChartPageSizeName,
+    orientation: Orientation,
+    accent_tone: ChartAccentTone,
+    show_chart_border: bool,
+    title: str,
+    chart_filename: str,
+) -> Sequence[object]:
+    return chart_page(
+        title=title,
+        description=(
+            "Synthetic quarterly comparison through "
+            f"{report_date.isoformat()}; legend, axes, and source are part of "
+            "the supplied chart artwork."
+        ),
+        chart_image_path=renderer.assets.image_path(chart_filename),
+        page_size=page_size,
+        orientation=orientation,
+        accent_tone=accent_tone,
+        show_chart_border=show_chart_border,
+        page_number_offset=1,
+        allow_upscale=True,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
 
 
 def _validate_pages(pages: Sequence[PlaygroundPage]) -> None:

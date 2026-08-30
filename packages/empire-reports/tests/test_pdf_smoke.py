@@ -4,12 +4,13 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from reportlab.platypus import PageBreak
+from reportlab.platypus import NextPageTemplate, PageBreak
 
 from empire_reports.contracts import RenderContext, ReportMetadata
 from empire_reports.renderers.pdf.components import _quote_tile_palette
 from empire_reports.renderers.pdf import (
     HeaderFooterSpec,
+    ChartPage,
     IntentionallyBlankPage,
     MetricCardSpec,
     MetricDetailRow,
@@ -20,6 +21,9 @@ from empire_reports.renderers.pdf import (
     QuoteTileSpec,
     SectionDividerPage,
     appendix_divider_page,
+    chart_page,
+    chart_page_layout,
+    chart_page_template_key,
     intentionally_blank_page,
     metrics_page,
     notes_page,
@@ -383,6 +387,141 @@ def test_metrics_page_rejects_detail_content_that_cannot_fit(tmp_path: Path) -> 
 
     with pytest.raises(ValueError, match="Reduce the number of detail rows"):
         renderer.render(page)
+
+
+def test_chart_page_renders_all_supported_page_geometries(tmp_path: Path) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(report_id="chart-pages", title="Chart Pages"),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    chart_path = renderer.assets.image_path("chart-page-example.svg")
+    raster_path = renderer.assets.image_path("buffett-no-crying.png")
+    combinations = (
+        ("LETTER", "portrait"),
+        ("LETTER", "landscape"),
+        ("LEGAL", "portrait"),
+        ("LEGAL", "landscape"),
+    )
+    story: list[object] = [paragraph("Chart page geometry test", styles=renderer.styles)]
+    for index, (page_size, orientation) in enumerate(combinations):
+        template_key = chart_page_template_key(page_size, orientation)
+        page = chart_page(
+            title=f"{page_size} {orientation}",
+            description="Chart artwork includes its axes, legend, and source.",
+            chart_image_path=raster_path if index == 0 else chart_path,
+            page_size=page_size,
+            orientation=orientation,
+            accent_tone="red" if index % 2 else "grey",
+            show_chart_border=bool(index % 2),
+            branding=renderer.branding,
+            theme=renderer.theme,
+        )
+        assert isinstance(page[0], ChartPage)
+        assert page[0].required_template_key == template_key
+        story.extend([NextPageTemplate(template_key), PageBreak(), *page])
+
+    result = renderer.render(story)
+
+    artifact = result.primary_artifact
+    assert artifact.exists
+    assert artifact.resolved_path().stat().st_size > 20_000
+
+
+def test_chart_page_requires_matching_page_template(tmp_path: Path) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(
+            report_id="chart-page-template",
+            title="Chart Page Template",
+        ),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    page = chart_page(
+        title="Landscape chart",
+        description="This page requires the landscape chart template.",
+        chart_image_path=renderer.assets.image_path("chart-page-example.svg"),
+        orientation="landscape",
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+    with pytest.raises(ValueError, match="chart_letter_landscape"):
+        renderer.render(page)
+
+
+def test_chart_page_layout_reports_exact_chart_box_before_rendering(
+    tmp_path: Path,
+) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(report_id="chart-layout", title="Chart Layout"),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    title = (
+        "AN INTENTIONALLY LONG CHART TITLE THAT CANNOT FIT ON ONE PORTRAIT "
+        "LETTER LINE"
+    )
+    layout = chart_page_layout(
+        title=title,
+        description="A concise description beneath the chart title.",
+        page_size="LETTER",
+        orientation="portrait",
+        show_chart_border=False,
+        theme=renderer.theme,
+    )
+    bordered = chart_page_layout(
+        title=title,
+        description="A concise description beneath the chart title.",
+        page_size="LETTER",
+        orientation="portrait",
+        show_chart_border=True,
+        theme=renderer.theme,
+    )
+
+    assert layout.page_width == pytest.approx(612.0)
+    assert layout.page_height == pytest.approx(792.0)
+    assert layout.display_title.endswith("...")
+    assert "\n" not in layout.display_title
+    assert layout.chart_area == layout.chart_box
+    assert bordered.chart_box.width == pytest.approx(
+        bordered.chart_area.width - 14.0
+    )
+    assert bordered.chart_box.height == pytest.approx(
+        bordered.chart_area.height - 14.0
+    )
+    assert layout.chart_box.pixel_size(dpi=144) == (
+        1066,
+        1275,
+    )
+    with pytest.raises(ValueError, match="dpi must be positive"):
+        layout.chart_box.pixel_size(dpi=0)
+
+
+def test_chart_page_validates_public_parameters(tmp_path: Path) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(report_id="chart-validation", title="Chart Validation"),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    chart_path = renderer.assets.image_path("chart-page-example.svg")
+
+    with pytest.raises(ValueError, match="page_size"):
+        chart_page(
+            title="Chart",
+            description="Description",
+            chart_image_path=chart_path,
+            page_size="A4",  # type: ignore[arg-type]
+        )
+    with pytest.raises(ValueError, match="accent_tone"):
+        chart_page(
+            title="Chart",
+            description="Description",
+            chart_image_path=chart_path,
+            accent_tone="blue",  # type: ignore[arg-type]
+        )
+    with pytest.raises(FileNotFoundError, match="Chart image not found"):
+        chart_page(
+            title="Chart",
+            description="Description",
+            chart_image_path=tmp_path / "missing.png",
+        )
 
 
 def test_quote_tile_grid_renders_semantic_market_colors(tmp_path: Path) -> None:

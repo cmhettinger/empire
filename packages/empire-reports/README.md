@@ -198,6 +198,71 @@ story = metrics_page(
 )
 ```
 
+Use `chart_page(...)` for a minimal full-page chart presentation rather than an
+in-flow `ChartBlock`. The component keeps the page white, reserves only a
+single-line title, description, small lower-left Empire footer logo, and optional
+page number, then fits a caller-provided raster or SVG chart into all remaining
+space without cropping or distortion. Titles that exceed the available line are
+truncated with an ASCII ellipsis. A thin neutral border around the complete chart
+area is optional. The chart artwork owns its axes, legend, annotations, and
+source text.
+
+The renderer registers four chart templates by default: portrait and landscape
+US Letter, plus portrait and landscape US Legal. Select the matching template
+before starting the chart page in a mixed-geometry report:
+
+```python
+from reportlab.platypus import NextPageTemplate, PageBreak
+
+from empire_reports.renderers.pdf import (
+    chart_page,
+    chart_page_layout,
+    chart_page_template_key,
+)
+
+template_key = chart_page_template_key("LEGAL", "landscape")
+layout = chart_page_layout(
+    title="REVENUE AND OPERATING MARGIN TREND",
+    description="Quarterly comparison through the reporting period.",
+    page_size="LEGAL",
+    orientation="landscape",
+    show_chart_border=True,
+    theme=renderer.theme,
+)
+chart_width_points = layout.chart_box.width
+chart_height_points = layout.chart_box.height
+chart_width_pixels, chart_height_pixels = layout.chart_box.pixel_size(dpi=144)
+
+story.extend(
+    [
+        NextPageTemplate(template_key),
+        PageBreak(),
+        *chart_page(
+            title="REVENUE AND OPERATING MARGIN TREND",
+            description="Quarterly comparison through the reporting period.",
+            chart_image_path=chart_path,
+            page_size="LEGAL",
+            orientation="landscape",
+            accent_tone="red",
+            show_chart_border=True,
+            branding=renderer.branding,
+            theme=renderer.theme,
+        ),
+    ]
+)
+```
+
+`chart_page_layout(...)` uses the same geometry calculation as `ChartPage` and
+returns both `chart_area` (the optional border rectangle) and `chart_box` (the
+actual image rectangle after border padding). Coordinates and dimensions use PDF
+points. `ChartBox.pixel_size(...)` converts the usable image box to a render size
+at the caller's requested DPI, rounding upward so generated artwork never
+undershoots the available area.
+
+`ChartPage.required_template_key` exposes the same expected key for callers that
+construct page sequences dynamically. Rendering fails clearly when the active
+template does not match the requested chart geometry.
+
 Publishing is intentionally outside this package. `empire-reports` renders local artifacts and returns metadata. A domain package or orchestration wrapper decides whether an artifact is run-scoped, durable, promoted to a "latest" location, emailed, attached to an object-store run, or retained under a domain-specific key layout.
 
 When changing `empire-reports`, prefer boring, explicit primitives over discovery-heavy frameworks. Add common helpers only when at least one real report needs them and they are clearly domain-neutral. Keep target-specific code under the relevant renderer family: PDF layout under `renderers/pdf`, audio scripts or helpers under `renderers/audio`, video helpers under `renderers/video`, JSON writers under `renderers/json`, and workbook helpers under `renderers/xlsx`.

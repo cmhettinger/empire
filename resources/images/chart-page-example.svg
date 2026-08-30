@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="820" viewBox="0 0 1000 820">
+  <rect width="1000" height="820" fill="#FFFFFF"/>
+  <g stroke="#E1E1E1" stroke-width="2">
+    <line x1="90" y1="100" x2="940" y2="100"/>
+    <line x1="90" y1="220" x2="940" y2="220"/>
+    <line x1="90" y1="340" x2="940" y2="340"/>
+    <line x1="90" y1="460" x2="940" y2="460"/>
+    <line x1="90" y1="580" x2="940" y2="580"/>
+  </g>
+  <g stroke="#727272" stroke-width="2">
+    <line x1="90" y1="70" x2="90" y2="620"/>
+    <line x1="90" y1="620" x2="940" y2="620"/>
+  </g>
+  <polyline
+    points="90,525 170,490 250,510 330,405 410,430 490,310 570,350 650,245 730,275 810,165 890,205 940,125"
+    fill="none"
+    stroke="#8B0000"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <polyline
+    points="90,175 170,210 250,190 330,270 410,250 490,355 570,330 650,430 730,400 810,500 890,475 940,540"
+    fill="none"
+    stroke="#2B2B2B"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <g fill="#666666" font-family="Arial, sans-serif" font-size="24">
+    <text x="45" y="108">80</text>
+    <text x="45" y="228">60</text>
+    <text x="45" y="348">40</text>
+    <text x="45" y="468">20</text>
+    <text x="58" y="588">0</text>
+    <text x="82" y="662">Q1</text>
+    <text x="290" y="662">Q2</text>
+    <text x="500" y="662">Q3</text>
+    <text x="710" y="662">Q4</text>
+    <text x="908" y="662">Q1</text>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="25" fill="#444444">
+    <line x1="255" y1="720" x2="315" y2="720" stroke="#8B0000" stroke-width="8" stroke-linecap="round"/>
+    <text x="330" y="728">Current period</text>
+    <line x1="570" y1="720" x2="630" y2="720" stroke="#2B2B2B" stroke-width="8" stroke-linecap="round"/>
+    <text x="645" y="728">Prior period</text>
+  </g>
+  <text x="90" y="790" fill="#777777" font-family="Arial, sans-serif" font-size="20">Source: Synthetic playground data</text>
+</svg>

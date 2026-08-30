@@ -10,6 +10,7 @@ from empire_reports.contracts import OutputFormat, RenderContext, RenderResult, 
 from empire_reports.paths import default_output_path
 from empire_reports.renderers.pdf.document import DocumentSpec, build_pdf, make_doc
 from empire_reports.renderers.pdf.layout import (
+    chart_page_template_specs,
     HeaderFooterSpec,
     PageSpec,
     TemplateRegistry,
@@ -57,6 +58,8 @@ class PdfRenderer:
                 )
             )
         )
+        for template_spec in chart_page_template_specs(self.theme):
+            registry.add(make_page_template(template_spec))
         return registry
 
     def render(
