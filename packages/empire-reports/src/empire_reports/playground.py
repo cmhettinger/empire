@@ -24,6 +24,7 @@ from empire_reports.renderers.pdf import (
     HeaderFooterSpec,
     PdfRenderer,
     QuoteTileSpec,
+    appendix_divider_page,
     paragraph,
     professional_letter_disclaimer_page,
     professional_letter_title_page,
@@ -164,6 +165,36 @@ def playground_pages() -> tuple[PlaygroundPage, ...]:
                 "replaceable quote image",
             ),
             builder=_professional_disclaimer_page,
+            template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="appendix-divider-grey",
+            title="Appendix divider page - grey rail",
+            description=(
+                "A full-page appendix divider using the neutral Empire rail."
+            ),
+            options=(
+                "appendix title and eyebrow",
+                "optional description and page number",
+                "grey rail tone",
+            ),
+            builder=_appendix_divider_grey_page,
+            template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="appendix-divider-red",
+            title="Appendix divider page - red rail",
+            description=(
+                "The same full-page appendix divider using the primary Empire rail."
+            ),
+            options=(
+                "appendix title and eyebrow",
+                "optional description and page number",
+                "red rail tone",
+            ),
+            builder=_appendix_divider_red_page,
             template_key="letter_title",
             annotate=False,
         ),
@@ -415,6 +446,38 @@ def _professional_disclaimer_page(
             "Full-page component with configurable labels, warning text, and quote image"
         ),
         assets=renderer.assets,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+
+def _appendix_divider_grey_page(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    _ = report_date
+    return appendix_divider_page(
+        title="APPENDIX A",
+        description=(
+            "Supporting information, reference data, and additional material."
+        ),
+        rail_tone="grey",
+        page_number_offset=1,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+
+def _appendix_divider_red_page(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    _ = report_date
+    return appendix_divider_page(
+        title="APPENDIX B",
+        description="Methodology, definitions, and supporting schedules.",
+        rail_tone="red",
+        page_number_offset=1,
         branding=renderer.branding,
         theme=renderer.theme,
     )

@@ -12,6 +12,7 @@ from empire_reports.renderers.pdf import (
     HeaderFooterSpec,
     PdfRenderer,
     QuoteTileSpec,
+    appendix_divider_page,
     paragraph,
     professional_letter_disclaimer_page,
     professional_letter_title_page,
@@ -127,6 +128,48 @@ def test_professional_disclaimer_page_uses_brand_assets(tmp_path: Path) -> None:
     artifact = result.primary_artifact
     assert artifact.exists
     assert artifact.resolved_path().stat().st_size > 10_000
+
+
+def test_appendix_divider_page_renders_both_rail_tones(tmp_path: Path) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(
+            report_id="appendix-divider",
+            title="Appendix Divider",
+        ),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    story = [
+        *appendix_divider_page(
+            title="APPENDIX A",
+            description="Supporting information and reference data.",
+            rail_tone="grey",
+            branding=renderer.branding,
+            theme=renderer.theme,
+        ),
+        PageBreak(),
+        *appendix_divider_page(
+            title="APPENDIX B",
+            description="Methodology and supporting schedules.",
+            rail_tone="red",
+            show_page_number=False,
+            branding=renderer.branding,
+            theme=renderer.theme,
+        ),
+    ]
+
+    result = renderer.render(story)
+
+    artifact = result.primary_artifact
+    assert artifact.exists
+    assert artifact.resolved_path().stat().st_size > 20_000
+
+
+def test_appendix_divider_page_rejects_unknown_rail_tone() -> None:
+    with pytest.raises(ValueError, match="rail_tone"):
+        appendix_divider_page(
+            title="APPENDIX A",
+            rail_tone="blue",  # type: ignore[arg-type]
+        )
 
 
 def test_quote_tile_grid_renders_semantic_market_colors(tmp_path: Path) -> None:

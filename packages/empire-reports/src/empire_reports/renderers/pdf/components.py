@@ -5,8 +5,10 @@ from dataclasses import dataclass
 from datetime import date
 from math import ceil
 from pathlib import Path
+from typing import Literal
 
 from reportlab.lib.colors import HexColor
+from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import stringWidth
@@ -27,6 +29,280 @@ def section_heading(text: str, *, styles: ReportStyles) -> Paragraph:
 
 def spacer(height: float = 12.0) -> Spacer:
     return Spacer(1, height)
+
+
+RailTone = Literal["grey", "red"]
+
+
+class AppendixDividerPage(Flowable):
+    """Full-page Empire appendix divider for portrait US Letter reports."""
+
+    def __init__(
+        self,
+        *,
+        title: str,
+        description: str | None = None,
+        eyebrow_text: str = "APPENDIX",
+        rail_tone: RailTone = "grey",
+        show_page_number: bool = True,
+        page_number_offset: int = 0,
+        branding: BrandingConfig | None = None,
+        theme: ReportTheme | None = None,
+        logo_path: Path | None = None,
+        body_watermark_path: Path | None = None,
+        rail_watermark_path: Path | None = None,
+    ) -> None:
+        super().__init__()
+        if rail_tone not in {"grey", "red"}:
+            raise ValueError("rail_tone must be 'grey' or 'red'.")
+        if page_number_offset < 0:
+            raise ValueError("page_number_offset cannot be negative.")
+        if not title.strip():
+            raise ValueError("title cannot be empty.")
+        if not eyebrow_text.strip():
+            raise ValueError("eyebrow_text cannot be empty.")
+
+        self.title = title
+        self.description = description
+        self.eyebrow_text = eyebrow_text
+        self.rail_tone = rail_tone
+        self.show_page_number = show_page_number
+        self.page_number_offset = page_number_offset
+        self.branding = branding or BrandingConfig.discover()
+        self.theme = theme or ReportTheme()
+        self.logo_path = logo_path or self.branding.logo_path(
+            color="color",
+            lockup="horizontal",
+            size="512h",
+        )
+        self.body_watermark_path = body_watermark_path or self.branding.logo_path(
+            color="light-grey",
+            lockup="icon",
+            size="512h",
+        )
+        self.rail_watermark_path = rail_watermark_path or self.branding.logo_path(
+            color="white",
+            lockup="icon",
+            size="512h",
+        )
+
+    def wrap(
+        self,
+        available_width: float,
+        available_height: float,
+    ) -> tuple[float, float]:
+        return available_width, available_height
+
+    def drawOn(self, canvas, x, y, _sW=0):  # noqa: N802
+        self.canv = canvas
+        self._sW = _sW
+        self.draw()
+
+    def draw(self) -> None:
+        canvas = self.canv
+        page_width, page_height = canvas._pagesize
+        if (
+            abs(page_width - letter[0]) > 0.5
+            or abs(page_height - letter[1]) > 0.5
+        ):
+            raise ValueError(
+                "AppendixDividerPage requires portrait US Letter page geometry."
+            )
+
+        theme = self.theme
+        rail_width = 1.14 * inch
+        separator_width = 0.035 * inch
+        body_x = rail_width + separator_width
+        body_width = page_width - body_x
+        content_x = body_x + (0.47 * inch)
+        content_right = page_width - (0.55 * inch)
+        content_width = content_right - content_x
+        rail_color = theme.dark_grey if self.rail_tone == "grey" else theme.primary
+
+        canvas.saveState()
+        canvas.setFillColor(theme.white)
+        canvas.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+
+        self._draw_body_watermark(
+            canvas,
+            page_width=page_width,
+            page_height=page_height,
+        )
+
+        canvas.setFillColor(rail_color)
+        canvas.rect(0, 0, rail_width, page_height, fill=1, stroke=0)
+        canvas.setFillColor(theme.white)
+        canvas.rect(
+            rail_width,
+            0,
+            separator_width,
+            page_height,
+            fill=1,
+            stroke=0,
+        )
+        self._draw_rail_watermark(canvas, rail_width=rail_width)
+
+        canvas.saveState()
+        eyebrow = canvas.beginText()
+        eyebrow.setTextOrigin(content_x, 7.08 * inch)
+        eyebrow.setFont(theme.body_semibold_font, 11)
+        eyebrow.setFillColor(theme.dark_grey)
+        eyebrow.setCharSpace(4.2)
+        eyebrow.textLine(self.eyebrow_text.upper())
+        canvas.drawText(eyebrow)
+        canvas.restoreState()
+
+        fitted_title_size = _fit_font_size(
+            self.title,
+            theme.display_font,
+            43.0,
+            content_width,
+            minimum=20.0,
+        )
+        canvas.setFillColor(theme.primary)
+        canvas.setFont(theme.display_font, fitted_title_size)
+        canvas.drawString(content_x, 6.25 * inch, self.title)
+
+        rule_y = 5.83 * inch
+        rule_end_x = min(content_x + (3.45 * inch), content_right - 10.0)
+        canvas.setStrokeColor(rail_color)
+        canvas.setLineWidth(1.25)
+        canvas.line(content_x, rule_y, rule_end_x, rule_y)
+
+        if self.description:
+            _draw_wrapped_text(
+                canvas,
+                self.description.upper(),
+                font_name=theme.body_semibold_font,
+                font_size=10.5,
+                leading=18.0,
+                text_color=theme.dark_grey,
+                x=content_x,
+                y=5.42 * inch,
+                max_width=min(content_width, 4.45 * inch),
+            )
+
+        self._draw_logo(
+            canvas,
+            body_x=body_x,
+            body_width=body_width,
+        )
+
+        footer_rule_y = 0.72 * inch
+        canvas.setStrokeColor(rail_color)
+        canvas.setLineWidth(1.0)
+        canvas.line(body_x, footer_rule_y, page_width, footer_rule_y)
+        if self.show_page_number:
+            page_number = max(
+                1,
+                int(canvas.getPageNumber()) - self.page_number_offset,
+            )
+            canvas.setFillColor(theme.dark_grey)
+            canvas.setFont(theme.body_semibold_font, 12)
+            canvas.drawRightString(
+                page_width - (0.54 * inch),
+                0.28 * inch,
+                str(page_number),
+            )
+        canvas.restoreState()
+
+    def _draw_body_watermark(
+        self,
+        canvas,
+        *,
+        page_width: float,
+        page_height: float,
+    ) -> None:
+        if not self.body_watermark_path.exists():
+            return
+        reader = ImageReader(str(self.body_watermark_path))
+        image_width, image_height = reader.getSize()
+        draw_width = 6.85 * inch
+        draw_height = draw_width * (float(image_height) / float(image_width))
+        canvas.saveState()
+        canvas.setFillAlpha(0.10)
+        canvas.drawImage(
+            reader,
+            page_width - (5.15 * inch),
+            page_height - (6.75 * inch),
+            width=draw_width,
+            height=draw_height,
+            mask="auto",
+            preserveAspectRatio=True,
+        )
+        canvas.restoreState()
+
+    def _draw_rail_watermark(self, canvas, *, rail_width: float) -> None:
+        if not self.rail_watermark_path.exists():
+            return
+        reader = ImageReader(str(self.rail_watermark_path))
+        image_width, image_height = reader.getSize()
+        draw_width = 4.0 * inch
+        draw_height = draw_width * (float(image_height) / float(image_width))
+        draw_x = (rail_width - draw_width) / 2.0
+        canvas.saveState()
+        canvas.setFillAlpha(0.085 if self.rail_tone == "grey" else 0.075)
+        canvas.drawImage(
+            reader,
+            draw_x,
+            -0.12 * inch,
+            width=draw_width,
+            height=draw_height,
+            mask="auto",
+            preserveAspectRatio=True,
+        )
+        canvas.restoreState()
+
+    def _draw_logo(self, canvas, *, body_x: float, body_width: float) -> None:
+        if not self.logo_path.exists():
+            return
+        reader = ImageReader(str(self.logo_path))
+        image_width, image_height = reader.getSize()
+        draw_width = 2.25 * inch
+        draw_height = draw_width * (float(image_height) / float(image_width))
+        draw_x = body_x + ((body_width - draw_width) / 2.0)
+        canvas.drawImage(
+            reader,
+            draw_x,
+            0.93 * inch,
+            width=draw_width,
+            height=draw_height,
+            mask="auto",
+            preserveAspectRatio=True,
+        )
+
+
+def appendix_divider_page(
+    *,
+    title: str,
+    description: str | None = None,
+    eyebrow_text: str = "APPENDIX",
+    rail_tone: RailTone = "grey",
+    show_page_number: bool = True,
+    page_number_offset: int = 0,
+    branding: BrandingConfig | None = None,
+    theme: ReportTheme | None = None,
+    logo_path: Path | None = None,
+    body_watermark_path: Path | None = None,
+    rail_watermark_path: Path | None = None,
+) -> list[Flowable]:
+    """Build one reusable appendix divider page."""
+
+    return [
+        AppendixDividerPage(
+            title=title,
+            description=description,
+            eyebrow_text=eyebrow_text,
+            rail_tone=rail_tone,
+            show_page_number=show_page_number,
+            page_number_offset=page_number_offset,
+            branding=branding,
+            theme=theme,
+            logo_path=logo_path,
+            body_watermark_path=body_watermark_path,
+            rail_watermark_path=rail_watermark_path,
+        )
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -708,6 +984,40 @@ def _draw_centered_text(
 ) -> None:
     text_width = stringWidth(text, font_name, font_size)
     canvas.drawString(x + ((width - text_width) / 2.0), y, text)
+
+
+def _draw_wrapped_text(
+    canvas,
+    text: str,
+    *,
+    font_name: str,
+    font_size: float,
+    leading: float,
+    text_color: object,
+    x: float,
+    y: float,
+    max_width: float,
+) -> None:
+    lines: list[str] = []
+    for paragraph_text in text.splitlines() or [text]:
+        words = paragraph_text.split()
+        if not words:
+            lines.append("")
+            continue
+        line = words[0]
+        for word in words[1:]:
+            candidate = f"{line} {word}"
+            if stringWidth(candidate, font_name, font_size) <= max_width:
+                line = candidate
+            else:
+                lines.append(line)
+                line = word
+        lines.append(line)
+
+    canvas.setFillColor(text_color)
+    canvas.setFont(font_name, font_size)
+    for index, line in enumerate(lines):
+        canvas.drawString(x, y - (index * leading), line)
 
 
 def _fit_font_size(

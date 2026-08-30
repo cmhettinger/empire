@@ -148,6 +148,11 @@ The main package concepts are:
 
 PDF support is intentionally practical and explicit. Domain PDF renderers should compose ReportLab stories from `empire_reports.renderers.pdf` helpers rather than reimplementing document setup, font registration, page templates, headers/footers, or common title-page behavior. The reusable professional title page is available as `professional_letter_title_page(...)`; domain reports can use it as-is or build their own title page under the domain package when they need special layout.
 
+Portrait US Letter reports can introduce appendix sections with
+`appendix_divider_page(...)`. The full-page divider supports the approved
+`grey` and `red` rail tones, configurable appendix labels and descriptions,
+optional page numbering, and replaceable Empire logo and watermark assets.
+
 Publishing is intentionally outside this package. `empire-reports` renders local artifacts and returns metadata. A domain package or orchestration wrapper decides whether an artifact is run-scoped, durable, promoted to a "latest" location, emailed, attached to an object-store run, or retained under a domain-specific key layout.
 
 When changing `empire-reports`, prefer boring, explicit primitives over discovery-heavy frameworks. Add common helpers only when at least one real report needs them and they are clearly domain-neutral. Keep target-specific code under the relevant renderer family: PDF layout under `renderers/pdf`, audio scripts or helpers under `renderers/audio`, video helpers under `renderers/video`, JSON writers under `renderers/json`, and workbook helpers under `renderers/xlsx`.

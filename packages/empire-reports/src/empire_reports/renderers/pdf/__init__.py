@@ -1,10 +1,13 @@
 """ReportLab-based PDF rendering helpers."""
 
 from empire_reports.renderers.pdf.components import (
+    AppendixDividerPage,
     ProfessionalLetterDisclaimerPage,
     ProfessionalLetterTitlePage,
     QuoteTileGrid,
     QuoteTileSpec,
+    RailTone,
+    appendix_divider_page,
     cover_page,
     paragraph,
     professional_letter_disclaimer_page,
@@ -32,6 +35,7 @@ from empire_reports.renderers.pdf.layout import (
 from empire_reports.renderers.pdf.renderer import PdfRenderer
 
 __all__ = [
+    "AppendixDividerPage",
     "DocumentSpec",
     "FrameSpec",
     "HeaderFooterSpec",
@@ -43,8 +47,10 @@ __all__ = [
     "ProfessionalLetterTitlePage",
     "QuoteTileGrid",
     "QuoteTileSpec",
+    "RailTone",
     "TemplateRegistry",
     "TemplateSpec",
+    "appendix_divider_page",
     "build_pdf",
     "cover_page",
     "inches",
