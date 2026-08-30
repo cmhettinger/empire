@@ -152,6 +152,11 @@ Portrait US Letter reports can introduce appendix sections with
 `appendix_divider_page(...)`. The full-page divider supports the approved
 `grey` and `red` rail tones, configurable appendix labels and descriptions,
 optional page numbering, and replaceable Empire logo and watermark assets.
+Use `section_divider_page(...)` for the same branded layout with a fixed
+`SECTION` eyebrow and a free-form section title.
+Use `intentionally_blank_page(...)` for a restrained spacer page with the same
+rail, watermark, logo, pagination, and approved color variants. Its message is
+rendered in plain black body text without decorative emphasis.
 
 Publishing is intentionally outside this package. `empire-reports` renders local artifacts and returns metadata. A domain package or orchestration wrapper decides whether an artifact is run-scoped, durable, promoted to a "latest" location, emailed, attached to an object-store run, or retained under a domain-specific key layout.
 

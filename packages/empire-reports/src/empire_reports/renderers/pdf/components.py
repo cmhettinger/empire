@@ -34,15 +34,25 @@ def spacer(height: float = 12.0) -> Spacer:
 RailTone = Literal["grey", "red"]
 
 
-class AppendixDividerPage(Flowable):
-    """Full-page Empire appendix divider for portrait US Letter reports."""
+@dataclass(frozen=True, slots=True)
+class _RailPageGeometry:
+    page_width: float
+    page_height: float
+    rail_width: float
+    body_x: float
+    body_width: float
+    content_x: float
+    content_right: float
+    content_width: float
+    rail_color: object
+
+
+class _ProfessionalRailPage(Flowable):
+    """Shared branded chrome for full-page portrait US Letter components."""
 
     def __init__(
         self,
         *,
-        title: str,
-        description: str | None = None,
-        eyebrow_text: str = "APPENDIX",
         rail_tone: RailTone = "grey",
         show_page_number: bool = True,
         page_number_offset: int = 0,
@@ -57,14 +67,6 @@ class AppendixDividerPage(Flowable):
             raise ValueError("rail_tone must be 'grey' or 'red'.")
         if page_number_offset < 0:
             raise ValueError("page_number_offset cannot be negative.")
-        if not title.strip():
-            raise ValueError("title cannot be empty.")
-        if not eyebrow_text.strip():
-            raise ValueError("eyebrow_text cannot be empty.")
-
-        self.title = title
-        self.description = description
-        self.eyebrow_text = eyebrow_text
         self.rail_tone = rail_tone
         self.show_page_number = show_page_number
         self.page_number_offset = page_number_offset
@@ -100,13 +102,26 @@ class AppendixDividerPage(Flowable):
 
     def draw(self) -> None:
         canvas = self.canv
+        geometry = self._geometry(canvas)
+        canvas.saveState()
+        self._draw_background(canvas, geometry=geometry)
+        self._draw_content(canvas, geometry=geometry)
+        self._draw_logo(
+            canvas,
+            body_x=geometry.body_x,
+            body_width=geometry.body_width,
+        )
+        self._draw_footer(canvas, geometry=geometry)
+        canvas.restoreState()
+
+    def _geometry(self, canvas) -> _RailPageGeometry:
         page_width, page_height = canvas._pagesize
         if (
             abs(page_width - letter[0]) > 0.5
             or abs(page_height - letter[1]) > 0.5
         ):
             raise ValueError(
-                "AppendixDividerPage requires portrait US Letter page geometry."
+                f"{type(self).__name__} requires portrait US Letter page geometry."
             )
 
         theme = self.theme
@@ -118,93 +133,96 @@ class AppendixDividerPage(Flowable):
         content_right = page_width - (0.55 * inch)
         content_width = content_right - content_x
         rail_color = theme.dark_grey if self.rail_tone == "grey" else theme.primary
-
-        canvas.saveState()
-        canvas.setFillColor(theme.white)
-        canvas.rect(0, 0, page_width, page_height, fill=1, stroke=0)
-
-        self._draw_body_watermark(
-            canvas,
+        return _RailPageGeometry(
             page_width=page_width,
             page_height=page_height,
+            rail_width=rail_width,
+            body_x=body_x,
+            body_width=body_width,
+            content_x=content_x,
+            content_right=content_right,
+            content_width=content_width,
+            rail_color=rail_color,
         )
 
-        canvas.setFillColor(rail_color)
-        canvas.rect(0, 0, rail_width, page_height, fill=1, stroke=0)
-        canvas.setFillColor(theme.white)
+    def _draw_background(
+        self,
+        canvas,
+        *,
+        geometry: _RailPageGeometry,
+    ) -> None:
+        separator_width = 0.035 * inch
+        canvas.setFillColor(self.theme.white)
         canvas.rect(
-            rail_width,
             0,
-            separator_width,
-            page_height,
+            0,
+            geometry.page_width,
+            geometry.page_height,
             fill=1,
             stroke=0,
         )
-        self._draw_rail_watermark(canvas, rail_width=rail_width)
 
-        canvas.saveState()
-        eyebrow = canvas.beginText()
-        eyebrow.setTextOrigin(content_x, 7.08 * inch)
-        eyebrow.setFont(theme.body_semibold_font, 11)
-        eyebrow.setFillColor(theme.dark_grey)
-        eyebrow.setCharSpace(4.2)
-        eyebrow.textLine(self.eyebrow_text.upper())
-        canvas.drawText(eyebrow)
-        canvas.restoreState()
-
-        fitted_title_size = _fit_font_size(
-            self.title,
-            theme.display_font,
-            43.0,
-            content_width,
-            minimum=20.0,
-        )
-        canvas.setFillColor(theme.primary)
-        canvas.setFont(theme.display_font, fitted_title_size)
-        canvas.drawString(content_x, 6.25 * inch, self.title)
-
-        rule_y = 5.83 * inch
-        rule_end_x = min(content_x + (3.45 * inch), content_right - 10.0)
-        canvas.setStrokeColor(rail_color)
-        canvas.setLineWidth(1.25)
-        canvas.line(content_x, rule_y, rule_end_x, rule_y)
-
-        if self.description:
-            _draw_wrapped_text(
-                canvas,
-                self.description.upper(),
-                font_name=theme.body_semibold_font,
-                font_size=10.5,
-                leading=18.0,
-                text_color=theme.dark_grey,
-                x=content_x,
-                y=5.42 * inch,
-                max_width=min(content_width, 4.45 * inch),
-            )
-
-        self._draw_logo(
+        self._draw_body_watermark(
             canvas,
-            body_x=body_x,
-            body_width=body_width,
+            page_width=geometry.page_width,
+            page_height=geometry.page_height,
         )
 
+        canvas.setFillColor(geometry.rail_color)
+        canvas.rect(
+            0,
+            0,
+            geometry.rail_width,
+            geometry.page_height,
+            fill=1,
+            stroke=0,
+        )
+        canvas.setFillColor(self.theme.white)
+        canvas.rect(
+            geometry.rail_width,
+            0,
+            separator_width,
+            geometry.page_height,
+            fill=1,
+            stroke=0,
+        )
+        self._draw_rail_watermark(canvas, rail_width=geometry.rail_width)
+
+    def _draw_content(
+        self,
+        canvas,
+        *,
+        geometry: _RailPageGeometry,
+    ) -> None:
+        raise NotImplementedError
+
+    def _draw_footer(
+        self,
+        canvas,
+        *,
+        geometry: _RailPageGeometry,
+    ) -> None:
         footer_rule_y = 0.72 * inch
-        canvas.setStrokeColor(rail_color)
+        canvas.setStrokeColor(geometry.rail_color)
         canvas.setLineWidth(1.0)
-        canvas.line(body_x, footer_rule_y, page_width, footer_rule_y)
+        canvas.line(
+            geometry.body_x,
+            footer_rule_y,
+            geometry.page_width,
+            footer_rule_y,
+        )
         if self.show_page_number:
             page_number = max(
                 1,
                 int(canvas.getPageNumber()) - self.page_number_offset,
             )
-            canvas.setFillColor(theme.dark_grey)
-            canvas.setFont(theme.body_semibold_font, 12)
+            canvas.setFillColor(self.theme.dark_grey)
+            canvas.setFont(self.theme.body_semibold_font, 12)
             canvas.drawRightString(
-                page_width - (0.54 * inch),
+                geometry.page_width - (0.54 * inch),
                 0.28 * inch,
                 str(page_number),
             )
-        canvas.restoreState()
 
     def _draw_body_watermark(
         self,
@@ -272,6 +290,150 @@ class AppendixDividerPage(Flowable):
         )
 
 
+class AppendixDividerPage(_ProfessionalRailPage):
+    """Full-page Empire appendix divider for portrait US Letter reports."""
+
+    def __init__(
+        self,
+        *,
+        title: str,
+        description: str | None = None,
+        eyebrow_text: str = "APPENDIX",
+        rail_tone: RailTone = "grey",
+        show_page_number: bool = True,
+        page_number_offset: int = 0,
+        branding: BrandingConfig | None = None,
+        theme: ReportTheme | None = None,
+        logo_path: Path | None = None,
+        body_watermark_path: Path | None = None,
+        rail_watermark_path: Path | None = None,
+    ) -> None:
+        if not title.strip():
+            raise ValueError("title cannot be empty.")
+        if not eyebrow_text.strip():
+            raise ValueError("eyebrow_text cannot be empty.")
+        super().__init__(
+            rail_tone=rail_tone,
+            show_page_number=show_page_number,
+            page_number_offset=page_number_offset,
+            branding=branding,
+            theme=theme,
+            logo_path=logo_path,
+            body_watermark_path=body_watermark_path,
+            rail_watermark_path=rail_watermark_path,
+        )
+        self.title = title
+        self.description = description
+        self.eyebrow_text = eyebrow_text
+
+    def _draw_content(
+        self,
+        canvas,
+        *,
+        geometry: _RailPageGeometry,
+    ) -> None:
+        theme = self.theme
+
+        canvas.saveState()
+        eyebrow = canvas.beginText()
+        eyebrow.setTextOrigin(geometry.content_x, 7.08 * inch)
+        eyebrow.setFont(theme.body_semibold_font, 11)
+        eyebrow.setFillColor(theme.dark_grey)
+        eyebrow.setCharSpace(4.2)
+        eyebrow.textLine(self.eyebrow_text.upper())
+        canvas.drawText(eyebrow)
+        canvas.restoreState()
+
+        fitted_title_size = _fit_font_size(
+            self.title,
+            theme.display_font,
+            43.0,
+            geometry.content_width,
+            minimum=20.0,
+        )
+        canvas.setFillColor(theme.primary)
+        canvas.setFont(theme.display_font, fitted_title_size)
+        canvas.drawString(geometry.content_x, 6.25 * inch, self.title)
+
+        rule_y = 5.83 * inch
+        rule_end_x = min(
+            geometry.content_x + (3.45 * inch),
+            geometry.content_right - 10.0,
+        )
+        canvas.setStrokeColor(geometry.rail_color)
+        canvas.setLineWidth(1.25)
+        canvas.line(geometry.content_x, rule_y, rule_end_x, rule_y)
+
+        if self.description:
+            _draw_wrapped_text(
+                canvas,
+                self.description.upper(),
+                font_name=theme.body_semibold_font,
+                font_size=10.5,
+                leading=18.0,
+                text_color=theme.dark_grey,
+                x=geometry.content_x,
+                y=5.42 * inch,
+                max_width=min(geometry.content_width, 4.45 * inch),
+            )
+
+
+class SectionDividerPage(AppendixDividerPage):
+    """Full-page Empire section divider sharing the appendix geometry."""
+
+    def __init__(
+        self,
+        *,
+        title: str,
+        description: str | None = None,
+        rail_tone: RailTone = "grey",
+        show_page_number: bool = True,
+        page_number_offset: int = 0,
+        branding: BrandingConfig | None = None,
+        theme: ReportTheme | None = None,
+        logo_path: Path | None = None,
+        body_watermark_path: Path | None = None,
+        rail_watermark_path: Path | None = None,
+    ) -> None:
+        super().__init__(
+            title=title,
+            description=description,
+            eyebrow_text="SECTION",
+            rail_tone=rail_tone,
+            show_page_number=show_page_number,
+            page_number_offset=page_number_offset,
+            branding=branding,
+            theme=theme,
+            logo_path=logo_path,
+            body_watermark_path=body_watermark_path,
+            rail_watermark_path=rail_watermark_path,
+        )
+
+
+class IntentionallyBlankPage(_ProfessionalRailPage):
+    """Quiet branded page reserved to preserve intentional document spacing."""
+
+    def _draw_content(
+        self,
+        canvas,
+        *,
+        geometry: _RailPageGeometry,
+    ) -> None:
+        center_x = geometry.body_x + (geometry.body_width / 2.0)
+        canvas.setFillColor(self.theme.black)
+        canvas.setFont(self.theme.body_font, 16)
+        canvas.drawCentredString(
+            center_x,
+            5.82 * inch,
+            "THIS PAGE INTENTIONALLY",
+        )
+        canvas.drawCentredString(
+            center_x,
+            5.52 * inch,
+            "LEFT BLANK",
+        )
+
+
 def appendix_divider_page(
     *,
     title: str,
@@ -293,6 +455,64 @@ def appendix_divider_page(
             title=title,
             description=description,
             eyebrow_text=eyebrow_text,
+            rail_tone=rail_tone,
+            show_page_number=show_page_number,
+            page_number_offset=page_number_offset,
+            branding=branding,
+            theme=theme,
+            logo_path=logo_path,
+            body_watermark_path=body_watermark_path,
+            rail_watermark_path=rail_watermark_path,
+        )
+    ]
+
+
+def section_divider_page(
+    *,
+    title: str,
+    description: str | None = None,
+    rail_tone: RailTone = "grey",
+    show_page_number: bool = True,
+    page_number_offset: int = 0,
+    branding: BrandingConfig | None = None,
+    theme: ReportTheme | None = None,
+    logo_path: Path | None = None,
+    body_watermark_path: Path | None = None,
+    rail_watermark_path: Path | None = None,
+) -> list[Flowable]:
+    """Build one reusable section divider page."""
+
+    return [
+        SectionDividerPage(
+            title=title,
+            description=description,
+            rail_tone=rail_tone,
+            show_page_number=show_page_number,
+            page_number_offset=page_number_offset,
+            branding=branding,
+            theme=theme,
+            logo_path=logo_path,
+            body_watermark_path=body_watermark_path,
+            rail_watermark_path=rail_watermark_path,
+        )
+    ]
+
+
+def intentionally_blank_page(
+    *,
+    rail_tone: RailTone = "grey",
+    show_page_number: bool = True,
+    page_number_offset: int = 0,
+    branding: BrandingConfig | None = None,
+    theme: ReportTheme | None = None,
+    logo_path: Path | None = None,
+    body_watermark_path: Path | None = None,
+    rail_watermark_path: Path | None = None,
+) -> list[Flowable]:
+    """Build one reusable intentionally blank page."""
+
+    return [
+        IntentionallyBlankPage(
             rail_tone=rail_tone,
             show_page_number=show_page_number,
             page_number_offset=page_number_offset,

@@ -10,13 +10,17 @@ from empire_reports.contracts import RenderContext, ReportMetadata
 from empire_reports.renderers.pdf.components import _quote_tile_palette
 from empire_reports.renderers.pdf import (
     HeaderFooterSpec,
+    IntentionallyBlankPage,
     PdfRenderer,
     QuoteTileSpec,
+    SectionDividerPage,
     appendix_divider_page,
+    intentionally_blank_page,
     paragraph,
     professional_letter_disclaimer_page,
     professional_letter_title_page,
     quote_tile_grid,
+    section_divider_page,
     section_heading,
 )
 
@@ -170,6 +174,69 @@ def test_appendix_divider_page_rejects_unknown_rail_tone() -> None:
             title="APPENDIX A",
             rail_tone="blue",  # type: ignore[arg-type]
         )
+
+
+def test_section_divider_page_reuses_divider_geometry(tmp_path: Path) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(
+            report_id="section-divider",
+            title="Section Divider",
+        ),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    grey_page = section_divider_page(
+        title="PORTFOLIO ANALYSIS",
+        description="Positioning, exposures, and performance.",
+        rail_tone="grey",
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+    red_page = section_divider_page(
+        title="MARKET OVERVIEW",
+        description="Current conditions, trends, and key indicators.",
+        rail_tone="red",
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+    assert isinstance(grey_page[0], SectionDividerPage)
+    assert grey_page[0].eyebrow_text == "SECTION"
+
+    result = renderer.render([*grey_page, PageBreak(), *red_page])
+
+    artifact = result.primary_artifact
+    assert artifact.exists
+    assert artifact.resolved_path().stat().st_size > 20_000
+
+
+def test_intentionally_blank_page_renders_both_rail_tones(tmp_path: Path) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(
+            report_id="intentionally-blank",
+            title="Intentionally Blank",
+        ),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    grey_page = intentionally_blank_page(
+        rail_tone="grey",
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+    red_page = intentionally_blank_page(
+        rail_tone="red",
+        show_page_number=False,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+    assert isinstance(grey_page[0], IntentionallyBlankPage)
+    assert grey_page[0].rail_tone == "grey"
+
+    result = renderer.render([*grey_page, PageBreak(), *red_page])
+
+    artifact = result.primary_artifact
+    assert artifact.exists
+    assert artifact.resolved_path().stat().st_size > 20_000
 
 
 def test_quote_tile_grid_renders_semantic_market_colors(tmp_path: Path) -> None:

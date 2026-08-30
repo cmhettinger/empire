@@ -25,10 +25,12 @@ from empire_reports.renderers.pdf import (
     PdfRenderer,
     QuoteTileSpec,
     appendix_divider_page,
+    intentionally_blank_page,
     paragraph,
     professional_letter_disclaimer_page,
     professional_letter_title_page,
     quote_tile_grid,
+    section_divider_page,
     section_heading,
     spacer,
 )
@@ -195,6 +197,66 @@ def playground_pages() -> tuple[PlaygroundPage, ...]:
                 "red rail tone",
             ),
             builder=_appendix_divider_red_page,
+            template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="section-divider-grey",
+            title="Section divider page - grey rail",
+            description=(
+                "A full-page section divider using the neutral Empire rail."
+            ),
+            options=(
+                "section title and fixed eyebrow",
+                "optional description and page number",
+                "grey rail tone",
+            ),
+            builder=_section_divider_grey_page,
+            template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="section-divider-red",
+            title="Section divider page - red rail",
+            description=(
+                "The same full-page section divider using the primary Empire rail."
+            ),
+            options=(
+                "section title and fixed eyebrow",
+                "optional description and page number",
+                "red rail tone",
+            ),
+            builder=_section_divider_red_page,
+            template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="intentionally-blank-grey",
+            title="Intentionally blank page - grey rail",
+            description=(
+                "A quiet branded spacer page using the neutral Empire rail."
+            ),
+            options=(
+                "fixed plain-black message",
+                "optional page number",
+                "grey rail tone",
+            ),
+            builder=_intentionally_blank_grey_page,
+            template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="intentionally-blank-red",
+            title="Intentionally blank page - red rail",
+            description=(
+                "The same quiet spacer page using the primary Empire rail."
+            ),
+            options=(
+                "fixed plain-black message",
+                "optional page number",
+                "red rail tone",
+            ),
+            builder=_intentionally_blank_red_page,
             template_key="letter_title",
             annotate=False,
         ),
@@ -476,6 +538,64 @@ def _appendix_divider_red_page(
     return appendix_divider_page(
         title="APPENDIX B",
         description="Methodology, definitions, and supporting schedules.",
+        rail_tone="red",
+        page_number_offset=1,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+
+def _section_divider_grey_page(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    _ = report_date
+    return section_divider_page(
+        title="PORTFOLIO ANALYSIS",
+        description="Positioning, exposures, performance, and key observations.",
+        rail_tone="grey",
+        page_number_offset=1,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+
+def _section_divider_red_page(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    _ = report_date
+    return section_divider_page(
+        title="MARKET OVERVIEW",
+        description=(
+            "A summary of current market conditions, trends, and key indicators."
+        ),
+        rail_tone="red",
+        page_number_offset=1,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+
+def _intentionally_blank_grey_page(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    _ = report_date
+    return intentionally_blank_page(
+        rail_tone="grey",
+        page_number_offset=1,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+
+def _intentionally_blank_red_page(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    _ = report_date
+    return intentionally_blank_page(
         rail_tone="red",
         page_number_offset=1,
         branding=renderer.branding,
