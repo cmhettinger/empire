@@ -443,6 +443,14 @@ Start the full environment:
 make empire-up
 ```
 
+This uses the existing local images for a fast daily startup. To pull the
+latest YouTube POT provider image, rebuild Airflow without its Docker cache,
+and then start the full environment, run:
+
+```bash
+make empire-up-latest
+```
+
 Check status:
 
 ```bash

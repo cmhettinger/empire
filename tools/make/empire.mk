@@ -1,7 +1,12 @@
-.PHONY: empire-up empire-down empire-ps empire-logs empire-jellyfin-up empire-jellyfin-down empire-jellyfin-logs
+.PHONY: empire-up empire-up-latest empire-down empire-ps empire-logs empire-jellyfin-up empire-jellyfin-down empire-jellyfin-logs
 
-empire-up: ## Start the full Empire local stack
-	$(COMPOSE) up -d postgres pgbouncer redis airflow-api airflow-scheduler airflow-dag-processor airflow-triggerer airflow-worker
+EMPIRE_SERVICES := postgres pgbouncer redis airflow-api airflow-scheduler airflow-dag-processor airflow-triggerer airflow-worker
+
+empire-up: ## Start the full Empire local stack using existing images
+	$(COMPOSE) up -d --no-build $(EMPIRE_SERVICES)
+
+empire-up-latest: airflow-build ## Refresh YouTube dependencies and start the full Empire local stack
+	$(COMPOSE) up -d --no-build $(EMPIRE_SERVICES)
 
 empire-down: ## Stop the full Empire local stack
 	$(COMPOSE) stop jellyfin airflow-api airflow-scheduler airflow-dag-processor airflow-triggerer airflow-worker youtube-pot-provider redis pgbouncer postgres
