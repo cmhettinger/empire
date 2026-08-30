@@ -7,12 +7,14 @@ from math import ceil
 from pathlib import Path
 from typing import Literal
 
+from reportlab.graphics import renderPDF
 from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import Flowable, Image, Paragraph, Spacer
+from svglib.svglib import svg2rlg
 
 from empire_reports.assets import AssetRegistry
 from empire_reports.branding import BrandingConfig, ReportTheme
@@ -32,6 +34,7 @@ def spacer(height: float = 12.0) -> Spacer:
 
 
 RailTone = Literal["grey", "red"]
+MetricValueStyle = Literal["body", "monospace"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -470,6 +473,410 @@ class NotesPage(_ProfessionalRailPage):
                 line_y,
             )
             line_y -= line_spacing
+
+
+@dataclass(frozen=True, slots=True)
+class MetricCardSpec:
+    """One prominent metric displayed near the top of a metrics page."""
+
+    value: str
+    label: str
+    icon_path: Path
+    suffix: str | None = None
+
+    def __post_init__(self) -> None:
+        value = self.value.strip()
+        label = self.label.strip()
+        suffix = self.suffix.strip() if self.suffix is not None else None
+        if not value:
+            raise ValueError("Metric card value cannot be empty.")
+        if not label:
+            raise ValueError("Metric card label cannot be empty.")
+        object.__setattr__(self, "value", value)
+        object.__setattr__(self, "label", label)
+        object.__setattr__(self, "icon_path", Path(self.icon_path))
+        object.__setattr__(self, "suffix", suffix or None)
+
+
+@dataclass(frozen=True, slots=True)
+class MetricDetailRow:
+    """One label and formatted value within a metrics detail section."""
+
+    label: str
+    value: str
+    value_style: MetricValueStyle = "body"
+
+    def __post_init__(self) -> None:
+        label = self.label.strip()
+        value = self.value.strip()
+        if not label:
+            raise ValueError("Metric detail label cannot be empty.")
+        if not value:
+            raise ValueError("Metric detail value cannot be empty.")
+        if self.value_style not in {"body", "monospace"}:
+            raise ValueError("value_style must be 'body' or 'monospace'.")
+        object.__setattr__(self, "label", label)
+        object.__setattr__(self, "value", value)
+
+
+@dataclass(frozen=True, slots=True)
+class MetricDetailSection:
+    """A titled group of related label-value details."""
+
+    title: str
+    rows: tuple[MetricDetailRow, ...]
+    icon_path: Path
+
+    def __post_init__(self) -> None:
+        title = self.title.strip()
+        rows = tuple(self.rows)
+        if not title:
+            raise ValueError("Metric detail section title cannot be empty.")
+        if not rows:
+            raise ValueError("Metric detail sections require at least one row.")
+        object.__setattr__(self, "title", title)
+        object.__setattr__(self, "rows", rows)
+        object.__setattr__(self, "icon_path", Path(self.icon_path))
+
+
+class MetricsPage(_ProfessionalRailPage):
+    """Configurable headline metrics and detail groups on branded US Letter."""
+
+    _DETAIL_TOP = 6.92 * inch
+    _DETAIL_BOTTOM = 1.62 * inch
+    _DETAIL_COLUMN_GAP = 0.42 * inch
+    _DETAIL_BAND_GAP = 10.0
+    _DETAIL_HEADER_HEIGHT = 26.0
+    _DETAIL_ROW_HEIGHT = 13.5
+
+    def __init__(
+        self,
+        *,
+        title: str,
+        metrics: Sequence[MetricCardSpec],
+        sections: Sequence[MetricDetailSection],
+        rail_tone: RailTone = "grey",
+        show_page_number: bool = True,
+        page_number_offset: int = 0,
+        branding: BrandingConfig | None = None,
+        theme: ReportTheme | None = None,
+        logo_path: Path | None = None,
+        body_watermark_path: Path | None = None,
+        rail_watermark_path: Path | None = None,
+    ) -> None:
+        title = title.strip()
+        metrics = tuple(metrics)
+        sections = tuple(sections)
+        if not title:
+            raise ValueError("title cannot be empty.")
+        if not 1 <= len(metrics) <= 4:
+            raise ValueError("MetricsPage requires between 1 and 4 metric cards.")
+        if not 1 <= len(sections) <= 8:
+            raise ValueError("MetricsPage requires between 1 and 8 detail sections.")
+        for icon_path in (
+            *(metric.icon_path for metric in metrics),
+            *(section.icon_path for section in sections),
+        ):
+            if not icon_path.is_file():
+                raise FileNotFoundError(f"Metric icon not found: {icon_path}")
+        super().__init__(
+            rail_tone=rail_tone,
+            show_page_number=show_page_number,
+            page_number_offset=page_number_offset,
+            branding=branding,
+            theme=theme,
+            logo_path=logo_path,
+            body_watermark_path=body_watermark_path,
+            rail_watermark_path=rail_watermark_path,
+        )
+        self.title = title
+        self.metrics = metrics
+        self.sections = sections
+
+    def _draw_content(
+        self,
+        canvas,
+        *,
+        geometry: _RailPageGeometry,
+    ) -> None:
+        title_size = _fit_font_size(
+            self.title,
+            self.theme.display_font,
+            22.0,
+            geometry.content_width,
+            minimum=14.0,
+        )
+        canvas.setFillColor(geometry.rail_color)
+        canvas.setFont(self.theme.display_font, title_size)
+        canvas.drawString(geometry.content_x, 9.85 * inch, self.title)
+
+        canvas.setStrokeColor(geometry.rail_color)
+        canvas.setLineWidth(1.25)
+        canvas.line(
+            geometry.content_x,
+            9.52 * inch,
+            min(geometry.content_x + (3.15 * inch), geometry.content_right),
+            9.52 * inch,
+        )
+
+        self._draw_metric_cards(canvas, geometry=geometry)
+        self._draw_detail_sections(canvas, geometry=geometry)
+
+    def _draw_metric_cards(
+        self,
+        canvas,
+        *,
+        geometry: _RailPageGeometry,
+    ) -> None:
+        card_gap = 0.15 * inch
+        maximum_card_width = 1.55 * inch
+        card_height = 1.28 * inch
+        available_card_width = (
+            geometry.content_width - ((len(self.metrics) - 1) * card_gap)
+        ) / len(self.metrics)
+        card_width = min(maximum_card_width, available_card_width)
+        row_width = (len(self.metrics) * card_width) + (
+            (len(self.metrics) - 1) * card_gap
+        )
+        card_x = geometry.content_x + ((geometry.content_width - row_width) / 2.0)
+        card_y = 7.50 * inch
+
+        for metric in self.metrics:
+            canvas.setStrokeColor(HexColor("#D3D3D3"))
+            canvas.setLineWidth(0.6)
+            canvas.rect(card_x, card_y, card_width, card_height, fill=0, stroke=1)
+
+            _draw_metric_icon(
+                canvas,
+                metric.icon_path,
+                x=card_x + ((card_width - 22.0) / 2.0),
+                y=card_y + card_height - 33.0,
+                width=22.0,
+                height=22.0,
+                color=geometry.rail_color,
+            )
+            self._draw_metric_value(
+                canvas,
+                metric=metric,
+                center_x=card_x + (card_width / 2.0),
+                baseline_y=card_y + 31.0,
+                maximum_width=card_width - 12.0,
+                color=geometry.rail_color,
+            )
+            label_size = _fit_font_size(
+                metric.label.upper(),
+                self.theme.body_semibold_font,
+                7.5,
+                card_width - 10.0,
+                minimum=5.5,
+            )
+            canvas.setFillColor(self.theme.dark_grey)
+            canvas.setFont(self.theme.body_semibold_font, label_size)
+            canvas.drawCentredString(
+                card_x + (card_width / 2.0),
+                card_y + 13.0,
+                metric.label.upper(),
+            )
+            card_x += card_width + card_gap
+
+    def _draw_metric_value(
+        self,
+        canvas,
+        *,
+        metric: MetricCardSpec,
+        center_x: float,
+        baseline_y: float,
+        maximum_width: float,
+        color: object,
+    ) -> None:
+        suffix_text = metric.suffix.upper() if metric.suffix else ""
+        suffix_size = 8.5
+        suffix_width = (
+            stringWidth(suffix_text, self.theme.body_semibold_font, suffix_size)
+            if suffix_text
+            else 0.0
+        )
+        suffix_gap = 4.0 if suffix_text else 0.0
+        value_size = _fit_font_size(
+            metric.value,
+            self.theme.display_font,
+            20.0,
+            maximum_width - suffix_width - suffix_gap,
+            minimum=11.0,
+        )
+        value_width = stringWidth(metric.value, self.theme.display_font, value_size)
+        combined_width = value_width + suffix_gap + suffix_width
+        value_x = center_x - (combined_width / 2.0)
+
+        canvas.setFillColor(color)
+        canvas.setFont(self.theme.display_font, value_size)
+        canvas.drawString(value_x, baseline_y, metric.value)
+        if suffix_text:
+            canvas.setFont(self.theme.body_semibold_font, suffix_size)
+            canvas.drawString(
+                value_x + value_width + suffix_gap,
+                baseline_y + 1.0,
+                suffix_text,
+            )
+
+    def _draw_detail_sections(
+        self,
+        canvas,
+        *,
+        geometry: _RailPageGeometry,
+    ) -> None:
+        column_width = (
+            geometry.content_width - self._DETAIL_COLUMN_GAP
+        ) / 2.0
+        bands = tuple(
+            self.sections[index : index + 2]
+            for index in range(0, len(self.sections), 2)
+        )
+        band_heights = tuple(
+            max(self._detail_section_height(section) for section in band)
+            for band in bands
+        )
+        required_height = sum(band_heights) + (
+            max(0, len(bands) - 1) * self._DETAIL_BAND_GAP
+        )
+        available_height = self._DETAIL_TOP - self._DETAIL_BOTTOM
+        if required_height > available_height:
+            raise ValueError(
+                "MetricsPage detail sections require "
+                f"{required_height:.1f} points; only {available_height:.1f} "
+                "points are available. Reduce the number of detail rows."
+            )
+
+        section_top = self._DETAIL_TOP
+        for band, band_height in zip(bands, band_heights, strict=True):
+            for column, section in enumerate(band):
+                section_x = geometry.content_x + (
+                    column * (column_width + self._DETAIL_COLUMN_GAP)
+                )
+                self._draw_detail_section(
+                    canvas,
+                    section=section,
+                    x=section_x,
+                    top=section_top,
+                    width=column_width,
+                    color=geometry.rail_color,
+                )
+            section_top -= band_height + self._DETAIL_BAND_GAP
+
+    def _draw_detail_section(
+        self,
+        canvas,
+        *,
+        section: MetricDetailSection,
+        x: float,
+        top: float,
+        width: float,
+        color: object,
+    ) -> None:
+        icon_size = 14.0
+        _draw_metric_icon(
+            canvas,
+            section.icon_path,
+            x=x,
+            y=top - icon_size,
+            width=icon_size,
+            height=icon_size,
+            color=color,
+        )
+        title_x = x + icon_size + 6.0
+        title_size = _fit_font_size(
+            section.title.upper(),
+            self.theme.display_font,
+            9.5,
+            width - icon_size - 6.0,
+            minimum=7.0,
+        )
+        canvas.setFillColor(self.theme.dark_grey)
+        canvas.setFont(self.theme.display_font, title_size)
+        canvas.drawString(title_x, top - 11.5, section.title.upper())
+
+        rule_y = top - 20.0
+        canvas.setStrokeColor(HexColor("#BDBDBD"))
+        canvas.setLineWidth(0.55)
+        canvas.line(x, rule_y, x + width, rule_y)
+
+        row_y = top - 32.0
+        for row in section.rows:
+            value_font = (
+                self.theme.code_font
+                if row.value_style == "monospace"
+                else self.theme.body_font
+            )
+            label_size = _fit_font_size(
+                row.label,
+                self.theme.body_font,
+                8.2,
+                width * 0.38,
+                minimum=6.5,
+            )
+            value_size = _fit_font_size(
+                row.value,
+                value_font,
+                8.2,
+                width * 0.57,
+                minimum=6.0,
+            )
+            label_width = stringWidth(row.label, self.theme.body_font, label_size)
+            value_width = stringWidth(row.value, value_font, value_size)
+            value_x = x + width - value_width
+
+            canvas.setFillColor(self.theme.dark_grey)
+            canvas.setFont(self.theme.body_font, label_size)
+            canvas.drawString(x, row_y, row.label)
+            canvas.setFont(value_font, value_size)
+            canvas.drawString(value_x, row_y, row.value)
+
+            leader_start = x + label_width + 5.0
+            leader_end = value_x - 5.0
+            if leader_end > leader_start:
+                canvas.setStrokeColor(HexColor("#D5D5D5"))
+                canvas.setLineWidth(0.4)
+                canvas.line(leader_start, row_y + 2.0, leader_end, row_y + 2.0)
+            row_y -= self._DETAIL_ROW_HEIGHT
+
+    @classmethod
+    def _detail_section_height(cls, section: MetricDetailSection) -> float:
+        return cls._DETAIL_HEADER_HEIGHT + (
+            len(section.rows) * cls._DETAIL_ROW_HEIGHT
+        )
+
+
+def metrics_page(
+    *,
+    title: str,
+    metrics: Sequence[MetricCardSpec],
+    sections: Sequence[MetricDetailSection],
+    rail_tone: RailTone = "grey",
+    show_page_number: bool = True,
+    page_number_offset: int = 0,
+    branding: BrandingConfig | None = None,
+    theme: ReportTheme | None = None,
+    logo_path: Path | None = None,
+    body_watermark_path: Path | None = None,
+    rail_watermark_path: Path | None = None,
+) -> list[Flowable]:
+    """Build one configurable branded metrics page."""
+
+    return [
+        MetricsPage(
+            title=title,
+            metrics=metrics,
+            sections=sections,
+            rail_tone=rail_tone,
+            show_page_number=show_page_number,
+            page_number_offset=page_number_offset,
+            branding=branding,
+            theme=theme,
+            logo_path=logo_path,
+            body_watermark_path=body_watermark_path,
+            rail_watermark_path=rail_watermark_path,
+        )
+    ]
 
 
 def appendix_divider_page(
@@ -1269,6 +1676,60 @@ def _draw_centered_text(
 ) -> None:
     text_width = stringWidth(text, font_name, font_size)
     canvas.drawString(x + ((width - text_width) / 2.0), y, text)
+
+
+def _draw_metric_icon(
+    canvas,
+    path: Path,
+    *,
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    color: object,
+) -> None:
+    """Draw one raster or SVG icon within fixed bounds."""
+
+    if path.suffix.lower() == ".svg":
+        drawing = svg2rlg(str(path))
+        if drawing is None or drawing.width <= 0 or drawing.height <= 0:
+            raise ValueError(f"Unable to render SVG metric icon: {path}")
+        _recolor_metric_icon(drawing, color=color)
+        scale = min(width / float(drawing.width), height / float(drawing.height))
+        draw_width = float(drawing.width) * scale
+        draw_height = float(drawing.height) * scale
+        drawing.scale(scale, scale)
+        renderPDF.draw(
+            drawing,
+            canvas,
+            x + ((width - draw_width) / 2.0),
+            y + ((height - draw_height) / 2.0),
+        )
+        return
+
+    reader = ImageReader(str(path))
+    image_width, image_height = reader.getSize()
+    scale = min(width / float(image_width), height / float(image_height))
+    draw_width = float(image_width) * scale
+    draw_height = float(image_height) * scale
+    canvas.drawImage(
+        reader,
+        x + ((width - draw_width) / 2.0),
+        y + ((height - draw_height) / 2.0),
+        width=draw_width,
+        height=draw_height,
+        mask="auto",
+        preserveAspectRatio=True,
+    )
+
+
+def _recolor_metric_icon(node, *, color: object) -> None:
+    for attribute in ("fillColor", "strokeColor"):
+        existing_color = getattr(node, attribute, None)
+        if existing_color is not None and existing_color != HexColor("#FFFFFF"):
+            setattr(node, attribute, color)
+    for child in getattr(node, "contents", ()):
+        _recolor_metric_icon(child, color=color)
 
 
 def _draw_wrapped_text(

@@ -9,6 +9,7 @@ packages = [{ include = "empire_reports", from = "src" }]
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
 reportlab = ">=4.0"
+svglib = ">=1.5,<1.6"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"

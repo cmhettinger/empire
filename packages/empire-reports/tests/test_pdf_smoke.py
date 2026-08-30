@@ -11,12 +11,17 @@ from empire_reports.renderers.pdf.components import _quote_tile_palette
 from empire_reports.renderers.pdf import (
     HeaderFooterSpec,
     IntentionallyBlankPage,
+    MetricCardSpec,
+    MetricDetailRow,
+    MetricDetailSection,
+    MetricsPage,
     NotesPage,
     PdfRenderer,
     QuoteTileSpec,
     SectionDividerPage,
     appendix_divider_page,
     intentionally_blank_page,
+    metrics_page,
     notes_page,
     paragraph,
     professional_letter_disclaimer_page,
@@ -269,6 +274,115 @@ def test_notes_page_renders_both_rail_tones(tmp_path: Path) -> None:
     artifact = result.primary_artifact
     assert artifact.exists
     assert artifact.resolved_path().stat().st_size > 20_000
+
+
+def test_metrics_page_renders_maximum_configuration_both_rail_tones(
+    tmp_path: Path,
+) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(
+            report_id="metrics-page",
+            title="Metrics Page",
+        ),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    icon = renderer.assets.icon_path
+    metrics = (
+        MetricCardSpec("128", "Pages", icon("document-1.svg")),
+        MetricCardSpec("6", "Data Sources", icon("database-1.svg")),
+        MetricCardSpec("24", "Figures", icon("bar-chart-1.svg")),
+        MetricCardSpec("1.8", "Runtime", icon("stopwatch-1.svg"), "sec"),
+    )
+    sections = tuple(
+        MetricDetailSection(
+            f"Section {index}",
+            tuple(
+                MetricDetailRow(f"Detail {row}", f"Value {index}.{row}")
+                for row in range(1, 5)
+            ),
+            icon("document-3.svg"),
+        )
+        for index in range(1, 9)
+    )
+    grey_page = metrics_page(
+        title="REPORT INFORMATION",
+        metrics=metrics,
+        sections=sections,
+        rail_tone="grey",
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+    red_page = metrics_page(
+        title="REPORT INFORMATION",
+        metrics=metrics[:2],
+        sections=sections[:3],
+        rail_tone="red",
+        show_page_number=False,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+    assert isinstance(grey_page[0], MetricsPage)
+    assert len(grey_page[0].metrics) == 4
+    assert len(grey_page[0].sections) == 8
+
+    result = renderer.render([*grey_page, PageBreak(), *red_page])
+
+    artifact = result.primary_artifact
+    assert artifact.exists
+    assert artifact.resolved_path().stat().st_size > 20_000
+
+
+def test_metrics_page_enforces_configuration_bounds(tmp_path: Path) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(report_id="metric-bounds", title="Metric Bounds"),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    icon = renderer.assets.icon_path("document-1.svg")
+    metric = MetricCardSpec("1", "Metric", icon)
+    section = MetricDetailSection(
+        "Section",
+        (MetricDetailRow("Label", "Value"),),
+        icon,
+    )
+
+    with pytest.raises(ValueError, match="between 1 and 4 metric cards"):
+        metrics_page(title="Metrics", metrics=(), sections=(section,))
+    with pytest.raises(ValueError, match="between 1 and 8 detail sections"):
+        metrics_page(title="Metrics", metrics=(metric,), sections=())
+    with pytest.raises(ValueError, match="between 1 and 8 detail sections"):
+        metrics_page(
+            title="Metrics",
+            metrics=(metric,),
+            sections=tuple(section for _ in range(9)),
+        )
+
+
+def test_metrics_page_rejects_detail_content_that_cannot_fit(tmp_path: Path) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(report_id="metric-overflow", title="Metric Overflow"),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    icon = renderer.assets.icon_path("document-1.svg")
+    page = metrics_page(
+        title="Metrics",
+        metrics=(MetricCardSpec("1", "Metric", icon),),
+        sections=(
+            MetricDetailSection(
+                "Oversized",
+                tuple(
+                    MetricDetailRow(f"Label {index}", f"Value {index}")
+                    for index in range(30)
+                ),
+                icon,
+            ),
+        ),
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+    with pytest.raises(ValueError, match="Reduce the number of detail rows"):
+        renderer.render(page)
 
 
 def test_quote_tile_grid_renders_semantic_market_colors(tmp_path: Path) -> None:

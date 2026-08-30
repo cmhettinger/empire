@@ -22,10 +22,14 @@ from reportlab.platypus import (
 from empire_reports.contracts import RenderContext, RenderResult, ReportMetadata
 from empire_reports.renderers.pdf import (
     HeaderFooterSpec,
+    MetricCardSpec,
+    MetricDetailRow,
+    MetricDetailSection,
     PdfRenderer,
     QuoteTileSpec,
     appendix_divider_page,
     intentionally_blank_page,
+    metrics_page,
     notes_page,
     paragraph,
     professional_letter_disclaimer_page,
@@ -288,6 +292,37 @@ def playground_pages() -> tuple[PlaygroundPage, ...]:
                 "red rail tone",
             ),
             builder=_notes_red_page,
+            template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="metrics-page-grey",
+            title="Metrics page - grey rail",
+            description=(
+                "A configurable overview with headline cards and up to eight "
+                "detail sections."
+            ),
+            options=(
+                "one to four metric cards",
+                "one to eight two-column detail sections",
+                "grey rail tone and theme-colored SVG icons",
+            ),
+            builder=_metrics_grey_page,
+            template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="metrics-page-red",
+            title="Metrics page - red rail",
+            description=(
+                "The same configurable overview using the primary Empire rail."
+            ),
+            options=(
+                "one to four metric cards",
+                "one to eight two-column detail sections",
+                "red rail tone and theme-colored SVG icons",
+            ),
+            builder=_metrics_red_page,
             template_key="letter_title",
             annotate=False,
         ),
@@ -658,6 +693,132 @@ def _notes_red_page(
         branding=renderer.branding,
         theme=renderer.theme,
     )
+
+
+def _metrics_grey_page(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    metrics, sections = _metrics_page_content(renderer, report_date)
+    return metrics_page(
+        title="REPORT INFORMATION",
+        metrics=metrics,
+        sections=sections,
+        rail_tone="grey",
+        page_number_offset=1,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+
+def _metrics_red_page(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    metrics, sections = _metrics_page_content(renderer, report_date)
+    return metrics_page(
+        title="REPORT INFORMATION",
+        metrics=metrics,
+        sections=sections,
+        rail_tone="red",
+        page_number_offset=1,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+
+def _metrics_page_content(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> tuple[tuple[MetricCardSpec, ...], tuple[MetricDetailSection, ...]]:
+    icon = renderer.assets.icon_path
+    metrics = (
+        MetricCardSpec("128", "Pages", icon("document-1.svg")),
+        MetricCardSpec("6", "Data Sources", icon("database-1.svg")),
+        MetricCardSpec("24", "Figures", icon("bar-chart-1.svg")),
+        MetricCardSpec("1.8", "Generation Time", icon("stopwatch-1.svg"), "sec"),
+    )
+    sections = (
+        MetricDetailSection(
+            "Report",
+            (
+                MetricDetailRow("Report ID", "2026-000184"),
+                MetricDetailRow("Generated", f"{report_date.isoformat()} 13:04 UTC"),
+                MetricDetailRow("Reporting Period", "2026 Q2"),
+                MetricDetailRow("Classification", "Internal"),
+            ),
+            icon("document-3.svg"),
+        ),
+        MetricDetailSection(
+            "Execution",
+            (
+                MetricDetailRow("Run ID", "a7f8c9d2", "monospace"),
+                MetricDetailRow("Runtime", "1.80 seconds"),
+                MetricDetailRow("Engine Version", "1.3.2"),
+                MetricDetailRow("Git Commit", "4f2a1d7", "monospace"),
+            ),
+            icon("gear-1.svg"),
+        ),
+        MetricDetailSection(
+            "Data Sources",
+            (
+                MetricDetailRow("SEC EDGAR", "2026-07-01"),
+                MetricDetailRow("FRED", "2026-07-01"),
+                MetricDetailRow("NOAA", "2026-07-01"),
+                MetricDetailRow("BLS", "2026-06-30"),
+            ),
+            icon("database-1.svg"),
+        ),
+        MetricDetailSection(
+            "Workbook",
+            (
+                MetricDetailRow("Workbook Version", "2026.07.02"),
+                MetricDetailRow("Workbook Hash", "c7d8128e", "monospace"),
+                MetricDetailRow("Template Version", "2.4.1"),
+                MetricDetailRow("Template Set", "Empire Standard"),
+            ),
+            icon("book-1.svg"),
+        ),
+        MetricDetailSection(
+            "Artificial Intelligence",
+            (
+                MetricDetailRow("Model", "gpt-5.6"),
+                MetricDetailRow("Provider", "OpenAI"),
+                MetricDetailRow("Temperature", "0.2"),
+                MetricDetailRow("Max Tokens", "4096"),
+            ),
+            icon("robot-1.svg"),
+        ),
+        MetricDetailSection(
+            "Environment",
+            (
+                MetricDetailRow("Host", "empire-reporting-02"),
+                MetricDetailRow("Operating System", "Ubuntu 22.04 LTS"),
+                MetricDetailRow("Python", "3.14.6"),
+                MetricDetailRow("PostgreSQL", "15.6"),
+            ),
+            icon("laptop-1.svg"),
+        ),
+        MetricDetailSection(
+            "Coverage",
+            (
+                MetricDetailRow("Securities", "842"),
+                MetricDetailRow("Markets", "12"),
+                MetricDetailRow("Currencies", "8"),
+            ),
+            icon("bar-chart-3.svg"),
+        ),
+        MetricDetailSection(
+            "Publication",
+            (
+                MetricDetailRow("Format", "PDF"),
+                MetricDetailRow("Page Size", "US Letter"),
+                MetricDetailRow("Audience", "Internal Research"),
+            ),
+            icon("document-4.svg"),
+        ),
+    )
+    return metrics, sections
 
 
 def _validate_pages(pages: Sequence[PlaygroundPage]) -> None:

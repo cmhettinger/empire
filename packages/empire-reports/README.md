@@ -161,6 +161,43 @@ Use `notes_page(...)` for a matching ruled page intended for handwritten notes.
 Its light-grey guides use 0.36-inch spacing and remain neutral in both rail
 themes.
 
+Use `metrics_page(...)` for a branded one-page overview containing one to four
+headline metric cards and one to eight detail sections. Detail sections retain
+a consistent half-page width and are placed left-to-right in a two-column grid.
+Their height follows their row count; rendering raises a clear error when the
+provided rows cannot fit above the standard footer. Icons may use raster assets
+or the shared SVG library and inherit the selected grey or red rail tone.
+
+```python
+from empire_reports.renderers.pdf import (
+    MetricCardSpec,
+    MetricDetailRow,
+    MetricDetailSection,
+    metrics_page,
+)
+
+story = metrics_page(
+    title="REPORT INFORMATION",
+    metrics=(
+        MetricCardSpec(
+            value="128",
+            label="Pages",
+            icon_path=renderer.assets.icon_path("document-1.svg"),
+        ),
+    ),
+    sections=(
+        MetricDetailSection(
+            title="Report",
+            icon_path=renderer.assets.icon_path("document-3.svg"),
+            rows=(MetricDetailRow("Classification", "Internal"),),
+        ),
+    ),
+    rail_tone="red",
+    branding=renderer.branding,
+    theme=renderer.theme,
+)
+```
+
 Publishing is intentionally outside this package. `empire-reports` renders local artifacts and returns metadata. A domain package or orchestration wrapper decides whether an artifact is run-scoped, durable, promoted to a "latest" location, emailed, attached to an object-store run, or retained under a domain-specific key layout.
 
 When changing `empire-reports`, prefer boring, explicit primitives over discovery-heavy frameworks. Add common helpers only when at least one real report needs them and they are clearly domain-neutral. Keep target-specific code under the relevant renderer family: PDF layout under `renderers/pdf`, audio scripts or helpers under `renderers/audio`, video helpers under `renderers/video`, JSON writers under `renderers/json`, and workbook helpers under `renderers/xlsx`.
