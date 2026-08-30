@@ -157,6 +157,9 @@ Use `section_divider_page(...)` for the same branded layout with a fixed
 Use `intentionally_blank_page(...)` for a restrained spacer page with the same
 rail, watermark, logo, pagination, and approved color variants. Its message is
 rendered in plain black body text without decorative emphasis.
+Use `notes_page(...)` for a matching ruled page intended for handwritten notes.
+Its light-grey guides use 0.36-inch spacing and remain neutral in both rail
+themes.
 
 Publishing is intentionally outside this package. `empire-reports` renders local artifacts and returns metadata. A domain package or orchestration wrapper decides whether an artifact is run-scoped, durable, promoted to a "latest" location, emailed, attached to an object-store run, or retained under a domain-specific key layout.
 

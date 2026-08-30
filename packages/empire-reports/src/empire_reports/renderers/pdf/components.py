@@ -434,6 +434,44 @@ class IntentionallyBlankPage(_ProfessionalRailPage):
         )
 
 
+class NotesPage(_ProfessionalRailPage):
+    """Branded ruled page for handwritten report notes."""
+
+    def _draw_content(
+        self,
+        canvas,
+        *,
+        geometry: _RailPageGeometry,
+    ) -> None:
+        canvas.setFillColor(geometry.rail_color)
+        canvas.setFont(self.theme.display_font, 22)
+        canvas.drawString(geometry.content_x, 9.85 * inch, "NOTES")
+
+        heading_rule_y = 9.54 * inch
+        canvas.setStrokeColor(geometry.rail_color)
+        canvas.setLineWidth(1.25)
+        canvas.line(
+            geometry.content_x,
+            heading_rule_y,
+            geometry.content_x + (2.1 * inch),
+            heading_rule_y,
+        )
+
+        canvas.setStrokeColor(self.theme.light_grey)
+        canvas.setLineWidth(0.45)
+        line_y = 8.95 * inch
+        final_line_y = 1.95 * inch
+        line_spacing = 0.36 * inch
+        while line_y >= final_line_y:
+            canvas.line(
+                geometry.content_x,
+                line_y,
+                geometry.content_right,
+                line_y,
+            )
+            line_y -= line_spacing
+
+
 def appendix_divider_page(
     *,
     title: str,
@@ -513,6 +551,33 @@ def intentionally_blank_page(
 
     return [
         IntentionallyBlankPage(
+            rail_tone=rail_tone,
+            show_page_number=show_page_number,
+            page_number_offset=page_number_offset,
+            branding=branding,
+            theme=theme,
+            logo_path=logo_path,
+            body_watermark_path=body_watermark_path,
+            rail_watermark_path=rail_watermark_path,
+        )
+    ]
+
+
+def notes_page(
+    *,
+    rail_tone: RailTone = "grey",
+    show_page_number: bool = True,
+    page_number_offset: int = 0,
+    branding: BrandingConfig | None = None,
+    theme: ReportTheme | None = None,
+    logo_path: Path | None = None,
+    body_watermark_path: Path | None = None,
+    rail_watermark_path: Path | None = None,
+) -> list[Flowable]:
+    """Build one reusable ruled notes page."""
+
+    return [
+        NotesPage(
             rail_tone=rail_tone,
             show_page_number=show_page_number,
             page_number_offset=page_number_offset,

@@ -26,6 +26,7 @@ from empire_reports.renderers.pdf import (
     QuoteTileSpec,
     appendix_divider_page,
     intentionally_blank_page,
+    notes_page,
     paragraph,
     professional_letter_disclaimer_page,
     professional_letter_title_page,
@@ -257,6 +258,36 @@ def playground_pages() -> tuple[PlaygroundPage, ...]:
                 "red rail tone",
             ),
             builder=_intentionally_blank_red_page,
+            template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="notes-page-grey",
+            title="Notes page - grey rail",
+            description=(
+                "A branded ruled page with handwriting-friendly line spacing."
+            ),
+            options=(
+                "light-grey writing guides",
+                "optional page number",
+                "grey rail tone",
+            ),
+            builder=_notes_grey_page,
+            template_key="letter_title",
+            annotate=False,
+        ),
+        PlaygroundPage(
+            key="notes-page-red",
+            title="Notes page - red rail",
+            description=(
+                "The same handwriting page using the primary Empire rail."
+            ),
+            options=(
+                "light-grey writing guides",
+                "optional page number",
+                "red rail tone",
+            ),
+            builder=_notes_red_page,
             template_key="letter_title",
             annotate=False,
         ),
@@ -596,6 +627,32 @@ def _intentionally_blank_red_page(
 ) -> Sequence[object]:
     _ = report_date
     return intentionally_blank_page(
+        rail_tone="red",
+        page_number_offset=1,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+
+def _notes_grey_page(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    _ = report_date
+    return notes_page(
+        rail_tone="grey",
+        page_number_offset=1,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+
+def _notes_red_page(
+    renderer: PdfRenderer,
+    report_date: date,
+) -> Sequence[object]:
+    _ = report_date
+    return notes_page(
         rail_tone="red",
         page_number_offset=1,
         branding=renderer.branding,

@@ -11,11 +11,13 @@ from empire_reports.renderers.pdf.components import _quote_tile_palette
 from empire_reports.renderers.pdf import (
     HeaderFooterSpec,
     IntentionallyBlankPage,
+    NotesPage,
     PdfRenderer,
     QuoteTileSpec,
     SectionDividerPage,
     appendix_divider_page,
     intentionally_blank_page,
+    notes_page,
     paragraph,
     professional_letter_disclaimer_page,
     professional_letter_title_page,
@@ -230,6 +232,36 @@ def test_intentionally_blank_page_renders_both_rail_tones(tmp_path: Path) -> Non
     )
 
     assert isinstance(grey_page[0], IntentionallyBlankPage)
+    assert grey_page[0].rail_tone == "grey"
+
+    result = renderer.render([*grey_page, PageBreak(), *red_page])
+
+    artifact = result.primary_artifact
+    assert artifact.exists
+    assert artifact.resolved_path().stat().st_size > 20_000
+
+
+def test_notes_page_renders_both_rail_tones(tmp_path: Path) -> None:
+    renderer = PdfRenderer(
+        metadata=ReportMetadata(
+            report_id="notes-page",
+            title="Notes Page",
+        ),
+        context=RenderContext(output_dir=tmp_path),
+    )
+    grey_page = notes_page(
+        rail_tone="grey",
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+    red_page = notes_page(
+        rail_tone="red",
+        show_page_number=False,
+        branding=renderer.branding,
+        theme=renderer.theme,
+    )
+
+    assert isinstance(grey_page[0], NotesPage)
     assert grey_page[0].rail_tone == "grey"
 
     result = renderer.render([*grey_page, PageBreak(), *red_page])
