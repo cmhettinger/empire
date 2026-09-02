@@ -255,8 +255,8 @@ wakes by deleting publication rows or advisory locks.
 A11.8 selects event-driven source completion as the production cadence; the
 coordinator still has `schedule=None`. It remains paused until P13.14 records a
 go decision after the staged backfill and bounded live-daily gates. EODData
-keeps its reviewed schedule, and Yahoo remains manual-only and paused between
-operator runs.
+and Yahoo are currently manual-only for local development. P13.4-P13.5 will
+restore reviewed source schedules only through a validated production profile.
 
 Inspect Airflow before activation, resume, or incident recovery:
 

@@ -13,10 +13,11 @@ paused until P13.14 records a go decision after the staged backfill and bounded
 live-daily gates. This preserves the release contract that a successful
 fixture vertical is necessary evidence, not production authorization.
 
-The source cadences do not change:
+The production cadence decision does not change, but the shared DAGs remain in
+their local-development state until P13.4-P13.5 add deployment-aware profiles:
 
-- `stonks_ohlcv_eoddata_daily_scrape` remains scheduled and unpaused at its
-  reviewed weekday cadence.
+- `stonks_ohlcv_eoddata_daily_scrape` uses `schedule=None` locally; its reviewed
+  weekday cadence is reserved for the future production profile.
 - `stonks_ohlcv_yahoo_daily_scrape` remains `schedule=None`, manual-only, and
   paused between operator runs under the V10.10 source decision.
 - The technical coordinator remains `schedule=None` and paused until P13.14.
@@ -46,7 +47,9 @@ the frozen release gates, including at least three consecutive ready effective
 dates and one unchanged rerun within the daily targets. Before activation:
 
 1. Confirm zero Airflow import errors and the expected three DAG definitions.
-2. Confirm EODData is unpaused, Yahoo is paused, and the coordinator is paused.
+2. Confirm the source DAGs match the reviewed production profile, Yahoo and the
+   coordinator have their intended pause states, and local source DAGs remain
+   manual.
 3. Inspect coordinator DAG runs and account for every queued or running wake.
 4. Confirm the reviewed calculation version, source universes, database
    readiness, report storage, performance, risks, and recovery decision.

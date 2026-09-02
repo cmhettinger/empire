@@ -52,10 +52,10 @@ def _effective_date_from_context(context: dict[str, object]) -> date:
 @dag(
     dag_id=DAG_ID,
     start_date=datetime(2026, 7, 17, tzinfo=MARKET_TIMEZONE),
-    schedule="15 20,23 * * 1-5",
+    schedule=None,
     catchup=False,
     max_active_runs=1,
-    tags=["stonks", "ohlcv", "eoddata", "scheduled"],
+    tags=["stonks", "ohlcv", "eoddata", "manual"],
 )
 def stonks_ohlcv_eoddata_daily_scrape():
     @task(task_id="run_eoddata_daily")
@@ -143,11 +143,7 @@ stonks_ohlcv_eoddata_daily_scrape_dag = (
     stonks_ohlcv_eoddata_daily_scrape()
 )
 
-# V10.8 rollout decision: run at 20:15 and 23:15 ET each weekday. The first
-# run follows the reviewed 20:00 eligibility cutoff; the second provides a
-# same-date retry and recent-session reconciliation opportunity. The bounded
-# 2026-07-31 run completed all three markets but needed 13 recovered retries,
-# so this two-run cadence limits provider pressure. Pause this DAG and restore
-# schedule=None if scheduled runs repeatedly show similar retry pressure or
-# provider failures. The package planner keeps holidays and completed work as
-# no-ops.
+# Local development remains manual until P13.4-P13.5 add deployment-aware
+# scheduling profiles. Production may restore the reviewed V10.8 cadence of
+# 20:15 and 23:15 ET each weekday only through that validated profile work.
+# The package planner continues to own eligibility and completed-work no-ops.

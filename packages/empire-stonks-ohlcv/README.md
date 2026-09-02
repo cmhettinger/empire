@@ -165,15 +165,14 @@ Two thin DAGs are implemented and discovered by the Airflow runtime. Both use
 
 | DAG ID | Delegated runner | Automatic scheduling state |
 |---|---|---|
-| `stonks_ohlcv_eoddata_daily_scrape` | `run_eoddata_daily()` | Enabled at 20:15 and 23:15 ET each weekday after the bounded V10.8 rollout. |
+| `stonks_ohlcv_eoddata_daily_scrape` | `run_eoddata_daily()` | Manual-only pending the P13.4-P13.5 deployment-aware scheduling profiles. |
 | `stonks_ohlcv_yahoo_daily_scrape` | `run_yahoo_daily()` | Manual-only and paused by the explicit V10.10 rollout decision. |
 
 Both DAGs dispatch a qualifying completion signal to the unscheduled
 technical-indicator coordinator. This downstream wiring does not change either
 source cadence. A11.8 selects event-driven operation for that coordinator but
-keeps it paused until the technical-indicator P13.14 rollout gate; EODData
-remains scheduled, while Yahoo remains manual-only and paused between operator
-runs.
+keeps it paused until the technical-indicator P13.14 rollout gate. EODData and
+Yahoo are currently manual-only on the development laptop.
 
 The Stooq historical workflow has no DAG. It remains a manual CLI-only import
 because Empire neither downloads the archive nor automates provider CAPTCHA,
@@ -928,11 +927,11 @@ a distinct trigger-run ID so a later EODData reconciliation or Yahoo/SPX rerun
 can recheck readiness; unchanged technical inputs converge through the
 downstream package's locked `NO_OP` path.
 
-## EODData scheduled DAG
+## EODData manual DAG
 
-Airflow DAG `stonks_ohlcv_eoddata_daily_scrape` runs at 20:15 and 23:15 ET on
-weekdays (`15 20,23 * * 1-5` in `America/New_York`). It disables catchup and
-permits one active run so EODData acquisitions cannot overlap. The task reads
+Airflow DAG `stonks_ohlcv_eoddata_daily_scrape` is currently manual-only with
+`schedule=None`. It disables catchup and permits one active run so EODData
+acquisitions cannot overlap. The task reads
 runtime settings from the
 Compose-provided process environment and delegates the complete workflow to
 `run_eoddata_daily()`. The package planner selects due exchanges; an
@@ -947,15 +946,11 @@ uses the New York date at `data_interval_end`. The task returns only the
 runner's compact secret-safe summary; detailed diagnostics remain in the stored
 report.
 
-V10.8 enabled the reduced two-run cadence after a bounded 2026-07-31 import
-completed all three markets with no failures, valid lineage and reports, and
-12,617 inserted bars. That run needed 13 recovered retries, so the earlier
-four-run proposal was deliberately reduced to limit provider pressure. The
-first run follows the reviewed 20:00 eligibility cutoff; the second provides a
-same-date retry and recent-session reconciliation opportunity. Holidays and
-completed exchanges remain package-planner no-ops. Pause the DAG and restore
-`schedule=None` if scheduled runs repeatedly show similar retry pressure or
-provider failures.
+V10.8 selected a reduced production cadence of 20:15 and 23:15 ET after a
+bounded 2026-07-31 import. Local development has been returned to manual
+operation until P13.4-P13.5 implement and validate deployment-aware scheduling
+profiles. The future production profile may restore that reviewed cadence;
+the local profile must retain `schedule=None`.
 
 ## Development
 
@@ -974,9 +969,9 @@ when changing those integration surfaces.
 
 The provider-native package paths are implemented for EODData daily, Yahoo
 historical/daily/reconciliation, and operator-supplied historical Stooq data.
-The EODData DAG is enabled at its bounded weekday cadence. The Yahoo DAG stays
-manual-only and paused by the explicit V10.10 decision; Stooq daily acquisition
-remains deferred pending proof of a stable, authorized non-browser
+The EODData and Yahoo DAGs are manual-only for local development. Yahoo remains
+paused between operator runs under the explicit V10.10 decision; Stooq daily
+acquisition remains deferred pending proof of a stable, authorized non-browser
 machine-download path.
 
 The following work is intentionally not implied by package completion:

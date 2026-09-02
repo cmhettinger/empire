@@ -184,21 +184,17 @@ retries, and updated current rows attributable to recent-session
 reconciliation. Missing-session ingestion updates are not mislabeled as
 reconciliation corrections.
 
-The Airflow DAG uses `15 20,23 * * 1-5` in `America/New_York`, with catchup
-disabled and at most one active DAG run. Manual runs and reruns may provide
-`dag_run.conf.effective_date` as an explicit `YYYY-MM-DD` override; if omitted,
-the DAG derives the New York date from `data_interval_end`. It invokes the
-package planner on every run, so an ineligible or already-complete date still
-finishes through the normal no-op Core and report lifecycle.
+The Airflow DAG currently uses `schedule=None` for local development, with
+catchup disabled and at most one active DAG run. Manual runs and reruns may
+provide `dag_run.conf.effective_date` as an explicit `YYYY-MM-DD` override; if
+omitted, the DAG derives the New York date from `data_interval_end`. It invokes
+the package planner on every run, so an ineligible or already-complete date
+still finishes through the normal no-op Core and report lifecycle.
 
-V10.8 enabled weekday runs at 20:15 and 23:15 ET after a bounded 2026-07-31
-import completed all three markets with no failures and valid lineage, bars,
-and reports. The run needed 13 recovered retries, so the earlier four-run
-proposal was reduced to limit provider pressure. The first invocation follows
-the 20:00 eligibility cutoff; the second retries same-date missing work and
-reconciles recent sessions. Exchange holidays and completed work are
-planner-owned no-ops rather than DAG logic. Repeated similar retry pressure or
-provider failures require pausing the DAG and restoring `schedule=None`.
+V10.8 selected weekday production runs at 20:15 and 23:15 ET after a bounded
+2026-07-31 import completed all three markets with no failures and valid
+lineage, bars, and reports. P13.4-P13.5 will restore that cadence only through a
+validated production profile while keeping local development manual.
 
 ## Ordered Requests
 
