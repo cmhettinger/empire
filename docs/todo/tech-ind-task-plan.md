@@ -163,7 +163,7 @@ checkpoint or resume path, stop criteria, and post-run coverage audit.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| P13.1 | [ ] | Size and procure the HPE host | Convert the V12.8 CPU, memory, storage-growth, database, container, and network assumptions into a reviewed HPE server configuration; record the selected hardware, expansion headroom, warranty/support, expected delivery, and purchase decision. | V12.8 |
+| P13.1 | [ ] | Size and procure the compact production host | Convert the V12.8 CPU, memory, storage-growth, database, container, and network assumptions into a reviewed new compact host configuration; evaluate a dedicated 64 GB RAM / 2 TB local SSD Empire host with a separate AI host deferred, prioritizing the lowest practical complete price. Require Ubuntu Server LTS for non-macOS devices; retain the earlier combined-host AI quotes as comparisons. Record the selected hardware, expansion headroom, warranty/support, expected delivery, and purchase decision. HPE is optional. | V12.8 |
 | P13.2 | [ ] | Establish the host baseline | Install and patch the reviewed server OS, firmware, Docker/Compose runtime, time synchronization, administrative access, firewall, power/restart behavior, and monitoring prerequisites; record versions and the recovery path. | P13.1 |
 | P13.3 | [ ] | Connect production networking and NAS storage | Assign the stable host identity and network configuration, create the production NAS shares and Empire storage layout, mount them with least-privilege ownership, and prove boot-time mount, reconnect, throughput, free-space, and failure behavior. Do not initialize Empire storage roots until the expected mounts are present. | P13.2 |
 | P13.4 | [ ] | Design deployment-aware Airflow cadence | Evaluate one shared DAG definition with a small validated deployment profile and environment-supplied schedules against separate local/prod DAG files. Prefer shared task logic and one DAG ID per workflow: local resolves EODData and Yahoo to `schedule=None`, production resolves explicit reviewed schedules, and the technical coordinator stays event-driven with `schedule=None`. Define parse-time validation, timezone/DST behavior, tags and observability, pause/rollback, configuration ownership, and safe behavior for missing or invalid settings. Duplicate DAG files are allowed only if Airflow import/serialization evidence shows the shared design is unsafe or materially harder to operate. | V12.8, A11.8 |
@@ -177,6 +177,35 @@ checkpoint or resume path, stop criteria, and post-run coverage audit.
 | P13.12 | [ ] | Start the first Monday automated daily cycle | Enable the reviewed production EODData and Yahoo schedules while leaving local development manual. Release the technical coordinator only under the reviewed readiness and backlog procedure, then record same-date source completion, automatic dispatch, technical freshness, resource use, and recovery evidence. | P13.11 |
 | P13.13 | [ ] | Observe bounded production operation | Verify at least three consecutive ready effective dates and one unchanged rerun within release targets; audit scheduled-run timing, queued wakes, warnings, source and benchmark coverage, provider request pressure, resource use, reports, backups, and stop conditions before normal activation. | P13.12 |
 | P13.14 | [ ] | Close the production rollout gate | Record the deployed commit, local and production cadence profiles, calculation version, supported universes, coverage, production performance, provider-access evidence, risks, recovery, and explicit go/no-go. On a go decision, leave the reviewed production source schedules and technical coordinator enabled while retaining `schedule=None` for the corresponding local-development source DAGs. | P13.13 |
+
+P13.1 scope clarification (2026-09-02): the owner requires new hardware only;
+the HP Elite Mini example establishes the compact form factor, not an HPE
+vendor requirement. See the
+[host sizing and procurement review](../stonks/tech-indicators-production-host-p13.1.md).
+The latest same-date direction considers a dedicated 64 GB / 2 TB Empire
+production host and a separate AI host later. Every non-macOS device must run
+Ubuntu Server LTS. The review retains the earlier 128 GB combined-host quotes
+and budget as comparison evidence; BOSGAME is no longer the recommendation.
+The production budget releases its model-storage allowance to Empire headroom.
+Exact-machine Ubuntu support and a fresh complete 64 GB / 2 TB quote remain
+purchase checks. This changes procurement planning, not deployment or routing.
+The owner subsequently prioritized stronger CPU responsiveness, quiet cooling,
+and 12–24 months of planning headroom at 64 GB / 2 TB. The review now includes
+a complete new Framework Desktop Max+ 395 / Noctua quote ($2,528; $2,817 with
+three-year warranty), measured noise comparisons, and explicit Mac CPU and
+Ubuntu Server LTS limitations. Its 4.5 L enclosure is larger than the HP Elite
+Mini reference, so size acceptance remains pending. No purchase is approved.
+The original HP i7-14700 / 64 GB / 2 TB Amazon configuration was then rechecked
+at $2,099 assembled (seller Poly Molly). It leads on value and size; Framework
+offers more measured parallel throughput, with similar single-core results in
+separate reviews. Seller warranty and actual Ubuntu/Empire acceptance remain
+unresolved; the comparison is not a production performance result.
+
+Blocked: 2026-09-02 P13.1 has a whole-host capacity budget, dated complete-price
+comparisons, expansion/support tradeoffs, and delivery-policy evidence in
+`docs/stonks/tech-indicators-production-host-p13.1.md`. Final hardware selection,
+accepted delivered quote/support terms, purchase decision, and order delivery
+estimate remain pending. No order was placed; the task stays unchecked.
 
 ---
 
