@@ -1,24 +1,27 @@
 # Production Host Sizing And Procurement Review (P13.1)
 
-Date: 2026-09-02. Status: sizing proposal prepared; procurement blocked pending
-owner selection and a confirmed delivered quote. No order has been placed.
+Date: 2026-09-04. Status: complete; the owner selected and ordered the in-place
+`hub-1` upgrade, with delivery expected 2026-09-05. Installation and acceptance
+remain P13.2-P13.7 work.
 
-The owner requires **new hardware**, a compact mini-PC form factor, and the
-lowest practical complete purchase price. HPE is optional. The latest
-2026-09-02 direction is to consider a **64 GB Empire production host with a
-2 TB local SSD**, then add a separate AI host later. All non-macOS devices
-must run **Ubuntu Server LTS**. The earlier 128 GB combined-host quotes remain
-as comparison evidence, not the current purchase recommendation. Final hardware
-selection is pending; 128 GB is not a universal Ollama minimum.
+The owner requires **new purchased components**, a compact mini-PC form factor,
+and the lowest practical complete purchase price; reusing the already-owned
+`hub-1` is now allowed. HPE is optional. The current direction is a **64 GB
+Empire production host with at least 2 TB of added local SSD capacity**, then a
+separate AI host later. All non-macOS devices must run **Ubuntu Server LTS**.
+The earlier complete-host and 128 GB combined-host quotes remain comparison
+evidence. The selected production host is `hub-1`; 128 GB is not a universal
+Ollama minimum.
 These instructions supersede the vendor wording in the historical development
 evidence, without changing its gates.
 
-## Recommendation For Review
+## Selected Direction And Rationale
 
-Propose separating production from inference. The latest owner request keeps
-64 GB RAM and 2 TB NVMe but raises the CPU target: quiet operation and responsive
-service with room for the next 12–24 months take priority over the lowest CPU
-price. The earlier eight-core Ryzen 7 255 is no longer the preferred CPU tier.
+Production remains separate from inference. The owner selected 64 GB RAM and
+2 TB added NVMe capacity. The earlier request prioritized a faster CPU, but the
+2026-09-04 cost-containment decision accepts the existing processor
+for up to one year only if measured production results pass unchanged gates.
+The earlier eight-core Ryzen 7 255 is no longer the preferred new-host CPU tier.
 Compare measured single-thread and sustained concurrent performance, with
 replaceable storage and preferably at least 2.5 GbE. Use Ubuntu Server LTS with
 native Docker Engine and Compose. A dedicated GPU is unnecessary for Empire's
@@ -32,13 +35,14 @@ existing deterministic ingestion/technical pipeline. Routing is not implemented
 by P13.1. Two hosts add power use and maintenance, so no lower lifetime cost is
 claimed before the second machine is selected.
 
-The original $764.99–$1,159 options remain Empire-only price references, but
+The 2026-09-04 selected cost-containment option reuses `hub-1` for one year,
+subject to confirming its free second M.2 slot and passing the existing
+production gates after the ordered 64 GB / 2 TB upgrade. The original
+$764.99–$1,159 options remain Empire-only price references, but
 their 512 GB/1 TB storage needs a fresh 2 TB complete quote. The HP example
 already lists 64 GB/2 TB, subject to its unresolved seller/support terms.
-The original HP Elite Mini is the leading value candidate for the stated
-compact, assembled Empire-only role. Framework is the higher-throughput
-alternative, conditional on accepting its larger enclosure and proving Ubuntu
-Server LTS. Neither is an owner-approved purchase or a claim of M4 Pro CPU parity.
+The replacement HP and Framework remain comparison evidence rather than the
+selected path. No alternative-host comparison is a claim of M4 Pro CPU parity.
 The owner subsequently confirmed 64 GB is sufficient and emphasized avoiding
 a CPU responsiveness downgrade from the development Mac. The Ryzen 7 255 is
 a budget capacity candidate, not a demonstrated performance match; see the
@@ -47,8 +51,128 @@ The owner raised support/reliability concerns about BOSGAME; its lower price
 alone establishes neither poor reliability nor equivalence to other vendors.
 BOSGAME M5 AI and GMKtec M5 Ultra are different machines despite similar names.
 
-These are candidate configurations, not a claim that any untested host passes
-Empire's production performance gates or is the cheapest offer anywhere.
+The unselected complete-host configurations are comparison candidates, not a
+claim that any untested host passes Empire's production performance gates or
+is the cheapest offer anywhere.
+
+### Reuse Candidate: Upgrade `hub-1`
+
+The live host inventory confirms an HP Elite Mini 805 G8 Desktop PC (`SBKPF`)
+running Ubuntu 26.04 LTS and kernel 7.0.0-27 with a Ryzen 5 PRO 5650G, 16 GB
+RAM, and a 512 GB-class SSD. [HP's G8 specifications](https://support.hp.com/gb-en/document/ish_4597643-4597687-16)
+list two user-accessible DDR4-3200 SODIMM slots, a supported maximum of 64 GB
+as 2 × 32 GB, and M.2 2280 PCIe NVMe storage through 2 TB. The platform has two
+M.2 2280 storage sockets. Confirm the second socket is present, empty, and has
+its retaining screw before opening the ordered SSD package or beginning the
+installation.
+
+The current RAM is one Timetec `TIMETEC-SD4-2666` 16 GB module configured at
+2,667 MT/s in channel A; channel B is empty. The proposed matched kit replaces
+that module, raises capacity to 64 GB, and enables dual-channel DDR4-3200.
+Ubuntu currently exposes 14.43 GiB of the nominal 16 GB, so acceptance must
+measure OS-visible memory and reduce the 64 GiB planning allocations if the
+same firmware/iGPU reservation remains after the upgrade.
+
+The current `SAMSUNG MZAL8512HFLU-00BL2` boot SSD reports 37 °C, zero critical
+warnings, zero media/data-integrity errors, 100% available spare, and 0% used
+endurance. It has 433 GiB free. Retaining it as the boot/runtime drive is
+reasonable. Only one NVMe namespace is visible to Ubuntu, consistent with an
+unused second socket but not proof that its retaining hardware is installed.
+BIOS T26 02.17.00 dated 2025-07-08 matches HP's published minimum remediation
+version for this model; recheck the current HP catalog during the P13.2 baseline.
+
+The proposed new parts were rechecked on Amazon on 2026-09-04:
+
+| Part | Fit and role | Observed price |
+|---|---|---:|
+| [Crucial CT2K32G4SFD832A](https://www.amazon.com/dp/B07ZLCVKPV?th=1), 64 GB kit (2 × 32 GB) | DDR4-3200, CL22, 1.2 V, non-ECC, unbuffered, 260-pin SODIMM; replaces the installed RAM | $468.00 |
+| [WD_BLACK SN7100 WDS200T4X0E](https://www.amazon.com/dp/B0DN6ZQ3PD?th=1), 2 TB | Bare M.2 2280 PCIe 4.0 NVMe TLC SSD; install in the free storage socket | $309.99 |
+| **Parts subtotal before tax** | Existing 512 GB boot SSD retained; about 2.5 TB raw local storage total | **$777.99** |
+
+The RAM specifications match HP's supported 64 GB configuration. Amazon showed
+the new kit sold and shipped by Memorybank; at $468 it is compatible but poor
+value and should be re-quoted against a reputable matched 2 × 32 GB JEDEC kit.
+Do not mix it with the current modules. The SSD offer was shipped by Amazon and
+sold by DealX. [Sandisk specifies](https://support-eu.sandisk.com/app/answers/detailweb/a_id/30797/~/wd-internal-ssd-endurance-and-warranty-periods)
+1,200 TBW or five years, whichever comes first. The drive will negotiate to the
+system's supported speed: [AMD specifies PCIe 3.0 for the 5650G](https://www.amd.com/en/support/downloads/drivers.html/processors/ryzen-pro/ryzen-pro-5000-series/amd-ryzen-5-pro-5650g.html),
+so its advertised PCIe 4.0 maximum is unused capacity, not an incompatibility.
+Its endurance, TLC flash, and lack of a bulky heatsink suit a database-data
+drive; still compare its price with other reputable 2 TB TLC NVMe drives.
+
+Current new-memory vendor comparison, rechecked 2026-09-04:
+
+| Vendor / exact part | Seller and support evidence | Price before tax |
+|---|---|---:|
+| [Timetec 64 GB dual-rank kit](https://www.amazon.com/dp/B08KRXFM4R), 2 × 32 GB DDR4-3200 CL22 2Rx8 | Amazon offer labeled Timetec International Inc; page advertises lifetime warranty and U.S. technical support | **$400.99** |
+| [Crucial CT2K32G4SFD832A at Provantage](https://www.provantage.com/crucial-technology-ct2k32g4sfd832a~7CIAL7WV.htm) | Factory new; Provantage states it is an authorized Crucial dealer and lists a lifetime limited warranty | **$477.63** |
+| [OWC 3S2D42R8064P direct](https://eshop.macsales.com/item/OWC/3S2D42R8064P/) | Direct seller; lifetime limited warranty, advanced replacement, and 30-day money-back policy | **$479.50 shown as business price** |
+| [Crucial CT2K32G4SFD832A at B&H](https://www.bhphotovideo.com/c/product/1600343-REG/crucial_ct2k32g4sfd832a_2_32gb_ddr4_3200_sodimm_1_2v.html) | Authorized dealer; exact matched kit | **$549.00** |
+
+All four have the required 2 × 32 GB, DDR4-3200, 260-pin, 1.2 V, non-ECC,
+unbuffered SODIMM characteristics. The Timetec kit is the recommended current
+value option: it is $67.01 below the linked Crucial Amazon offer, uses the same
+brand already operating in `hub-1`, and is sold under the brand-named Amazon
+seller with an advertised lifetime warranty. It makes the recommended RAM plus
+SN7100 subtotal **$710.98** before tax, saving **$1,388.02** versus the $2,099
+replacement HP. Confirm seller, new condition, warranty, stock, and checkout
+price immediately before purchase. Avoid marketplace offers that do not name
+the manufacturer part, module count, voltage, ECC status, and return coverage.
+
+Rush-delivery Amazon comparison, rechecked 2026-09-04 for the page's default
+Ashburn 20147 destination (Prime delivery shown for 2026-09-05):
+
+| Exact offer | Compatibility and channel | Price before tax | Decision |
+|---|---|---:|---|
+| [PNY MN64GK2D43200-TB](https://www.amazon.com/dp/B0CFYT36QM/), 64 GB (2 × 32 GB) DDR4-3200 CL22 | 260-pin, 1.2 V, non-ECC SODIMM; shipped and sold by Amazon.com | **$411.99** | **Preferred rush option** |
+| [Gigastone B09478SXD7](https://www.amazon.com/dp/B09478SXD7/), 64 GB (2 × 32 GB) DDR4-3200 CL22 | 260-pin, 1.2 V, non-ECC unbuffered SODIMM; shipped by Amazon and sold by Gigastone America | **$448.99** | Compatible, but costs more than PNY and the listing showed only seven ratings |
+| [Timetec B09BH51XX2](https://www.amazon.com/dp/B09BH51XX2/), 64 GB (2 × 32 GB) DDR4-3200 CL22 2Rx8 | Listing explicitly specifies ECC; HP documents non-ECC memory for this system | **$429.99** | Reject for this host |
+| [Crucial CP2K32G4DFRA32A](https://www.amazon.com/dp/B0C29W4G29/), 64 GB (2 × 32 GB) DDR4-3200 | 288-pin desktop UDIMM, sold by marketplace seller STOCKYFY | **$554.00** | Physically incompatible; reject |
+
+The PNY kit is the lowest-priced compatible next-day offer in this set and has
+the cleanest fulfillment channel. Delivery dates remain address-, account-, and
+checkout-dependent; verify the destination-specific promise before submitting
+the order.
+
+### Selected And Ordered Upgrade
+
+On 2026-09-04 the owner ordered these new components for `hub-1`, with the
+Amazon order showing arrival on 2026-09-05:
+
+| Ordered component | Accepted role and support terms | Planning price before tax |
+|---|---|---:|
+| [PNY MN64GK2D43200-TB](https://www.amazon.com/dp/B0CFYT36QM), 64 GB (2 × 32 GB) DDR4-3200 CL22 notebook kit | Replace the installed 16 GB module; PNY publishes a limited lifetime original-purchaser memory warranty, subject to its authorized-channel terms | $411.99 |
+| [WD_BLACK SN7100 WDS200T4X0E](https://www.amazon.com/dp/B0DN6ZQ3PD), 2 TB M.2 2280 NVMe TLC SSD | Add as the Empire data drive; Sandisk publishes five-year/1,200-TBW coverage, whichever comes first | $309.99 |
+| **Planning subtotal** | Actual charged total and tax remain in the private order record | **$721.98** |
+
+The purchase accepts consumer return/mail-in support rather than an onsite
+server SLA. Retain the order invoice and serial-number records for warranty
+claims. P13.2 must inspect the empty M.2 position and retaining hardware before
+opening the SSD packaging, then install and test both parts while the retailer
+return window is available. After installation, both SODIMM slots will contain
+the matched PNY kit and the platform will be at HP's documented 64 GB maximum.
+Both M.2 positions will be occupied by the retained 512 GB boot drive and the
+new 2 TB data drive; future local expansion therefore requires drive
+replacement or external/NAS storage.
+
+The selected $721.98 planning subtotal saves $1,377.02 before tax versus the
+$2,099 assembled HP replacement and
+keeps a known Ubuntu host. Six Zen 3 cores / twelve threads are enough to test
+the present concurrency-two Empire deployment, but this does not meet the
+owner's earlier desire for development-Mac-like CPU responsiveness. Empire's
+technical writer is globally serialized, and the measured V12.6 pilot spent
+most of its time in calculation and validation. The reuse decision therefore
+depends on the exact P13.7/P13.10 performance gates on `hub-1`; do not raise
+worker concurrency merely to use all twelve hardware threads.
+
+Retain the 512 GB SSD for Ubuntu, Docker engine data, images, and code. Mount
+the new SSD at the reviewed Empire production data root and place PostgreSQL,
+Airflow logs, report/object-store working data, and other durable application
+paths there through normal environment/Compose configuration. No Docker
+reinstall is required. Before moving data, take and verify a backup; use the
+filesystem UUID in `/etc/fstab`, require the mount before containers start,
+and rehearse reboot, missing-mount failure, and restore behavior in P13.2-P13.7.
+The NAS remains the backup/archive tier, not the live PostgreSQL volume.
 
 ### Original HP Versus Framework
 
@@ -535,13 +659,14 @@ destination and is not a promised delivery date for this purchase.
 | Decision field | Current record |
 |---|---|
 | Owner-approved constraints | New only; compact and quiet; 64 GB RAM / 2 TB SSD; stronger CPU and responsiveness with 12–24 months planning headroom; lowest practical price within those priorities; HPE optional; Ubuntu Server LTS for every non-macOS device |
-| Current proposal | Dedicated Empire host, separate AI later; HP i7-14700 / 64 GB / 2 TB at $2,099 assembled leads on value and size, pending seller support and Ubuntu Server LTS acceptance; Framework at $2,528 DIY ($2,817 with three-year warranty) offers more parallel throughput and 5 GbE in a larger case |
-| Owner-reviewed final selection | Pending; no model or bill of materials approved |
-| Warranty/support acceptance | Pending: selected vendor/service terms, RAM compatibility, SSD endurance, Ubuntu compatibility, and sustained noise/thermal behavior |
-| Delivered price | Pending destination, taxes/duties, shipping and final seller selection |
-| Purchase decision / order | Pending; no order placed |
-| Expected delivery | Unconfirmed; policy windows above are planning evidence only |
-| P13.1 completion | Blocked; leave unchecked until the reviewed purchase and delivery record is complete |
+| Selected production host | Reuse the confirmed HP Elite Mini 805 G8 `hub-1` for approximately one year; defer a separate AI host and retain the $2,099 replacement HP and $2,528 Framework only as fallbacks |
+| Owner-reviewed final selection | PNY `MN64GK2D43200-TB` 64 GB matched SODIMM kit plus WD_BLACK SN7100 `WDS200T4X0E` 2 TB NVMe SSD; retain the healthy 512 GB boot SSD |
+| Warranty/support acceptance | Consumer support accepted: PNY published limited lifetime memory coverage and Sandisk five-year/1,200-TBW SSD coverage, both subject to purchase and claim terms; no onsite SLA |
+| Ordered-price record | $721.98 planning subtotal before tax from the observed selected offers; the private order confirmation governs the actual charge |
+| Purchase decision / order | Approved and ordered by the owner on 2026-09-04 |
+| Expected delivery | Amazon order shows arrival 2026-09-05; installation and observed delivery are P13.2 evidence |
+| Expansion headroom | RAM reaches the documented 64 GB maximum; both M.2 positions will be occupied after installation; NAS/external storage or drive replacement supplies later capacity |
+| P13.1 completion | Complete; selection, purchase decision, support tradeoff, expansion limit, and expected delivery are recorded. Hardware fit, burn-in, and production readiness remain later gates |
 
 ## Verification
 
@@ -588,3 +713,33 @@ tests of the non-T i7-14700 HP and Framework. `git diff --check` and an inline
 `python3` check passed for relative links, fences, whitespace, unchecked P13.1,
 the $429/$718 differences, and the 61% multicore comparison. Hardware performance
 and Ubuntu Server LTS remain untested; no runtime changes were made.
+
+Existing-host revision (2026-09-04): reviewed the related Codex hardware record,
+HP G8 platform specification, AMD CPU interface, Sandisk endurance contract,
+and both live selected Amazon offers. `git diff --check` and an inline `python3`
+check passed for relative links, fences, whitespace, unchecked P13.1, the
+$777.99 subtotal, and the $1,321.01 replacement-price difference. Physical slot
+inspection and all production performance, storage, reboot, and restore checks
+remain unrun. No part was purchased and no runtime was changed.
+
+Live `hub-1` inventory revision (2026-09-04): confirmed the exact HP Elite Mini
+805 G8 model, Ubuntu/kernel, CPU topology, BIOS, one-module memory layout,
+single visible NVMe device, filesystem capacity, Docker baseline, and filtered
+boot-SSD health. The BIOS matches HP's published 02.17.00 security-remediation
+minimum. Documentation checks below were rerun; no firmware, storage, Docker,
+or purchase action was performed.
+
+Memory-vendor revision (2026-09-04): compared new exact-spec 64 GB kits from
+Timetec's Amazon seller, authorized Crucial resellers Provantage and B&H, and
+OWC direct. The $400.99 Timetec 2Rx8 kit is the current value recommendation;
+with the linked SSD the subtotal is $710.98. Prices exclude tax and remain
+purchase-time checks. No cart or order was created.
+
+Purchase revision (2026-09-04): recorded the owner-confirmed order for PNY
+`MN64GK2D43200-TB` 64 GB memory and WD_BLACK SN7100 `WDS200T4X0E` 2 TB NVMe,
+expected 2026-09-05, with a $721.98 observed-offer planning subtotal before
+tax. Rechecked the exact PNY product specification and published limited
+lifetime memory warranty plus the Sandisk five-year/1,200-TBW SSD terms.
+Focused Markdown assertions and `git diff --check` passed. Installation,
+hardware health, storage, reboot, restore, and production performance remain
+P13.2-P13.10 acceptance work.

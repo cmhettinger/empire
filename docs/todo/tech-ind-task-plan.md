@@ -151,32 +151,33 @@ together with their `Done:` notes.
 
 ## Phase 13: Build Out Production And Start Daily Operation
 
-Goal: provision the new home-lab production host, establish durable network and
-NAS-backed operation, add deployment-aware Airflow cadence, seed production
-history, build initial technical coverage, and start automated daily EODData,
-Yahoo, and technical-indicator workflows while local development stays manual.
+Goal: upgrade the existing `hub-1` home-lab host for production, establish
+durable local and NAS-backed operation, add deployment-aware Airflow cadence,
+seed production history, build initial technical coverage, and start automated
+daily EODData, Yahoo, and technical-indicator workflows while local development
+stays manual.
 
 Phase 13 starts only after V12.8 records a ready decision. Broad imports and
-backfills run on the new production host, not on the development laptop. Each
-long-running step must have a reviewed scope, capacity check, durable report,
-checkpoint or resume path, stop criteria, and post-run coverage audit.
+backfills run on the upgraded production host, not on the development laptop.
+Each long-running step must have a reviewed scope, capacity check, durable
+report, checkpoint or resume path, stop criteria, and post-run coverage audit.
 
 | ID | Status | Goal | Complete When | Depends On |
 |----|--------|------|---------------|------------|
-| P13.1 | [ ] | Size and procure the compact production host | Convert the V12.8 CPU, memory, storage-growth, database, container, and network assumptions into a reviewed new compact host configuration; evaluate a dedicated 64 GB RAM / 2 TB local SSD Empire host with a separate AI host deferred, prioritizing the lowest practical complete price. Require Ubuntu Server LTS for non-macOS devices; retain the earlier combined-host AI quotes as comparisons. Record the selected hardware, expansion headroom, warranty/support, expected delivery, and purchase decision. HPE is optional. | V12.8 |
-| P13.2 | [ ] | Establish the host baseline | Install and patch the reviewed server OS, firmware, Docker/Compose runtime, time synchronization, administrative access, firewall, power/restart behavior, and monitoring prerequisites; record versions and the recovery path. | P13.1 |
-| P13.3 | [ ] | Connect production networking and NAS storage | Assign the stable host identity and network configuration, create the production NAS shares and Empire storage layout, mount them with least-privilege ownership, and prove boot-time mount, reconnect, throughput, free-space, and failure behavior. Do not initialize Empire storage roots until the expected mounts are present. | P13.2 |
+| P13.1 | [x] | Size and procure the compact production host | Convert the V12.8 CPU, memory, storage-growth, database, container, and network assumptions into a reviewed in-place-upgrade or replacement configuration; evaluate a dedicated 64 GB RAM / 2 TB added local SSD Empire host with a separate AI host deferred, prioritizing the lowest practical complete price. Require Ubuntu Server LTS for non-macOS devices; retain the earlier complete-host and combined-host AI quotes as comparisons. Record the selected host and parts, expansion headroom, warranty/support tradeoff, expected delivery, and purchase decision. HPE is optional. | V12.8 |
+| P13.2 | [ ] | Install the upgrade and establish the host baseline | Back up and shut down the existing HP Elite Mini 805 G8 `hub-1`, inspect the second M.2 position and retaining hardware, install the ordered matched 64 GB PNY kit and 2 TB WD_BLACK SSD, and prove firmware detection, dual-channel memory, full memory diagnostics, NVMe health, sustained load temperatures, and stable reboot while the return window is open. Recheck and patch BIOS, Ubuntu Server LTS, Docker/Compose, time synchronization, administrative access, firewall, power/restart behavior, existing-service recovery, and monitoring prerequisites; record versions, serial-safe inventory, and the hardware rollback path. | P13.1 |
+| P13.3 | [ ] | Connect production networking, local storage, and NAS | Preserve the stable `hub-1` identity and reviewed network configuration; partition, format, and mount the new 2 TB SSD as the production data volume, then create the production NAS shares and Empire storage layout with least-privilege ownership. Prove UUID-based boot mounts, reconnect, local/NAS throughput, free space, backup placement, missing-mount failure behavior, and recovery without disrupting the retained boot disk or existing services. Do not initialize or start Empire storage roots until every expected mount is present. | P13.2 |
 | P13.4 | [ ] | Design deployment-aware Airflow cadence | Evaluate one shared DAG definition with a small validated deployment profile and environment-supplied schedules against separate local/prod DAG files. Prefer shared task logic and one DAG ID per workflow: local resolves EODData and Yahoo to `schedule=None`, production resolves explicit reviewed schedules, and the technical coordinator stays event-driven with `schedule=None`. Define parse-time validation, timezone/DST behavior, tags and observability, pause/rollback, configuration ownership, and safe behavior for missing or invalid settings. Duplicate DAG files are allowed only if Airflow import/serialization evidence shows the shared design is unsafe or materially harder to operate. | V12.8, A11.8 |
 | P13.5 | [ ] | Implement and verify scheduling profiles | Implement the selected cadence configuration without duplicating package business logic. Add committed non-secret defaults/templates and deployment wiring; update the Yahoo provider-access decision and rollout contracts for a conservative production cadence. Tests must parse the same DAG code under local and production profiles, prove local source DAGs are manual, prove production EODData and Yahoo schedules are exact, prove catchup/overlap protections and source-triggered technical dispatch remain intact, and prove rollback to manual operation requires configuration plus the documented Airflow refresh/restart rather than a code fork. | P13.4 |
-| P13.6 | [ ] | Deploy the reviewed Empire release | Clone the repository on the server, check out the exact commit reviewed after P13.5, create the uncommitted production environment and secrets from the committed template, configure the production Airflow profile, database, and NAS-backed storage roots, build the required images, run Flyway, initialize Core storage roots, and initialize Airflow using repository workflows. | V12.8, P13.3, P13.5 |
-| P13.7 | [ ] | Prove production infrastructure readiness | Run database, PgBouncer, storage, package, CLI, report, and Airflow preflights; verify expected DAGs and import health, exact production schedules, local-versus-production profile isolation, backups and restore procedure, service restart/reboot recovery, observability, and initial paused states before source loading. | P13.6 |
-| P13.8 | [ ] | Run the weekend Stooq starter import | Manually acquire and record the approved Stooq archive and provenance, run the production Stooq historical import for the reviewed U.S. stock partitions with checkpoints and stop criteria, resume safely as needed, and audit counts, coverage, warnings, performance, Core lineage, JSON/PDF reports, and absence of canonical/source crossover. | P13.7 |
-| P13.9 | [ ] | Backfill the Yahoo benchmark universe | Run the bounded seeded Yahoo index, yield, volatility, currency, commodity, and continuous-futures backfill with provider-safe pacing and resume; verify SPX identity/history, calendar coverage, native semantics, request volume, lineage, and JSON/PDF reports. | P13.7 |
-| P13.10 | [ ] | Build initial production technical coverage | After the Stooq and Yahoo source audits pass, backfill technical indicators in staged provider/market cohorts. Verify counts, warm-up/null and generated/SPX coverage, publication isolation, resume, adjustment warnings, inactive-listing handling, production performance, reports, and no OHLCV mutation. | P13.8-P13.9 |
+| P13.6 | [ ] | Deploy the reviewed Empire release | Create or update a dedicated production checkout on `hub-1`, check out the exact commit reviewed after P13.5, create the uncommitted production environment and secrets from the committed template, and configure the production Airflow profile, database, and mounted local/NAS storage roots without absorbing unrelated existing services. Build the required images, run Flyway, initialize Core storage roots, and initialize Airflow using repository workflows. | V12.8, P13.3, P13.5 |
+| P13.7 | [ ] | Prove upgraded production infrastructure readiness | Run database, PgBouncer, storage, package, CLI, report, and Airflow preflights on the upgraded `hub-1`; verify expected DAGs and import health, exact production schedules, local-versus-production profile isolation, backups and restore procedure, service restart/reboot recovery, hardware health and temperature telemetry, memory and disk headroom, observability, and initial paused states before source loading. Record the return-to-old-RAM/boot-only recovery path if the new hardware fails. | P13.6 |
+| P13.8 | [ ] | Run the weekend Stooq starter import | Manually acquire and record the approved Stooq archive and provenance, run the production Stooq historical import on upgraded `hub-1` for the reviewed U.S. stock partitions with checkpoints, resource monitoring, and stop criteria, resume safely as needed, and audit counts, coverage, warnings, performance, Core lineage, JSON/PDF reports, and absence of canonical/source crossover. | P13.7 |
+| P13.9 | [ ] | Backfill the Yahoo benchmark universe | Run the bounded seeded Yahoo index, yield, volatility, currency, commodity, and continuous-futures backfill on upgraded `hub-1` with provider-safe pacing, resource monitoring, and resume; verify SPX identity/history, calendar coverage, native semantics, request volume, lineage, and JSON/PDF reports. | P13.7 |
+| P13.10 | [ ] | Build initial production technical coverage | After the Stooq and Yahoo source audits pass, backfill technical indicators in staged provider/market cohorts on upgraded `hub-1`. Verify counts, warm-up/null and generated/SPX coverage, publication isolation, resume, adjustment warnings, inactive-listing handling, no OHLCV mutation, reports, and the frozen production performance/RSS/disk gates on the actual Ryzen 5 PRO 5650G host before increasing scope. | P13.8-P13.9 |
 | P13.11 | [ ] | Rehearse the automated production daily path | With normal automation still paused, temporarily exercise the production schedules or their exact scheduled-run semantics for bounded same-date EODData and Yahoo prerequisites followed by source-triggered technical refresh. Inspect effective-date derivation, readiness, atomic publication, idempotency, correction behavior, locking, Core lineage, reports, Airflow dispatch, and rollback; confirm the local profile remains manual. | P13.10, A11.8 |
 | P13.12 | [ ] | Start the first Monday automated daily cycle | Enable the reviewed production EODData and Yahoo schedules while leaving local development manual. Release the technical coordinator only under the reviewed readiness and backlog procedure, then record same-date source completion, automatic dispatch, technical freshness, resource use, and recovery evidence. | P13.11 |
-| P13.13 | [ ] | Observe bounded production operation | Verify at least three consecutive ready effective dates and one unchanged rerun within release targets; audit scheduled-run timing, queued wakes, warnings, source and benchmark coverage, provider request pressure, resource use, reports, backups, and stop conditions before normal activation. | P13.12 |
-| P13.14 | [ ] | Close the production rollout gate | Record the deployed commit, local and production cadence profiles, calculation version, supported universes, coverage, production performance, provider-access evidence, risks, recovery, and explicit go/no-go. On a go decision, leave the reviewed production source schedules and technical coordinator enabled while retaining `schedule=None` for the corresponding local-development source DAGs. | P13.13 |
+| P13.13 | [ ] | Observe bounded production operation | Verify at least three consecutive ready effective dates and one unchanged rerun within release targets; audit scheduled-run timing, queued wakes, warnings, source and benchmark coverage, provider request pressure, Ryzen 5 PRO 5650G CPU saturation, memory pressure, SSD/NAS growth and temperature, reports, backups, and stop conditions before normal activation. | P13.12 |
+| P13.14 | [ ] | Close the production rollout gate | Record the deployed commit, exact upgraded `hub-1` hardware and storage layout, local and production cadence profiles, calculation version, supported universes, coverage, production performance, provider-access evidence, risks, recovery, and explicit go/no-go. On a go decision, leave the reviewed production source schedules and technical coordinator enabled while retaining `schedule=None` for the corresponding local-development source DAGs. | P13.13 |
 
 P13.1 scope clarification (2026-09-02): the owner requires new hardware only;
 the HP Elite Mini example establishes the compact form factor, not an HPE
@@ -194,18 +195,33 @@ and 12–24 months of planning headroom at 64 GB / 2 TB. The review now includes
 a complete new Framework Desktop Max+ 395 / Noctua quote ($2,528; $2,817 with
 three-year warranty), measured noise comparisons, and explicit Mac CPU and
 Ubuntu Server LTS limitations. Its 4.5 L enclosure is larger than the HP Elite
-Mini reference, so size acceptance remains pending. No purchase is approved.
+Mini reference, so size acceptance remained pending at that stage. No purchase
+had been approved at that stage.
 The original HP i7-14700 / 64 GB / 2 TB Amazon configuration was then rechecked
 at $2,099 assembled (seller Poly Molly). It leads on value and size; Framework
 offers more measured parallel throughput, with similar single-core results in
 separate reviews. Seller warranty and actual Ubuntu/Empire acceptance remain
 unresolved; the comparison is not a production performance result.
 
-Blocked: 2026-09-02 P13.1 has a whole-host capacity budget, dated complete-price
-comparisons, expansion/support tradeoffs, and delivery-policy evidence in
-`docs/stonks/tech-indicators-production-host-p13.1.md`. Final hardware selection,
-accepted delivered quote/support terms, purchase decision, and order delivery
-estimate remain pending. No order was placed; the task stays unchecked.
+P13.1 selected upgrade (2026-09-04): the owner will operate the existing
+`hub-1` (HP Elite Mini 805 G8, Ryzen 5 PRO 5650G, Ubuntu Server LTS) for
+approximately one year instead of buying a replacement. Live inventory
+confirmed one 16 GB DDR4-2667 module, one visible healthy 512 GB Samsung boot
+NVMe, and BIOS 02.17.00. The owner ordered a new PNY
+`MN64GK2D43200-TB` matched 64 GB DDR4-3200 SODIMM kit and WD_BLACK SN7100
+`WDS200T4X0E` 2 TB TLC NVMe SSD, with arrival shown for 2026-09-05. The
+observed selected-offer planning subtotal is $721.98 before tax; the private
+order confirmation governs the actual charge. RAM reaches the documented
+64 GB maximum and both M.2 positions will be occupied after installation.
+Physical M.2 fit, burn-in, storage setup, and the unchanged production
+performance/recovery gates move to P13.2-P13.7.
+
+Done: 2026-09-04 — selected and purchased the in-place `hub-1` upgrade in
+`docs/stonks/tech-indicators-production-host-p13.1.md`; revised P13.2-P13.14
+for hardware installation, mounted local/NAS storage, deployment, and measured
+Ryzen 5 PRO 5650G acceptance. `git diff --check` and the focused standard-
+library Markdown/phase assertions passed; no runtime, database, CLI, report,
+or Airflow behavior changed.
 
 ---
 
